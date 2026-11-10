@@ -53,6 +53,9 @@ pub struct GpuImageCache {
     pub width: u32,
     pub height: u32,
     pub transform_hash: u64,
+    /// Unique per upload, so a processor can tell whether its cached blurs are of this
+    /// texture (see `gpu_processing::BlurCacheKey`).
+    pub generation: u64,
 }
 
 pub struct GpuProcessorState {

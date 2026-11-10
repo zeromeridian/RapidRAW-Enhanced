@@ -89,8 +89,21 @@ pub fn is_raw_file<P: AsRef<Path>>(path: P) -> bool {
         .any(|(raw_ext, _)| raw_ext.eq_ignore_ascii_case(ext))
 }
 
+/// Whether `name` is an AppleDouble file (`._photo.CR3`): macOS writes one beside each file
+/// it copies to a volume without native metadata support (exFAT, FAT, SMB). It holds
+/// metadata only and is never an image, even though it keeps the image's extension.
+fn is_apple_double_file(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with("._"))
+}
+
 pub fn is_supported_image_file<P: AsRef<Path>>(path: P) -> bool {
     let path = path.as_ref();
+
+    if is_apple_double_file(path) {
+        return false;
+    }
 
     let ext = match path.extension().and_then(|s| s.to_str()) {
         Some(e) => e,
@@ -107,4 +120,21 @@ pub fn is_supported_image_file<P: AsRef<Path>>(path: P) -> bool {
     NON_RAW_EXTENSIONS
         .iter()
         .any(|non_raw_ext| non_raw_ext.eq_ignore_ascii_case(ext))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_supported_image_file;
+
+    #[test]
+    fn apple_double_files_are_not_images() {
+        assert!(!is_supported_image_file("._260102-0143-R7-RAW.CR3"));
+        assert!(!is_supported_image_file(
+            "/Volumes/Card/DCIM/._IMG_0001.JPG"
+        ));
+        assert!(is_supported_image_file("/Volumes/Card/DCIM/IMG_0001.JPG"));
+        assert!(is_supported_image_file("260102-0143-R7-RAW.CR3"));
+        // Other names starting with a dot keep their current handling.
+        assert!(is_supported_image_file(".hidden.jpg"));
+    }
 }

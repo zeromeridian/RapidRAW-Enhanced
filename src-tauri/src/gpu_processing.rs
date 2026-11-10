@@ -541,10 +541,29 @@ struct BlurParams {
     tile_offset_y: u32,
     input_width: u32,
     input_height: u32,
+    /// The tile's output rectangle in image coordinates (end exclusive). The vertical pass
+    /// stores only these pixels, at their image position, so the blurs of every tile can
+    /// stay in the blur textures together and be reused while the input does not change.
+    output_start_x: u32,
+    output_start_y: u32,
+    output_end_x: u32,
+    output_end_y: u32,
     _pad1: u32,
     _pad2: u32,
     _pad3: u32,
 }
+
+/// What the blur textures of a [`GpuProcessor`] currently hold: the blurs of one input
+/// texture over one render region. The blurs depend on nothing else, so a render with the
+/// same key (e.g. every tick of a slider drag) reuses them instead of running the passes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct BlurCacheKey {
+    input_generation: u64,
+    bounds: (u32, u32, u32, u32),
+}
+
+/// Gives every uploaded input texture its own [`crate::app_state::GpuImageCache::generation`].
+static NEXT_INPUT_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -604,6 +623,8 @@ pub struct GpuProcessor {
     tonal_blur_view: wgpu::TextureView,
     clarity_blur_view: wgpu::TextureView,
     structure_blur_view: wgpu::TextureView,
+    /// What the four blur textures hold; `None` until a render has filled them all.
+    blur_cache: std::sync::Mutex<Option<BlurCacheKey>>,
 
     pub tile_output_texture: wgpu::Texture,
     pub tile_output_texture_view: wgpu::TextureView,
@@ -1208,6 +1229,7 @@ impl GpuProcessor {
             tonal_blur_view,
             clarity_blur_view,
             structure_blur_view,
+            blur_cache: std::sync::Mutex::new(None),
             tile_output_texture,
             tile_output_texture_view,
             working_texture,
@@ -1493,6 +1515,20 @@ impl GpuProcessor {
             RenderOutputPrecision::SixteenBit => RenderedPixels::U16(vec![0u16; output_len]),
         };
 
+        let blur_cache_key = BlurCacheKey {
+            input_generation: input.generation,
+            bounds: (bounds.x, bounds.y, bounds.width, bounds.height),
+        };
+        let blurs_are_cached = {
+            let mut blur_cache = self.blur_cache.lock().unwrap();
+            let cached = *blur_cache == Some(blur_cache_key);
+            if !cached {
+                // Cleared until every tile below has refreshed its part.
+                *blur_cache = None;
+            }
+            cached
+        };
+
         let start_tile_x = bounds.x / TILE_SIZE;
         let start_tile_y = bounds.y / TILE_SIZE;
         let end_tile_x = (bounds.x + bounds.width).div_ceil(TILE_SIZE);
@@ -1528,11 +1564,8 @@ impl GpuProcessor {
                     depth_or_array_layers: 1,
                 };
 
-                let run_blur = |base_radius: f32, output_view: &wgpu::TextureView| -> bool {
+                let run_blur = |base_radius: f32, output_view: &wgpu::TextureView| {
                     let radius = (base_radius * scale).ceil().max(1.0) as u32;
-                    if radius == 0 {
-                        return false;
-                    }
 
                     let params = BlurParams {
                         radius,
@@ -1540,6 +1573,10 @@ impl GpuProcessor {
                         tile_offset_y: input_y_start,
                         input_width,
                         input_height,
+                        output_start_x: x_start,
+                        output_start_y: y_start,
+                        output_end_x: x_end,
+                        output_end_y: y_end,
                         _pad1: 0,
                         _pad2: 0,
                         _pad3: 0,
@@ -1601,13 +1638,14 @@ impl GpuProcessor {
                     }
 
                     queue.submit(Some(blur_encoder.finish()));
-                    true
                 };
 
-                let did_create_sharpness_blur = run_blur(1.0, &self.sharpness_blur_view);
-                let did_create_tonal_blur = run_blur(3.5, &self.tonal_blur_view);
-                let did_create_clarity_blur = run_blur(8.0, &self.clarity_blur_view);
-                let did_create_structure_blur = run_blur(40.0, &self.structure_blur_view);
+                if !blurs_are_cached {
+                    run_blur(1.0, &self.sharpness_blur_view);
+                    run_blur(3.5, &self.tonal_blur_view);
+                    run_blur(8.0, &self.clarity_blur_view);
+                    run_blur(40.0, &self.structure_blur_view);
+                }
 
                 let mut main_encoder = device.create_command_encoder(&Default::default());
 
@@ -1649,35 +1687,19 @@ impl GpuProcessor {
 
                 bind_group_entries.push(wgpu::BindGroupEntry {
                     binding: 5 + MAX_MASK_BINDINGS,
-                    resource: wgpu::BindingResource::TextureView(if did_create_sharpness_blur {
-                        &self.sharpness_blur_view
-                    } else {
-                        &self.pipelines.dummy_blur_view
-                    }),
+                    resource: wgpu::BindingResource::TextureView(&self.sharpness_blur_view),
                 });
                 bind_group_entries.push(wgpu::BindGroupEntry {
                     binding: 6 + MAX_MASK_BINDINGS,
-                    resource: wgpu::BindingResource::TextureView(if did_create_tonal_blur {
-                        &self.tonal_blur_view
-                    } else {
-                        &self.pipelines.dummy_blur_view
-                    }),
+                    resource: wgpu::BindingResource::TextureView(&self.tonal_blur_view),
                 });
                 bind_group_entries.push(wgpu::BindGroupEntry {
                     binding: 7 + MAX_MASK_BINDINGS,
-                    resource: wgpu::BindingResource::TextureView(if did_create_clarity_blur {
-                        &self.clarity_blur_view
-                    } else {
-                        &self.pipelines.dummy_blur_view
-                    }),
+                    resource: wgpu::BindingResource::TextureView(&self.clarity_blur_view),
                 });
                 bind_group_entries.push(wgpu::BindGroupEntry {
                     binding: 8 + MAX_MASK_BINDINGS,
-                    resource: wgpu::BindingResource::TextureView(if did_create_structure_blur {
-                        &self.structure_blur_view
-                    } else {
-                        &self.pipelines.dummy_blur_view
-                    }),
+                    resource: wgpu::BindingResource::TextureView(&self.structure_blur_view),
                 });
 
                 bind_group_entries.push(wgpu::BindGroupEntry {
@@ -1801,6 +1823,10 @@ impl GpuProcessor {
                 }
             }
         }
+
+        // Every tile has stored its blurs, so the next render of this input and region
+        // can reuse them. A failed tile returned above and leaves the cache empty.
+        *self.blur_cache.lock().unwrap() = Some(blur_cache_key);
 
         Ok((final_pixels, out_width, out_height, bounds.x, bounds.y))
     }
@@ -1988,6 +2014,7 @@ fn process_and_get_dynamic_image_inner(
             width,
             height,
             transform_hash,
+            generation: NEXT_INPUT_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
         });
     }
 
@@ -2273,6 +2300,127 @@ mod tests {
         adjustments.mask_adjustments[0].flare_amount = 0.65;
 
         assert_eq!(flare_generation_amount(&adjustments), 0.65);
+    }
+
+    /// A compute-only context, or `None` on machines without a usable GPU adapter.
+    fn headless_gpu_context() -> Option<crate::image_processing::GpuContext> {
+        let instance = wgpu::Instance::default();
+        let adapter =
+            pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
+                .ok()?;
+        let limits = adapter.limits();
+        let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+            required_limits: limits.clone(),
+            ..Default::default()
+        }))
+        .ok()?;
+        Some(crate::image_processing::GpuContext {
+            device: std::sync::Arc::new(device),
+            queue: std::sync::Arc::new(queue),
+            limits,
+            display: Default::default(),
+            pipelines: Default::default(),
+        })
+    }
+
+    fn upload_test_image(
+        context: &crate::image_processing::GpuContext,
+        image: &image::DynamicImage,
+    ) -> crate::app_state::GpuImageCache {
+        use wgpu::util::DeviceExt;
+        let (width, height) = (image.width(), image.height());
+        let texture = context.device.create_texture_with_data(
+            &context.queue,
+            &wgpu::TextureDescriptor {
+                label: Some("Test Input Texture"),
+                size: wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba16Float,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[],
+            },
+            wgpu::util::TextureDataOrder::MipMajor,
+            bytemuck::cast_slice(&super::to_rgba_f16(image)),
+        );
+        let texture_view = texture.create_view(&Default::default());
+        crate::app_state::GpuImageCache {
+            texture,
+            texture_view,
+            width,
+            height,
+            transform_hash: 0,
+            generation: super::NEXT_INPUT_GENERATION
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+        }
+    }
+
+    #[test]
+    fn reused_blurs_render_the_same_pixels_as_fresh_ones() {
+        let Some(context) = headless_gpu_context() else {
+            eprintln!("No GPU adapter; skipping the blur cache render test.");
+            return;
+        };
+        // Wider than one 2048 px tile, so the blurs of two tiles share the blur textures.
+        let (width, height) = (2600, 1500);
+        let image =
+            image::DynamicImage::ImageRgb32F(image::ImageBuffer::from_fn(width, height, |x, y| {
+                let ripple = ((x * 7 + y * 13) % 97) as f32 / 97.0;
+                image::Rgb([x as f32 / width as f32, y as f32 / height as f32, ripple])
+            }));
+        let input = upload_test_image(&context, &image);
+        let processor =
+            super::GpuProcessor::new(context, (width + 255) & !255, (height + 255) & !255)
+                .expect("processor");
+
+        let mut adjustments = AllAdjustments::default();
+        adjustments.global.exposure = 0.3;
+        adjustments.global.shadows = 40.0;
+        adjustments.global.highlights = -30.0;
+        adjustments.global.sharpness = 60.0;
+        adjustments.global.clarity = 35.0;
+        adjustments.global.structure = 45.0;
+        adjustments.global.dehaze = 20.0;
+
+        let render = |roi: Option<super::Roi>| -> Vec<u8> {
+            let request = super::RenderRequest {
+                adjustments,
+                mask_bitmaps: &[],
+                lut: None,
+                roi,
+            };
+            match processor
+                .run(
+                    &input,
+                    request,
+                    false,
+                    false,
+                    super::RenderOutputPrecision::EightBit,
+                )
+                .expect("render")
+                .0
+            {
+                super::RenderedPixels::U8(pixels) => pixels,
+                super::RenderedPixels::U16(_) => unreachable!("8-bit render"),
+            }
+        };
+        let roi = Some(super::Roi {
+            x: 1900,
+            y: 300,
+            width: 500,
+            height: 900,
+        });
+
+        let fresh_full = render(None);
+        assert_eq!(render(None), fresh_full, "reused blurs, whole image");
+        let fresh_roi = render(roi);
+        assert_eq!(render(roi), fresh_roi, "reused blurs, region");
+        assert_eq!(render(None), fresh_full, "blurs refreshed after the region");
     }
 
     #[test]

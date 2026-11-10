@@ -1796,10 +1796,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         t_luma_nr, t_color_nr, scale, is_raw
     );
 
-    let sharpness_blurred = textureLoad(sharpness_blur_texture, id.xy, 0).rgb;
-    let tonal_blurred = textureLoad(tonal_blur_texture, id.xy, 0).rgb;
-    let clarity_blurred = textureLoad(clarity_blur_texture, id.xy, 0).rgb;
-    let structure_blurred = textureLoad(structure_blur_texture, id.xy, 0).rgb;
+    let sharpness_blurred = textureLoad(sharpness_blur_texture, absolute_coord, 0).rgb;
+    let tonal_blurred = textureLoad(tonal_blur_texture, absolute_coord, 0).rgb;
+    let clarity_blurred = textureLoad(clarity_blur_texture, absolute_coord, 0).rgb;
+    let structure_blurred = textureLoad(structure_blur_texture, absolute_coord, 0).rgb;
 
     let motion_blur_amount = adjustments.global.motion_blur_amount;
     if (motion_blur_amount > 0.0) {

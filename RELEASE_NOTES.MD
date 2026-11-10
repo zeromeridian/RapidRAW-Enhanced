@@ -5,6 +5,53 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.38.10-fix-perf — 2026-11-10
+
+### Fixes
+
+- Hidden `._` files that macOS writes beside photos on memory cards,
+  external drives and network shares no longer appear as broken photos in
+  the Library, imports or keyword searches.
+
+### Under the hood
+
+- The temporary timing logs of the measurement builds are removed.
+
+## 1.38.9-fix-perf — 2026-11-10
+
+### Performance
+
+- The preview updates faster while a slider moves: the detail blurs behind
+  sharpening, clarity, structure, dehaze and the tone controls are now
+  computed once per photo and view instead of on every slider step. The
+  image looks exactly the same.
+
+### Under the hood
+
+- This build still records timing in the log for measurement.
+
+## 1.38.8-fix-perf — 2026-11-10
+
+### Under the hood
+
+- Third measurement build: the log records the cost of each image
+  processing step while a slider moves. Previews may update slightly more
+  slowly in this build. No change to editing.
+
+## 1.38.7-fix-perf — 2026-11-10
+
+### Under the hood
+
+- Second measurement build: the log also records how long the graphics
+  card takes for each preview while a slider moves. No change to editing.
+
+## 1.38.6-fix-perf — 2026-11-10
+
+### Under the hood
+
+- Measurement build: the editor records render and preview timings in its
+  log so slider responsiveness can be profiled. No change to editing.
+
 ## 1.38.5-fix-perf — 2026-11-09
 
 ### Fixes
