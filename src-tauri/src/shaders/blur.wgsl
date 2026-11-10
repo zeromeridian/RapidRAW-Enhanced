@@ -4,6 +4,11 @@ struct BlurParams {
     tile_offset_y: u32,
     input_width: u32,
     input_height: u32,
+    // The tile's output rectangle in image coordinates (end exclusive).
+    output_start_x: u32,
+    output_start_y: u32,
+    output_end_x: u32,
+    output_end_y: u32,
     _pad1: u32,
     _pad2: u32,
     _pad3: u32,
@@ -79,5 +84,12 @@ fn vertical_blur(@builtin(global_invocation_id) id: vec3<u32>) {
     }
 
     let final_color = total_color / total_weight;
-    textureStore(output_texture, id.xy, vec4<f32>(final_color, 1.0));
+    // Stored at its image position, and only inside this tile's output rectangle, so the
+    // blurs of all tiles stay valid together (the overlap belongs to the neighbouring tile).
+    let image_coord = vec2<u32>(id.x + params.tile_offset_x, id.y + params.tile_offset_y);
+    if (image_coord.x < params.output_start_x || image_coord.x >= params.output_end_x
+        || image_coord.y < params.output_start_y || image_coord.y >= params.output_end_y) {
+        return;
+    }
+    textureStore(output_texture, image_coord, vec4<f32>(final_color, 1.0));
 }
