@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.38.5-fix-perf — 2026-11-09
+
+### Fixes
+
+- Drop-down lists are no longer cut off by the panel they are in. They open
+  below or above, wherever there is more room, and use the available
+  window height, so the mask **Blend Mode** list shows all modes without
+  scrolling in a normal-sized window.
+
 ## 1.38.4-fix-perf — 2026-11-09
 
 ### Under the hood

@@ -1,10 +1,35 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, ChevronDown } from 'lucide-react';
 import Input from './Input';
 import Text from './Text';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
 import clsx from 'clsx';
+
+/** Gap between the trigger and the list, and between the list and the window edge. */
+const MENU_GAP = 8;
+
+interface MenuPosition {
+  left: number;
+  width: number;
+  top?: number;
+  bottom?: number;
+  maxHeight: number;
+}
+
+/** Below the trigger, or above it when there is more room there, using all the room available. */
+const getMenuPosition = (trigger: DOMRect): MenuPosition => {
+  const spaceBelow = window.innerHeight - trigger.bottom - MENU_GAP * 2;
+  const spaceAbove = trigger.top - MENU_GAP * 2;
+  const placeAbove = spaceAbove > spaceBelow;
+  return {
+    left: trigger.left,
+    width: trigger.width,
+    ...(placeAbove ? { bottom: window.innerHeight - trigger.top + MENU_GAP } : { top: trigger.bottom + MENU_GAP }),
+    maxHeight: Math.max(placeAbove ? spaceAbove : spaceBelow, 0),
+  };
+};
 
 export interface OptionItem<T extends React.Key> {
   label: string;
@@ -36,6 +61,9 @@ const Dropdown = <T extends React.Key>({
 }: DropdownProps<T>) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -43,7 +71,9 @@ const Dropdown = <T extends React.Key>({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      // The list is rendered into the document body, so it is outside `dropdownRef`.
+      if (dropdownRef.current && !dropdownRef.current.contains(target) && !menuRef.current?.contains(target)) {
         setIsOpen(false);
       }
     };
@@ -58,6 +88,28 @@ const Dropdown = <T extends React.Key>({
       setSearchTerm('');
       setShowSearch(false);
     }
+  }, [isOpen]);
+
+  // The list lives outside the panels (which clip their content), so it follows the trigger
+  // through scrolling and window resizes.
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setMenuPosition(null);
+      return;
+    }
+    const update = () => {
+      if (triggerRef.current) setMenuPosition(getMenuPosition(triggerRef.current.getBoundingClientRect()));
+    };
+    const onScroll = (event: Event) => {
+      if (!menuRef.current?.contains(event.target as Node)) update();
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', onScroll, true);
+    };
   }, [isOpen]);
 
   const handleSelect = (option: OptionItem<T>) => {
@@ -106,6 +158,7 @@ const Dropdown = <T extends React.Key>({
   return (
     <div className={`relative ${className}`} ref={dropdownRef} onKeyDown={handleContainerKeyDown}>
       <button
+        ref={triggerRef}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         disabled={disabled}
@@ -129,58 +182,69 @@ const Dropdown = <T extends React.Key>({
         />
       </button>
 
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            animate={{ opacity: 1, scale: 1 }}
-            className="absolute right-0 mt-2 w-full origin-top-right z-20"
-            exit={{ opacity: 0, scale: 0.95 }}
-            initial={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.1, ease: 'easeOut' }}
-          >
-            <div
-              aria-orientation="vertical"
-              className="bg-surface/95 backdrop-blur-md rounded-lg shadow-xl p-2 max-h-80 overflow-y-auto"
-              role="listbox"
+      {createPortal(
+        <AnimatePresence>
+          {isOpen && menuPosition && (
+            <motion.div
+              ref={menuRef}
+              animate={{ opacity: 1, scale: 1 }}
+              className={clsx('fixed z-[60]', menuPosition.bottom === undefined ? 'origin-top' : 'origin-bottom')}
+              style={{
+                left: menuPosition.left,
+                width: menuPosition.width,
+                top: menuPosition.top,
+                bottom: menuPosition.bottom,
+              }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.1, ease: 'easeOut' }}
             >
-              {showSearch && (
-                <Input
-                  ref={searchInputRef}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder={searchPlaceholder}
-                  autoFocus={true}
-                  className="mb-2"
-                />
-              )}
+              <div
+                aria-orientation="vertical"
+                className="bg-surface/95 backdrop-blur-md rounded-lg shadow-xl p-2 overflow-y-auto"
+                style={{ maxHeight: menuPosition.maxHeight }}
+                role="listbox"
+              >
+                {showSearch && (
+                  <Input
+                    ref={searchInputRef}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder={searchPlaceholder}
+                    autoFocus={true}
+                    className="mb-2"
+                  />
+                )}
 
-              {filteredOptions.map((option: OptionItem<T>) => {
-                const isSelected = value === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    onClick={() => handleSelect(option)}
-                    className={clsx(
-                      'w-full text-left px-3 py-2 rounded-md flex items-center justify-between',
-                      'transition-colors duration-150 hover:bg-bg-primary',
-                      {
-                        'bg-bg-primary': isSelected,
-                      },
-                    )}
-                    role="option"
-                    aria-selected={isSelected}
-                  >
-                    <Text color={TextColors.primary} weight={isSelected ? TextWeights.semibold : TextWeights.normal}>
-                      {option.label}
-                    </Text>
-                    {isSelected && <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />}
-                  </button>
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                {filteredOptions.map((option: OptionItem<T>) => {
+                  const isSelected = value === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      onClick={() => handleSelect(option)}
+                      className={clsx(
+                        'w-full text-left px-3 py-2 rounded-md flex items-center justify-between',
+                        'transition-colors duration-150 hover:bg-bg-primary',
+                        {
+                          'bg-bg-primary': isSelected,
+                        },
+                      )}
+                      role="option"
+                      aria-selected={isSelected}
+                    >
+                      <Text color={TextColors.primary} weight={isSelected ? TextWeights.semibold : TextWeights.normal}>
+                        {option.label}
+                      </Text>
+                      {isSelected && <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />}
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </div>
   );
 };
