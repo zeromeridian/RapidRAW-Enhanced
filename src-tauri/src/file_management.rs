@@ -587,13 +587,13 @@ fn is_sidecar_of(sidecar_filename: &str, image_filename: &str) -> bool {
 #[cfg(test)]
 mod output_naming_tests {
     use super::{
-        DC_SUBJECT, LR_HIERARCHICAL_SUBJECT, apply_preset_adjustments_to_path,
-        collect_preset_batch_folder_paths, compute_thumbnail_cache_hash,
-        ensure_transfer_destination_free, extract_app_xmp_value, extract_xmp_bag,
-        extract_xmp_stack, find_all_associated_files, generate_filename_from_template,
-        import_rapidraw_sidecars_blocking, is_sidecar_of, parse_sidecar_filename,
-        parse_virtual_path, read_xmp_from_folder_blocking, sanitize_filename_suffix,
-        set_app_xmp_value, sync_metadata_from_xmp, sync_metadata_to_xmp,
+        DC_SUBJECT, LOCAL_ONLY_ADJUSTMENT_KEYS, LR_HIERARCHICAL_SUBJECT,
+        apply_preset_adjustments_to_path, collect_preset_batch_folder_paths,
+        compute_thumbnail_cache_hash, ensure_transfer_destination_free, extract_app_xmp_value,
+        extract_xmp_bag, extract_xmp_stack, find_all_associated_files,
+        generate_filename_from_template, import_rapidraw_sidecars_blocking, is_sidecar_of,
+        parse_sidecar_filename, parse_virtual_path, read_xmp_from_folder_blocking,
+        sanitize_filename_suffix, set_app_xmp_value, sync_metadata_from_xmp, sync_metadata_to_xmp,
     };
     use crate::app_settings::AppSettings;
     use crate::image_processing::ImageMetadata;
@@ -790,6 +790,8 @@ mod output_naming_tests {
                 "fogEnabled": true,
                 "fogDepthMap": "data:image/png;space=source;base64,BBBB",
                 "lensBlurDepthMap": "data:image/png;space=source;base64,CCCC",
+                "motionBlurDepthEnabled": true,
+                "motionBlurDepthMap": "data:image/png;space=source;base64,DDDD",
             }),
             ..ImageMetadata::default()
         };
@@ -799,7 +801,7 @@ mod output_naming_tests {
         let encoded = extract_app_xmp_value(&xmp, "Adjustments").unwrap();
         let portable: Value =
             serde_json::from_slice(&general_purpose::STANDARD.decode(encoded).unwrap()).unwrap();
-        for key in ["relightNormalMap", "fogDepthMap", "lensBlurDepthMap"] {
+        for key in LOCAL_ONLY_ADJUSTMENT_KEYS {
             assert!(
                 portable.get(key).is_none(),
                 "{key} must not be written to XMP"
@@ -807,6 +809,7 @@ mod output_naming_tests {
         }
         assert_eq!(portable["relightLights"], lights);
         assert_eq!(portable["fogEnabled"], true);
+        assert_eq!(portable["motionBlurDepthEnabled"], true);
 
         let mut other_device = ImageMetadata::default();
         assert!(sync_metadata_from_xmp(&image, &mut other_device, true));
@@ -815,7 +818,7 @@ mod output_naming_tests {
 
         let mut same_device = local.clone();
         sync_metadata_from_xmp(&image, &mut same_device, true);
-        for key in ["relightNormalMap", "fogDepthMap", "lensBlurDepthMap"] {
+        for key in LOCAL_ONLY_ADJUSTMENT_KEYS {
             assert_eq!(same_device.adjustments[key], local.adjustments[key]);
         }
     }
@@ -2994,6 +2997,7 @@ pub fn generate_thumbnail_data(
             .unwrap_or(false);
         let flip_vertical = meta.adjustments["flipVertical"].as_bool().unwrap_or(false);
 
+        let motion_extent = crate::motion_blur::render_extent(&processing_base, 1.0);
         let flipped_image = apply_flip(Cow::Owned(processing_base), flip_horizontal, flip_vertical);
         let rotated_image = apply_rotation(flipped_image, rotation_degrees);
 
@@ -3070,6 +3074,15 @@ pub fn generate_thumbnail_data(
                 mask_bitmaps: &mask_bitmaps,
                 lut,
                 roi: None,
+                motion_blur: crate::motion_blur::MotionBlurs::new(
+                    &meta.adjustments,
+                    (preview_w, preview_h),
+                    (
+                        unscaled_crop_offset.0 * total_scale,
+                        unscaled_crop_offset.1 * total_scale,
+                    ),
+                    motion_extent,
+                ),
             },
             "generate_thumbnail_data",
         ) {
@@ -6557,6 +6570,7 @@ const LOCAL_ONLY_ADJUSTMENT_KEYS: &[&str] = &[
     crate::relight::RELIGHT_NORMAL_MAP_KEY,
     crate::fog::FOG_DEPTH_MAP_KEY,
     crate::lens_blur::LENS_BLUR_DEPTH_MAP_KEY,
+    crate::motion_blur::MOTION_BLUR_DEPTH_MAP_KEY,
 ];
 
 fn portable_xmp_adjustments(adjustments: &Value) -> Cow<'_, Value> {

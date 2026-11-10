@@ -80,6 +80,12 @@ export enum Effect {
   GaussianBlurAmount = 'gaussianBlurAmount',
   MotionBlurAmount = 'motionBlurAmount',
   MotionBlurAngle = 'motionBlurAngle',
+  MotionBlurType = 'motionBlurType',
+  MotionBlurLayer = 'motionBlurLayer',
+  MotionBlurHighlights = 'motionBlurHighlights',
+  MotionBlurDepthEnabled = 'motionBlurDepthEnabled',
+  MotionBlurDepth = 'motionBlurDepth',
+  MotionBlurDepthMap = 'motionBlurDepthMap',
   GrainAmount = 'grainAmount',
   GrainRoughness = 'grainRoughness',
   GrainSize = 'grainSize',
@@ -329,6 +335,13 @@ export interface Adjustments {
   monochrome: boolean;
   motionBlurAmount: number;
   motionBlurAngle: number;
+  motionBlurType?: MotionBlurType;
+  motionBlurLayer?: MotionBlurLayer;
+  motionBlurHighlights?: number;
+  motionBlurDepthEnabled?: boolean;
+  motionBlurDepth?: number;
+  /** Local AI depth map for Motion Blur depth, shared by the photo and its masks. */
+  motionBlurDepthMap?: string | null;
   orientationSteps: number;
   relightAmbient: number;
   relightEnabled: boolean;
@@ -479,6 +492,11 @@ export interface MaskAdjustments {
   monochrome: boolean;
   motionBlurAmount: number;
   motionBlurAngle: number;
+  motionBlurType?: MotionBlurType;
+  motionBlurLayer?: MotionBlurLayer;
+  motionBlurHighlights?: number;
+  motionBlurDepthEnabled?: boolean;
+  motionBlurDepth?: number;
   saturation: number;
   sectionVisibility: SectionVisibility;
   shadows: number;
@@ -1118,7 +1136,18 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         CreativeAdjustment.FlareAmount,
       ],
     },
-    { label: 'modals.copyPaste.groups.motionBlur', keys: [Effect.MotionBlurAmount, Effect.MotionBlurAngle] },
+    {
+      label: 'modals.copyPaste.groups.motionBlur',
+      keys: [
+        Effect.MotionBlurAmount,
+        Effect.MotionBlurAngle,
+        Effect.MotionBlurType,
+        Effect.MotionBlurLayer,
+        Effect.MotionBlurHighlights,
+        Effect.MotionBlurDepthEnabled,
+        Effect.MotionBlurDepth,
+      ],
+    },
     {
       label: 'modals.copyPaste.groups.lut',
       keys: [Effect.LutIntensity, Effect.LutName, Effect.LutPath, Effect.LutSize, Effect.LutData],
@@ -1214,6 +1243,42 @@ export const CROP_GEOMETRY_KEYS = [
 
 export type CropGeometry = Pick<Adjustments, (typeof CROP_GEOMETRY_KEYS)[number]>;
 
+/** The AI maps behind Lens Blur, Relight and Fog. */
+export type EffectMapKey = 'lensBlurDepthMap' | 'relightNormalMap' | 'fogDepthMap' | 'motionBlurDepthMap';
+
+export type MotionBlurType = 'linear' | 'zoom' | 'spin' | 'smooth';
+export type MotionBlurLayer = 'auto' | 'subject' | 'panning' | 'uniform';
+
+/** Motion blur defaults when an edit has none; mirror `motion_blur.rs`. */
+export const DEFAULT_MOTION_BLUR_HIGHLIGHTS = 30;
+export const DEFAULT_MOTION_BLUR_DEPTH = 50;
+
+/** Values that warp the effect maps onto the image; mirrors `GEOMETRY_KEYS` in `cache_utils.rs`. */
+export const EFFECT_MAP_GEOMETRY_KEYS = [
+  'transformDistortion',
+  'transformVertical',
+  'transformHorizontal',
+  'transformRotate',
+  'transformAspect',
+  'transformScale',
+  'transformXOffset',
+  'transformYOffset',
+  'transformConstrainCrop',
+  'guidedPerspective',
+  'lensDistortionAmount',
+  'lensVignetteAmount',
+  'lensTcaAmount',
+  'lensDistortionParams',
+  'lensMaker',
+  'lensModel',
+  'lensDistortionEnabled',
+  'lensTcaEnabled',
+  'lensVignetteEnabled',
+] as const satisfies ReadonlyArray<keyof Adjustments>;
+
+/** Lens Blur's focus range when an edit has none; mirrors the fallbacks in `lens_blur.rs`. */
+export const LENS_BLUR_RANGE_DEFAULTS = { minDepth: 20, maxDepth: 100, minFade: 15, maxFade: 15 } as const;
+
 export const pickCropGeometry = (adjustments: Adjustments): CropGeometry =>
   Object.fromEntries(CROP_GEOMETRY_KEYS.map((key) => [key, structuredClone(adjustments[key])])) as CropGeometry;
 
@@ -1304,6 +1369,11 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     CreativeAdjustment.FlareAmount,
     Effect.MotionBlurAmount,
     Effect.MotionBlurAngle,
+    Effect.MotionBlurType,
+    Effect.MotionBlurLayer,
+    Effect.MotionBlurHighlights,
+    Effect.MotionBlurDepthEnabled,
+    Effect.MotionBlurDepth,
     Effect.GrainAmount,
     Effect.GrainRoughness,
     Effect.GrainSize,

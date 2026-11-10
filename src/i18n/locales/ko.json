@@ -157,6 +157,22 @@
       "motionBlur": "모션 블러",
       "motionBlurAngle": "각도",
       "motionBlurDirection": "방향 (드래그, Shift로 15° 단위)",
+      "motionBlurHighlights": "하이라이트",
+      "motionBlurType": "유형",
+      "motionBlurTypes": {
+        "linear": "선형",
+        "zoom": "줌",
+        "spin": "회전",
+        "smooth": "부드럽게"
+      },
+      "motionBlurLayer": "움직임",
+      "motionBlurLayers": {
+        "auto": "자동",
+        "panning": "패닝",
+        "subject": "움직이는 피사체",
+        "uniform": "균일"
+      },
+      "motionBlurDepth": "깊이",
       "relight": "리라이팅",
       "relightAddLight": "조명 추가",
       "relightAmbient": "주변광",

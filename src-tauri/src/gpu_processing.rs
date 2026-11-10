@@ -33,6 +33,7 @@ pub struct RenderRequest<'a> {
     pub mask_bitmaps: &'a [ImageBuffer<Luma<u8>, Vec<u8>>],
     pub lut: Option<Arc<Lut>>,
     pub roi: Option<Roi>,
+    pub motion_blur: crate::motion_blur::MotionBlurs,
 }
 
 fn flare_generation_amount(adjustments: &AllAdjustments) -> f32 {
@@ -565,6 +566,37 @@ struct BlurCacheKey {
 /// Gives every uploaded input texture its own [`crate::app_state::GpuImageCache::generation`].
 static NEXT_INPUT_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
+/// Motion blurred inputs and mask results kept per processor (an interactive and a final input).
+const MOTION_CACHE_ENTRIES: usize = 2;
+
+/// The texture the main shader reads: the uploaded input, or its motion-blurred copy.
+struct RenderInput<'a> {
+    texture_view: &'a wgpu::TextureView,
+    width: u32,
+    height: u32,
+    /// Identifies the texture's contents for the blur cache.
+    generation: u64,
+}
+
+impl<'a> RenderInput<'a> {
+    fn from_cache(cache: &'a crate::app_state::GpuImageCache) -> Self {
+        Self {
+            texture_view: &cache.texture_view,
+            width: cache.width,
+            height: cache.height,
+            generation: cache.generation,
+        }
+    }
+}
+
+/// A motion-blurred input; `mask_view` holds the masks blurred along with it, when any are.
+struct MotionBlurred {
+    _texture: wgpu::Texture,
+    view: wgpu::TextureView,
+    mask_view: Option<wgpu::TextureView>,
+    generation: u64,
+}
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct FlareParams {
@@ -595,6 +627,7 @@ pub struct GpuPipelines {
     main_bgl: wgpu::BindGroupLayout,
     main_pipeline: wgpu::ComputePipeline,
     high_precision: std::sync::OnceLock<HighPrecisionPipeline>,
+    motion_blur: std::sync::OnceLock<crate::motion_blur::MotionBlurPipelines>,
     dummy_blur_view: wgpu::TextureView,
     dummy_lut_view: wgpu::TextureView,
     dummy_lut_sampler: wgpu::Sampler,
@@ -625,6 +658,10 @@ pub struct GpuProcessor {
     structure_blur_view: wgpu::TextureView,
     /// What the four blur textures hold; `None` until a render has filled them all.
     blur_cache: std::sync::Mutex<Option<BlurCacheKey>>,
+    /// Motion-blurred inputs by `motion_blur::cache_key`, newest last.
+    motion_cache: std::sync::Mutex<Vec<(u64, Arc<MotionBlurred>)>>,
+    /// The grain level of each input texture (by generation), measured once per upload.
+    motion_grain: std::sync::Mutex<Vec<(u64, f32)>>,
 
     pub tile_output_texture: wgpu::Texture,
     pub tile_output_texture_view: wgpu::TextureView,
@@ -1024,6 +1061,7 @@ impl GpuPipelines {
             main_bgl,
             main_pipeline,
             high_precision: std::sync::OnceLock::new(),
+            motion_blur: std::sync::OnceLock::new(),
             dummy_blur_view,
             dummy_lut_view,
             dummy_lut_sampler,
@@ -1230,6 +1268,8 @@ impl GpuProcessor {
             clarity_blur_view,
             structure_blur_view,
             blur_cache: std::sync::Mutex::new(None),
+            motion_cache: std::sync::Mutex::new(Vec::new()),
+            motion_grain: std::sync::Mutex::new(Vec::new()),
             tile_output_texture,
             tile_output_texture_view,
             working_texture,
@@ -1237,6 +1277,140 @@ impl GpuProcessor {
             output_texture,
             output_texture_view,
         })
+    }
+
+    /// The mask bitmaps as one texture array (at least two layers, as the shader binds an array).
+    fn mask_texture_view(
+        &self,
+        mask_bitmaps: &[ImageBuffer<Luma<u8>, Vec<u8>>],
+        width: u32,
+        height: u32,
+    ) -> wgpu::TextureView {
+        let mask_layer_count = mask_bitmaps.len().clamp(2, MAX_MASKS) as u32;
+        let buffer_size = (width as usize) * (height as usize) * (mask_layer_count as usize);
+        let mut mask_texture_data = Vec::with_capacity(buffer_size);
+        for mask_bitmap in mask_bitmaps.iter().take(MAX_MASKS) {
+            mask_texture_data.extend_from_slice(mask_bitmap.as_raw());
+        }
+        mask_texture_data.resize(buffer_size, 0);
+        let mask_texture = self.context.device.create_texture_with_data(
+            &self.context.queue,
+            &wgpu::TextureDescriptor {
+                label: Some("Full Mask Texture Array"),
+                size: wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: mask_layer_count,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::R8Unorm,
+                // COPY_SRC: motion blur copies the masks before blurring them with the image.
+                usage: wgpu::TextureUsages::TEXTURE_BINDING
+                    | wgpu::TextureUsages::COPY_DST
+                    | wgpu::TextureUsages::COPY_SRC,
+                view_formats: &[],
+            },
+            TextureDataOrder::MipMajor,
+            &mask_texture_data,
+        );
+        mask_texture.create_view(&wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::D2Array),
+            ..Default::default()
+        })
+    }
+
+    /// Runs the request's motion blurs on `input` (cached per input, masks, depth and blur
+    /// settings), or `None` when there is nothing to blur.
+    fn motion_blurred(
+        &self,
+        input: &GpuImageCache,
+        base_image: &DynamicImage,
+        request: &RenderRequest,
+        mask_view: &wgpu::TextureView,
+    ) -> Result<Option<Arc<MotionBlurred>>, String> {
+        let motion = &request.motion_blur;
+        if motion.blurs.is_empty() {
+            return Ok(None);
+        }
+
+        let mask_key = {
+            let mut hasher = blake3::Hasher::new();
+            for mask in request.mask_bitmaps {
+                hasher.update(&mask.width().to_le_bytes());
+                hasher.update(&mask.height().to_le_bytes());
+                hasher.update(mask.as_raw());
+            }
+            u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap())
+        };
+        let key = crate::motion_blur::cache_key(
+            input.generation,
+            mask_key,
+            motion.depth.as_deref(),
+            &motion.blurs,
+        );
+        let mut cache = self.motion_cache.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some((_, blurred)) = cache.iter().find(|(k, _)| *k == key) {
+            return Ok(Some(Arc::clone(blurred)));
+        }
+
+        let is_raw = request.adjustments.global.is_raw_image;
+        let grain = {
+            let mut grains = self.motion_grain.lock().unwrap_or_else(|e| e.into_inner());
+            match grains
+                .iter()
+                .find(|(generation, _)| *generation == input.generation)
+            {
+                Some((_, grain)) => *grain,
+                None => {
+                    let grain = crate::motion_blur::estimate_grain(base_image, is_raw == 1);
+                    if grains.len() >= MOTION_CACHE_ENTRIES {
+                        grains.remove(0);
+                    }
+                    grains.push((input.generation, grain));
+                    grain
+                }
+            }
+        };
+        let device = &self.context.device;
+        let pipelines = self
+            .pipelines
+            .motion_blur
+            .get_or_init(|| crate::motion_blur::MotionBlurPipelines::new(device));
+        let depth = motion.depth.as_deref().map(|map| {
+            (
+                pipelines.upload_depth(device, &self.context.queue, map),
+                map,
+            )
+        });
+
+        let Some(output) = crate::motion_blur::render(
+            &self.context,
+            pipelines,
+            &input.texture_view,
+            (input.width, input.height),
+            is_raw,
+            grain,
+            &motion.blurs,
+            request.mask_bitmaps,
+            mask_view,
+            depth.as_ref().map(|(view, map)| (view, *map)),
+        )?
+        else {
+            return Ok(None);
+        };
+        let blurred = Arc::new(MotionBlurred {
+            _texture: output.texture,
+            view: output.view,
+            mask_view: output.mask_view,
+            generation: NEXT_INPUT_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+        });
+        if cache.len() >= MOTION_CACHE_ENTRIES {
+            cache.remove(0);
+        }
+        cache.push((key, Arc::clone(&blurred)));
+        Ok(Some(blurred))
     }
 
     fn high_precision_tile(&self) -> &HighPrecisionTile {
@@ -1263,13 +1437,14 @@ impl GpuProcessor {
 
     fn run(
         &self,
-        input: &GpuImageCache,
+        input: RenderInput,
+        mask_texture_view: &wgpu::TextureView,
         request: RenderRequest,
         skip_cpu_readback: bool,
         output_to_display: bool,
         output_precision: RenderOutputPrecision,
     ) -> Result<(RenderedPixels, u32, u32, u32, u32), String> {
-        let input_texture_view = &input.texture_view;
+        let input_texture_view = input.texture_view;
         let (width, height) = (input.width, input.height);
         let device = &self.context.device;
         let queue = &self.context.queue;
@@ -1317,44 +1492,6 @@ impl GpuProcessor {
         });
         let out_width = bounds.width;
         let out_height = bounds.height;
-        let mask_layer_count = request.mask_bitmaps.len().clamp(2, MAX_MASKS) as u32;
-        let full_texture_size = wgpu::Extent3d {
-            width,
-            height,
-            depth_or_array_layers: mask_layer_count,
-        };
-        let buffer_size = (width as usize) * (height as usize) * (mask_layer_count as usize);
-        let mut mask_texture_data = Vec::with_capacity(buffer_size);
-        if request.mask_bitmaps.is_empty() {
-            mask_texture_data.resize(buffer_size, 0);
-        } else {
-            for mask_bitmap in request.mask_bitmaps.iter().take(MAX_MASKS) {
-                mask_texture_data.extend_from_slice(mask_bitmap.as_raw());
-            }
-            if mask_texture_data.len() < buffer_size {
-                mask_texture_data.resize(buffer_size, 0);
-            }
-        }
-        let mask_texture = device.create_texture_with_data(
-            queue,
-            &wgpu::TextureDescriptor {
-                label: Some("Full Mask Texture Array"),
-                size: full_texture_size,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::R8Unorm,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                view_formats: &[],
-            },
-            TextureDataOrder::MipMajor,
-            &mask_texture_data,
-        );
-        let mask_texture_view = mask_texture.create_view(&wgpu::TextureViewDescriptor {
-            dimension: Some(wgpu::TextureViewDimension::D2Array),
-            ..Default::default()
-        });
-
         let (lut_texture_view, lut_sampler) = if let Some(lut_arc) = &request.lut {
             let lut_data = &lut_arc.data;
             let size = lut_arc.size;
@@ -1674,7 +1811,7 @@ impl GpuProcessor {
                 ];
                 bind_group_entries.push(wgpu::BindGroupEntry {
                     binding: 3,
-                    resource: wgpu::BindingResource::TextureView(&mask_texture_view),
+                    resource: wgpu::BindingResource::TextureView(mask_texture_view),
                 });
                 bind_group_entries.push(wgpu::BindGroupEntry {
                     binding: 3 + MAX_MASK_BINDINGS,
@@ -2020,10 +2157,26 @@ fn process_and_get_dynamic_image_inner(
 
     let cache = cache_lock.as_ref().unwrap();
 
+    let mask_view = processor.mask_texture_view(request.mask_bitmaps, width, height);
+    let motion = processor.motion_blurred(cache, base_image, &request, &mask_view)?;
+    let (input, mask_view) = match &motion {
+        Some(blurred) => (
+            RenderInput {
+                texture_view: &blurred.view,
+                width,
+                height,
+                generation: blurred.generation,
+            },
+            blurred.mask_view.as_ref().unwrap_or(&mask_view),
+        ),
+        None => (RenderInput::from_cache(cache), &mask_view),
+    };
+
     let skip_readback = output_to_display;
 
     let (processed_pixels, out_w, out_h, out_x, out_y) = processor.run(
-        cache,
+        input,
+        mask_view,
         request,
         skip_readback,
         output_to_display,
@@ -2387,16 +2540,19 @@ mod tests {
         adjustments.global.structure = 45.0;
         adjustments.global.dehaze = 20.0;
 
+        let mask_view = processor.mask_texture_view(&[], width, height);
         let render = |roi: Option<super::Roi>| -> Vec<u8> {
             let request = super::RenderRequest {
                 adjustments,
                 mask_bitmaps: &[],
                 lut: None,
                 roi,
+                motion_blur: Default::default(),
             };
             match processor
                 .run(
-                    &input,
+                    super::RenderInput::from_cache(&input),
+                    &mask_view,
                     request,
                     false,
                     false,

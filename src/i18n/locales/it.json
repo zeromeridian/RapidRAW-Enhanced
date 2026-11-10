@@ -157,6 +157,22 @@
       "motionBlur": "Sfocatura di movimento",
       "motionBlurAngle": "Angolo",
       "motionBlurDirection": "Direzione (trascina; Maiusc a passi di 15°)",
+      "motionBlurHighlights": "Luci",
+      "motionBlurType": "Tipo",
+      "motionBlurTypes": {
+        "linear": "Lineare",
+        "zoom": "Zoom",
+        "spin": "Rotazione",
+        "smooth": "Morbido"
+      },
+      "motionBlurLayer": "Movimento",
+      "motionBlurLayers": {
+        "auto": "Automatico",
+        "panning": "Panning",
+        "subject": "Soggetto in movimento",
+        "uniform": "Uniforme"
+      },
+      "motionBlurDepth": "Profondità",
       "relight": "Riilluminazione",
       "relightAddLight": "Aggiungi luce",
       "relightAmbient": "Ambiente",

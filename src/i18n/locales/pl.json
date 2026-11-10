@@ -157,6 +157,22 @@
       "motionBlur": "Rozmycie ruchu",
       "motionBlurAngle": "Kąt",
       "motionBlurDirection": "Kierunek (przeciągnij; Shift co 15°)",
+      "motionBlurHighlights": "Światła",
+      "motionBlurType": "Typ",
+      "motionBlurTypes": {
+        "linear": "Liniowe",
+        "zoom": "Zoom",
+        "spin": "Obrót",
+        "smooth": "Wygładzenie"
+      },
+      "motionBlurLayer": "Ruch",
+      "motionBlurLayers": {
+        "auto": "Automatycznie",
+        "panning": "Panoramowanie",
+        "subject": "Ruchomy obiekt",
+        "uniform": "Jednolite"
+      },
+      "motionBlurDepth": "Głębia",
       "relight": "Ponowne oświetlenie",
       "relightAddLight": "Dodaj światło",
       "relightAmbient": "Światło otoczenia",

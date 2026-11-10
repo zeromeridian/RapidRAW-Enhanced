@@ -278,9 +278,14 @@ details are in `RELEASE_NOTES.MD`.
   whatever a typed description names, such as "water" or "boat". Each mask
   type downloads its model on first use, and existing masks keep their stored
   result.
-- **Motion Blur** in Effects blurs the photo along a straight line. Amount
-  sets the blur length relative to the image size; the direction is set with
-  a compass dial (Shift snaps to 15°) or a typed angle from −90° to 90°.
+- **Motion Blur** in Effects (engine from RapidRAW): linear, zoom and spin
+  blurs, plus smooth in masks, with Highlights (bright lights keep their
+  energy in the streak) and the image's grain restored over blurred areas.
+  In AI-subject masks the Motion setting separates subject and background
+  (Auto, Moving Subject, Panning, Uniform) without halos. **Depth** uses an
+  AI depth map so near objects streak more than distant ones. The linear
+  direction is set with a compass dial (Shift snaps to 15°) or a typed angle
+  from −90° to 90°.
 - Local masks support Black & White conversion, Color Calibration, Light
   Flares, Gaussian Blur, Motion Blur, and Grain in addition to the existing
   tonal, color, detail, curve, glow, and halation adjustments. The mask
@@ -324,6 +329,11 @@ details are in `RELEASE_NOTES.MD`.
   Guided Perspective geometry changes. Their effects render at preview resolution in
   Develop for fast adjustment. Generated depth and normal maps stay local, and
   synced edits offer to regenerate them.
+- An interactive **3D depth view** (from RapidRAW) in Lens Blur, Relight,
+  Fog, Motion Blur depth, and AI depth masks shows the scene from its depth map with the effect
+  applied (including TIR's Fog feather and Relight shine), and lets the
+  focus range, fog start, depth-mask band, or selected light be dragged in
+  depth; rotate, zoom, and pan the view. It only previews the settings.
 
 ## Files, export, and metadata
 

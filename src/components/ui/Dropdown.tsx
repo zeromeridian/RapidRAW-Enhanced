@@ -189,6 +189,7 @@ const Dropdown = <T extends React.Key>({
               ref={menuRef}
               animate={{ opacity: 1, scale: 1 }}
               className={clsx('fixed z-[60]', menuPosition.bottom === undefined ? 'origin-top' : 'origin-bottom')}
+              data-dropdown-menu
               style={{
                 left: menuPosition.left,
                 width: menuPosition.width,

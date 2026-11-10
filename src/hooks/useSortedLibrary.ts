@@ -34,6 +34,18 @@ const parseExifNumber = (val: string | undefined): number => {
 export const parseAperture = parseExifNumber;
 export const parseFocalLength = parseExifNumber;
 
+const fileNameCollator = new Intl.Collator(undefined, { numeric: true });
+
+/**
+ * Orders file names with digit runs read as numbers (`IMG_2` before `IMG_10`); names the numeric
+ * collation treats as equal (`frame_1`, `frame_01`) fall back to `localeCompare` for a stable order.
+ */
+const compareFileNames = (a: ImageFile, b: ImageFile): number => {
+  const nameA = a.path.split(/[\\/]/).pop() || a.path;
+  const nameB = b.path.split(/[\\/]/).pop() || b.path;
+  return fileNameCollator.compare(nameA, nameB) || nameA.localeCompare(nameB);
+};
+
 export interface GroupedLibrary {
   displayList: ImageFile[];
   badges: Map<GroupId, GroupBadgeInfo> | null;
@@ -212,18 +224,13 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
       case 'edited':
         comparison = a.is_edited === b.is_edited ? 0 : a.is_edited ? 1 : -1;
         break;
-      default: {
-        const nameA = a.path.split(/[\\/]/).pop() || a.path;
-        const nameB = b.path.split(/[\\/]/).pop() || b.path;
-        comparison = nameA.localeCompare(nameB);
+      default:
+        comparison = compareFileNames(a, b);
         break;
-      }
     }
 
     if (comparison === 0 && key !== 'name') {
-      const nameA = a.path.split(/[\\/]/).pop() || a.path;
-      const nameB = b.path.split(/[\\/]/).pop() || b.path;
-      return nameA.localeCompare(nameB);
+      return compareFileNames(a, b);
     }
 
     return order === SortDirection.Ascending ? comparison : -comparison;

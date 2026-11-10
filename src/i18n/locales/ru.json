@@ -157,6 +157,22 @@
       "motionBlur": "Размытие в движении",
       "motionBlurAngle": "Угол",
       "motionBlurDirection": "Направление (перетащите; Shift — шаг 15°)",
+      "motionBlurHighlights": "Света",
+      "motionBlurType": "Тип",
+      "motionBlurTypes": {
+        "linear": "Линейное",
+        "zoom": "Зум",
+        "spin": "Вращение",
+        "smooth": "Сглаживание"
+      },
+      "motionBlurLayer": "Движение",
+      "motionBlurLayers": {
+        "auto": "Авто",
+        "panning": "Проводка",
+        "subject": "Движущийся объект",
+        "uniform": "Равномерное"
+      },
+      "motionBlurDepth": "Глубина",
       "relight": "Переосвещение",
       "relightAddLight": "Добавить свет",
       "relightAmbient": "Окружающий свет",

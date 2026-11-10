@@ -364,6 +364,32 @@ pub async fn generate_relight_normal_map(
     crate::effect_maps::encode_source_space_map(&image::DynamicImage::ImageRgba8(normal_img))
 }
 
+/// Binary grid for the 3D depth view (layout in `effect_maps::build_depth_preview`).
+#[tauri::command]
+pub async fn get_depth_preview(
+    js_adjustments: serde_json::Value,
+    map_key: Option<String>,
+    map_data: Option<String>,
+    max_size: u32,
+    state: tauri::State<'_, AppState>,
+) -> Result<tauri::ipc::Response, String> {
+    let (base_image, is_raw) = crate::get_original_image(&state)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::effect_maps::build_depth_preview(
+            base_image.as_ref(),
+            is_raw,
+            &js_adjustments,
+            map_key.as_deref(),
+            map_data.as_deref(),
+            max_size.clamp(16, 512),
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map(tauri::ipc::Response::new)
+    .ok_or_else(|| "Depth map unavailable".to_string())
+}
+
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn generate_ai_subject_mask(

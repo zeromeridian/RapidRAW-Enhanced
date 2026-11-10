@@ -158,6 +158,22 @@
       "motionBlur": "Motion Blur",
       "motionBlurAngle": "Angle",
       "motionBlurDirection": "Direction (drag; Shift snaps to 15°)",
+      "motionBlurHighlights": "Highlights",
+      "motionBlurType": "Type",
+      "motionBlurTypes": {
+        "linear": "Linear",
+        "zoom": "Zoom",
+        "spin": "Spin",
+        "smooth": "Smooth"
+      },
+      "motionBlurLayer": "Motion",
+      "motionBlurLayers": {
+        "auto": "Auto",
+        "panning": "Panning",
+        "subject": "Moving Subject",
+        "uniform": "Uniform"
+      },
+      "motionBlurDepth": "Depth",
       "relight": "Relight",
       "relightAddLight": "Add Light",
       "relightAmbient": "Ambient",
