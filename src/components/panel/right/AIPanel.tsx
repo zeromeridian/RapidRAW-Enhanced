@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   DndContext,
   DragOverlay,
@@ -54,7 +55,7 @@ import {
   getSubMaskName,
 } from './Masks';
 import { Adjustments, AiPatch } from '../../../utils/adjustments';
-import { BRUSH_SIZE_MAX, BRUSH_SIZE_MIN, OPTION_SEPARATOR } from '../../ui/AppProperties';
+import { OPTION_SEPARATOR } from '../../ui/AppProperties';
 import { createSubMask } from '../../../utils/maskUtils';
 import Text from '../../ui/Text';
 import PanelHeader from '../../ui/PanelHeader';
@@ -66,6 +67,7 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useAiMasking } from '../../../hooks/useAiMasking';
+import { BrushTools, NewMaskDropZone, SubMaskRow, SubMaskRowLabels } from './MaskEditorShared';
 
 interface DragData {
   type: 'Container' | 'SubMask' | 'Creation';
@@ -119,56 +121,18 @@ const SUB_MASK_CONFIG: any = {
   },
 };
 
-const BrushTools = ({ settings, onSettingsChange }: { settings: any; onSettingsChange: any }) => {
-  const { t } = useTranslation();
-
-  return (
-    <div>
-      <Slider
-        defaultValue={100}
-        label={t('editor.ai.brush.size')}
-        max={BRUSH_SIZE_MAX}
-        min={BRUSH_SIZE_MIN}
-        onChange={(e: any) => onSettingsChange((s: any) => ({ ...s, size: Number(e.target.value) }))}
-        step={1}
-        value={settings.size}
-        fillOrigin="min"
-      />
-      <Slider
-        defaultValue={50}
-        label={t('editor.ai.brush.feather')}
-        max={100}
-        min={0}
-        onChange={(e: any) => onSettingsChange((s: any) => ({ ...s, feather: Number(e.target.value) }))}
-        step={1}
-        value={settings.feather}
-        fillOrigin="min"
-      />
-      <div className="grid grid-cols-2 gap-2 pt-2">
-        <button
-          className={`p-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-            settings.tool === ToolType.Brush
-              ? 'text-primary bg-surface'
-              : 'bg-surface text-text-secondary hover:bg-card-active'
-          }`}
-          onClick={() => onSettingsChange((s: any) => ({ ...s, tool: ToolType.Brush }))}
-        >
-          {t('editor.ai.brush.add')}
-        </button>
-        <button
-          className={`p-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-            settings.tool === ToolType.Eraser
-              ? 'text-primary bg-surface'
-              : 'bg-surface text-text-secondary hover:bg-card-active'
-          }`}
-          onClick={() => onSettingsChange((s: any) => ({ ...s, tool: ToolType.Eraser }))}
-        >
-          {t('editor.ai.brush.erase')}
-        </button>
-      </div>
-    </div>
-  );
-};
+const subMaskRowLabels = (t: TFunction): SubMaskRowLabels => ({
+  rename: t('editor.ai.actions.rename'),
+  duplicate: t('editor.ai.actions.duplicateComponent'),
+  duplicateAndInvert: t('editor.ai.actions.duplicateAndInvertComponent'),
+  copy: t('editor.ai.actions.copyComponent'),
+  paste: t('editor.ai.actions.pasteComponent'),
+  delete: t('editor.ai.actions.deleteComponent'),
+  deleteTooltip: t('editor.ai.actions.deleteComponent'),
+  switchToSubtract: t('editor.ai.actions.switchToSubtract'),
+  switchToIntersect: t('editor.ai.actions.switchToIntersect'),
+  switchToAdd: t('editor.ai.actions.switchToAdd'),
+});
 
 interface ConnectionStatusProps {
   aiProvider: string;
@@ -1163,7 +1127,7 @@ export default function AIPanel() {
 
                 <AnimatePresence>
                   {activeDragItem?.type === 'Creation' && (adjustments.aiPatches || []).length > 0 && (
-                    <NewMaskDropZone isOver={isRootOver} />
+                    <NewMaskDropZone isOver={isRootOver} text={t('editor.ai.dropzoneText')} />
                   )}
                 </AnimatePresence>
 
@@ -1277,22 +1241,6 @@ export default function AIPanel() {
         ) : null}
       </DragOverlay>
     </DndContext>
-  );
-}
-
-function NewMaskDropZone({ isOver }: { isOver: boolean }) {
-  const { t } = useTranslation();
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, height: 0, marginTop: 0 }}
-      animate={{ opacity: 1, height: 'auto', marginTop: '4px' }}
-      exit={{ opacity: 0, height: 0, marginTop: 0 }}
-      transition={{ duration: 0.2, ease: 'easeOut' }}
-      className={`p-4 compact:p-2.5 rounded-lg text-center ${isOver ? 'border border-accent/80 bg-bg-tertiary/50' : ''}`}
-    >
-      <Text weight={TextWeights.medium}>{t('editor.ai.dropzoneText')}</Text>
-    </motion.div>
   );
 }
 
@@ -1594,6 +1542,7 @@ function ContainerRow({
                   tempName={tempName}
                   setTempName={setTempName}
                   isParentLoading={container.isLoading}
+                  labels={subMaskRowLabels(t)}
                 />
               ))}
             </AnimatePresence>
@@ -1628,229 +1577,6 @@ function ContainerRow({
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
-  );
-}
-
-function SubMaskRow({
-  subMask,
-  index,
-  totalCount,
-  containerId,
-  isActive,
-  parentVisible,
-  onSelect,
-  updateSubMask,
-  handleDelete,
-  handleDuplicate,
-  handleDuplicateAndInvert,
-  handlePaste,
-  handleCopy,
-  hasCopiedSubMask,
-  activeDragItem,
-  analyzingSubMaskId,
-  renamingId,
-  setRenamingId,
-  tempName,
-  setTempName,
-  isParentLoading,
-}: any) {
-  const { t } = useTranslation();
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: subMask.id,
-    data: { type: 'SubMask', item: subMask, parentId: containerId },
-  });
-  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
-    id: subMask.id,
-    data: { type: 'SubMask', item: subMask, parentId: containerId },
-  });
-  const setCombinedRef = (node: HTMLElement | null) => {
-    setNodeRef(node);
-    setDroppableRef(node);
-  };
-  const MaskIcon = MASK_ICON_MAP[subMask.type] || Circle;
-  const { showContextMenu } = useContextMenu();
-  const [isHovered, setIsHovered] = useState(false);
-  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isDraggingContainer = activeDragItem?.type === 'Container';
-  const isAnalyzing = subMask.id === analyzingSubMaskId || (isParentLoading && subMask.type === Mask.QuickEraser);
-
-  const handleMouseEnter = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-    setIsHovered(true);
-  };
-  const handleMouseLeave = () => {
-    hoverTimeoutRef.current = setTimeout(() => setIsHovered(false), 1000);
-  };
-  useEffect(() => {
-    return () => {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    };
-  }, []);
-
-  const handleRenameSubmit = () => {
-    if (tempName.trim()) {
-      const newName = tempName.trim();
-      updateSubMask(subMask.id, { name: newName });
-    }
-    setRenamingId(null);
-  };
-
-  const onContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    showContextMenu(e.clientX, e.clientY, [
-      {
-        label: t('editor.ai.actions.rename'),
-        icon: FileEdit,
-        onClick: () => {
-          setRenamingId(subMask.id);
-          setTempName(getSubMaskName(subMask));
-        },
-      },
-      { label: t('editor.ai.actions.duplicateComponent'), icon: PlusSquare, onClick: handleDuplicate },
-      { label: t('editor.ai.actions.duplicateAndInvertComponent'), icon: RotateCcw, onClick: handleDuplicateAndInvert },
-      { label: t('editor.ai.actions.copyComponent'), icon: Copy, onClick: handleCopy },
-      {
-        label: t('editor.ai.actions.pasteComponent'),
-        icon: ClipboardPaste,
-        disabled: !hasCopiedSubMask,
-        onClick: handlePaste,
-      },
-      { type: OPTION_SEPARATOR },
-      { label: t('editor.ai.actions.deleteComponent'), icon: Trash2, isDestructive: true, onClick: handleDelete },
-    ]);
-  };
-  const showNumber = isHovered && totalCount > 1;
-
-  return (
-    <motion.div
-      layout="position"
-      initial={{ opacity: 0, x: -15 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
-      exit={{ opacity: 0, x: -15, scale: 0.95, transition: { duration: 0.2 } }}
-      ref={setCombinedRef}
-      {...attributes}
-      {...listeners}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      className={`flex items-center gap-2 p-2 compact:py-1 rounded-md transition-colors group cursor-pointer
-            ${isActive ? 'bg-surface' : 'hover:bg-card-active'}
-            ${isOver && !isDraggingContainer ? 'border-t-2 border-accent' : ''}
-            ${isDragging ? 'opacity-40 z-50' : ''}
-            ${parentVisible === false ? 'opacity-50' : ''}
-            ${isDraggingContainer ? 'opacity-30 pointer-events-none' : ''}
-            transition-opacity duration-300`}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect();
-      }}
-      onContextMenu={onContextMenu}
-    >
-      <Text
-        as="div"
-        variant={TextVariants.small}
-        weight={TextWeights.bold}
-        className="relative w-4 h-4 ml-1 shrink-0 flex items-center justify-center"
-      >
-        <AnimatePresence mode="wait" initial={false}>
-          {isAnalyzing ? (
-            <motion.div
-              key="analyzing"
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.5 }}
-              transition={{ duration: 0.15 }}
-              className="absolute"
-            >
-              <Loader2 size={16} className="animate-spin" />
-            </motion.div>
-          ) : showNumber ? (
-            <motion.span
-              key="number"
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.5 }}
-              transition={{ duration: 0.15 }}
-              className="absolute"
-            >
-              {index}
-            </motion.span>
-          ) : (
-            <motion.div
-              key="icon"
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.5 }}
-              transition={{ duration: 0.15 }}
-              className="absolute"
-            >
-              <MaskIcon size={16} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Text>
-      {renamingId === subMask.id ? (
-        <input
-          autoFocus
-          className="bg-bg-primary text-sm w-full rounded px-1 outline-none border border-accent"
-          value={tempName}
-          onChange={(e) => setTempName(e.target.value)}
-          onBlur={handleRenameSubmit}
-          onKeyDown={(e) => e.key === 'Enter' && handleRenameSubmit()}
-          onClick={(e) => e.stopPropagation()}
-        />
-      ) : (
-        <Text color={TextColors.primary} className="flex-1 truncate select-none">
-          {getSubMaskName(subMask)}
-        </Text>
-      )}
-      <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-        {index > 1 && (
-          <button
-            className="p-1 hover:text-text-primary text-text-secondary"
-            data-tooltip={
-              subMask.mode === SubMaskMode.Additive
-                ? t('editor.ai.actions.switchToSubtract')
-                : subMask.mode === SubMaskMode.Subtractive
-                  ? t('editor.ai.actions.switchToIntersect')
-                  : t('editor.ai.actions.switchToAdd')
-            }
-            onClick={(e) => {
-              e.stopPropagation();
-              updateSubMask(subMask.id, {
-                mode:
-                  subMask.mode === SubMaskMode.Additive
-                    ? SubMaskMode.Subtractive
-                    : subMask.mode === SubMaskMode.Subtractive
-                      ? SubMaskMode.Intersect
-                      : SubMaskMode.Additive,
-              });
-            }}
-          >
-            {subMask.mode === SubMaskMode.Additive ? (
-              <Plus size={16} />
-            ) : subMask.mode === SubMaskMode.Subtractive ? (
-              <Minus size={16} />
-            ) : (
-              <SquaresIntersect size={16} />
-            )}
-          </button>
-        )}
-        <button
-          className="p-1 hover:text-red-500 text-text-secondary"
-          data-tooltip={t('editor.ai.actions.deleteComponent')}
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDelete();
-          }}
-        >
-          <Trash2 size={16} />
-        </button>
-      </div>
     </motion.div>
   );
 }
@@ -2091,7 +1817,16 @@ function SettingsPanel({
               ))}
 
               {subMaskConfig.showBrushTools && brushSettings && (
-                <BrushTools settings={brushSettings} onSettingsChange={setBrushSettings} />
+                <BrushTools
+                  settings={brushSettings}
+                  onSettingsChange={setBrushSettings}
+                  labels={{
+                    size: t('editor.ai.brush.size'),
+                    feather: t('editor.ai.brush.feather'),
+                    brush: t('editor.ai.brush.add'),
+                    eraser: t('editor.ai.brush.erase'),
+                  }}
+                />
               )}
             </>
           )}

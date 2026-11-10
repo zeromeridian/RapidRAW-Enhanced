@@ -33,6 +33,10 @@ export const parseKeywordInput = (input: string) => parseKeywordPath(input.toLow
 export const formatKeyword = (keyword: string, separator = ' › ') =>
   keyword.split(KEYWORD_PATH_SEPARATOR).join(separator);
 
+/** Displays a stored tag: a user keyword without its `user:` prefix, an AI tag as it is. */
+export const displayTag = (tag: string) =>
+  formatKeyword(tag.startsWith(USER_TAG_PREFIX) ? tag.slice(USER_TAG_PREFIX.length) : tag);
+
 interface KeywordSetSettings {
   activeKeywordSet?: string | null;
   keywordSets?: unknown;

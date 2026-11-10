@@ -120,21 +120,10 @@ const lensParamsFromAdjustments = (adjustments: Adjustments): LensParams => ({
   lensDistortionParams: adjustments.lensDistortionParams,
 });
 
-const parseFocalLength = (exif: any): number | null => {
-  if (!exif || !exif.FocalLength) return null;
-  const val = parseFloat(exif.FocalLength);
-  return isNaN(val) ? null : val;
-};
-
-const parseAperture = (exif: any): number | null => {
-  if (!exif || !exif.FNumber) return null;
-  const val = parseFloat(exif.FNumber);
-  return isNaN(val) ? null : val;
-};
-
-const parseDistance = (exif: any): number | null => {
-  if (!exif || !exif.SubjectDistance) return null;
-  const val = parseFloat(exif.SubjectDistance);
+/** An EXIF field read with `parseFloat` (so "f/2.8" gives null); null when missing. */
+const parseExifFloat = (exif: any, key: 'FocalLength' | 'FNumber' | 'SubjectDistance'): number | null => {
+  if (!exif || !exif[key]) return null;
+  const val = parseFloat(exif[key]);
   return isNaN(val) ? null : val;
 };
 
@@ -169,9 +158,9 @@ export default function LensCorrectionModal({
   const [modeBubbleStyle, setModeBubbleStyle] = useState({});
   const isModeInitialAnimation = useRef(true);
 
-  const focalLength = useMemo(() => parseFocalLength(selectedImage?.exif), [selectedImage?.exif]);
-  const aperture = useMemo(() => parseAperture(selectedImage?.exif), [selectedImage?.exif]);
-  const distance = useMemo(() => parseDistance(selectedImage?.exif), [selectedImage?.exif]);
+  const focalLength = useMemo(() => parseExifFloat(selectedImage?.exif, 'FocalLength'), [selectedImage?.exif]);
+  const aperture = useMemo(() => parseExifFloat(selectedImage?.exif, 'FNumber'), [selectedImage?.exif]);
+  const distance = useMemo(() => parseExifFloat(selectedImage?.exif, 'SubjectDistance'), [selectedImage?.exif]);
 
   const availability = useMemo(() => {
     if (!params.lensDistortionParams) return { distortion: false, tca: false, vignetting: false };

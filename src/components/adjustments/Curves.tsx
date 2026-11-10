@@ -2,7 +2,16 @@ import { useState, useRef, useEffect, useMemo, useId } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCcw, Copy, ClipboardPaste, Spline, Settings2, Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { ActiveChannel, Adjustments, Coord, ParametricCurveSettings } from '../../utils/adjustments';
+import {
+  ActiveChannel,
+  Adjustments,
+  Coord,
+  DEFAULT_PARAMETRIC_CURVE,
+  DEFAULT_PARAMETRIC_CURVE_SETTINGS,
+  ParametricCurveSettings,
+  getDefaultCurves,
+  getDefaultParametricCurve,
+} from '../../utils/adjustments';
 import { Theme, OPTION_SEPARATOR } from '../ui/AppProperties';
 import { useContextMenu } from '../../context/ContextMenuContext';
 import Text from '../ui/Text';
@@ -46,44 +55,6 @@ interface CurveGraphProps {
   theme: string;
   onDragStateChange?: (isDragging: boolean) => void;
 }
-
-const DEFAULT_PARAMETRIC_CURVE_SETTINGS: ParametricCurveSettings = {
-  darks: 0,
-  shadows: 0,
-  highlights: 0,
-  lights: 0,
-  whiteLevel: 0,
-  blackLevel: 0,
-  split1: 25,
-  split2: 50,
-  split3: 75,
-};
-
-const DEFAULT_PARAMETRIC_CURVE = {
-  luma: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
-  red: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
-  green: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
-  blue: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
-};
-
-const DEFAULT_POINT_CURVES = {
-  blue: [
-    { x: 0, y: 0 },
-    { x: 255, y: 255 },
-  ],
-  green: [
-    { x: 0, y: 0 },
-    { x: 255, y: 255 },
-  ],
-  luma: [
-    { x: 0, y: 0 },
-    { x: 255, y: 255 },
-  ],
-  red: [
-    { x: 0, y: 0 },
-    { x: 255, y: 255 },
-  ],
-};
 
 function buildParametricPoints(settings: ParametricCurveSettings): Array<Coord> {
   const vH = settings.highlights / 100;
@@ -412,7 +383,7 @@ export default function CurveGraph({
           },
         };
       } else {
-        const restoredPointCurves = prev.pointCurves || DEFAULT_POINT_CURVES;
+        const restoredPointCurves = prev.pointCurves || getDefaultCurves();
         return {
           ...prev,
           curveMode: 'point',
@@ -710,12 +681,7 @@ export default function CurveGraph({
         setAdjustments((prev: any) => {
           return {
             ...prev,
-            parametricCurve: {
-              luma: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
-              red: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
-              green: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
-              blue: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
-            },
+            parametricCurve: getDefaultParametricCurve(),
             curves: {
               luma: buildParametricPoints(DEFAULT_PARAMETRIC_CURVE_SETTINGS),
               red: buildParametricPoints(DEFAULT_PARAMETRIC_CURVE_SETTINGS),

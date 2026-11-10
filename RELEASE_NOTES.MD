@@ -5,6 +5,13 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.38.4-fix-perf — 2026-11-09
+
+### Under the hood
+
+- Internal cleanup of the Masks and AI panels, tone curves, lens
+  correction, sorting, and keywords. Nothing looks or works differently.
+
 ## 1.38.3-fix-perf — 2026-11-09
 
 ### Performance

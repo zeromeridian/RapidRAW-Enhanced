@@ -1,16 +1,10 @@
-import {
-  type ChangeEvent,
-  type PointerEvent as ReactPointerEvent,
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-} from 'react';
+import { type ChangeEvent, useState, useEffect, useRef, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { v4 as uuidv4 } from 'uuid';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   DndContext,
   DragOverlay,
@@ -81,13 +75,14 @@ import {
   ADJUSTMENT_SECTIONS,
 } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { BRUSH_SIZE_MAX, BRUSH_SIZE_MIN, OPTION_SEPARATOR, Orientation } from '../../ui/AppProperties';
+import { OPTION_SEPARATOR, Orientation } from '../../ui/AppProperties';
 import { createSubMask } from '../../../utils/maskUtils';
 import { usePresets } from '../../../hooks/usePresets';
 import Text from '../../ui/Text';
 import PanelHeader from '../../ui/PanelHeader';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { useEditorStore } from '../../../store/useEditorStore';
+import { BrushTools, BrushToolsLabels, NewMaskDropZone, SubMaskRow, SubMaskRowLabels } from './MaskEditorShared';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 
 const ALL_MASK_CREATION_TYPES = [
@@ -163,58 +158,26 @@ const SUB_MASK_CONFIG: Record<Mask, any> = {
   [Mask.QuickEraser]: { parameters: [] },
 };
 
-const BrushTools = ({
-  settings,
-  onSettingsChange,
-  onDragStateChange,
-}: {
-  settings: any;
-  onSettingsChange: any;
-  onDragStateChange?: (isDragging: boolean) => void;
-}) => {
-  const { t } = useTranslation();
+const brushToolsLabels = (t: TFunction): BrushToolsLabels => ({
+  size: t('editor.masks.brush.size'),
+  feather: t('editor.masks.brush.feather'),
+  brush: t('editor.masks.brush.brush'),
+  eraser: t('editor.masks.brush.eraser'),
+});
 
-  return (
-    <div>
-      <Slider
-        defaultValue={100}
-        label={t('editor.masks.brush.size')}
-        max={BRUSH_SIZE_MAX}
-        min={BRUSH_SIZE_MIN}
-        onChange={(e: any) => onSettingsChange((s: any) => ({ ...s, size: Number(e.target.value) }))}
-        step={1}
-        value={settings.size}
-        fillOrigin="min"
-        onDragStateChange={onDragStateChange}
-      />
-      <Slider
-        defaultValue={50}
-        label={t('editor.masks.brush.feather')}
-        max={100}
-        min={0}
-        onChange={(e: any) => onSettingsChange((s: any) => ({ ...s, feather: Number(e.target.value) }))}
-        step={1}
-        value={settings.feather}
-        fillOrigin="min"
-        onDragStateChange={onDragStateChange}
-      />
-      <div className="grid grid-cols-2 gap-2 pt-2">
-        <button
-          className={`p-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${settings.tool === ToolType.Brush ? 'text-primary bg-surface' : 'bg-surface text-text-secondary hover:bg-card-active'}`}
-          onClick={() => onSettingsChange((s: any) => ({ ...s, tool: ToolType.Brush }))}
-        >
-          {t('editor.masks.brush.brush')}
-        </button>
-        <button
-          className={`p-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${settings.tool === ToolType.Eraser ? 'text-primary bg-surface' : 'bg-surface text-text-secondary hover:bg-card-active'}`}
-          onClick={() => onSettingsChange((s: any) => ({ ...s, tool: ToolType.Eraser }))}
-        >
-          {t('editor.masks.brush.eraser')}
-        </button>
-      </div>
-    </div>
-  );
-};
+const subMaskRowLabels = (t: TFunction): SubMaskRowLabels => ({
+  rename: t('editor.masks.actions.rename'),
+  duplicate: t('editor.masks.actions.duplicateComponent'),
+  duplicateAndInvert: t('editor.masks.actions.duplicateAndInvertComponent'),
+  copy: t('editor.masks.actions.copyComponent'),
+  paste: t('editor.masks.actions.pasteComponent'),
+  delete: t('editor.masks.actions.deleteComponent'),
+  // The Masks panel has always used the AI panel's (identical) text here.
+  deleteTooltip: t('editor.ai.actions.deleteComponent'),
+  switchToSubtract: t('editor.masks.actions.switchToSubtract'),
+  switchToIntersect: t('editor.masks.actions.switchToIntersect'),
+  switchToAdd: t('editor.masks.actions.switchToAdd'),
+});
 
 const FlowBrushTool = ({
   flow,
@@ -244,7 +207,12 @@ const FlowBrushTool = ({
         fillOrigin="min"
         onDragStateChange={onDragStateChange}
       />
-      <BrushTools settings={settings} onSettingsChange={onSettingsChange} onDragStateChange={onDragStateChange} />
+      <BrushTools
+        settings={settings}
+        onSettingsChange={onSettingsChange}
+        onDragStateChange={onDragStateChange}
+        labels={brushToolsLabels(t)}
+      />
     </div>
   );
 };
@@ -1106,7 +1074,7 @@ export default function MasksPanel() {
 
                 <AnimatePresence>
                   {activeDragItem?.type === 'Creation' && adjustments.masks.length > 0 && (
-                    <NewMaskDropZone isOver={isRootOver} />
+                    <NewMaskDropZone isOver={isRootOver} text={t('editor.masks.dropzoneText')} />
                   )}
                 </AnimatePresence>
 
@@ -1227,22 +1195,6 @@ export default function MasksPanel() {
         ) : null}
       </DragOverlay>
     </DndContext>
-  );
-}
-
-function NewMaskDropZone({ isOver }: { isOver: boolean }) {
-  const { t } = useTranslation();
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, height: 0, marginTop: 0 }}
-      animate={{ opacity: 1, height: 'auto', marginTop: '4px' }}
-      exit={{ opacity: 0, height: 0, marginTop: 0 }}
-      transition={{ duration: 0.2, ease: 'easeOut' }}
-      className={`p-4 compact:p-2.5 rounded-lg text-center ${isOver ? 'border border-accent/80 bg-bg-tertiary/50' : ''}`}
-    >
-      <Text weight={TextWeights.medium}>{t('editor.masks.dropzoneText')}</Text>
-    </motion.div>
   );
 }
 
@@ -1560,7 +1512,12 @@ function ContainerRow({
                   setRenamingId={setRenamingId}
                   tempName={tempName}
                   setTempName={setTempName}
-                  setIsMaskControlHovered={setIsMaskControlHovered}
+                  labels={subMaskRowLabels(t)}
+                  visibilityToggle={{
+                    hideLabel: t('editor.masks.actions.hideComponent'),
+                    showLabel: t('editor.masks.actions.showComponent'),
+                    onHoverChange: setIsMaskControlHovered,
+                  }}
                 />
               ))}
             </AnimatePresence>
@@ -1595,253 +1552,6 @@ function ContainerRow({
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
-  );
-}
-
-function SubMaskRow({
-  subMask,
-  index,
-  totalCount,
-  containerId,
-  isActive,
-  parentVisible,
-  onSelect,
-  updateSubMask,
-  handleDelete,
-  handleDuplicate,
-  handleDuplicateAndInvert,
-  handlePaste,
-  handleCopy,
-  hasCopiedSubMask,
-  activeDragItem,
-  analyzingSubMaskId,
-  renamingId,
-  setRenamingId,
-  tempName,
-  setTempName,
-  setIsMaskControlHovered,
-}: any) {
-  const { t } = useTranslation();
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: subMask.id,
-    data: { type: 'SubMask', item: subMask, parentId: containerId },
-  });
-  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
-    id: subMask.id,
-    data: { type: 'SubMask', item: subMask, parentId: containerId },
-  });
-  const setCombinedRef = (node: HTMLElement | null) => {
-    setNodeRef(node);
-    setDroppableRef(node);
-  };
-  const MaskIcon = MASK_ICON_MAP[subMask.type] || Circle;
-  const { showContextMenu } = useContextMenu();
-  const [isHovered, setIsHovered] = useState(false);
-  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const isDraggingContainer = activeDragItem?.type === 'Container';
-  const isAnalyzing = subMask.id === analyzingSubMaskId;
-
-  const handleMouseEnter = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-    setIsHovered(true);
-  };
-
-  const handleMouseLeave = () => {
-    hoverTimeoutRef.current = setTimeout(() => {
-      setIsHovered(false);
-    }, 1000);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    };
-  }, []);
-
-  const handleRenameSubmit = () => {
-    if (tempName.trim()) {
-      const newName = tempName.trim();
-      updateSubMask(subMask.id, { name: newName });
-    }
-    setRenamingId(null);
-  };
-
-  const onContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    showContextMenu(e.clientX, e.clientY, [
-      {
-        label: t('editor.masks.actions.rename'),
-        icon: FileEdit,
-        onClick: () => {
-          setRenamingId(subMask.id);
-          setTempName(getSubMaskName(subMask));
-        },
-      },
-      { label: t('editor.masks.actions.duplicateComponent'), icon: PlusSquare, onClick: handleDuplicate },
-      {
-        label: t('editor.masks.actions.duplicateAndInvertComponent'),
-        icon: RotateCcw,
-        onClick: handleDuplicateAndInvert,
-      },
-      { label: t('editor.masks.actions.copyComponent'), icon: Copy, onClick: handleCopy },
-      {
-        label: t('editor.masks.actions.pasteComponent'),
-        icon: ClipboardPaste,
-        disabled: !hasCopiedSubMask,
-        onClick: handlePaste,
-      },
-      { type: OPTION_SEPARATOR },
-      { label: t('editor.masks.actions.deleteComponent'), icon: Trash2, isDestructive: true, onClick: handleDelete },
-    ]);
-  };
-
-  const showNumber = isHovered && totalCount > 1;
-
-  return (
-    <motion.div
-      layout="position"
-      initial={{ opacity: 0, x: -15 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
-      exit={{ opacity: 0, x: -15, scale: 0.95, transition: { duration: 0.2 } }}
-      ref={setCombinedRef}
-      {...attributes}
-      {...listeners}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      className={`flex items-center gap-2 p-2 compact:py-1 rounded-md transition-colors group cursor-pointer
-            ${isActive ? 'bg-surface' : 'hover:bg-card-active'}
-            ${isOver && !isDraggingContainer ? 'border-t-2 border-accent' : ''}
-            ${isDragging ? 'opacity-40 z-50' : ''}
-            ${parentVisible === false ? 'opacity-50' : ''}
-            ${isDraggingContainer ? 'opacity-30 pointer-events-none' : ''}
-            transition-opacity duration-300`}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect();
-      }}
-      onContextMenu={onContextMenu}
-    >
-      <Text
-        as="div"
-        variant={TextVariants.small}
-        weight={TextWeights.bold}
-        className="relative w-4 h-4 ml-1 shrink-0 flex items-center justify-center"
-      >
-        <AnimatePresence mode="wait" initial={false}>
-          {isAnalyzing ? (
-            <motion.div
-              key="analyzing"
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.5 }}
-              transition={{ duration: 0.15 }}
-              className="absolute"
-            >
-              <Loader2 size={16} className="animate-spin" />
-            </motion.div>
-          ) : showNumber ? (
-            <motion.span
-              key="number"
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.5 }}
-              transition={{ duration: 0.15 }}
-              className="absolute"
-            >
-              {index}
-            </motion.span>
-          ) : (
-            <motion.div
-              key="icon"
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.5 }}
-              transition={{ duration: 0.15 }}
-              className="absolute"
-            >
-              <MaskIcon size={16} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Text>
-      {renamingId === subMask.id ? (
-        <input
-          autoFocus
-          className="bg-bg-primary text-sm w-full rounded px-1 outline-none border border-accent"
-          value={tempName}
-          onChange={(e) => setTempName(e.target.value)}
-          onBlur={handleRenameSubmit}
-          onKeyDown={(e) => e.key === 'Enter' && handleRenameSubmit()}
-          onClick={(e) => e.stopPropagation()}
-        />
-      ) : (
-        <Text color={TextColors.primary} className="flex-1 truncate select-none">
-          {getSubMaskName(subMask)}
-        </Text>
-      )}
-      <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-        {index > 1 && (
-          <button
-            className="p-1 hover:text-text-primary text-text-secondary"
-            data-tooltip={
-              subMask.mode === SubMaskMode.Additive
-                ? t('editor.masks.actions.switchToSubtract')
-                : subMask.mode === SubMaskMode.Subtractive
-                  ? t('editor.masks.actions.switchToIntersect')
-                  : t('editor.masks.actions.switchToAdd')
-            }
-            onClick={(e) => {
-              e.stopPropagation();
-              updateSubMask(subMask.id, {
-                mode:
-                  subMask.mode === SubMaskMode.Additive
-                    ? SubMaskMode.Subtractive
-                    : subMask.mode === SubMaskMode.Subtractive
-                      ? SubMaskMode.Intersect
-                      : SubMaskMode.Additive,
-              });
-            }}
-          >
-            {subMask.mode === SubMaskMode.Additive ? (
-              <Plus size={16} />
-            ) : subMask.mode === SubMaskMode.Subtractive ? (
-              <Minus size={16} />
-            ) : (
-              <SquaresIntersect size={16} />
-            )}
-          </button>
-        )}
-        <button
-          className="p-1 hover:text-text-primary text-text-secondary"
-          data-tooltip={
-            subMask.visible ? t('editor.masks.actions.hideComponent') : t('editor.masks.actions.showComponent')
-          }
-          onMouseEnter={() => setIsMaskControlHovered(true)}
-          onMouseLeave={() => setIsMaskControlHovered(false)}
-          onClick={(e) => {
-            e.stopPropagation();
-            updateSubMask(subMask.id, { visible: !subMask.visible });
-          }}
-        >
-          {subMask.visible ? <Eye size={16} /> : <EyeOff size={16} />}
-        </button>
-        <button
-          className="p-1 hover:text-red-500 text-text-secondary"
-          data-tooltip={t('editor.ai.actions.deleteComponent')}
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDelete();
-          }}
-        >
-          <Trash2 size={16} />
-        </button>
-      </div>
     </motion.div>
   );
 }
@@ -2259,6 +1969,7 @@ function SettingsPanel({
                     settings={brushSettings}
                     onSettingsChange={setBrushSettings}
                     onDragStateChange={onDragStateChange}
+                    labels={brushToolsLabels(t)}
                   />
                 ))}
             </>
