@@ -25,6 +25,7 @@ import {
   USER_TAG_PREFIX,
   applyKeywordOperationToTag,
   buildKeywordTree,
+  displayTag,
   filterKeywordTree,
   formatKeyword,
   keywordOperationTag,
@@ -43,8 +44,6 @@ interface PendingOperation {
   isMerge: boolean;
 }
 
-const displayTag = (tag: string) =>
-  formatKeyword(tag.startsWith(USER_TAG_PREFIX) ? tag.slice(USER_TAG_PREFIX.length) : tag);
 // The last level of a user keyword tag, e.g. `berlin` for `user:places|germany|berlin`.
 const lastLevel = (tag: string) => tag.slice(USER_TAG_PREFIX.length).split(KEYWORD_PATH_SEPARATOR).pop() ?? '';
 

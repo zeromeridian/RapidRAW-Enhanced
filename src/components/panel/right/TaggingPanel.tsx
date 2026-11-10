@@ -16,11 +16,9 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { isImageFlagTag } from '../../../utils/imageFlags';
-import { USER_TAG_PREFIX, formatKeyword, parseKeywordInput } from '../../../utils/keywords';
+import { USER_TAG_PREFIX, displayTag, parseKeywordInput } from '../../../utils/keywords';
 
 const isEditableTag = (tag: string) => !tag.startsWith('color:') && !isImageFlagTag(tag);
-const displayTag = (tag: string) =>
-  formatKeyword(tag.startsWith(USER_TAG_PREFIX) ? tag.slice(USER_TAG_PREFIX.length) : tag);
 
 interface TaggingPanelProps {
   // Shown next to the library grid, which has no panel switcher to close it with

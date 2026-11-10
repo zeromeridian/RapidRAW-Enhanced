@@ -24,20 +24,15 @@ export const parseShutter = (val: string | undefined): number => {
   return isNaN(numVal) ? 0 : numVal;
 };
 
-export const parseAperture = (val: string | undefined): number => {
-  if (!val) return 0;
-  const match = val.match(/(\d+(\.\d+)?)/);
+/** The first number in an EXIF text such as "f/2.8" or "50.0 mm"; 0 when there is none. */
+const parseExifNumber = (val: string | undefined): number => {
+  const match = val?.match(/(\d+(\.\d+)?)/);
   const numVal = match ? parseFloat(match[0]) : 0;
   return isNaN(numVal) ? 0 : numVal;
 };
 
-export const parseFocalLength = (val: string | undefined): number => {
-  if (!val) return 0;
-  const match = val.match(/(\d+(\.\d+)?)/);
-  if (!match) return 0;
-  const numVal = parseFloat(match[0]);
-  return isNaN(numVal) ? 0 : numVal;
-};
+export const parseAperture = parseExifNumber;
+export const parseFocalLength = parseExifNumber;
 
 export interface GroupedLibrary {
   displayList: ImageFile[];
