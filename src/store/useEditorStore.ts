@@ -17,6 +17,7 @@ import { ToolType } from '../components/panel/right/Masks';
 import { OverlayMode } from '../components/panel/right/CropPanel';
 import type { SpeedEditTarget } from '../components/ui/Slider';
 import { describeHistoryChange } from '../utils/editHistory';
+import type { TargetedAdjustment } from '../utils/targetedAdjustment';
 
 /** Undo history keeps at most this many steps; the oldest is dropped first. */
 const MAX_HISTORY_STEPS = 50;
@@ -82,6 +83,8 @@ interface EditorState {
   isStraightenActive: boolean;
   isWbPickerActive: boolean;
   isRelightPickerActive: boolean;
+  /** The colour mixer or tone curve pipette acting on the photo, or null. */
+  targetedAdjustment: TargetedAdjustment | null;
   activeRelightLightId: string | null;
   liveRotation: number | null;
   /** The Crop panel's values when it was opened (null outside Crop); Escape restores them. */
@@ -115,6 +118,16 @@ interface EditorState {
   resetHistory: (initialState: Adjustments) => void;
   goToHistoryIndex: (index: number) => void;
 }
+
+type CanvasToolState = Pick<EditorState, 'isWbPickerActive' | 'isRelightPickerActive' | 'targetedAdjustment'>;
+
+/** Turns every tool that takes clicks on the photo off, except `activeTool` if given (one is active at a time). */
+export const canvasToolState = (activeTool: Partial<CanvasToolState> = {}): CanvasToolState => ({
+  isWbPickerActive: false,
+  isRelightPickerActive: false,
+  targetedAdjustment: null,
+  ...activeTool,
+});
 
 export const useEditorStore = create<EditorState>((set) => ({
   selectedImage: null,
@@ -157,6 +170,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   isStraightenActive: false,
   isWbPickerActive: false,
   isRelightPickerActive: false,
+  targetedAdjustment: null,
   activeRelightLightId: null,
   liveRotation: null,
   cropSessionSnapshot: null,

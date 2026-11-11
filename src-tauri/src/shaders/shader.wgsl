@@ -231,6 +231,12 @@ const HSL_RANGES: array<HslRange, 8> = array<HslRange, 8>(
 @group(0) @binding(11) var linear_sampler: sampler;
 
 override HIGH_PRECISION_OUTPUT: u32 = 0u;
+// A sample probe writes the colour a targeted adjustment reads at its stage
+// instead of the finished pixel (`gpu_processing::SampleProbe`).
+override SAMPLE_PROBE: u32 = 0u;
+const SAMPLE_PROBE_HSL: u32 = 1u;
+const SAMPLE_PROBE_CURVE: u32 = 2u;
+const SAMPLE_PROBE_MASK_CURVE: u32 = 3u;
 
 const LUMA_COEFF = vec3<f32>(0.2126, 0.7152, 0.0722);
 
@@ -738,6 +744,23 @@ fn apply_creative_color(color: vec3<f32>, sat: f32, vib: f32) -> vec3<f32> {
         processed = mix(vec3<f32>(luma), processed, 1.0 + amount);
     }
     return processed;
+}
+
+// The hue (0-1), saturation and value `apply_hsl_panel` weighs its bands by;
+// neutral pixels, which it leaves alone, read as zero.
+fn hsl_probe(color: vec3<f32>) -> vec4<f32> {
+    let safe_color = max(color, vec3<f32>(0.0));
+    if (distance(safe_color.r, safe_color.g) < 0.001 && distance(safe_color.g, safe_color.b) < 0.001) {
+        return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    }
+    let hsv = rgb_to_hsv(safe_color);
+    return vec4<f32>(hsv.x / 360.0, hsv.y, hsv.z, 1.0);
+}
+
+// The values a tone curve reads: red, green, blue and the luma its luma curve uses.
+fn curve_probe(color: vec3<f32>) -> vec4<f32> {
+    let safe_color = clamp(color, vec3<f32>(0.0), vec3<f32>(1.0));
+    return vec4<f32>(safe_color, get_luma(safe_color));
 }
 
 fn apply_hsl_panel(color: vec3<f32>, hsl_adjustments: array<HslColor, 8>, coords_i: vec2<i32>) -> vec3<f32> {
@@ -1857,6 +1880,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             composite_rgb_linear = mix(composite_rgb_linear, calibrated, influence);
         }
     }
+    if (SAMPLE_PROBE == SAMPLE_PROBE_HSL) {
+        textureStore(output_texture, id.xy, hsl_probe(composite_rgb_linear));
+        return;
+    }
     composite_rgb_linear = apply_hsl_panel(composite_rgb_linear, final_hsl, absolute_coord_i);
     composite_rgb_linear = apply_hue_shift(composite_rgb_linear, t_hue);
     composite_rgb_linear = apply_creative_color(composite_rgb_linear, t_saturation, t_vibrance);
@@ -1930,12 +1957,20 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         base_srgb = linear_to_srgb(composite_rgb_linear);
     }
 
+    if (SAMPLE_PROBE == SAMPLE_PROBE_CURVE) {
+        textureStore(output_texture, id.xy, curve_probe(base_srgb));
+        return;
+    }
     var final_rgb = apply_all_curves(base_srgb,
         adjustments.global.luma_curve, adjustments.global.luma_curve_count,
         adjustments.global.red_curve, adjustments.global.red_curve_count,
         adjustments.global.green_curve, adjustments.global.green_curve_count,
         adjustments.global.blue_curve, adjustments.global.blue_curve_count
     );
+    if (SAMPLE_PROBE == SAMPLE_PROBE_MASK_CURVE) {
+        textureStore(output_texture, id.xy, curve_probe(final_rgb));
+        return;
+    }
 
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let influence = get_mask_influence(i, absolute_coord);

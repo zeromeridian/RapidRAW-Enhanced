@@ -23,6 +23,7 @@
       "ariaSelectColor": "{{name}}色を選択",
       "blackAndWhite": "Black & White",
       "monochromeDesc": "Switch between color and a persisted monochrome rendering while preserving all color adjustments.",
+      "mixerPickerTooltip": "カラーミキサーのスポイト：写真をクリックして上下にドラッグ",
       "calibration": {
         "colors": {
           "blue": "ブルー",
@@ -95,6 +96,7 @@
       "selectPreset": "Tone curve preset",
       "updatePreset": "Update preset",
       "parametricCurve": "パラメトリックカーブ",
+      "pickerTooltip": "トーンカーブのスポイト：写真をクリックして上下にドラッグ",
       "params": {
         "blackLevel": "黒レベル",
         "darks": "暗部",

@@ -1084,6 +1084,7 @@ fn process_image_for_export_pipeline(
             mask_bitmaps: &mask_bitmaps,
             lut,
             roi: None,
+            probe: None,
             motion_blur: crate::motion_blur::MotionBlurs::new(
                 js_adjustments,
                 (img_w, img_h),
@@ -1492,6 +1493,7 @@ fn export_masks_for_image(
                     mask_bitmaps: &single_bitmaps,
                     lut: lut.clone(),
                     roi: None,
+                    probe: None,
                     motion_blur: Default::default(),
                 },
                 "export_mask_image",
@@ -1606,6 +1608,7 @@ fn export_adjustments_as_lut(
             mask_bitmaps: &[],
             lut,
             roi: None,
+            probe: None,
             motion_blur: Default::default(),
         },
         "export_lut",
@@ -2341,6 +2344,7 @@ pub async fn estimate_export_sizes(
                 mask_bitmaps: &mask_bitmaps,
                 lut,
                 roi: None,
+                probe: None,
                 motion_blur: crate::motion_blur::MotionBlurs::new(
                     &adjustments_clone,
                     (img_w, img_h),
@@ -2481,6 +2485,7 @@ pub async fn estimate_export_sizes(
                 mask_bitmaps: &mask_bitmaps,
                 lut,
                 roi: None,
+                probe: None,
                 motion_blur: crate::motion_blur::MotionBlurs::new(
                     &js_adjustments,
                     (preview_w, preview_h),

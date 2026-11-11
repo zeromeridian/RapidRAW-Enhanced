@@ -669,6 +669,7 @@ export const useKeyboardShortcuts = ({
         execute: (e: KeyboardEvent, s: any) => {
           e.preventDefault();
           if (s.ui.lightsOutMode !== 'off') s.ui.setUI({ lightsOutMode: 'off' });
+          else if (s.editor.targetedAdjustment) s.editor.setEditor({ targetedAdjustment: null });
           else if (s.editor.isStraightenActive) s.editor.setEditor({ isStraightenActive: false });
           else if (s.editor.isGuidedPerspectiveActive) s.editor.setEditor({ isGuidedPerspectiveActive: false });
           else if (s.ui.customEscapeHandler) s.ui.customEscapeHandler();

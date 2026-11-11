@@ -36,7 +36,7 @@ import { DepthRangePicker } from '../ui/DepthRangePicker';
 import AiEffectSection, { EffectMapStatus } from './AiEffectSection';
 import DepthScope from '../ui/depthScope/DepthScope';
 import { ScenePatch } from '../ui/depthScope/scene';
-import { useEditorStore } from '../../store/useEditorStore';
+import { canvasToolState, useEditorStore } from '../../store/useEditorStore';
 import { useEditorActions } from '../../hooks/useEditorActions';
 import { useContextMenu } from '../../context/ContextMenuContext';
 
@@ -275,7 +275,7 @@ export default function EffectsPanel({
   const activeLight = relightLights.find((light) => light.id === activeRelightLightId);
 
   const activateLight = (id: string) => {
-    setEditor({ activeRelightLightId: id, isRelightPickerActive: true, isWbPickerActive: false });
+    setEditor({ activeRelightLightId: id, ...canvasToolState({ isRelightPickerActive: true }) });
   };
 
   const handleSelectLight = (id: string) => {

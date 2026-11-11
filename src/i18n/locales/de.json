@@ -23,6 +23,7 @@
       "ariaSelectColor": "{{name}}-Farbe auswählen",
       "blackAndWhite": "Black & White",
       "monochromeDesc": "Switch between color and a persisted monochrome rendering while preserving all color adjustments.",
+      "mixerPickerTooltip": "Farbmischer-Pipette: Auf das Foto klicken und nach oben oder unten ziehen",
       "calibration": {
         "colors": {
           "blue": "Blau",
@@ -95,6 +96,7 @@
       "selectPreset": "Tone curve preset",
       "updatePreset": "Update preset",
       "parametricCurve": "Parametrische Kurve",
+      "pickerTooltip": "Gradationskurven-Pipette: Auf das Foto klicken und nach oben oder unten ziehen",
       "params": {
         "blackLevel": "Schwarzpunkt",
         "darks": "Dunkle Töne",

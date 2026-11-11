@@ -610,6 +610,7 @@ fn render_lut_swatch(
             mask_bitmaps: &[],
             lut: Some(lut),
             roi: None,
+            probe: None,
             motion_blur: Default::default(),
         },
         "generate_lut_previews",

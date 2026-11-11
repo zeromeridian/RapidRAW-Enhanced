@@ -23,6 +23,7 @@
       "ariaSelectColor": "Seleccionar color {{name}}",
       "blackAndWhite": "Black & White",
       "monochromeDesc": "Switch between color and a persisted monochrome rendering while preserving all color adjustments.",
+      "mixerPickerTooltip": "Selector del mezclador de colores: haz clic y arrastra hacia arriba o abajo en la foto",
       "calibration": {
         "colors": {
           "blue": "Azul",
@@ -95,6 +96,7 @@
       "selectPreset": "Tone curve preset",
       "updatePreset": "Update preset",
       "parametricCurve": "Curva paramétrica",
+      "pickerTooltip": "Selector de la curva de tonos: haz clic y arrastra hacia arriba o abajo en la foto",
       "params": {
         "blackLevel": "Nivel de negro",
         "darks": "Oscuros",

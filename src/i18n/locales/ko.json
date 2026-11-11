@@ -23,6 +23,7 @@
       "ariaSelectColor": "{{name}} 색상 선택",
       "blackAndWhite": "Black & White",
       "monochromeDesc": "Switch between color and a persisted monochrome rendering while preserving all color adjustments.",
+      "mixerPickerTooltip": "컬러 믹서 스포이트: 사진을 클릭한 채 위아래로 드래그",
       "calibration": {
         "colors": {
           "blue": "파랑",
@@ -95,6 +96,7 @@
       "selectPreset": "Tone curve preset",
       "updatePreset": "Update preset",
       "parametricCurve": "파라메트릭 커브",
+      "pickerTooltip": "톤 커브 스포이트: 사진을 클릭한 채 위아래로 드래그",
       "params": {
         "blackLevel": "블랙 레벨",
         "darks": "어두운 영역",

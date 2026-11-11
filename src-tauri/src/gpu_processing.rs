@@ -28,12 +28,39 @@ pub enum RenderOutputPrecision {
     SixteenBit,
 }
 
+/// A render that returns, instead of finished pixels, the colour a targeted adjustment
+/// reads at its stage of `shader.wgsl` (its `SAMPLE_PROBE_*` constants).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SampleProbe {
+    /// Hue, saturation and value before the colour mixer.
+    Hsl,
+    /// Red, green, blue and luma before the global tone curve.
+    Curve,
+    /// Red, green, blue and luma before the mask tone curves.
+    MaskCurve,
+}
+
+impl SampleProbe {
+    const COUNT: usize = 3;
+
+    fn index(self) -> usize {
+        self as usize
+    }
+
+    /// The shader's `SAMPLE_PROBE` value; 0 is the normal render.
+    fn shader_value(self) -> f64 {
+        (self.index() + 1) as f64
+    }
+}
+
 pub struct RenderRequest<'a> {
     pub adjustments: AllAdjustments,
     pub mask_bitmaps: &'a [ImageBuffer<Luma<u8>, Vec<u8>>],
     pub lut: Option<Arc<Lut>>,
     pub roi: Option<Roi>,
     pub motion_blur: crate::motion_blur::MotionBlurs,
+    pub probe: Option<SampleProbe>,
 }
 
 fn flare_generation_amount(adjustments: &AllAdjustments) -> f32 {
@@ -625,7 +652,10 @@ pub struct GpuPipelines {
     flare_sampler: wgpu::Sampler,
     main_bgl_entries: Vec<wgpu::BindGroupLayoutEntry>,
     main_bgl: wgpu::BindGroupLayout,
+    main_pipeline_layout: wgpu::PipelineLayout,
+    main_shader_module: wgpu::ShaderModule,
     main_pipeline: wgpu::ComputePipeline,
+    sample_probes: [std::sync::OnceLock<wgpu::ComputePipeline>; SampleProbe::COUNT],
     high_precision: std::sync::OnceLock<HighPrecisionPipeline>,
     motion_blur: std::sync::OnceLock<crate::motion_blur::MotionBlurPipelines>,
     dummy_blur_view: wgpu::TextureView,
@@ -1059,13 +1089,33 @@ impl GpuPipelines {
             flare_sampler,
             main_bgl_entries: bind_group_layout_entries,
             main_bgl,
+            main_pipeline_layout: pipeline_layout,
+            main_shader_module: shader_module,
             main_pipeline,
+            sample_probes: Default::default(),
             high_precision: std::sync::OnceLock::new(),
             motion_blur: std::sync::OnceLock::new(),
             dummy_blur_view,
             dummy_lut_view,
             dummy_lut_sampler,
         }
+    }
+
+    /// A sample probe's pipeline, compiled on first use (only targeted adjustments need it).
+    fn sample_probe(&self, device: &wgpu::Device, probe: SampleProbe) -> &wgpu::ComputePipeline {
+        self.sample_probes[probe.index()].get_or_init(|| {
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("Sample Probe Pipeline"),
+                layout: Some(&self.main_pipeline_layout),
+                module: &self.main_shader_module,
+                entry_point: Some("main"),
+                compilation_options: wgpu::PipelineCompilationOptions {
+                    constants: &[("SAMPLE_PROBE", probe.shader_value())],
+                    ..Default::default()
+                },
+                cache: None,
+            })
+        })
     }
 
     /// The 16-bit output pipeline, compiled on first use (only 16-bit exports need it).
@@ -1458,6 +1508,13 @@ impl GpuProcessor {
                 "High-precision GPU output is only supported for CPU-readback renders.".to_string(),
             );
         }
+        if request.probe.is_some()
+            && (skip_cpu_readback
+                || output_to_display
+                || output_precision != RenderOutputPrecision::EightBit)
+        {
+            return Err("Sample probes are only supported for 8-bit CPU-readback renders.".into());
+        }
 
         let high_precision_tile = if output_precision == RenderOutputPrecision::SixteenBit {
             Some(self.high_precision_tile())
@@ -1476,7 +1533,10 @@ impl GpuProcessor {
                 )
             } else {
                 (
-                    &self.pipelines.main_pipeline,
+                    match request.probe {
+                        Some(probe) => self.pipelines.sample_probe(device, probe),
+                        None => &self.pipelines.main_pipeline,
+                    },
                     &self.pipelines.main_bgl,
                     &self.tile_output_texture,
                     &self.tile_output_texture_view,
@@ -2432,8 +2492,29 @@ fn process_and_get_dynamic_image_inner(
 
 #[cfg(test)]
 mod tests {
-    use super::{flare_generation_amount, high_precision_shader_source};
+    use super::{
+        SampleProbe, flare_generation_amount, high_precision_shader_source, image_shader_source,
+    };
     use crate::image_processing::AllAdjustments;
+
+    #[test]
+    fn sample_probes_match_the_shader_constants() {
+        let source = image_shader_source();
+        assert!(source.contains("override SAMPLE_PROBE: u32 = 0u;"));
+        for (probe, name) in [
+            (SampleProbe::Hsl, "SAMPLE_PROBE_HSL"),
+            (SampleProbe::Curve, "SAMPLE_PROBE_CURVE"),
+            (SampleProbe::MaskCurve, "SAMPLE_PROBE_MASK_CURVE"),
+        ] {
+            let constant = format!("const {name}: u32 = {}u;", probe.shader_value());
+            assert!(source.contains(&constant), "missing `{constant}`");
+            assert!(source.contains(&format!("if (SAMPLE_PROBE == {name})")));
+        }
+        assert_eq!(
+            serde_json::from_str::<SampleProbe>("\"maskCurve\"").unwrap(),
+            SampleProbe::MaskCurve
+        );
+    }
 
     #[test]
     fn high_precision_shader_keeps_shared_transfer_and_changes_storage_format() {
@@ -2547,6 +2628,7 @@ mod tests {
                 mask_bitmaps: &[],
                 lut: None,
                 roi,
+                probe: None,
                 motion_blur: Default::default(),
             };
             match processor

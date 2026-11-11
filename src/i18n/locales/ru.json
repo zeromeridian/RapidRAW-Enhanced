@@ -23,6 +23,7 @@
       "ariaSelectColor": "Выбрать цвет: {{name}}",
       "blackAndWhite": "Black & White",
       "monochromeDesc": "Switch between color and a persisted monochrome rendering while preserving all color adjustments.",
+      "mixerPickerTooltip": "Пипетка смешения цветов: нажмите на фото и перетащите вверх или вниз",
       "calibration": {
         "colors": {
           "blue": "Синий",
@@ -95,6 +96,7 @@
       "selectPreset": "Tone curve preset",
       "updatePreset": "Update preset",
       "parametricCurve": "Параметрическая кривая",
+      "pickerTooltip": "Пипетка тоновой кривой: нажмите на фото и перетащите вверх или вниз",
       "params": {
         "blackLevel": "Точка черного",
         "darks": "Темные тона",

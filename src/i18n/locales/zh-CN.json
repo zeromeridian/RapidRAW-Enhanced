@@ -23,6 +23,7 @@
       "ariaSelectColor": "选择 {{name}} 颜色",
       "blackAndWhite": "Black & White",
       "monochromeDesc": "Switch between color and a persisted monochrome rendering while preserving all color adjustments.",
+      "mixerPickerTooltip": "颜色混合器吸管：在照片上按住并上下拖动",
       "calibration": {
         "colors": {
           "blue": "蓝色",
@@ -95,6 +96,7 @@
       "selectPreset": "Tone curve preset",
       "updatePreset": "Update preset",
       "parametricCurve": "参数曲线",
+      "pickerTooltip": "色调曲线吸管：在照片上按住并上下拖动",
       "params": {
         "blackLevel": "黑色色阶",
         "darks": "暗部",

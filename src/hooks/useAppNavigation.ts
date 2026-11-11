@@ -4,7 +4,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { homeDir } from '@tauri-apps/api/path';
 import { toast } from 'react-toastify';
 import { useLibraryStore } from '../store/useLibraryStore';
-import { useEditorStore } from '../store/useEditorStore';
+import { canvasToolState, useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -198,8 +198,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       activeMaskId: null,
       activeMaskContainerId: null,
       activeAiPatchContainerId: null,
-      isWbPickerActive: false,
-      isRelightPickerActive: false,
+      ...canvasToolState(),
       activeRelightLightId: null,
       activeAiSubMaskId: null,
       transformedOriginalUrl: null,
@@ -267,8 +266,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
         activeMaskContainerId: null,
         activeAiPatchContainerId: null,
         activeAiSubMaskId: null,
-        isWbPickerActive: false,
-        isRelightPickerActive: false,
+        ...canvasToolState(),
         activeRelightLightId: null,
         transformedOriginalUrl: null,
       });
