@@ -9,9 +9,10 @@
   document and test the `--edit` exit codes.
 - **Linux Flatpak: deferred** by the owner (2026-11-02); see "Deferred:
   Linux Flatpak".
-- **Open owner decisions:** 2 (Photo Craft's Save on a 16-bit TIFF), 3
-  (single instance, hands-on on macOS), 5 (sRGB only or also a wide-gamut
-  option); see "Owner decisions".
+- **Owner decisions:** all answered (2, 3 and 5 on 2026-11-10). The work
+  they lead to is `UPSTREAM_FEATURE_GAP.md` Plan item 15: a wide-gamut
+  option, and a round trip that works however the editor saves or opens
+  files.
 - **Known gap:** a copy that is open in Develop does not reload when the
   editor saves it again.
 
@@ -225,20 +226,22 @@ reads it, and a failed read is retried on the next poll.
    cache, so it stages under the Pictures folder instead
    (`~/Pictures/.ThisIsRAW External Edits/`), as recommended. Confirm this
    fallback before implementing it.
-2. **Photo Craft's Save on an opened TIFF.** The docs (`v0.19.0`) say Save
-   writes back to the opened file in its own format; confirm hands-on for a
-   16-bit TIFF. If the user does Save As to PSD, the session either watches
-   the folder for any saved file, or ThisIsRAW gains PSD reading (Photo
-   Craft's standalone PSD crate is MIT/Apache).
-3. **Single instance.** Answered by the docs (`v0.19.0`): yes on every
-   platform, so the file opens as a new tab in the running window. Still
-   confirm hands-on on macOS.
+2. **Decided 2026-11-10: handle every way the editor saves** (no hands-on
+   test needed). The session promotes any supported image saved into the
+   staging folder, whether Save writes back to the TIFF or Save As picks a
+   new name or format. A PSD-only save is still not picked up, because
+   ThisIsRAW cannot read PSD (Photo Craft's MIT/Apache PSD crate would be
+   the way to add it if wanted).
+3. **Decided 2026-11-10: assume nothing about windows.** Whether the editor
+   opens the copy as a new tab or a new window must not matter to the
+   session.
 4. **Decided 2026-11-01: Lightroom's `-Edit` suffix** (`<stem>-Edit.tif`,
    collision-safe as `<stem>-Edit-2.tif`, …), replacing
    `_thisisraw-edit-<timestamp>`. Existing `_thisisraw-edit` files are left
    as they are.
-5. **Round-trip colour space.** sRGB only, or also a wide-gamut 16-bit
-   option.
+5. **Decided 2026-11-10: sRGB plus a wide-gamut option.** sRGB stays the
+   default; each editor can choose a 16-bit ProPhoto RGB TIFF instead, as
+   Lightroom Classic offers.
 6. **Decided 2026-11-01: keep unsaved sessions for 7 days.**
 7. **Decided 2026-11-02: a preferred format per editor.** Each configured
    editor stores TIFF, JPEG, or "ask each time"; Photo Craft defaults to
