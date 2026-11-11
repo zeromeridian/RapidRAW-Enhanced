@@ -323,7 +323,9 @@ details are in `RELEASE_NOTES.MD`.
   Glow has a colour (Hue and Saturation) and Halation a Hue; mask glow and
   halation use the same colours.
 - Mask overlays can be hidden without disabling the selected mask through a
-  dedicated Masking-panel control or configurable `O` shortcut.
+  dedicated Masking-panel control or configurable `O` shortcut. The
+  overlay stays visible and follows the drag while range bars, Tolerance,
+  Grow, Feather or Global Feather shape the mask.
 - Brush and Flow masks preview their adjustments live while painting, with
   smoothed strokes, a brush size of up to 1000, and Lightroom-style `[` / `]`
   size shortcuts (Rotate 90° uses Command/Ctrl+`[` / `]`).

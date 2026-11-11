@@ -50,6 +50,8 @@ const parseRgb = (rgbStr: string): [number, number, number, number] => {
 
 const NEUTRAL_GREY_RGB: [number, number, number, number] = [128 / 255, 128 / 255, 128 / 255, 1.0];
 const NEUTRAL_GREY_CSS = '#808080';
+/** Linear size of the mask overlay while a drag shapes the mask (a quarter of the pixels). */
+const MASK_OVERLAY_DRAG_SCALE = 0.5;
 
 const checkCropValid = (pixelCrop: Partial<Crop>, imageW: number, imageH: number, rotation: number) => {
   if (pixelCrop.x === undefined || pixelCrop.y === undefined || !pixelCrop.width || !pixelCrop.height) {
@@ -123,6 +125,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   const showOriginal = useEditorStore((s) => s.showOriginal);
   const maskOverlayVisible = useEditorStore((s) => s.maskOverlayVisible);
   const isSliderDragging = useEditorStore((s) => s.isSliderDragging);
+  const isMaskShapeDragging = useEditorStore((s) => s.isSliderDragging && s.isMaskShapeDragging);
   const targetZoom = useEditorStore((s) => s.zoom);
   const originalSize = useEditorStore((s) => s.originalSize);
   const isRotationActive = useEditorStore((s) => s.isRotationActive);
@@ -1424,7 +1427,17 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
       }
     }
 
-    requestMaskOverlay(maskDefForOverlay, imageRenderSize, adjustments);
+    // While a drag shapes the mask, a smaller overlay keeps up with it; the canvas stretches it
+    // to the photo, and release renders it at full size again.
+    const overlaySize = isMaskShapeDragging
+      ? {
+          ...imageRenderSize,
+          width: imageRenderSize.width * MASK_OVERLAY_DRAG_SCALE,
+          height: imageRenderSize.height * MASK_OVERLAY_DRAG_SCALE,
+          scale: imageRenderSize.scale * MASK_OVERLAY_DRAG_SCALE,
+        }
+      : imageRenderSize;
+    requestMaskOverlay(maskDefForOverlay, overlaySize, adjustments);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     overlayTriggerHash,
@@ -1433,6 +1446,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     activeMaskContainerId,
     activeAiPatchContainerId,
     imageRenderSize,
+    isMaskShapeDragging,
   ]);
 
   useEffect(() => {
