@@ -43,6 +43,11 @@ const GUARD: f32 = 0.0005;
 const MATTE_EDGE: f32 = 1.5;
 const MATTE_SMOOTH: f32 = 0.0004;
 const MATTE_TILE: usize = 64;
+/// In a mixed mask, edges narrower than this share of the image diagonal snap like an AI
+/// outline, edges wider than [`MATTE_SOFT_WIDTH`] keep the mask's values, and the snap fades
+/// out in between.
+const MATTE_SHARP_WIDTH: f32 = 0.01;
+const MATTE_SOFT_WIDTH: f32 = 0.04;
 /// Mask types whose edges follow an object, so a blur can separate subject and background.
 const SEGMENTED_TYPES: [&str; 5] = [
     "ai-subject",
@@ -57,6 +62,9 @@ const AMOUNT_GAMMA: f32 = 1.5;
 const TAPS: f32 = 8.0;
 const AUTO_BORDER_SHARE: f32 = 0.5;
 const AUTO_FULL_COVER: f32 = 0.98;
+const AUTO_SOFT_SHARE: f32 = 0.25;
+/// Mask values between these count as partly covered in [`MaskStats::soft`].
+const SOFT_BAND: (f32, f32) = (0.1, 0.9);
 const STATS_SAMPLES: f32 = 1_048_576.0;
 const SPIN_GRID: u32 = 256;
 const SPIN_MIN_SHARE: f64 = 0.05;
@@ -94,6 +102,9 @@ pub struct MotionBlur {
     pub highlights: f32,
     pub depth: f32,
     pub segmented: bool,
+    /// A segmented mask that also has drawn or colour-range components, or a component below
+    /// full opacity: its matte keeps their soft ramps and sharpens only the AI outlines.
+    pub mixed: bool,
 }
 
 #[derive(Clone, Default)]
@@ -128,7 +139,12 @@ fn percent(value: &Value, default: f64) -> f32 {
     (value.as_f64().unwrap_or(default) as f32 / 100.0).clamp(0.0, 1.0)
 }
 
-fn motion_blur(adj: &Value, mask: Option<usize>, segmented: bool) -> Option<MotionBlur> {
+fn motion_blur(
+    adj: &Value,
+    mask: Option<usize>,
+    segmented: bool,
+    mixed: bool,
+) -> Option<MotionBlur> {
     let amount = percent(&adj["motionBlurAmount"], 0.0);
     if amount <= 0.0 || !is_section_visible(adj, "effects") {
         return None;
@@ -157,12 +173,17 @@ fn motion_blur(adj: &Value, mask: Option<usize>, segmented: bool) -> Option<Moti
             0.0
         },
         segmented,
+        mixed,
     })
 }
 
 /// Whether the whole-image motion blur is on (mask motion blurs make an edit through their mask).
 pub fn is_active(adjustments: &Value) -> bool {
-    motion_blur(adjustments, None, false).is_some()
+    motion_blur(adjustments, None, false, false).is_some()
+}
+
+fn is_segmented(sub: &Value) -> bool {
+    SEGMENTED_TYPES.contains(&sub["type"].as_str().unwrap_or(""))
 }
 
 fn from_adjustments(adjustments: &Value) -> Vec<MotionBlur> {
@@ -177,13 +198,18 @@ fn from_adjustments(adjustments: &Value) -> Vec<MotionBlur> {
         .take(MAX_MASKS)
         .enumerate()
         .filter_map(|(index, mask)| {
-            let segmented = mask["subMasks"].as_array().is_some_and(|subs| {
-                subs.iter()
-                    .any(|sub| SEGMENTED_TYPES.contains(&sub["type"].as_str().unwrap_or("")))
-            });
-            motion_blur(&mask["adjustments"], Some(index), segmented)
+            let subs = mask["subMasks"].as_array().map_or(&[][..], Vec::as_slice);
+            let segmented = subs.iter().any(is_segmented);
+            let mixed = segmented
+                && subs
+                    .iter()
+                    .filter(|sub| sub["visible"].as_bool().unwrap_or(true))
+                    .any(|sub| {
+                        !is_segmented(sub) || sub["opacity"].as_f64().unwrap_or(100.0) < 100.0
+                    });
+            motion_blur(&mask["adjustments"], Some(index), segmented, mixed)
         })
-        .chain(motion_blur(adjustments, None, false))
+        .chain(motion_blur(adjustments, None, false, false))
         .collect()
 }
 
@@ -235,7 +261,7 @@ pub fn cache_key(
         .map(|map| (map.dimensions(), map.as_raw()))
         .hash(&mut hasher);
     for blur in blurs {
-        (blur.mask, blur.kind, blur.layer, blur.segmented).hash(&mut hasher);
+        (blur.mask, blur.kind, blur.layer, blur.segmented, blur.mixed).hash(&mut hasher);
         for value in [blur.amount, blur.angle, blur.highlights, blur.depth] {
             value.to_bits().hash(&mut hasher);
         }
@@ -335,28 +361,60 @@ fn snap_alpha(value: f32, gx: f32, gy: f32) -> f32 {
     (0.5 + (value - 0.5) / slope).clamp(0.0, 1.0)
 }
 
-fn snap_window(values: &[f32], w: usize, h: usize) -> Vec<f32> {
+/// How much of the snap applies where a mask's values cross their full range over
+/// `1 / steepness` of the image diagonal: all of it on AI outlines, none on drawn ramps.
+fn ramp_snap_share(steepness: f32) -> f32 {
+    let (soft, sharp) = (MATTE_SOFT_WIDTH.recip(), MATTE_SHARP_WIDTH.recip());
+    let t = ((steepness - soft) / (sharp - soft)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// Keeps a mixed mask's soft ramps out of the snap. `spread` widens the slope estimate past
+/// 8-bit steps, so a wide ramp does not read as a row of narrow edges.
+#[derive(Clone, Copy)]
+struct RampGuard {
+    spread: usize,
+    diagonal: f32,
+}
+
+fn snap_window(values: &[f32], w: usize, h: usize, guard: Option<RampGuard>) -> Vec<f32> {
     let at = |x: usize, y: usize| values[y * w + x];
+    let slope = |x: usize, y: usize, reach: usize| {
+        let (left, right) = (x.saturating_sub(reach), (x + reach).min(w - 1));
+        let (up, down) = (y.saturating_sub(reach), (y + reach).min(h - 1));
+        (
+            (at(right, y) - at(left, y)) / (right - left).max(1) as f32,
+            (at(x, down) - at(x, up)) / (down - up).max(1) as f32,
+        )
+    };
     (0..w * h)
         .map(|i| {
             let (x, y) = (i % w, i / w);
-            let (left, right) = (x.saturating_sub(1), (x + 1).min(w - 1));
-            let (up, down) = (y.saturating_sub(1), (y + 1).min(h - 1));
-            snap_alpha(
-                at(x, y),
-                (at(right, y) - at(left, y)) * 0.5,
-                (at(x, down) - at(x, up)) * 0.5,
-            )
+            let value = at(x, y);
+            let (gx, gy) = slope(x, y, 1);
+            let snapped = snap_alpha(value, gx, gy);
+            match guard {
+                None => snapped,
+                Some(RampGuard { spread, diagonal }) => {
+                    let (sx, sy) = slope(x, y, spread);
+                    value + (snapped - value) * ramp_snap_share(sx.hypot(sy) * diagonal)
+                }
+            }
         })
         .collect()
 }
 
-fn refine_matte(mask: &GrayImage, peak: f32) -> GrayImage {
+fn refine_matte(mask: &GrayImage, peak: f32, keep_ramps: bool) -> GrayImage {
     let (w, h) = (mask.width() as usize, mask.height() as usize);
     let raw = mask.as_raw();
     let inv = 1.0 / (peak * 255.0);
-    let radius = ((w as f32).hypot(h as f32) * MATTE_SMOOTH).round().max(1.0) as usize;
+    let diagonal = (w as f32).hypot(h as f32);
+    let radius = (diagonal * MATTE_SMOOTH).round().max(1.0) as usize;
     let margin = 2 * radius + 2;
+    let guard = keep_ramps.then_some(RampGuard {
+        spread: radius,
+        diagonal,
+    });
     let to_u8 = |alpha: f32| (alpha * 255.0).round() as u8;
 
     let mut matte = GrayImage::new(w as u32, h as u32);
@@ -372,11 +430,11 @@ fn refine_matte(mask: &GrayImage, peak: f32) -> GrayImage {
                 let (wx1, wy1) = ((x0 + cols + margin).min(w), (y0 + rows + margin).min(h));
                 let first = raw[wy0 * w + wx0];
                 if (wy0..wy1).all(|y| raw[y * w + wx0..y * w + wx1].iter().all(|&v| v == first)) {
-                    let value = to_u8(snap_alpha(
-                        snap_alpha(first as f32 * inv, 0.0, 0.0),
-                        0.0,
-                        0.0,
-                    ));
+                    let alpha = (first as f32 * inv).min(1.0);
+                    let value = to_u8(match guard {
+                        Some(_) => alpha,
+                        None => snap_alpha(snap_alpha(alpha, 0.0, 0.0), 0.0, 0.0),
+                    });
                     for y in 0..rows {
                         band[y * w + x0..y * w + x0 + cols].fill(value);
                     }
@@ -388,11 +446,11 @@ fn refine_matte(mask: &GrayImage, peak: f32) -> GrayImage {
                     .flat_map(|y| raw[y * w + wx0..y * w + wx1].iter())
                     .map(|&v| v as f32 * inv)
                     .collect();
-                let mut snapped = snap_window(&window, ww, wh);
+                let mut snapped = snap_window(&window, ww, wh, guard);
                 for _ in 0..2 {
                     box_blur(&mut snapped, ww, wh, radius);
                 }
-                let refined = snap_window(&snapped, ww, wh);
+                let refined = snap_window(&snapped, ww, wh, guard);
                 for row in 0..rows {
                     let source = (y0 + row - wy0) * ww + x0 - wx0;
                     for (out, &alpha) in band[row * w + x0..row * w + x0 + cols]
@@ -411,6 +469,8 @@ struct MaskStats {
     peak: f32,
     border: f32,
     cover: f32,
+    /// Share of the masked area that is only partly covered (a fade rather than an outline).
+    soft: f32,
     centroid: [f32; 2],
     hole_centroid: [f32; 2],
 }
@@ -421,6 +481,7 @@ impl MaskStats {
             peak: 1.0,
             border: 1.0,
             cover: 1.0,
+            soft: 0.0,
             centroid: [w * 0.5, h * 0.5],
             hole_centroid: [w * 0.5, h * 0.5],
         }
@@ -430,6 +491,8 @@ impl MaskStats {
 #[derive(Default, Clone, Copy)]
 struct StatsSums {
     count: f32,
+    masked: f32,
+    partial: f32,
     q: f32,
     qx: f32,
     qy: f32,
@@ -442,6 +505,8 @@ impl StatsSums {
     fn add(self, o: Self) -> Self {
         Self {
             count: self.count + o.count,
+            masked: self.masked + o.masked,
+            partial: self.partial + o.partial,
             q: self.q + o.q,
             qx: self.qx + o.qx,
             qy: self.qy + o.qy,
@@ -474,6 +539,12 @@ fn mask_stats(mask: &GrayImage) -> Option<MaskStats> {
                 let q = q_at(x, y);
                 let fx = x as f32 + 0.5;
                 s.count += 1.0;
+                if q > SOFT_BAND.0 {
+                    s.masked += 1.0;
+                    if q < SOFT_BAND.1 {
+                        s.partial += 1.0;
+                    }
+                }
                 s.q += q;
                 s.qx += q * fx;
                 s.qy += q * fy;
@@ -509,14 +580,22 @@ fn mask_stats(mask: &GrayImage) -> Option<MaskStats> {
         peak: peak as f32 / 255.0,
         border: border_sum / border_count,
         cover: sums.q / sums.count.max(1.0),
+        soft: sums.partial / sums.masked.max(1.0),
         centroid: centroid_of(sums.q, sums.qx, sums.qy),
         hole_centroid: centroid_of(sums.h, sums.hx, sums.hy),
     })
 }
 
+/// Auto separates subject and background only along a clear outline. A mixed mask that is
+/// mostly fade (a gradient through an AI mask) blurs uniformly, so its strength follows the
+/// fade instead of flipping between Panning and Moving Subject at a small change.
 fn resolve_layer(blur: &MotionBlur, stats: &MaskStats) -> MotionLayer {
     match blur.layer {
-        MotionLayer::Auto if !blur.segmented || stats.cover > AUTO_FULL_COVER => {
+        MotionLayer::Auto
+            if !blur.segmented
+                || stats.cover > AUTO_FULL_COVER
+                || (blur.mixed && stats.soft > AUTO_SOFT_SHARE) =>
+        {
             MotionLayer::Uniform
         }
         MotionLayer::Auto if stats.border > AUTO_BORDER_SHARE => MotionLayer::Panning,
@@ -800,7 +879,7 @@ fn plan(
         spins,
         matte: mask
             .filter(|_| needs_matte(blur))
-            .map(|mask| refine_matte(mask, stats.peak)),
+            .map(|mask| refine_matte(mask, stats.peak, blur.mixed)),
     })
 }
 
@@ -1596,6 +1675,7 @@ mod tests {
         let mask = blurs[0];
         assert_eq!(mask.mask, Some(0));
         assert!(mask.segmented);
+        assert!(!mask.mixed);
         assert_eq!(mask.layer, MotionLayer::Panning);
         assert_eq!(mask.kind, MotionKind::Linear);
         assert!((mask.amount - 0.6).abs() < 1e-6);
@@ -1609,6 +1689,138 @@ mod tests {
         assert_eq!(photo.angle, 30.0);
         assert_eq!(photo.depth, 0.0);
         assert!(is_active(&adjustments));
+    }
+
+    #[test]
+    fn mixed_masks_combine_ai_with_other_components() {
+        let blur = |subs: Value| {
+            from_adjustments(&json!({
+                "masks": [{
+                    "visible": true,
+                    "subMasks": subs,
+                    "adjustments": { "motionBlurAmount": 50 }
+                }]
+            }))[0]
+        };
+        let pure = blur(json!([{ "type": "ai-foreground" }, { "type": "ai-sky" }]));
+        assert!(pure.segmented && !pure.mixed);
+        let minus_linear = blur(json!([
+            { "type": "ai-foreground", "invert": true },
+            { "type": "linear", "mode": "subtractive" }
+        ]));
+        assert!(minus_linear.segmented && minus_linear.mixed);
+        let faded = blur(json!([{ "type": "ai-subject", "opacity": 60 }]));
+        assert!(faded.mixed);
+        let hidden_linear = blur(json!([
+            { "type": "ai-subject" },
+            { "type": "linear", "visible": false }
+        ]));
+        assert!(!hidden_linear.mixed);
+        // Drawn masks without AI keep the plain matte.
+        let drawn = blur(json!([{ "type": "linear" }]));
+        assert!(!drawn.segmented && !drawn.mixed);
+    }
+
+    /// Left half: a drawn ramp over half the height. Right half: an AI-like outline
+    /// softened over a few pixels.
+    fn ramp_and_outline() -> GrayImage {
+        GrayImage::from_fn(400, 600, |x, y| {
+            let alpha = if x < 200 {
+                (500.0 - y as f32) / 400.0
+            } else {
+                (303.0 - y as f32) / 6.0
+            };
+            Luma([(alpha.clamp(0.0, 1.0) * 255.0).round() as u8])
+        })
+    }
+
+    #[test]
+    fn mixed_mattes_keep_drawn_ramps_and_snap_ai_outlines() {
+        let mask = ramp_and_outline();
+        let mixed = refine_matte(&mask, 1.0, true);
+        let plain = refine_matte(&mask, 1.0, false);
+        let at = |m: &GrayImage, x, y| m.get_pixel(x, y)[0] as i32;
+
+        for y in (120..=480).step_by(40) {
+            let input = at(&mask, 100, y);
+            assert!(
+                (at(&mixed, 100, y) - input).abs() <= 2,
+                "ramp at y={y}: {} vs {input}",
+                at(&mixed, 100, y)
+            );
+        }
+        // The plain matte turns the same ramp into a step at its middle.
+        assert_eq!(at(&plain, 100, 200), 255);
+        assert_eq!(at(&plain, 100, 400), 0);
+
+        // The AI outline snaps the same way in both mattes.
+        let soft = |m: &GrayImage| {
+            (280..320)
+                .filter(|&y| (16..240).contains(&at(m, 300, y)))
+                .count()
+        };
+        assert!(soft(&mask) >= 4);
+        for m in [&mixed, &plain] {
+            assert!(soft(m) <= 2, "outline still {} px soft", soft(m));
+        }
+        assert_eq!(at(&mixed, 300, 280), 255);
+        assert_eq!(at(&mixed, 300, 320), 0);
+    }
+
+    #[test]
+    fn auto_blurs_a_mostly_faded_mixed_mask_uniformly() {
+        let mixed = from_adjustments(&json!({
+            "masks": [{
+                "visible": true,
+                "subMasks": [
+                    { "type": "ai-foreground", "invert": true },
+                    { "type": "linear", "mode": "subtractive", "opacity": 92 }
+                ],
+                "adjustments": { "motionBlurAmount": 50 }
+            }]
+        }))[0];
+        assert_eq!(mixed.layer, MotionLayer::Auto);
+
+        // The reported photo: full at the top, a long fade down to what the linear's
+        // opacity leaves, and the person cut out.
+        let faded = |left: f32| {
+            GrayImage::from_fn(200, 300, |x, y| {
+                let alpha = if (120..140).contains(&x) && (200..250).contains(&y) {
+                    0.0
+                } else {
+                    let t = ((y as f32 - 15.0) / 220.0).clamp(0.0, 1.0);
+                    1.0 - t * (1.0 - left)
+                };
+                Luma([(alpha * 255.0).round() as u8])
+            })
+        };
+        for left in [0.08, 0.07, 0.3] {
+            let stats = mask_stats(&faded(left)).unwrap();
+            assert_eq!(
+                resolve_layer(&mixed, &stats),
+                MotionLayer::Uniform,
+                "{left}"
+            );
+        }
+
+        // A crisp AI subject with a brushed addition still separates subject and background.
+        let crisp = GrayImage::from_fn(200, 300, |x, y| {
+            Luma([if (60..140).contains(&x) && (80..260).contains(&y) {
+                255
+            } else {
+                0
+            }])
+        });
+        let stats = mask_stats(&crisp).unwrap();
+        assert_eq!(resolve_layer(&mixed, &stats), MotionLayer::Subject);
+
+        // Pure AI masks keep Auto's choice even when soft.
+        let pure = MotionBlur {
+            mixed: false,
+            ..mixed
+        };
+        let stats = mask_stats(&faded(0.08)).unwrap();
+        assert_ne!(resolve_layer(&pure, &stats), MotionLayer::Uniform);
     }
 
     #[test]
@@ -1647,6 +1859,9 @@ mod tests {
         assert_ne!(key, cache_key(1, 2, Some(&depth), &blurs));
         let stronger = from_adjustments(&json!({ "motionBlurAmount": 51 }));
         assert_ne!(key, cache_key(1, 2, None, &stronger));
+        let mut mixed = blurs.clone();
+        mixed[0].mixed = true;
+        assert_ne!(key, cache_key(1, 2, None, &mixed));
     }
 
     #[test]

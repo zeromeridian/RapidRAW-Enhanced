@@ -290,7 +290,10 @@ details are in `RELEASE_NOTES.MD`.
   blurs, plus smooth in masks, with Highlights (bright lights keep their
   energy in the streak) and the image's grain restored over blurred areas.
   In AI-subject masks the Motion setting separates subject and background
-  (Auto, Moving Subject, Panning, Uniform) without halos. **Depth** uses an
+  (Auto, Moving Subject, Panning, Uniform) without halos. When an AI mask
+  also has drawn or colour-range components, or one below full opacity,
+  the blur keeps their soft fades and sharpens only the AI outlines; Auto
+  blurs such a mask uniformly when it is mostly fade. **Depth** uses an
   AI depth map so near objects streak more than distant ones. The linear
   direction is set with a compass dial (Shift snaps to 15°) or a typed angle
   from −90° to 90°.

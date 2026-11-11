@@ -5,6 +5,29 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.41.2-dev-rr-gap — 2026-11-11
+
+### Fixes
+
+- **Motion Blur on Auto no longer jumps between looks** on a mask that is
+  mostly a fade, such as an AI mask with a Linear gradient subtracted. A
+  one-step change (for example the gradient's opacity from 92 to 93) could
+  switch between a sharp wall and a grey smear. Auto now blurs such masks
+  evenly, with the strength following the fade. Moving Subject and Panning
+  can still be chosen by hand.
+
+## 1.41.1-dev-rr-gap — 2026-11-11
+
+### Fixes
+
+- **Motion Blur in a mixed mask fades smoothly.** When an AI mask is
+  combined with a Linear, Radial or Brush component (for example an
+  inverted Foreground minus a Linear gradient), the blur now follows the
+  gradient instead of stopping at a hard line. The same applies to Color
+  and Luminance components and to components below full opacity. AI
+  outlines stay crisp. Existing Motion Blur edits on such masks change
+  accordingly; masks made only of AI components look the same as before.
+
 ## 1.41.0-dev-rr-gap — 2026-11-10
 
 ### Develop
