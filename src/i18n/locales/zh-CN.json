@@ -656,10 +656,14 @@
       "depthRange": {
         "far": "远",
         "near": "近",
-        "reset": "重置",
         "title": "深度范围"
       },
       "dropzoneText": "拖放到此处以创建新蒙版",
+      "luminanceRange": {
+        "dark": "暗",
+        "light": "亮",
+        "title": "亮度范围"
+      },
       "maskAdjustmentsTitle": "蒙版调整",
       "maskingTitle": "蒙版",
       "masksTitle": "蒙版",

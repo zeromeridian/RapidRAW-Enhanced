@@ -231,6 +231,31 @@ impl Default for ParametricMaskParameters {
     }
 }
 
+/// A Luminance mask's tone range in percent (0 black, 100 white). Masks made before `1.42.0`
+/// have none and keep selecting by Tolerance around the picked tone.
+#[derive(Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+struct LuminanceRangeParameters {
+    min_luminance: f32,
+    max_luminance: f32,
+    #[serde(default)]
+    min_fade: f32,
+    #[serde(default)]
+    max_fade: f32,
+}
+
+/// Rec. 601 luma of a source pixel in 0–255, the tone a Luminance mask selects by.
+fn pixel_luma(pixel: Rgba<u8>) -> f32 {
+    0.299 * pixel[0] as f32 + 0.587 * pixel[1] as f32 + 0.114 * pixel[2] as f32
+}
+
+fn source_pixel_at(warped: &DynamicImage, x: f64, y: f64) -> Option<Rgba<u8>> {
+    let (x, y) = (x.round() as i64, y.round() as i64);
+    let (width, height) = warped.dimensions();
+    (x >= 0 && y >= 0 && x < width as i64 && y < height as i64)
+        .then(|| warped.get_pixel(x as u32, y as u32))
+}
+
 fn grayscale_dilate(image: &GrayImage, k: u8) -> GrayImage {
     let (width, height) = image.dimensions();
     if width == 0 || height == 0 {
@@ -922,26 +947,27 @@ fn generate_ai_sky_bitmap(
     Some(mask)
 }
 
-/// Mask strength at a nearness in percent (100 nearest): the depth range with its fades, scaled
-/// by the nearness itself unless the mask has `full_strength` (masks made before `1.41.5`).
-fn ai_depth_mask_weight(params: &AiDepthMaskParameters, nearness: f32) -> f32 {
+/// Strength of a range mask at `value`: full between `min` and `max`, easing to zero over
+/// `min_fade` below and `max_fade` above. All in percent, as the range bar shows them.
+fn range_band_weight(min: f32, max: f32, min_fade: f32, max_fade: f32, value: f32) -> f32 {
     fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
         let t = ((x - edge0) / (edge1 - edge0).max(0.0001)).clamp(0.0, 1.0);
         t * t * (3.0 - 2.0 * t)
     }
 
-    let lower = smoothstep(
-        params.min_depth - params.min_fade,
+    smoothstep(min - min_fade, min, value) * (1.0 - smoothstep(max, max + max_fade, value))
+}
+
+/// Mask strength at a nearness in percent (100 nearest): the depth range with its fades, scaled
+/// by the nearness itself unless the mask has `full_strength` (masks made before `1.41.5`).
+fn ai_depth_mask_weight(params: &AiDepthMaskParameters, nearness: f32) -> f32 {
+    let band = range_band_weight(
         params.min_depth,
+        params.max_depth,
+        params.min_fade,
+        params.max_fade,
         nearness,
     );
-    let upper = 1.0
-        - smoothstep(
-            params.max_depth,
-            params.max_depth + params.max_fade,
-            nearness,
-        );
-    let band = lower * upper;
     if params.full_strength {
         band
     } else {
@@ -1079,13 +1105,7 @@ fn generate_color_bitmap(
     let warped = warped_image?;
     let (full_w, full_h) = warped.dimensions();
 
-    let target_x = params.target_x.round() as i32;
-    let target_y = params.target_y.round() as i32;
-    if target_x < 0 || target_y < 0 || target_x >= full_w as i32 || target_y >= full_h as i32 {
-        return None;
-    }
-
-    let ref_pixel = warped.get_pixel(target_x as u32, target_y as u32);
+    let ref_pixel = source_pixel_at(warped, params.target_x, params.target_y)?;
     let ref_r = ref_pixel[0] as f32;
     let ref_g = ref_pixel[1] as f32;
     let ref_b = ref_pixel[2] as f32;
@@ -1180,15 +1200,31 @@ fn generate_luminance_bitmap(
     let warped = warped_image?;
     let (full_w, full_h) = warped.dimensions();
 
-    let target_x = params.target_x.round() as i32;
-    let target_y = params.target_y.round() as i32;
-    if target_x < 0 || target_y < 0 || target_x >= full_w as i32 || target_y >= full_h as i32 {
-        return None;
-    }
-
-    let ref_pixel = warped.get_pixel(target_x as u32, target_y as u32);
-    let ref_luma =
-        0.299 * ref_pixel[0] as f32 + 0.587 * ref_pixel[1] as f32 + 0.114 * ref_pixel[2] as f32;
+    let range: Option<LuminanceRangeParameters> =
+        serde::Deserialize::deserialize(params_value).ok();
+    let luma_weight: Box<dyn Fn(f32) -> f32> = match range {
+        Some(r) => Box::new(move |luma| {
+            range_band_weight(
+                r.min_luminance,
+                r.max_luminance,
+                r.min_fade,
+                r.max_fade,
+                luma / 2.55,
+            )
+        }),
+        None => {
+            let ref_luma = pixel_luma(source_pixel_at(warped, params.target_x, params.target_y)?);
+            let tolerance_val = (params.tolerance * 2.55).max(1.0);
+            Box::new(move |luma| {
+                let dist = (luma - ref_luma).abs();
+                if dist <= tolerance_val {
+                    1.0 - (dist / tolerance_val)
+                } else {
+                    0.0
+                }
+            })
+        }
+    };
 
     let mut mask = GrayImage::new(width, height);
 
@@ -1207,7 +1243,6 @@ fn generate_luminance_bitmap(
     let center_x = scaled_coarse_rotated_w / 2.0;
     let center_y = scaled_coarse_rotated_h / 2.0;
 
-    let tolerance_val = (params.tolerance * 2.55).max(1.0);
     let inv_scale = 1.0 / scale;
 
     for y_out in 0..height {
@@ -1250,13 +1285,8 @@ fn generate_luminance_bitmap(
                 let y_src = (y_unrotated_coarse * inv_scale) as u32;
 
                 if x_src < full_w && y_src < full_h {
-                    let pixel = warped.get_pixel(x_src, y_src);
-                    let luma =
-                        0.299 * pixel[0] as f32 + 0.587 * pixel[1] as f32 + 0.114 * pixel[2] as f32;
-                    let dist = (luma - ref_luma).abs();
-
-                    if dist <= tolerance_val {
-                        let intensity = 1.0 - (dist / tolerance_val);
+                    let intensity = luma_weight(pixel_luma(warped.get_pixel(x_src, y_src)));
+                    if intensity > 0.0 {
                         mask.put_pixel(x_out, y_out, Luma([(intensity * 255.0) as u8]));
                     }
                 }
@@ -1443,6 +1473,24 @@ pub async fn generate_mask_overlay(
     .await
 }
 
+/// The tone a Luminance mask reads at a picked point (`x`, `y` as in its `targetX`/`targetY`),
+/// in percent, or `None` outside the photo.
+#[tauri::command]
+pub async fn sample_mask_luminance(
+    mut js_adjustments: serde_json::Value,
+    x: f64,
+    y: f64,
+    app_handle: tauri::AppHandle,
+) -> Result<Option<f32>, String> {
+    crate::blocking_command::run_blocking(move || {
+        let state = app_handle.state::<AppState>();
+        crate::adjustment_utils::hydrate_adjustments(&state, &mut js_adjustments);
+        let warped = get_cached_full_warped_image(&state, &js_adjustments)?;
+        Ok(source_pixel_at(&warped, x, y).map(|pixel| pixel_luma(pixel) / 2.55))
+    })
+    .await
+}
+
 fn generate_mask_overlay_blocking(
     mut mask_def: serde_json::Value,
     width: u32,
@@ -1590,9 +1638,55 @@ pub fn get_cached_or_generate_mask(
 
 #[cfg(test)]
 mod tests {
-    use super::{MaskDefinition, ai_depth_mask_weight, mask_cache_key};
+    use super::{MaskDefinition, ai_depth_mask_weight, generate_luminance_bitmap, mask_cache_key};
     use crate::ai_processing::AiDepthMaskParameters;
+    use image::{DynamicImage, RgbImage};
     use serde_json::json;
+
+    /// A one-row grey ramp: pixel `x` has the tone `x` (0–255).
+    fn grey_ramp() -> DynamicImage {
+        DynamicImage::ImageRgb8(RgbImage::from_fn(256, 1, |x, _| {
+            image::Rgb([x as u8, x as u8, x as u8])
+        }))
+    }
+
+    fn luminance_row(params: serde_json::Value) -> Vec<u8> {
+        generate_luminance_bitmap(&params, 256, 1, 1.0, (0.0, 0.0), Some(&grey_ramp()))
+            .unwrap()
+            .into_raw()
+    }
+
+    #[test]
+    fn luminance_masks_without_a_range_keep_the_tolerance_selection() {
+        let row = luminance_row(json!({ "targetX": 128.0, "targetY": 0.0, "tolerance": 20.0 }));
+        // The selection before `1.42.0`: linear falloff over the tolerance around the pick.
+        let tolerance = 20.0f32 * 2.55;
+        let luma = |v: f32| 0.299 * v + 0.587 * v + 0.114 * v;
+        for (x, &value) in row.iter().enumerate() {
+            let dist = (luma(x as f32) - luma(128.0)).abs();
+            let expected = if dist <= tolerance {
+                ((1.0 - dist / tolerance) * 255.0) as u8
+            } else {
+                0
+            };
+            assert_eq!(value, expected, "tone {x}");
+        }
+    }
+
+    #[test]
+    fn luminance_ranges_select_tones_with_fades() {
+        let row = luminance_row(json!({
+            "targetX": -10000.0, "targetY": -10000.0,
+            "minLuminance": 40.0, "maxLuminance": 60.0, "minFade": 10.0, "maxFade": 0.0,
+        }));
+        let at = |percent: f32| row[(percent * 2.55).round() as usize];
+        assert_eq!(at(50.0), 255);
+        assert_eq!(at(40.0), 255);
+        assert_eq!(at(59.0), 255);
+        assert_eq!(at(25.0), 0);
+        assert_eq!(at(65.0), 0);
+        assert!(at(35.0) > 0 && at(35.0) < 255);
+    }
 
     #[test]
     fn full_strength_depth_masks_cover_far_ranges_fully() {

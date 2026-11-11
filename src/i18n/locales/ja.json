@@ -656,10 +656,14 @@
       "depthRange": {
         "far": "遠景",
         "near": "近景",
-        "reset": "リセット",
         "title": "奥行き範囲"
       },
       "dropzoneText": "ここにドロップして新しいマスクを作成",
+      "luminanceRange": {
+        "dark": "暗い",
+        "light": "明るい",
+        "title": "ルミナンス範囲"
+      },
       "maskAdjustmentsTitle": "マスク補正",
       "maskingTitle": "マスク処理",
       "masksTitle": "マスク一覧",

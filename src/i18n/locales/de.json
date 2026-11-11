@@ -658,10 +658,14 @@
       "depthRange": {
         "far": "Fern",
         "near": "Nah",
-        "reset": "Zurücksetzen",
         "title": "Tiefenbereich"
       },
       "dropzoneText": "Hier ablegen, um eine neue Maske zu erstellen",
+      "luminanceRange": {
+        "dark": "Dunkel",
+        "light": "Hell",
+        "title": "Luminanzbereich"
+      },
       "maskAdjustmentsTitle": "Maskenanpassungen",
       "maskingTitle": "Maskieren",
       "masksTitle": "Masken",

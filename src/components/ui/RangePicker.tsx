@@ -3,44 +3,48 @@ import { useTranslation } from 'react-i18next';
 import Text from './Text';
 import { TextVariants } from '../../types/typography';
 
-export function DepthRangePicker({
-  minDepth,
-  maxDepth,
-  minFade,
-  maxFade,
-  defaultMinDepth = 20,
-  defaultMaxDepth = 100,
-  defaultMinFade = 15,
-  defaultMaxFade = 15,
+/** A range bar's values in percent: the fully selected span and the fades beyond each end. */
+export interface RangeValues {
+  min: number;
+  max: number;
+  minFade: number;
+  maxFade: number;
+}
+
+/**
+ * A Lightroom-style range bar: two handles bound the fully selected span, two smaller ones
+ * set the fades beyond it; the span drags as a whole and clicking the title resets it.
+ */
+export function RangePicker({
+  title,
+  startLabel,
+  endLabel,
+  gradient,
+  value,
+  defaults,
   onChange,
   onDragStateChange,
 }: {
-  minDepth: number;
-  maxDepth: number;
-  minFade: number;
-  maxFade: number;
-  defaultMinDepth?: number;
-  defaultMaxDepth?: number;
-  defaultMinFade?: number;
-  defaultMaxFade?: number;
-  onChange: (values: { minDepth: number; maxDepth: number; minFade: number; maxFade: number }) => void;
+  title: string;
+  startLabel: string;
+  endLabel: string;
+  /** CSS background of the track, from the 0 end to the 100 end. */
+  gradient: string;
+  value: RangeValues;
+  defaults: RangeValues;
+  onChange: (values: RangeValues) => void;
   onDragStateChange?: (isDragging: boolean) => void;
 }) {
   const { t } = useTranslation();
   const trackRef = useRef<HTMLDivElement>(null);
   const [activeHandle, setActiveHandle] = useState<string | null>(null);
-  const [dragValues, setDragValues] = useState<{
-    minDepth: number;
-    maxDepth: number;
-    minFade: number;
-    maxFade: number;
-  } | null>(null);
+  const [dragValues, setDragValues] = useState<RangeValues | null>(null);
   const rafRef = useRef<number>(0);
   const [isLabelHovered, setIsLabelHovered] = useState(false);
 
-  const vals = dragValues ?? { minDepth, maxDepth, minFade, maxFade };
-  const fadeLeftEdge = Math.max(0, vals.minDepth - vals.minFade);
-  const fadeRightEdge = Math.min(100, vals.maxDepth + vals.maxFade);
+  const vals = dragValues ?? value;
+  const fadeLeftEdge = Math.max(0, vals.min - vals.minFade);
+  const fadeRightEdge = Math.min(100, vals.max + vals.maxFade);
 
   useEffect(() => {
     return () => {
@@ -54,48 +58,44 @@ export function DepthRangePicker({
     return Math.max(0, Math.min(100, Math.round(((e.clientX - rect.left) / rect.width) * 100)));
   };
 
-  const compute = (
-    handle: string,
-    val: number,
-    init: { minDepth: number; maxDepth: number; minFade: number; maxFade: number; startVal: number },
-  ): { minDepth: number; maxDepth: number; minFade: number; maxFade: number } => {
+  const compute = (handle: string, val: number, init: RangeValues & { startVal: number }): RangeValues => {
     switch (handle) {
-      case 'minDepth': {
-        const v = Math.max(0, Math.min(val, init.maxDepth));
-        return { minDepth: v, maxDepth: init.maxDepth, minFade: Math.min(init.minFade, v), maxFade: init.maxFade };
+      case 'min': {
+        const v = Math.max(0, Math.min(val, init.max));
+        return { min: v, max: init.max, minFade: Math.min(init.minFade, v), maxFade: init.maxFade };
       }
-      case 'maxDepth': {
-        const v = Math.max(init.minDepth, Math.min(100, val));
+      case 'max': {
+        const v = Math.max(init.min, Math.min(100, val));
         return {
-          minDepth: init.minDepth,
-          maxDepth: v,
+          min: init.min,
+          max: v,
           minFade: init.minFade,
           maxFade: Math.min(init.maxFade, 100 - v),
         };
       }
       case 'fadeLeft': {
-        const edge = Math.max(0, Math.min(val, init.minDepth));
+        const edge = Math.max(0, Math.min(val, init.min));
         return {
-          minDepth: init.minDepth,
-          maxDepth: init.maxDepth,
-          minFade: init.minDepth - edge,
+          min: init.min,
+          max: init.max,
+          minFade: init.min - edge,
           maxFade: init.maxFade,
         };
       }
       case 'fadeRight': {
-        const edge = Math.max(init.maxDepth, Math.min(100, val));
+        const edge = Math.max(init.max, Math.min(100, val));
         return {
-          minDepth: init.minDepth,
-          maxDepth: init.maxDepth,
+          min: init.min,
+          max: init.max,
           minFade: init.minFade,
-          maxFade: edge - init.maxDepth,
+          maxFade: edge - init.max,
         };
       }
       case 'range': {
         const delta = val - init.startVal;
-        const width = init.maxDepth - init.minDepth;
-        let nMin = Math.round(init.minDepth + delta);
-        let nMax = Math.round(init.maxDepth + delta);
+        const width = init.max - init.min;
+        let nMin = Math.round(init.min + delta);
+        let nMax = Math.round(init.max + delta);
         if (nMin < 0) {
           nMin = 0;
           nMax = width;
@@ -105,14 +105,14 @@ export function DepthRangePicker({
           nMin = 100 - width;
         }
         return {
-          minDepth: nMin,
-          maxDepth: nMax,
+          min: nMin,
+          max: nMax,
           minFade: Math.min(init.minFade, nMin),
           maxFade: Math.min(init.maxFade, 100 - nMax),
         };
       }
       default:
-        return { minDepth: init.minDepth, maxDepth: init.maxDepth, minFade: init.minFade, maxFade: init.maxFade };
+        return { min: init.min, max: init.max, minFade: init.minFade, maxFade: init.maxFade };
     }
   };
 
@@ -181,12 +181,7 @@ export function DepthRangePicker({
         : 'rgba(255,255,255,0.45)';
 
   const handleReset = () => {
-    onChange({
-      minDepth: defaultMinDepth,
-      maxDepth: defaultMaxDepth,
-      minFade: defaultMinFade,
-      maxFade: defaultMaxFade,
-    });
+    onChange(defaults);
   };
 
   const isDragging = activeHandle !== null;
@@ -206,7 +201,7 @@ export function DepthRangePicker({
             isLabelHovered ? 'opacity-0' : 'opacity-100'
           }`}
         >
-          {t('editor.masks.depthRange.title')}
+          {title}
         </Text>
         <Text
           variant={TextVariants.label}
@@ -215,7 +210,7 @@ export function DepthRangePicker({
             isLabelHovered ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          {t('editor.masks.depthRange.reset')}
+          {t('ui.slider.reset')}
         </Text>
       </div>
       <div ref={trackRef} className="relative rounded-md overflow-hidden mt-2 select-none" style={{ height: 44 }}>
@@ -226,12 +221,7 @@ export function DepthRangePicker({
           />
         )}
 
-        <div
-          className="absolute inset-0"
-          style={{
-            background: 'linear-gradient(to right, #ddd 0%, #bbb 20%, #999 35%, #666 55%, #333 80%, #111 100%)',
-          }}
-        />
+        <div className="absolute inset-0" style={{ background: gradient }} />
         <div
           className="absolute inset-y-0 left-0 bg-black/60 pointer-events-none"
           style={{ width: `${fadeLeftEdge}%` }}
@@ -255,7 +245,7 @@ export function DepthRangePicker({
           <div
             className="absolute inset-y-0 pointer-events-none"
             style={{
-              left: `${vals.maxDepth}%`,
+              left: `${vals.max}%`,
               width: `${vals.maxFade}%`,
               background: 'linear-gradient(to right, transparent, rgba(0,0,0,0.6))',
             }}
@@ -267,8 +257,8 @@ export function DepthRangePicker({
             key={i}
             className="absolute h-px pointer-events-none"
             style={{
-              left: `${vals.minDepth}%`,
-              width: `${Math.max(0, vals.maxDepth - vals.minDepth)}%`,
+              left: `${vals.min}%`,
+              width: `${Math.max(0, vals.max - vals.min)}%`,
               background: 'rgba(255,255,255,0.3)',
               ...(i === 0 ? { top: 0 } : { bottom: 0 }),
             }}
@@ -277,8 +267,8 @@ export function DepthRangePicker({
 
         {[
           { pos: fadeLeftEdge, key: 'fadeLeft', main: false },
-          { pos: vals.minDepth, key: 'minDepth', main: true },
-          { pos: vals.maxDepth, key: 'maxDepth', main: true },
+          { pos: vals.min, key: 'min', main: true },
+          { pos: vals.max, key: 'max', main: true },
           { pos: fadeRightEdge, key: 'fadeRight', main: false },
         ].map(({ pos, key, main }) => (
           <div
@@ -297,8 +287,8 @@ export function DepthRangePicker({
         <div
           className="absolute inset-y-0"
           style={{
-            left: `${vals.minDepth}%`,
-            width: `${Math.max(0, vals.maxDepth - vals.minDepth)}%`,
+            left: `${vals.min}%`,
+            width: `${Math.max(0, vals.max - vals.min)}%`,
             cursor: activeHandle === 'range' ? 'grabbing' : 'grab',
             zIndex: 5,
           }}
@@ -322,8 +312,8 @@ export function DepthRangePicker({
         ))}
 
         {[
-          { pos: vals.minDepth, key: 'minDepth' },
-          { pos: vals.maxDepth, key: 'maxDepth' },
+          { pos: vals.min, key: 'min' },
+          { pos: vals.max, key: 'max' },
         ].map(({ pos, key }) => (
           <div
             key={key}
@@ -338,9 +328,56 @@ export function DepthRangePicker({
         ))}
       </div>
       <Text as="div" variant={TextVariants.small} className="flex justify-between select-none px-1">
-        <span>{t('editor.masks.depthRange.near')}</span>
-        <span>{t('editor.masks.depthRange.far')}</span>
+        <span>{startLabel}</span>
+        <span>{endLabel}</span>
       </Text>
     </div>
+  );
+}
+
+/** A depth range in nearness percent (100 nearest), as Lens Blur and depth masks store it. */
+export interface DepthRange {
+  minDepth: number;
+  maxDepth: number;
+  minFade: number;
+  maxFade: number;
+}
+
+const DEPTH_RANGE_GRADIENT = 'linear-gradient(to right, #ddd 0%, #bbb 20%, #999 35%, #666 55%, #333 80%, #111 100%)';
+
+/** The bar shows Near on the left, so it runs opposite to the stored nearness. */
+const depthToBar = ({ minDepth, maxDepth, minFade, maxFade }: DepthRange): RangeValues => ({
+  min: 100 - maxDepth,
+  max: 100 - minDepth,
+  minFade: maxFade,
+  maxFade: minFade,
+});
+
+/** A range bar over depth, from Near to Far. */
+export function DepthRangePicker({
+  value,
+  defaults,
+  onChange,
+  onDragStateChange,
+}: {
+  value: DepthRange;
+  defaults: DepthRange;
+  onChange: (range: DepthRange) => void;
+  onDragStateChange?: (isDragging: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <RangePicker
+      title={t('editor.masks.depthRange.title')}
+      startLabel={t('editor.masks.depthRange.near')}
+      endLabel={t('editor.masks.depthRange.far')}
+      gradient={DEPTH_RANGE_GRADIENT}
+      value={depthToBar(value)}
+      defaults={depthToBar(defaults)}
+      onChange={({ min, max, minFade, maxFade }) =>
+        onChange({ minDepth: 100 - max, maxDepth: 100 - min, minFade: maxFade, maxFade: minFade })
+      }
+      onDragStateChange={onDragStateChange}
+    />
   );
 }

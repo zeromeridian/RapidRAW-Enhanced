@@ -291,6 +291,11 @@ details are in `RELEASE_NOTES.MD`.
   object edges, and masks the whole range at full
   strength, far ranges included (older depth masks keep their
   distance-weighted strength).
+- **Luminance range bar** for Luminance masks, as in Lightroom Classic: a
+  dark-to-light bar with range and fade handles (the same bar as the depth
+  range); a click on the photo sets the range around that tone. Luminance
+  masks made before `1.42.0` keep their Tolerance selection until a tone is
+  picked again.
 - **Motion Blur** in Effects (engine from RapidRAW): linear, zoom and spin
   blurs, plus smooth in masks, with Highlights (bright lights keep their
   energy in the streak) and the image's grain restored over blurred areas.

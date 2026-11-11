@@ -1284,19 +1284,30 @@ export const LENS_BLUR_RANGE_DEFAULTS = { minDepth: 20, maxDepth: 100, minFade: 
  * nearness in percent (100 nearest), as in `mask_generation::generate_ai_depth_bitmap`.
  */
 export const AI_DEPTH_MASK_RANGE_DEFAULTS = { minDepth: 70, maxDepth: 100, minFade: 15, maxFade: 0 } as const;
-const AI_DEPTH_PICK_HALF_WIDTH = 8;
-const AI_DEPTH_PICK_FADE = 12;
 
-/** A depth mask range centred on a picked nearness, with soft fades that stay inside 0–100. */
+/**
+ * A Luminance mask's tone range in percent (0 black, 100 white), as in
+ * `mask_generation::LuminanceRangeParameters`. New masks start on every tone, as in Lightroom.
+ */
+export const LUMINANCE_MASK_RANGE_DEFAULTS = { minLuminance: 0, maxLuminance: 100, minFade: 0, maxFade: 0 } as const;
+
+/** A range bar's span centred on a picked value, with soft fades that stay inside 0–100. */
+const rangeAround = (value: number, halfWidth: number, fade: number) => {
+  const min = Math.round(Math.max(0, value - halfWidth));
+  const max = Math.round(Math.min(100, value + halfWidth));
+  return { min, max, minFade: Math.min(fade, min), maxFade: Math.min(fade, 100 - max) };
+};
+
+/** A depth mask range centred on a picked nearness. */
 export const aiDepthMaskRangeAround = (depth: number) => {
-  const minDepth = Math.round(Math.max(0, depth - AI_DEPTH_PICK_HALF_WIDTH));
-  const maxDepth = Math.round(Math.min(100, depth + AI_DEPTH_PICK_HALF_WIDTH));
-  return {
-    minDepth,
-    maxDepth,
-    minFade: Math.min(AI_DEPTH_PICK_FADE, minDepth),
-    maxFade: Math.min(AI_DEPTH_PICK_FADE, 100 - maxDepth),
-  };
+  const { min, max, minFade, maxFade } = rangeAround(depth, 8, 12);
+  return { minDepth: min, maxDepth: max, minFade, maxFade };
+};
+
+/** A Luminance mask range centred on a picked tone. */
+export const luminanceMaskRangeAround = (luminance: number) => {
+  const { min, max, minFade, maxFade } = rangeAround(luminance, 10, 15);
+  return { minLuminance: min, maxLuminance: max, minFade, maxFade };
 };
 
 export const pickCropGeometry = (adjustments: Adjustments): CropGeometry =>

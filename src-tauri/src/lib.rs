@@ -2749,6 +2749,7 @@ pub fn run() {
             editor_round_trip::clear_editor_round_trips,
             image_processing::calculate_auto_adjustments,
             mask_generation::generate_mask_overlay,
+            mask_generation::sample_mask_luminance,
             file_management::update_exif_fields,
             file_management::get_supported_file_types,
             file_management::read_exif_for_paths,

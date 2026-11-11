@@ -681,10 +681,14 @@
       "depthRange": {
         "far": "Longe",
         "near": "Perto",
-        "reset": "Redefinir",
         "title": "Intervalo de Profundidade"
       },
       "dropzoneText": "Solte aqui para criar uma nova máscara",
+      "luminanceRange": {
+        "dark": "Escuro",
+        "light": "Claro",
+        "title": "Intervalo de Luminância"
+      },
       "maskAdjustmentsTitle": "Ajustes da Máscara",
       "maskingTitle": "Mascaramento",
       "masksTitle": "Máscaras",

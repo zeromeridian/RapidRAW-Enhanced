@@ -704,10 +704,14 @@
       "depthRange": {
         "far": "Далеко",
         "near": "Близко",
-        "reset": "Сбросить",
         "title": "Диапазон глубины"
       },
       "dropzoneText": "Перетащите сюда, чтобы создать новую маску",
+      "luminanceRange": {
+        "dark": "Тёмные",
+        "light": "Светлые",
+        "title": "Диапазон яркости"
+      },
       "maskAdjustmentsTitle": "Коррекция маски",
       "maskingTitle": "Маскирование",
       "masksTitle": "Маски",

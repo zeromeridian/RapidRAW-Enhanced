@@ -32,7 +32,7 @@ import { ColorSwatch } from './Color';
 import { AppSettings } from '../ui/AppProperties';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
-import { DepthRangePicker } from '../ui/DepthRangePicker';
+import { type DepthRange, DepthRangePicker } from '../ui/RangePicker';
 import AiEffectSection, { EffectMapStatus } from './AiEffectSection';
 import DepthScope from '../ui/depthScope/DepthScope';
 import { ScenePatch } from '../ui/depthScope/scene';
@@ -240,6 +240,13 @@ export default function EffectsPanel({
 
   const handleScenePatch = (patch: ScenePatch) => {
     setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, ...patch }));
+  };
+
+  const lensBlurRange: DepthRange = {
+    minDepth: adjustments.lensBlurMinDepth ?? LENS_BLUR_RANGE_DEFAULTS.minDepth,
+    maxDepth: adjustments.lensBlurMaxDepth ?? LENS_BLUR_RANGE_DEFAULTS.maxDepth,
+    minFade: adjustments.lensBlurMinFade ?? LENS_BLUR_RANGE_DEFAULTS.minFade,
+    maxFade: adjustments.lensBlurMaxFade ?? LENS_BLUR_RANGE_DEFAULTS.maxFade,
   };
 
   const handleLutIntensityChange = (intensity: number) => {
@@ -463,10 +470,7 @@ export default function EffectsPanel({
                 mapKey="lensBlurDepthMap"
                 scene={{
                   kind: 'lensBlur',
-                  minDepth: adjustments.lensBlurMinDepth ?? LENS_BLUR_RANGE_DEFAULTS.minDepth,
-                  maxDepth: adjustments.lensBlurMaxDepth ?? LENS_BLUR_RANGE_DEFAULTS.maxDepth,
-                  minFade: adjustments.lensBlurMinFade ?? LENS_BLUR_RANGE_DEFAULTS.minFade,
-                  maxFade: adjustments.lensBlurMaxFade ?? LENS_BLUR_RANGE_DEFAULTS.maxFade,
+                  ...lensBlurRange,
                   amount: adjustments.lensBlurAmount ?? 50,
                 }}
                 onChange={handleScenePatch}
@@ -505,21 +509,15 @@ export default function EffectsPanel({
             />
 
             <DepthRangePicker
-              minDepth={100 - (adjustments.lensBlurMaxDepth ?? LENS_BLUR_RANGE_DEFAULTS.maxDepth)}
-              maxDepth={100 - (adjustments.lensBlurMinDepth ?? LENS_BLUR_RANGE_DEFAULTS.minDepth)}
-              minFade={adjustments.lensBlurMaxFade ?? LENS_BLUR_RANGE_DEFAULTS.maxFade}
-              maxFade={adjustments.lensBlurMinFade ?? LENS_BLUR_RANGE_DEFAULTS.minFade}
-              defaultMinDepth={0}
-              defaultMaxDepth={80}
-              defaultMinFade={20}
-              defaultMaxFade={20}
-              onChange={(values: { minDepth: number; maxDepth: number; minFade: number; maxFade: number }) => {
+              value={lensBlurRange}
+              defaults={{ minDepth: 20, maxDepth: 100, minFade: 20, maxFade: 20 }}
+              onChange={(range: DepthRange) => {
                 setAdjustments((prev: Partial<Adjustments>) => ({
                   ...prev,
-                  lensBlurMinDepth: 100 - values.maxDepth,
-                  lensBlurMaxDepth: 100 - values.minDepth,
-                  lensBlurMinFade: values.maxFade,
-                  lensBlurMaxFade: values.minFade,
+                  lensBlurMinDepth: range.minDepth,
+                  lensBlurMaxDepth: range.maxDepth,
+                  lensBlurMinFade: range.minFade,
+                  lensBlurMaxFade: range.maxFade,
                 }));
               }}
               onDragStateChange={onDragStateChange}
