@@ -45,6 +45,7 @@ const KEY_NAMES: Record<string, string> = {
   transformYOffset: 'Transform Y Offset',
   colorGrading: 'Color Grading',
   colorCalibration: 'Color Calibration',
+  pointColors: 'Point Color',
   toneMapper: 'Tone Mapper',
   showClipping: 'Show Clipping',
   sectionVisibility: 'Section Visibility',
@@ -222,6 +223,8 @@ export function describeHistoryChange(before: Adjustments, after: Adjustments): 
           nestedChanges(`HSL ${formatKey(channel.replace(/s$/, ''))}`, beforeHsl[channel], values),
         );
       }
+      case 'pointColors':
+        return [formatKey(key)];
       case 'colorGrading':
       case 'colorCalibration':
         return nestedChanges(formatKey(key), prev[key], next[key]);

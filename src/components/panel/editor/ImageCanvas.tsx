@@ -1562,6 +1562,7 @@ const ImageCanvas = memo(
       : 0;
 
     const effectiveZoomScale = transformState.scale > 0 ? transformState.scale : 1;
+    const isPointColorPicking = useEditorStore((state) => state.targetedAdjustment?.tool === 'pointColor');
 
     const {
       isActive: isTargetedAdjustmentActive,
@@ -2967,7 +2968,8 @@ const ImageCanvas = memo(
     };
 
     const effectiveCursor = useMemo(() => {
-      if (isTargetedAdjustmentActive) return TARGETED_ADJUSTMENT_CURSOR;
+      // Point Color picks on a click; the other pipettes drag up and down.
+      if (isTargetedAdjustmentActive) return isPointColorPicking ? 'crosshair' : TARGETED_ADJUSTMENT_CURSOR;
       if (isWbPickerActive || showRelightLights) return 'crosshair';
       if (isParametricActive) return 'crosshair';
       if (isInitialDrawing) return 'crosshair';
@@ -2994,6 +2996,7 @@ const ImageCanvas = memo(
       return cursorStyle;
     }, [
       isTargetedAdjustmentActive,
+      isPointColorPicking,
       isWbPickerActive,
       showRelightLights,
       isInitialDrawing,

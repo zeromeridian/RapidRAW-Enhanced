@@ -33,12 +33,17 @@ export function useImageProcessing(
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const storedAdjustments = useEditorStore((state) => state.adjustments);
   const isGuidedPerspectiveActive = useEditorStore((state) => state.isGuidedPerspectiveActive);
-  // While guides are drawn, the preview shows the whole warped frame:
-  // uncropped and unstraightened. Saving always uses the stored adjustments.
-  const adjustments = useMemo(
-    () => (isGuidedPerspectiveActive ? { ...storedAdjustments, crop: null, rotation: 0 } : storedAdjustments),
-    [isGuidedPerspectiveActive, storedAdjustments],
+  const visualizedPointColorId = useEditorStore((state) =>
+    state.isPointColorRangeVisualized ? state.activePointColorId : null,
   );
+  // While guides are drawn, the preview shows the whole warped frame: uncropped and
+  // unstraightened. Visualize Range shows one Point Color's range (`pointColorVisualize`,
+  // read only by the preview). Saving always uses the stored adjustments.
+  const adjustments = useMemo(() => {
+    const rendered = isGuidedPerspectiveActive ? { ...storedAdjustments, crop: null, rotation: 0 } : storedAdjustments;
+    const visualized = (storedAdjustments.pointColors ?? []).findIndex((point) => point.id === visualizedPointColorId);
+    return visualized < 0 ? rendered : { ...rendered, pointColorVisualize: visualized };
+  }, [isGuidedPerspectiveActive, storedAdjustments, visualizedPointColorId]);
   const previewOverride = useEditorStore((state) => state.previewOverride);
   const isWaveformVisible = useEditorStore((state) => state.isWaveformVisible);
   const activeWaveformChannel = useEditorStore((state) => state.activeWaveformChannel);

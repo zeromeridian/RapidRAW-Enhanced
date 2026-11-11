@@ -5,6 +5,24 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.43.0-dev-point-color — 2026-11-11
+
+### Develop
+
+- **Point Color**, as in Lightroom Classic: switch the Color Mixer to
+  Point Color, turn on its pipette and click a colour in the photo. Each
+  click adds a point (up to eight per photo) that changes only the colours
+  close to the one you picked.
+- For the selected point, Hue Shift, Sat Shift and Lum Shift change those
+  colours, and Variance widens or narrows how many similar colours follow.
+- Refine the picked colour by dragging in the hue and saturation field or
+  the luminance strip beside it. A pair of swatches shows the colour
+  before and after.
+- Hue Range, Saturation Range and Luminance Range bars set exactly which
+  colours are affected, with soft edges. Turn on Visualize Range to see
+  the selected point's colours while everything else turns grey.
+- Point Color applies to the whole photo; masks keep the Color Mixer.
+
 ## 1.42.0-dev-luminance-range-bar — 2026-11-11
 
 ### Masks

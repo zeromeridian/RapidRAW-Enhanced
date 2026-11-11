@@ -68,7 +68,26 @@
       "vibrance": "自然な彩度",
       "wbPickerTooltip": "ホワイトバランススポイト",
       "wbPickerWgpuDisabled": "WBスポイト: 設定でWGPUを無効にしてください。",
-      "whiteBalance": "ホワイトバランス"
+      "whiteBalance": "ホワイトバランス",
+      "pointColor": {
+        "ariaSelectPoint": "ポイント {{index}} を選択",
+        "delete": "ポイントを削除",
+        "empty": "スポイトで写真の色を選ぶとポイントが追加されます。",
+        "full": "1枚の写真につき最大 {{count}} 個のポイント",
+        "high": "高",
+        "hueRange": "色相範囲",
+        "hueShift": "色相シフト",
+        "low": "低",
+        "luminanceRange": "輝度範囲",
+        "luminanceShift": "輝度シフト",
+        "mixerMode": "ミキサー",
+        "pickerTooltip": "ポイントカラーのスポイト：写真の色をクリックしてポイントを追加",
+        "pointColorMode": "ポイントカラー",
+        "saturationRange": "彩度範囲",
+        "saturationShift": "彩度シフト",
+        "variance": "バリエーション",
+        "visualize": "範囲を視覚化"
+      }
     },
     "curves": {
       "channelTitle": "{{channel}} チャンネル",
@@ -1321,6 +1340,7 @@
         "masks": "マスク",
         "motionBlur": "モーションブラー",
         "noiseReduction": "ノイズ低減",
+        "pointColor": "ポイントカラー",
         "presence": "外観",
         "sharpness": "シャープネス",
         "tone": "トーン",

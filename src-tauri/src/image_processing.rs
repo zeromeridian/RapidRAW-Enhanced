@@ -1546,6 +1546,28 @@ pub struct HslColor {
     _pad: f32,
 }
 
+/// Point Colors per photo, as in Lightroom Classic (`MAX_POINT_COLORS` in `utils/adjustments.ts`).
+pub const MAX_POINT_COLORS: usize = 8;
+
+/// One Point Color as the shader applies it: the target colour in perceptual HSV hue (degrees),
+/// saturation and luma (0–1), its shifts, and the ranges around it already widened by Variance.
+/// Each range is `[min, max, min_fade, max_fade]` relative to the target (hue in degrees).
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
+#[repr(C)]
+pub struct PointColorSettings {
+    hue: f32,
+    saturation: f32,
+    luminance: f32,
+    hue_shift: f32,
+    saturation_shift: f32,
+    luminance_shift: f32,
+    _pad1: f32,
+    _pad2: f32,
+    hue_range: [f32; 4],
+    saturation_range: [f32; 4],
+    luminance_range: [f32; 4],
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
 #[repr(C)]
 pub struct ColorGradeSettings {
@@ -1684,6 +1706,13 @@ pub struct GlobalAdjustments {
     /// Glow colour hue in degrees and how far the glow moves toward it (0–1).
     pub glow_hue: f32,
     pub glow_saturation: f32,
+
+    pub point_colors: [PointColorSettings; MAX_POINT_COLORS],
+    pub point_color_count: u32,
+    /// 1 + the index of the Point Color whose range the preview shows (Visualize Range), 0 off.
+    pub point_color_visualize: u32,
+    _pad_point_color1: f32,
+    _pad_point_color2: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
@@ -1875,6 +1904,95 @@ const SCALES: AdjustmentScales = AdjustmentScales {
     halation: 100.0,
     flares: 100.0,
 };
+
+/// A Point Color range as stored: offsets from the picked value (hue in degrees, saturation and
+/// luminance in percent) and the fades beyond them.
+#[derive(Deserialize, Debug, Clone, Copy, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct PointColorRange {
+    min: f32,
+    max: f32,
+    min_fade: f32,
+    max_fade: f32,
+}
+
+impl PointColorRange {
+    fn scaled(self, factor: f32) -> [f32; 4] {
+        [
+            self.min * factor,
+            self.max * factor,
+            self.min_fade * factor,
+            self.max_fade * factor,
+        ]
+    }
+}
+
+/// A Point Color as stored in the adjustments (`PointColor` in `utils/adjustments.ts`).
+#[derive(Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+struct PointColor {
+    hue: f32,
+    saturation: f32,
+    luminance: f32,
+    #[serde(default)]
+    hue_shift: f32,
+    #[serde(default)]
+    saturation_shift: f32,
+    #[serde(default)]
+    luminance_shift: f32,
+    #[serde(default = "default_point_color_variance")]
+    variance: f32,
+    #[serde(default)]
+    hue_range: PointColorRange,
+    #[serde(default)]
+    saturation_range: PointColorRange,
+    #[serde(default)]
+    luminance_range: PointColorRange,
+}
+
+fn default_point_color_variance() -> f32 {
+    50.0
+}
+
+impl PointColor {
+    /// The shader's settings. Shifts use the colour mixer's scales, so ±100 moves as far as
+    /// the mixer's sliders; Variance 0–100 narrows or widens every range by up to 2×.
+    fn settings(&self) -> PointColorSettings {
+        let variance = 2f32.powf((self.variance.clamp(0.0, 100.0) - 50.0) / 50.0);
+        PointColorSettings {
+            hue: self.hue.rem_euclid(360.0),
+            saturation: self.saturation / 100.0,
+            luminance: self.luminance / 100.0,
+            hue_shift: self.hue_shift * SCALES.hsl_hue_multiplier * 2.0,
+            saturation_shift: self.saturation_shift / SCALES.hsl_saturation,
+            luminance_shift: self.luminance_shift / SCALES.hsl_luminance,
+            _pad1: 0.0,
+            _pad2: 0.0,
+            hue_range: self.hue_range.scaled(variance),
+            saturation_range: self.saturation_range.scaled(variance / 100.0),
+            luminance_range: self.luminance_range.scaled(variance / 100.0),
+        }
+    }
+}
+
+fn parse_point_colors(
+    js_points: Option<&serde_json::Value>,
+) -> ([PointColorSettings; MAX_POINT_COLORS], u32) {
+    let mut settings = [PointColorSettings::default(); MAX_POINT_COLORS];
+    let points = js_points
+        .and_then(|v| Vec::<serde_json::Value>::deserialize(v).ok())
+        .unwrap_or_default();
+    let mut count = 0;
+    for point in points
+        .iter()
+        .filter_map(|p| PointColor::deserialize(p).ok())
+        .take(MAX_POINT_COLORS)
+    {
+        settings[count] = point.settings();
+        count += 1;
+    }
+    (settings, count as u32)
+}
 
 fn parse_hsl_adjustments(js_hsl: &serde_json::Value) -> [HslColor; 8] {
     let mut hsl_array = [HslColor::default(); 8];
@@ -2390,6 +2508,12 @@ fn get_global_adjustments_from_json(
         (0, 1.0)
     };
 
+    let (point_colors, point_color_count) = if is_visible("color") {
+        parse_point_colors(js_adjustments.get("pointColors"))
+    } else {
+        ([PointColorSettings::default(); MAX_POINT_COLORS], 0)
+    };
+
     GlobalAdjustments {
         exposure: get_val("basic", "exposure", SCALES.exposure, None),
         brightness: get_val("basic", "brightness", SCALES.brightness, None),
@@ -2568,6 +2692,15 @@ fn get_global_adjustments_from_json(
         _pad_motion_blur2: 0.0,
         glow_hue: get_val("effects", "glowHue", 1.0, Some(DEFAULT_GLOW_HUE)),
         glow_saturation: get_val("effects", "glowSaturation", 100.0, None),
+
+        point_colors,
+        point_color_count,
+        point_color_visualize: js_adjustments["pointColorVisualize"]
+            .as_u64()
+            .filter(|&index| (index as u32) < point_color_count)
+            .map_or(0, |index| index as u32 + 1),
+        _pad_point_color1: 0.0,
+        _pad_point_color2: 0.0,
     }
 }
 
@@ -3800,9 +3933,10 @@ pub async fn calculate_auto_adjustments(
 #[cfg(test)]
 mod tests {
     use super::{
-        AllAdjustments, DEFAULT_GLOW_HUE, GeometryParams, GlobalAdjustments, MaskAdjustments,
-        build_transform_matrix, calculate_histogram_from_image, compute_transform_constrain_scale,
-        get_global_adjustments_from_json, get_mask_adjustments_from_json, transform_covers_output,
+        AllAdjustments, DEFAULT_GLOW_HUE, GeometryParams, GlobalAdjustments, MAX_POINT_COLORS,
+        MaskAdjustments, build_transform_matrix, calculate_histogram_from_image,
+        compute_transform_constrain_scale, get_global_adjustments_from_json,
+        get_mask_adjustments_from_json, is_image_edited, transform_covers_output,
         warp_image_geometry,
     };
     use image::{DynamicImage, Rgb, Rgb32FImage};
@@ -3978,6 +4112,57 @@ mod tests {
         assert_eq!(coloured.glow_hue, 200.0);
         assert!((coloured.glow_saturation - 0.6).abs() < 1e-6);
         assert_eq!(coloured.halation_hue_shift, 120.0);
+    }
+
+    #[test]
+    fn point_colors_reach_the_shader_with_variance_applied() {
+        let point = json!({
+            "id": "a", "hue": 370, "saturation": 60, "luminance": 40,
+            "hueShift": 50, "saturationShift": -20, "luminanceShift": 10, "variance": 100,
+            "hueRange": { "min": -10, "max": 10, "minFade": 15, "maxFade": 15 },
+            "saturationRange": { "min": -15, "max": 15, "minFade": 20, "maxFade": 20 },
+            "luminanceRange": { "min": -20, "max": 20, "minFade": 25, "maxFade": 25 },
+        });
+        let global = get_global_adjustments_from_json(
+            &json!({ "pointColors": [point], "pointColorVisualize": 0 }),
+            true,
+            None,
+        );
+        assert_eq!(global.point_color_count, 1);
+        assert_eq!(global.point_color_visualize, 1);
+        let settings = global.point_colors[0];
+        assert_eq!(settings.hue, 10.0);
+        assert!((settings.saturation - 0.6).abs() < 1e-6);
+        // ±100 turns the hue ±60°, as the colour mixer's sliders do.
+        assert!((settings.hue_shift - 30.0).abs() < 1e-5);
+        assert!((settings.saturation_shift + 0.2).abs() < 1e-6);
+        // Variance 100 doubles every range; saturation and luminance ranges are in 0–1.
+        assert_eq!(settings.hue_range, [-20.0, 20.0, 30.0, 30.0]);
+        assert!((settings.luminance_range[1] - 0.4).abs() < 1e-6);
+
+        let hidden = get_global_adjustments_from_json(
+            &json!({ "pointColors": [point], "sectionVisibility": { "color": false } }),
+            true,
+            None,
+        );
+        assert_eq!(hidden.point_color_count, 0);
+
+        let many = get_global_adjustments_from_json(
+            &json!({ "pointColors": vec![point; MAX_POINT_COLORS + 2], "pointColorVisualize": 9 }),
+            true,
+            None,
+        );
+        assert_eq!(many.point_color_count as usize, MAX_POINT_COLORS);
+        assert_eq!(many.point_color_visualize, 0);
+    }
+
+    #[test]
+    fn a_point_color_shift_counts_as_an_edit() {
+        let point = |shift: i32| json!({ "pointColors": [{ "id": "a", "hue": 30, "saturation": 50, "luminance": 50, "hueShift": shift }] });
+        assert!(is_image_edited(&point(40), true, None));
+        // A point is still an edit with no shift, as a mask without adjustments is.
+        assert!(is_image_edited(&point(0), true, None));
+        assert!(!is_image_edited(&json!({ "pointColors": [] }), true, None));
     }
 
     #[test]

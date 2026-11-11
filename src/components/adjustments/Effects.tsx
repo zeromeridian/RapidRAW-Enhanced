@@ -28,7 +28,7 @@ import {
 import Dropdown from '../ui/Dropdown';
 import LUTControl from '../ui/LUTControl';
 import ColorField, { normalizeHexColor, useParsedTextField } from '../ui/ColorField';
-import { ColorSwatch } from './Color';
+import { ColorSwatch } from '../ui/ColorSwatch';
 import { AppSettings } from '../ui/AppProperties';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';

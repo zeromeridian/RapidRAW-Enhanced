@@ -45,6 +45,7 @@ export enum ColorAdjustment {
   Hue = 'hue',
   Luminance = 'luminance',
   Monochrome = 'monochrome',
+  PointColors = 'pointColors',
   Saturation = 'saturation',
   Temperature = 'temperature',
   Tint = 'tint',
@@ -296,6 +297,7 @@ export interface Adjustments {
   highlights: number;
   hsl: Hsl;
   hue: number;
+  pointColors: PointColor[];
   lensBlurAmount: number;
   lensBlurDiffusion: number;
   lensBlurShape: 'circle' | 'hexagon' | 'octagon' | 'ring';
@@ -449,6 +451,61 @@ export interface HueSatLum {
   saturation: number;
   luminance: number;
 }
+
+/**
+ * A Point Color range around the picked value: offsets from it (hue in degrees, saturation
+ * and luminance in percent) and the fades beyond them, as in `image_processing::PointColorRange`.
+ */
+export interface PointColorRange {
+  min: number;
+  max: number;
+  minFade: number;
+  maxFade: number;
+}
+
+/**
+ * A Point Color, as in Lightroom Classic: the picked colour (perceptual hue in degrees,
+ * saturation and luminance in percent), its shifts (−100–100, the colour mixer's scales),
+ * Variance (0–100, 50 keeps the ranges as set) and the ranges it selects.
+ */
+export interface PointColor {
+  id: string;
+  hue: number;
+  saturation: number;
+  luminance: number;
+  hueShift: number;
+  saturationShift: number;
+  luminanceShift: number;
+  variance: number;
+  hueRange: PointColorRange;
+  saturationRange: PointColorRange;
+  luminanceRange: PointColorRange;
+}
+
+/** Point Colors per photo; mirrors `image_processing::MAX_POINT_COLORS`. */
+export const MAX_POINT_COLORS = 8;
+
+/** The ranges a new Point Color starts with, also what each range bar resets to. */
+export const POINT_COLOR_RANGE_DEFAULTS = {
+  hueRange: { min: -10, max: 10, minFade: 15, maxFade: 15 },
+  saturationRange: { min: -15, max: 15, minFade: 20, maxFade: 20 },
+  luminanceRange: { min: -20, max: 20, minFade: 25, maxFade: 25 },
+} as const satisfies Record<string, PointColorRange>;
+
+export const DEFAULT_POINT_COLOR_VARIANCE = 50;
+
+/** A Point Color on a picked colour, with no shift yet. */
+export const createPointColor = (hue: number, saturation: number, luminance: number): PointColor => ({
+  id: uuidv4(),
+  hue,
+  saturation,
+  luminance,
+  hueShift: 0,
+  saturationShift: 0,
+  luminanceShift: 0,
+  variance: DEFAULT_POINT_COLOR_VARIANCE,
+  ...POINT_COLOR_RANGE_DEFAULTS,
+});
 
 interface Hsl {
   [index: string]: HueSatLum;
@@ -758,6 +815,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
     reds: { hue: 0, saturation: 0, luminance: 0 },
     yellows: { hue: 0, saturation: 0, luminance: 0 },
   },
+  pointColors: [],
   hue: 0,
   lensBlurAmount: 40,
   lensBlurDiffusion: 0,
@@ -1029,6 +1087,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     colorCalibration: { ...INITIAL_ADJUSTMENTS.colorCalibration, ...(loadedAdjustments.colorCalibration || {}) },
     colorGrading: { ...INITIAL_ADJUSTMENTS.colorGrading, ...(loadedAdjustments.colorGrading || {}) },
     hsl: { ...INITIAL_ADJUSTMENTS.hsl, ...(loadedAdjustments.hsl || {}) },
+    pointColors: loadedAdjustments.pointColors ?? INITIAL_ADJUSTMENTS.pointColors,
     curves: loadedAdjustments.curves ? deepCloneCurves(loadedAdjustments.curves) : getDefaultCurves(),
     pointCurves: loadedAdjustments.pointCurves ? deepCloneCurves(loadedAdjustments.pointCurves) : getDefaultCurves(),
     parametricCurve: loadedAdjustments.parametricCurve
@@ -1088,6 +1147,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     },
     { label: 'modals.copyPaste.groups.colorGrading', keys: [ColorAdjustment.ColorGrading] },
     { label: 'modals.copyPaste.groups.colorMixer', keys: [ColorAdjustment.Hsl] },
+    { label: 'modals.copyPaste.groups.pointColor', keys: [ColorAdjustment.PointColors] },
     { label: 'modals.copyPaste.groups.colorCalibration', keys: ['colorCalibration'] },
   ],
   details: [
@@ -1372,6 +1432,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     ColorAdjustment.Tint,
     ColorAdjustment.Vibrance,
     ColorAdjustment.Hsl,
+    ColorAdjustment.PointColors,
     ColorAdjustment.ColorGrading,
     'colorCalibration',
     ColorAdjustment.Hue,

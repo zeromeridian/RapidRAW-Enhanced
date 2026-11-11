@@ -3,7 +3,8 @@ import { invoke } from '@tauri-apps/api/core';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { useEditorStore } from '../store/useEditorStore';
-import { Adjustments } from '../utils/adjustments';
+import { Adjustments, MAX_POINT_COLORS, createPointColor } from '../utils/adjustments';
+import { samplePickedColor } from '../utils/pointColor';
 import { stripSentMaskData } from '../utils/maskUtils';
 import {
   TargetedAdjustment,
@@ -56,7 +57,7 @@ const getClientPoint = (e: MouseEvent | TouchEvent): Coord | undefined => {
 const clampOffset = ({ edit }: ActiveDrag, offset: number) =>
   edit ? Math.max(edit.range[0], Math.min(edit.range[1], offset)) : offset;
 
-/** Runs the colour mixer and tone curve pipettes (`targetedAdjustment` in the editor store) on the canvas. */
+/** Runs the colour mixer, tone curve and Point Color pipettes (`targetedAdjustment` in the editor store) on the canvas. */
 export function useTargetedAdjustment({
   activeMaskContainerId,
   getCanvasPointer,
@@ -121,11 +122,32 @@ export function useTargetedAdjustment({
     setEditor({ isSliderDragging: false });
   }, [setEditor]);
 
+  /** Point Color: a click adds a point on the colour under the cursor and selects it. */
+  const addPointColor = useCallback(
+    (pick: Pick) => {
+      pick
+        .sample()
+        .then((pixels) => {
+          const picked = samplePickedColor(pixels);
+          if (!picked || (useEditorStore.getState().adjustments.pointColors?.length ?? 0) >= MAX_POINT_COLORS) return;
+          const point = createPointColor(picked.hue, picked.saturation, picked.luminance);
+          setAdjustments((prev) => ({ ...prev, pointColors: [...(prev.pointColors ?? []), point] }));
+          setEditor({ activePointColorId: point.id });
+        })
+        .catch((err) => console.error('Failed to sample the preview for Point Color:', err));
+    },
+    [setAdjustments, setEditor],
+  );
+
   const start = useCallback(
     (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
       const pick = getPick(e);
       const clientPoint = getClientPoint(e.evt);
       if (!pick || !clientPoint) return;
+      if (pick.target.tool === 'pointColor') {
+        if (!pick.maskId) addPointColor(pick);
+        return;
+      }
 
       end();
       const drag: ActiveDrag = { last: clientPoint, offset: 0, appliedOffset: null, edit: null };
@@ -167,7 +189,7 @@ export function useTargetedAdjustment({
         })
         .catch((err) => console.error('Failed to sample the preview for a targeted adjustment:', err));
     },
-    [getPick, setEditor, applyDrag, end],
+    [getPick, setEditor, applyDrag, end, addPointColor],
   );
 
   const reset = useCallback(

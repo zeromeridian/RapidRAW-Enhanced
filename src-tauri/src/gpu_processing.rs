@@ -39,10 +39,12 @@ pub enum SampleProbe {
     Curve,
     /// Red, green, blue and luma before the mask tone curves.
     MaskCurve,
+    /// The perceptual hue, saturation and luma Point Color selects by, after the colour mixer.
+    PointColor,
 }
 
 impl SampleProbe {
-    const COUNT: usize = 3;
+    const COUNT: usize = 4;
 
     fn index(self) -> usize {
         self as usize
@@ -2505,6 +2507,7 @@ mod tests {
             (SampleProbe::Hsl, "SAMPLE_PROBE_HSL"),
             (SampleProbe::Curve, "SAMPLE_PROBE_CURVE"),
             (SampleProbe::MaskCurve, "SAMPLE_PROBE_MASK_CURVE"),
+            (SampleProbe::PointColor, "SAMPLE_PROBE_POINT_COLOR"),
         ] {
             let constant = format!("const {name}: u32 = {}u;", probe.shader_value());
             assert!(source.contains(&constant), "missing `{constant}`");

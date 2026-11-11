@@ -68,7 +68,26 @@
       "vibrance": "Intensidad",
       "wbPickerTooltip": "Selector de balance de blancos",
       "wbPickerWgpuDisabled": "Selector BB: Desactiva WGPU en los Ajustes.",
-      "whiteBalance": "Balance de blancos"
+      "whiteBalance": "Balance de blancos",
+      "pointColor": {
+        "ariaSelectPoint": "Seleccionar punto {{index}}",
+        "delete": "Eliminar punto",
+        "empty": "Elige un color de la foto con el cuentagotas para añadir un punto.",
+        "full": "Hasta {{count}} puntos por foto",
+        "high": "Alta",
+        "hueRange": "Rango de tono",
+        "hueShift": "Cambio de tono",
+        "low": "Baja",
+        "luminanceRange": "Rango de luminancia",
+        "luminanceShift": "Cambio de luminancia",
+        "mixerMode": "Mezclador",
+        "pickerTooltip": "Selector de color de punto: haz clic en un color de la foto para añadir un punto",
+        "pointColorMode": "Color de punto",
+        "saturationRange": "Rango de saturación",
+        "saturationShift": "Cambio de saturación",
+        "variance": "Varianza",
+        "visualize": "Visualizar rango"
+      }
     },
     "curves": {
       "channelTitle": "Canal {{channel}}",
@@ -1354,6 +1373,7 @@
         "masks": "Máscaras",
         "motionBlur": "Desenfoque de movimiento",
         "noiseReduction": "Reducción de ruido",
+        "pointColor": "Color de punto",
         "presence": "Presencia",
         "sharpness": "Nitidez",
         "tone": "Tonos",

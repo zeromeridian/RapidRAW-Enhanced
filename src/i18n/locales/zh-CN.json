@@ -68,7 +68,26 @@
       "vibrance": "鲜艳度",
       "wbPickerTooltip": "白平衡选取器",
       "wbPickerWgpuDisabled": "白平衡选取器：请在设置中禁用 WGPU。",
-      "whiteBalance": "白平衡"
+      "whiteBalance": "白平衡",
+      "pointColor": {
+        "ariaSelectPoint": "选择点 {{index}}",
+        "delete": "删除点",
+        "empty": "用吸管点击照片中的颜色以添加点。",
+        "full": "每张照片最多 {{count}} 个点",
+        "high": "高",
+        "hueRange": "色相范围",
+        "hueShift": "色相偏移",
+        "low": "低",
+        "luminanceRange": "亮度范围",
+        "luminanceShift": "亮度偏移",
+        "mixerMode": "混合器",
+        "pickerTooltip": "点颜色吸管：点击照片中的颜色以添加点",
+        "pointColorMode": "点颜色",
+        "saturationRange": "饱和度范围",
+        "saturationShift": "饱和度偏移",
+        "variance": "变化",
+        "visualize": "可视化范围"
+      }
     },
     "curves": {
       "channelTitle": "{{channel}} 通道",
@@ -1321,6 +1340,7 @@
         "masks": "蒙版",
         "motionBlur": "动感模糊",
         "noiseReduction": "降噪",
+        "pointColor": "点颜色",
         "presence": "质感",
         "sharpness": "锐度",
         "tone": "色调",
