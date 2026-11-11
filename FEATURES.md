@@ -273,6 +273,11 @@ details are in `RELEASE_NOTES.MD`.
   Red, Green, and Blue graphs are tinted with the channel's colour above the
   diagonal and its complement (cyan, magenta, yellow) below, as in Lightroom
   Classic.
+- **Point Color** in the Color Mixer, as in Lightroom Classic (whole photo):
+  up to eight points picked with a pipette, each with Hue/Sat/Lum Shift,
+  Variance, a hue–saturation field and luminance strip to refine the picked
+  colour, before/after swatches, Hue/Saturation/Luminance range bars, and
+  Visualize Range. Points travel with the edit (XMP, copy/paste, presets).
 - **Targeted adjustment pipettes**, as in Lightroom Classic: drag up or down
   on the photo to change what is under the cursor, double-click to reset it.
   The **Color Mixer** pipette (from RapidRAW) moves every colour band found

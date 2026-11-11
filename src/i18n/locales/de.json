@@ -68,7 +68,26 @@
       "vibrance": "Dynamik",
       "wbPickerTooltip": "Weißabgleich-Pipette",
       "wbPickerWgpuDisabled": "WA-Pipette: WGPU in den Einstellungen deaktivieren.",
-      "whiteBalance": "Weißabgleich"
+      "whiteBalance": "Weißabgleich",
+      "pointColor": {
+        "ariaSelectPoint": "Punkt {{index}} auswählen",
+        "delete": "Punkt löschen",
+        "empty": "Mit der Pipette eine Farbe im Foto auswählen, um einen Punkt hinzuzufügen.",
+        "full": "Bis zu {{count}} Punkte pro Foto",
+        "high": "Hoch",
+        "hueRange": "Farbtonbereich",
+        "hueShift": "Farbton-Verschiebung",
+        "low": "Niedrig",
+        "luminanceRange": "Luminanzbereich",
+        "luminanceShift": "Luminanz-Verschiebung",
+        "mixerMode": "Mischer",
+        "pickerTooltip": "Punktfarben-Pipette: Auf eine Farbe im Foto klicken, um einen Punkt hinzuzufügen",
+        "pointColorMode": "Punktfarbe",
+        "saturationRange": "Sättigungsbereich",
+        "saturationShift": "Sättigungs-Verschiebung",
+        "variance": "Varianz",
+        "visualize": "Bereich anzeigen"
+      }
     },
     "curves": {
       "channelTitle": "{{channel}}-Kanal",
@@ -1323,6 +1342,7 @@
         "masks": "Masken",
         "motionBlur": "Bewegungsunschärfe",
         "noiseReduction": "Rauschreduzierung",
+        "pointColor": "Punktfarbe",
         "presence": "Präsenz",
         "sharpness": "Schärfe",
         "tone": "Tonwerte",

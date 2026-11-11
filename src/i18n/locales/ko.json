@@ -68,7 +68,26 @@
       "vibrance": "생동감",
       "wbPickerTooltip": "화이트 밸런스 피커",
       "wbPickerWgpuDisabled": "WB 피커: 설정에서 WGPU를 비활성화하세요.",
-      "whiteBalance": "화이트 밸런스"
+      "whiteBalance": "화이트 밸런스",
+      "pointColor": {
+        "ariaSelectPoint": "포인트 {{index}} 선택",
+        "delete": "포인트 삭제",
+        "empty": "스포이트로 사진의 색을 선택하면 포인트가 추가됩니다.",
+        "full": "사진당 최대 {{count}}개 포인트",
+        "high": "높음",
+        "hueRange": "색조 범위",
+        "hueShift": "색조 이동",
+        "low": "낮음",
+        "luminanceRange": "휘도 범위",
+        "luminanceShift": "휘도 이동",
+        "mixerMode": "믹서",
+        "pickerTooltip": "포인트 컬러 스포이트: 사진의 색을 클릭해 포인트 추가",
+        "pointColorMode": "포인트 컬러",
+        "saturationRange": "채도 범위",
+        "saturationShift": "채도 이동",
+        "variance": "변화량",
+        "visualize": "범위 시각화"
+      }
     },
     "curves": {
       "channelTitle": "{{channel}} 채널",
@@ -1321,6 +1340,7 @@
         "masks": "마스크",
         "motionBlur": "모션 블러",
         "noiseReduction": "노이즈 감소",
+        "pointColor": "포인트 컬러",
         "presence": "외관",
         "sharpness": "선명도",
         "tone": "톤",

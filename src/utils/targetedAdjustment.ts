@@ -22,10 +22,12 @@ import {
 } from './toneCurve';
 
 export type TargetedAdjustment =
-  { tool: 'colorMixer'; property: HslMixerProperty } | { tool: 'toneCurve'; channel: ActiveChannel };
+  | { tool: 'colorMixer'; property: HslMixerProperty }
+  | { tool: 'toneCurve'; channel: ActiveChannel }
+  | { tool: 'pointColor' };
 
 /** The render stage a target samples (`gpu_processing::SampleProbe`). */
-export type SampleProbe = 'hsl' | 'curve' | 'maskCurve';
+export type SampleProbe = 'hsl' | 'curve' | 'maskCurve' | 'pointColor';
 
 /** A drag prepared at press time: `apply` maps the drag offset onto the adjustments at that time. */
 export interface TargetedDrag {
@@ -60,6 +62,7 @@ const withTargetAdjustments = (
 
 export const getSampleProbe = (target: TargetedAdjustment, maskId: string | null): SampleProbe => {
   if (target.tool === 'colorMixer') return 'hsl';
+  if (target.tool === 'pointColor') return 'pointColor';
   return maskId ? 'maskCurve' : 'curve';
 };
 
@@ -159,6 +162,8 @@ export const beginTargetedDrag = (
     };
   }
 
+  // Point Color picks a colour on click (`useTargetedAdjustment`); it has no drag or reset.
+  if (target.tool === 'pointColor') return null;
   const { channel } = target;
   const tone = sampledTone(pixels, channel);
   if (tone === null) return null;
@@ -216,6 +221,8 @@ export const resetTargetedAdjustment = (
       : null;
   }
 
+  // Point Color picks a colour on click (`useTargetedAdjustment`); it has no drag or reset.
+  if (target.tool === 'pointColor') return null;
   const { channel } = target;
   const tone = sampledTone(pixels, channel);
   if (tone === null) return null;

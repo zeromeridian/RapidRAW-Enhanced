@@ -85,6 +85,9 @@ interface EditorState {
   isRelightPickerActive: boolean;
   /** The colour mixer or tone curve pipette acting on the photo, or null. */
   targetedAdjustment: TargetedAdjustment | null;
+  /** The Point Color the Color Mixer edits, and whether the preview shows its range only. */
+  activePointColorId: string | null;
+  isPointColorRangeVisualized: boolean;
   activeRelightLightId: string | null;
   liveRotation: number | null;
   /** The Crop panel's values when it was opened (null outside Crop); Escape restores them. */
@@ -171,6 +174,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   isWbPickerActive: false,
   isRelightPickerActive: false,
   targetedAdjustment: null,
+  activePointColorId: null,
+  isPointColorRangeVisualized: false,
   activeRelightLightId: null,
   liveRotation: null,
   cropSessionSnapshot: null,

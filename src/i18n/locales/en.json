@@ -68,7 +68,26 @@
       "vibrance": "Vibrance",
       "wbPickerTooltip": "White Balance Picker",
       "wbPickerWgpuDisabled": "WB Picker: Disable WGPU in Settings.",
-      "whiteBalance": "White Balance"
+      "whiteBalance": "White Balance",
+      "pointColor": {
+        "ariaSelectPoint": "Select point {{index}}",
+        "delete": "Delete point",
+        "empty": "Pick a color in the photo with the pipette to add a point.",
+        "full": "Up to {{count}} points per photo",
+        "high": "High",
+        "hueRange": "Hue Range",
+        "hueShift": "Hue Shift",
+        "low": "Low",
+        "luminanceRange": "Luminance Range",
+        "luminanceShift": "Lum Shift",
+        "mixerMode": "Mixer",
+        "pickerTooltip": "Point Color Picker: click a color in the photo to add a point",
+        "pointColorMode": "Point Color",
+        "saturationRange": "Saturation Range",
+        "saturationShift": "Sat Shift",
+        "variance": "Variance",
+        "visualize": "Visualize Range"
+      }
     },
     "curves": {
       "channelTitle": "{{channel}} Channel",
@@ -1444,6 +1463,7 @@
         "masks": "Masks",
         "motionBlur": "Motion Blur",
         "noiseReduction": "Noise Reduction",
+        "pointColor": "Point Color",
         "presence": "Presence",
         "sharpness": "Sharpness",
         "tone": "Tone",

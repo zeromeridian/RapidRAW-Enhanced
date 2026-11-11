@@ -5,13 +5,21 @@ import { useTranslation } from 'react-i18next';
 import Slider from '../ui/Slider';
 import Switch from '../ui/Switch';
 import ColorWheel from '../ui/ColorWheel';
-import { ColorAdjustment, ColorCalibration, HueSatLum, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
+import {
+  ColorAdjustment,
+  ColorCalibration,
+  HueSatLum,
+  INITIAL_ADJUSTMENTS,
+  MAX_POINT_COLORS,
+} from '../../utils/adjustments';
 import { Adjustments, ColorGrading } from '../../utils/adjustments';
 import { AppSettings } from '../ui/AppProperties';
 import Text from '../ui/Text';
+import { ColorSwatch } from '../ui/ColorSwatch';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { canvasToolState, useEditorStore } from '../../store/useEditorStore';
 import { HSL_MIXER_BANDS, HslMixerBand, HslMixerProperty } from '../../utils/hslMixer';
+import PointColorPanel from './PointColor';
 
 interface ColorProps {
   color: string;
@@ -59,86 +67,6 @@ const tabPillClassName = (isActive: boolean) =>
 /** The section header buttons for the pickers and the expanded Color Mixer. */
 export const headerToggleClassName = (isActive: boolean) =>
   `p-1.5 rounded-md transition-colors ${isActive ? 'bg-accent text-button-text' : 'hover:bg-bg-secondary text-text-secondary'}`;
-
-interface ColorSwatchProps {
-  color: string;
-  isActive: boolean;
-  name: string;
-  ariaLabel: string;
-  onClick: (name: string) => void;
-}
-
-export const ColorSwatch = ({ color, name, isActive, ariaLabel, onClick }: ColorSwatchProps) => {
-  const [isPressed, setIsPressed] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-
-  const handleMouseDown = () => {
-    setIsPressed(true);
-  };
-
-  const handleMouseUp = () => {
-    setIsPressed(false);
-  };
-
-  const handleMouseLeave = () => {
-    setIsPressed(false);
-    setIsHovered(false);
-  };
-
-  const handleMouseEnter = () => {
-    setIsHovered(true);
-  };
-
-  const handleClick = () => {
-    onClick(name);
-  };
-
-  const getTransform = () => {
-    if (isPressed) return 'scale(0.95)';
-    if (isActive) return 'scale(1.1)';
-    if (isHovered) return 'scale(1.08)';
-    return 'scale(1)';
-  };
-
-  return (
-    <button
-      aria-label={ariaLabel}
-      className="relative w-6 h-6 focus:outline-hidden group"
-      onClick={handleClick}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
-      onMouseEnter={handleMouseEnter}
-      onTouchStart={handleMouseDown}
-      onTouchEnd={handleMouseUp}
-    >
-      <div
-        className={`absolute inset-0 rounded-full border-2 transition-all duration-200 ease-out ${
-          isActive ? 'border-white opacity-100' : 'scale-100 border-transparent opacity-0'
-        }`}
-        style={{
-          transform: isActive ? (isPressed ? 'scale(1.1)' : 'scale(1.25)') : undefined,
-          transition: isPressed
-            ? 'transform 100ms cubic-bezier(0.4, 0, 0.2, 1), opacity 200ms ease-out'
-            : 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms ease-out',
-        }}
-      />
-
-      <div
-        className={`absolute inset-0 rounded-full transition-all duration-150 ease-out ${
-          isActive ? 'shadow-lg' : 'shadow-md'
-        }`}
-        style={{
-          backgroundColor: color,
-          transform: getTransform(),
-          transition: isPressed
-            ? 'transform 100ms cubic-bezier(0.4, 0, 0.2, 1)'
-            : 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-        }}
-      />
-    </button>
-  );
-};
 
 const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: ColorPanelProps) => {
   const { t } = useTranslation();
@@ -437,7 +365,12 @@ export default function ColorPanel({
   const [mixerTab, setMixerTab] = useState<HslMixerProperty>('hue');
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
   const isWgpuEnabled = appSettings?.useWgpuRenderer !== false;
+  const [mixerMode, setMixerMode] = useState<'mixer' | 'pointColor'>('mixer');
+  // Point Color is for the whole photo for now (Plan item 4); masks keep the mixer only.
+  const isPointColorMode = !isForMask && mixerMode === 'pointColor';
   const isMixerPickerActive = useEditorStore((state) => state.targetedAdjustment?.tool === 'colorMixer');
+  const isPointColorPickerActive = useEditorStore((state) => state.targetedAdjustment?.tool === 'pointColor');
+  const isPointColorFull = (adjustments.pointColors?.length ?? 0) >= MAX_POINT_COLORS;
   const isMixerPickerDragging = useEditorStore(
     (state) => state.targetedAdjustment?.tool === 'colorMixer' && state.isSliderDragging,
   );
@@ -476,6 +409,14 @@ export default function ColorPanel({
     setEditor(
       canvasToolState(isMixerPickerActive ? {} : { targetedAdjustment: { tool: 'colorMixer', property: mixerTab } }),
     );
+  };
+
+  const togglePointColorPicker = () =>
+    setEditor(canvasToolState(isPointColorPickerActive ? {} : { targetedAdjustment: { tool: 'pointColor' } }));
+
+  const selectMixerMode = (mode: 'mixer' | 'pointColor') => {
+    if (isMixerPickerActive || isPointColorPickerActive) setEditor({ targetedAdjustment: null });
+    setMixerMode(mode);
   };
 
   const toggleMixerExpanded = () => {
@@ -639,24 +580,64 @@ export default function ColorPanel({
             {t('adjustments.color.colorMixer')}
           </Text>
           <div className="flex items-center gap-1">
-            <button
-              onClick={toggleMixerPicker}
-              className={headerToggleClassName(isMixerPickerActive)}
-              data-tooltip={t('adjustments.color.mixerPickerTooltip')}
-            >
-              <Pipette size={16} />
-            </button>
-            <button
-              onClick={toggleMixerExpanded}
-              className={headerToggleClassName(isMixerExpanded)}
-              data-tooltip={t('adjustments.color.toggleSliders')}
-            >
-              <Sliders size={16} />
-            </button>
+            {isPointColorMode ? (
+              <button
+                onClick={togglePointColorPicker}
+                disabled={isPointColorFull && !isPointColorPickerActive}
+                className={`${headerToggleClassName(isPointColorPickerActive)} disabled:opacity-40 disabled:cursor-not-allowed`}
+                data-tooltip={
+                  isPointColorFull
+                    ? t('adjustments.color.pointColor.full', { count: MAX_POINT_COLORS })
+                    : t('adjustments.color.pointColor.pickerTooltip')
+                }
+              >
+                <Pipette size={16} />
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={toggleMixerPicker}
+                  className={headerToggleClassName(isMixerPickerActive)}
+                  data-tooltip={t('adjustments.color.mixerPickerTooltip')}
+                >
+                  <Pipette size={16} />
+                </button>
+                <button
+                  onClick={toggleMixerExpanded}
+                  className={headerToggleClassName(isMixerExpanded)}
+                  data-tooltip={t('adjustments.color.toggleSliders')}
+                >
+                  <Sliders size={16} />
+                </button>
+              </>
+            )}
           </div>
         </div>
+        {!isForMask && (
+          <div className="grid grid-cols-2 gap-1 mb-3 compact:mb-2">
+            {(['mixer', 'pointColor'] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => selectMixerMode(mode)}
+                className={`py-1 rounded-md text-xs transition-colors ${
+                  mixerMode === mode
+                    ? 'bg-accent text-button-text shadow-sm'
+                    : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary'
+                }`}
+              >
+                {t(`adjustments.color.pointColor.${mode}Mode`)}
+              </button>
+            ))}
+          </div>
+        )}
         <div style={mixerTrackStyle}>
-          {isMixerExpanded ? (
+          {isPointColorMode ? (
+            <PointColorPanel
+              adjustments={adjustments}
+              setAdjustments={setAdjustments}
+              onDragStateChange={onDragStateChange}
+            />
+          ) : isMixerExpanded ? (
             <>
               <div className="flex items-center gap-2 mb-4 compact:mb-2 px-1">
                 {mixerTabs.map(({ id, label }) => (

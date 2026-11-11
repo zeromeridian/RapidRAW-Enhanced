@@ -12,6 +12,22 @@ struct HslColor {
     _pad: f32,
 }
 
+// One Point Color (`image_processing::PointColorSettings`). Ranges are min, max, min fade
+// and max fade relative to the target, hue in degrees.
+struct PointColor {
+    hue: f32,
+    saturation: f32,
+    luminance: f32,
+    hue_shift: f32,
+    saturation_shift: f32,
+    luminance_shift: f32,
+    _pad1: f32,
+    _pad2: f32,
+    hue_range: vec4<f32>,
+    saturation_range: vec4<f32>,
+    luminance_range: vec4<f32>,
+}
+
 struct ColorGradeSettings {
     hue: f32,
     saturation: f32,
@@ -120,6 +136,12 @@ struct GlobalAdjustments {
     _pad_motion_blur2: f32,
     glow_hue: f32,
     glow_saturation: f32,
+
+    point_colors: array<PointColor, 8>,
+    point_color_count: u32,
+    point_color_visualize: u32,
+    _pad_point_color1: f32,
+    _pad_point_color2: f32,
 }
 
 struct MaskAdjustments {
@@ -237,6 +259,7 @@ override SAMPLE_PROBE: u32 = 0u;
 const SAMPLE_PROBE_HSL: u32 = 1u;
 const SAMPLE_PROBE_CURVE: u32 = 2u;
 const SAMPLE_PROBE_MASK_CURVE: u32 = 3u;
+const SAMPLE_PROBE_POINT_COLOR: u32 = 4u;
 
 const LUMA_COEFF = vec3<f32>(0.2126, 0.7152, 0.0722);
 
@@ -804,21 +827,67 @@ fn apply_hsl_panel(color: vec3<f32>, hsl_adjustments: array<HslColor, 8>, coords
         total_lum_adjust += hsl_adjustments[i].luminance * luma_influence;
     }
 
-    if (original_hsv.y * (1.0 + total_sat_multiplier) < 0.0001) {
-        let final_luma = original_luma * (1.0 + total_lum_adjust);
+    return shift_hsv(original_hsv, original_luma, total_hue_shift, total_sat_multiplier, total_lum_adjust);
+}
+
+// Rotates a colour's hue by `hue_shift` degrees, scales its saturation by 1 + `sat_multiplier`
+// and its luma by 1 + `lum_adjust`; shared by the colour mixer and Point Color.
+fn shift_hsv(original_hsv: vec3<f32>, original_luma: f32, hue_shift: f32, sat_multiplier: f32, lum_adjust: f32) -> vec3<f32> {
+    if (original_hsv.y * (1.0 + sat_multiplier) < 0.0001) {
+        let final_luma = original_luma * (1.0 + lum_adjust);
         return vec3<f32>(final_luma);
     }
     var hsv = original_hsv;
-    hsv.x = (hsv.x + total_hue_shift + 360.0) % 360.0;
-    hsv.y = clamp(hsv.y * (1.0 + total_sat_multiplier), 0.0, 1.0);
+    hsv.x = (hsv.x + hue_shift + 360.0) % 360.0;
+    hsv.y = clamp(hsv.y * (1.0 + sat_multiplier), 0.0, 1.0);
     let hs_shifted_rgb = hsv_to_rgb(vec3<f32>(hsv.x, hsv.y, original_hsv.z));
     let new_luma = get_luma(hs_shifted_rgb);
-    let target_luma = original_luma * (1.0 + total_lum_adjust);
+    let target_luma = original_luma * (1.0 + lum_adjust);
     if (new_luma < 0.0001) {
         return vec3<f32>(max(0.0, target_luma));
     }
-    let final_color = hs_shifted_rgb * (target_luma / new_luma);
-    return final_color;
+    return hs_shifted_rgb * (target_luma / new_luma);
+}
+
+// The values Point Color selects by: hue (degrees) and saturation of the display-encoded
+// colour, and its luma, so ranges follow what the eye sees rather than linear light.
+fn point_color_coords(color: vec3<f32>) -> vec3<f32> {
+    let srgb = linear_to_srgb(clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)));
+    let hsv = rgb_to_hsv(srgb);
+    return vec3<f32>(hsv.x, hsv.y, get_luma(srgb));
+}
+
+// Full inside [min, max] of `range` (min, max, min fade, max fade), easing to zero over the
+// fades; mirrors `mask_generation::range_band_weight`.
+fn range_band(range: vec4<f32>, x: f32) -> f32 {
+    let lower = clamp((x - (range.x - range.z)) / max(range.z, 0.0001), 0.0, 1.0);
+    let upper = clamp(((range.y + range.w) - x) / max(range.w, 0.0001), 0.0, 1.0);
+    return lower * lower * (3.0 - 2.0 * lower) * upper * upper * (3.0 - 2.0 * upper);
+}
+
+fn point_color_weight(point: PointColor, coords: vec3<f32>) -> f32 {
+    let hue_offset = ((coords.x - point.hue + 540.0) % 360.0) - 180.0;
+    return range_band(point.hue_range, hue_offset)
+        * range_band(point.saturation_range, coords.y - point.saturation)
+        * range_band(point.luminance_range, coords.z - point.luminance);
+}
+
+fn apply_point_colors(color: vec3<f32>, coords: vec3<f32>) -> vec3<f32> {
+    var hue_shift = 0.0;
+    var sat_multiplier = 0.0;
+    var lum_adjust = 0.0;
+    for (var i = 0u; i < adjustments.global.point_color_count; i = i + 1u) {
+        let point = adjustments.global.point_colors[i];
+        let weight = point_color_weight(point, coords);
+        hue_shift += point.hue_shift * weight;
+        sat_multiplier += point.saturation_shift * weight;
+        lum_adjust += point.luminance_shift * weight;
+    }
+    if (hue_shift == 0.0 && sat_multiplier == 0.0 && lum_adjust == 0.0) {
+        return color;
+    }
+    let safe_color = max(color, vec3<f32>(0.0));
+    return shift_hsv(rgb_to_hsv(safe_color), get_luma(safe_color), hue_shift, sat_multiplier, lum_adjust);
 }
 
 fn apply_color_grading(color: vec3<f32>, shadows: ColorGradeSettings, midtones: ColorGradeSettings, highlights: ColorGradeSettings, global: ColorGradeSettings, blending: f32, balance: f32) -> vec3<f32> {
@@ -1885,6 +1954,18 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
     composite_rgb_linear = apply_hsl_panel(composite_rgb_linear, final_hsl, absolute_coord_i);
+    let point_coords = point_color_coords(composite_rgb_linear);
+    if (SAMPLE_PROBE == SAMPLE_PROBE_POINT_COLOR) {
+        textureStore(output_texture, id.xy, vec4<f32>(point_coords.x / 360.0, point_coords.y, point_coords.z, 1.0));
+        return;
+    }
+    composite_rgb_linear = apply_point_colors(composite_rgb_linear, point_coords);
+    // Visualize Range: the shown Point Color's range keeps its colour, the rest turns grey.
+    var point_color_visualized = 1.0;
+    if (adjustments.global.point_color_visualize > 0u) {
+        point_color_visualized = point_color_weight(
+            adjustments.global.point_colors[adjustments.global.point_color_visualize - 1u], point_coords);
+    }
     composite_rgb_linear = apply_hue_shift(composite_rgb_linear, t_hue);
     composite_rgb_linear = apply_creative_color(composite_rgb_linear, t_saturation, t_vibrance);
 
@@ -2041,6 +2122,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
                 final_rgb = mix(final_rgb, blended, influence);
             }
         }
+    }
+
+    if (adjustments.global.point_color_visualize > 0u) {
+        final_rgb = mix(vec3<f32>(get_luma(final_rgb)), final_rgb, point_color_visualized);
     }
 
     if (adjustments.global.show_clipping == 1u) {

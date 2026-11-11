@@ -68,7 +68,26 @@
       "vibrance": "Красочность",
       "wbPickerTooltip": "Пипетка баланса белого",
       "wbPickerWgpuDisabled": "Пипетка ББ: отключите WGPU в настройках.",
-      "whiteBalance": "Баланс белого"
+      "whiteBalance": "Баланс белого",
+      "pointColor": {
+        "ariaSelectPoint": "Выбрать точку {{index}}",
+        "delete": "Удалить точку",
+        "empty": "Выберите пипеткой цвет на фото, чтобы добавить точку.",
+        "full": "До {{count}} точек на фото",
+        "high": "Высокая",
+        "hueRange": "Диапазон тона",
+        "hueShift": "Сдвиг тона",
+        "low": "Низкая",
+        "luminanceRange": "Диапазон светимости",
+        "luminanceShift": "Сдвиг светимости",
+        "mixerMode": "Микшер",
+        "pickerTooltip": "Пипетка точечного цвета: нажмите на цвет на фото, чтобы добавить точку",
+        "pointColorMode": "Точечный цвет",
+        "saturationRange": "Диапазон насыщенности",
+        "saturationShift": "Сдвиг насыщенности",
+        "variance": "Разброс",
+        "visualize": "Показать диапазон"
+      }
     },
     "curves": {
       "channelTitle": "Канал {{channel}}",
@@ -1385,6 +1404,7 @@
         "masks": "Маски",
         "motionBlur": "Размытие в движении",
         "noiseReduction": "Подавление шума",
+        "pointColor": "Точечный цвет",
         "presence": "Присутствие",
         "sharpness": "Резкость",
         "tone": "Тональность",
