@@ -5,6 +5,20 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.42.0-dev-luminance-range-bar — 2026-11-11
+
+### Masks
+
+- **Luminance range bar**, as in Lightroom Classic: a Luminance mask now
+  has a dark-to-light bar. Drag its two lower handles to set the tones
+  that are fully selected, drag the upper handles to soften the edges of
+  the range, or drag the middle to move the whole range. Click the
+  title to reset it to every tone.
+- Clicking the photo with a Luminance mask sets the range around the
+  tone you clicked, which you can then refine on the bar.
+- Luminance masks made before this version keep their Tolerance slider
+  and look unchanged; clicking the photo switches them to the range bar.
+
 ## 1.41.6-dev-rr-gap — 2026-11-11
 
 ### Fixes

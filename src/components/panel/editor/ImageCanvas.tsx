@@ -4,6 +4,7 @@ import 'react-image-crop/dist/ReactCrop.css';
 import { Stage, Layer, Ellipse, Line, Transformer, Group, Circle, Rect } from 'react-konva';
 import { PercentCrop, Crop } from 'react-image-crop';
 import { Stamp, Bandage, RotateCw } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
 import {
   Adjustments,
   AiPatch,
@@ -12,10 +13,11 @@ import {
   RelightLight,
   aiDepthMaskRangeAround,
   createRelightLight,
+  luminanceMaskRangeAround,
 } from '../../../utils/adjustments';
 import { sampleDepthMap } from '../../ui/depthScope/DepthScope';
 import { Mask, SubMask, SubMaskMode, ToolType } from '../right/Masks';
-import { AppSettings, BrushSettings, Panel, SelectedImage } from '../../ui/AppProperties';
+import { AppSettings, BrushSettings, Invokes, Panel, SelectedImage } from '../../ui/AppProperties';
 import { RenderSize } from '../../../hooks/useImageRenderSize';
 import { useImageNaturalSize } from '../../../hooks/useImageNaturalSize';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
@@ -29,6 +31,7 @@ import { useUIStore } from '../../../store/useUIStore';
 import { orientNormalizedPoint, rotatePoint, unorientNormalizedPoint } from '../../../utils/cropUtils';
 import { lightsOutTarget } from '../../../utils/lightsOut';
 import { applyCrop } from '../../../hooks/useEditorActions';
+import { stripSentMaskData } from '../../../utils/maskUtils';
 
 interface CursorPreview {
   visible: boolean;
@@ -2106,7 +2109,27 @@ const ImageCanvas = memo(
           newParams.orientationSteps = adjustments.orientationSteps || 0;
           delete newParams.isInitialDraw;
 
-          updateSubMask(activeId, { parameters: newParams });
+          if (activeSubMask.type !== Mask.Luminance) {
+            updateSubMask(activeId, { parameters: newParams });
+            return;
+          }
+
+          // A pick sets the range around the picked tone (older Tolerance masks switch to a range).
+          const { patchesSentToBackend } = useEditorStore.getState();
+          invoke<number | null>(Invokes.SampleMaskLuminance, {
+            jsAdjustments: stripSentMaskData(adjustments, patchesSentToBackend),
+            x,
+            y,
+          })
+            .catch((err) => {
+              console.error('Failed to sample the luminance at the pick:', err);
+              return null;
+            })
+            .then((luminance) => {
+              updateSubMask(activeId, {
+                parameters: luminance === null ? newParams : { ...newParams, ...luminanceMaskRangeAround(luminance) },
+              });
+            });
           return;
         }
 

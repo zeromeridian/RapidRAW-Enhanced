@@ -68,6 +68,7 @@ export enum Invokes {
   GetEditorRoundTripCacheSize = 'get_editor_round_trip_cache_size',
   GetDepthPreview = 'get_depth_preview',
   SampleAdjustmentProbe = 'sample_adjustment_probe',
+  SampleMaskLuminance = 'sample_mask_luminance',
   FrontendLog = 'frontend_log',
   GenerateAiForegroundMask = 'generate_ai_foreground_mask',
   GenerateAiSkyMask = 'generate_ai_sky_mask',

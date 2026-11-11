@@ -51,7 +51,7 @@ import DetailsPanel from '../../adjustments/Details';
 import EffectsPanel from '../../adjustments/Effects';
 import Waveform from '../editor/Waveform';
 import Resizer from '../../ui/Resizer';
-import { DepthRangePicker } from '../../ui/DepthRangePicker';
+import { type DepthRange, DepthRangePicker, RangePicker, type RangeValues } from '../../ui/RangePicker';
 import DepthScope from '../../ui/depthScope/DepthScope';
 
 import {
@@ -75,6 +75,7 @@ import {
   MaskBlendMode,
   ADJUSTMENT_SECTIONS,
   AI_DEPTH_MASK_RANGE_DEFAULTS,
+  LUMINANCE_MASK_RANGE_DEFAULTS,
 } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { OPTION_SEPARATOR, Orientation } from '../../ui/AppProperties';
@@ -107,6 +108,14 @@ interface DragData {
   maskType?: Mask;
   parentId?: string;
 }
+
+/** A Luminance mask's stored tone range as the range bar shows it. */
+const luminanceToBar = (p: { minLuminance: number; maxLuminance: number; minFade?: number; maxFade?: number }) => ({
+  min: p.minLuminance,
+  max: p.maxLuminance,
+  minFade: p.minFade ?? 0,
+  maxFade: p.maxFade ?? 0,
+});
 
 const SUB_MASK_CONFIG: Record<Mask, any> = {
   [Mask.Radial]: {
@@ -451,6 +460,7 @@ export default function MasksPanel() {
         subMask.parameters.tolerance = 20;
         subMask.parameters.feather = 35;
       }
+      if (type === Mask.Luminance) Object.assign(subMask.parameters, LUMINANCE_MASK_RANGE_DEFAULTS);
     }
 
     if (type === Mask.AiDepth) {
@@ -1650,24 +1660,17 @@ function SettingsPanel({
     updateSubMask(activeSubMask.id, { parameters: newParams });
   };
 
-  const handleDepthRangeChange = (values: { minDepth: number; maxDepth: number; minFade: number; maxFade: number }) => {
-    if (!isActive || !activeSubMask) return;
-
-    const newParams = {
-      ...activeSubMask.parameters,
-      minDepth: 100 - values.maxDepth,
-      maxDepth: 100 - values.minDepth,
-      minFade: values.maxFade,
-      maxFade: values.minFade,
-    };
-    updateSubMask(activeSubMask.id, { parameters: newParams });
-  };
+  const handleLuminanceRangeChange = ({ min, max, minFade, maxFade }: RangeValues) =>
+    handleSubMaskParametersChange({ minLuminance: min, maxLuminance: max, minFade, maxFade });
 
   const subMaskConfig = activeSubMask ? SUB_MASK_CONFIG[activeSubMask.type] || {} : {};
   const isAiMask =
     activeSubMask &&
     [Mask.AiSubject, Mask.AiForeground, Mask.AiSky, Mask.AiDepth, Mask.AiText].includes(activeSubMask.type);
   const isComponentMode = !!activeSubMask;
+  // Luminance masks made before `1.42.0` select by Tolerance until a tone is picked again.
+  const isLuminanceRange =
+    activeSubMask?.type === Mask.Luminance && activeSubMask.parameters?.minLuminance !== undefined;
   const isTextMask = activeSubMask?.type === Mask.AiText;
 
   const handleGenerateTextMaskClick = () => {
@@ -1932,39 +1935,55 @@ function SettingsPanel({
 
               {activeSubMask.type === Mask.AiDepth && (
                 <DepthRangePicker
-                  minDepth={100 - (activeSubMask.parameters?.maxDepth ?? 100)}
-                  maxDepth={100 - (activeSubMask.parameters?.minDepth ?? 0)}
-                  minFade={activeSubMask.parameters?.maxFade ?? 15}
-                  maxFade={activeSubMask.parameters?.minFade ?? 15}
-                  defaultMinDepth={100 - AI_DEPTH_MASK_RANGE_DEFAULTS.maxDepth}
-                  defaultMaxDepth={100 - AI_DEPTH_MASK_RANGE_DEFAULTS.minDepth}
-                  defaultMinFade={AI_DEPTH_MASK_RANGE_DEFAULTS.maxFade}
-                  defaultMaxFade={AI_DEPTH_MASK_RANGE_DEFAULTS.minFade}
-                  onChange={handleDepthRangeChange}
+                  value={{
+                    minDepth: activeSubMask.parameters?.minDepth ?? 0,
+                    maxDepth: activeSubMask.parameters?.maxDepth ?? 100,
+                    minFade: activeSubMask.parameters?.minFade ?? 15,
+                    maxFade: activeSubMask.parameters?.maxFade ?? 15,
+                  }}
+                  defaults={AI_DEPTH_MASK_RANGE_DEFAULTS}
+                  onChange={(range: DepthRange) => handleSubMaskParametersChange({ ...range })}
                   onDragStateChange={onDragStateChange}
                 />
               )}
 
-              {subMaskConfig.parameters?.map((param: any) => (
-                <Slider
-                  key={param.key}
-                  label={
-                    param.key === 'feather' && activeSubMask.type === Mask.AiDepth
-                      ? t('editor.masks.params.globalFeather')
-                      : t('editor.masks.params.' + param.key)
-                  }
-                  min={param.min}
-                  max={param.max}
-                  step={param.step}
-                  defaultValue={param.defaultValue}
-                  value={(activeSubMask.parameters[param.key] || 0) * (param.multiplier || 1)}
-                  onChange={(e: any) =>
-                    handleSubMaskParametersChange({ [param.key]: parseFloat(e.target.value) / (param.multiplier || 1) })
-                  }
-                  {...(param.key !== 'grow' && { fillOrigin: 'min' })}
+              {isLuminanceRange && (
+                <RangePicker
+                  title={t('editor.masks.luminanceRange.title')}
+                  startLabel={t('editor.masks.luminanceRange.dark')}
+                  endLabel={t('editor.masks.luminanceRange.light')}
+                  gradient="linear-gradient(to right, #000, #fff)"
+                  value={luminanceToBar(activeSubMask.parameters)}
+                  defaults={luminanceToBar(LUMINANCE_MASK_RANGE_DEFAULTS)}
+                  onChange={handleLuminanceRangeChange}
                   onDragStateChange={onDragStateChange}
                 />
-              ))}
+              )}
+
+              {subMaskConfig.parameters
+                ?.filter((param: { key: string }) => !(isLuminanceRange && param.key === 'tolerance'))
+                .map((param: any) => (
+                  <Slider
+                    key={param.key}
+                    label={
+                      param.key === 'feather' && activeSubMask.type === Mask.AiDepth
+                        ? t('editor.masks.params.globalFeather')
+                        : t('editor.masks.params.' + param.key)
+                    }
+                    min={param.min}
+                    max={param.max}
+                    step={param.step}
+                    defaultValue={param.defaultValue}
+                    value={(activeSubMask.parameters[param.key] || 0) * (param.multiplier || 1)}
+                    onChange={(e: any) =>
+                      handleSubMaskParametersChange({
+                        [param.key]: parseFloat(e.target.value) / (param.multiplier || 1),
+                      })
+                    }
+                    {...(param.key !== 'grow' && { fillOrigin: 'min' })}
+                    onDragStateChange={onDragStateChange}
+                  />
+                ))}
 
               {subMaskConfig.showBrushTools &&
                 brushSettings &&

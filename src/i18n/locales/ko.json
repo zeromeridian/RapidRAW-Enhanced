@@ -656,10 +656,14 @@
       "depthRange": {
         "far": "멀리",
         "near": "가까이",
-        "reset": "초기화",
         "title": "심도 범위"
       },
       "dropzoneText": "여기에 놓아 새 마스크를 만드세요",
+      "luminanceRange": {
+        "dark": "어두움",
+        "light": "밝음",
+        "title": "휘도 범위"
+      },
       "maskAdjustmentsTitle": "마스크 조정",
       "maskingTitle": "마스킹",
       "masksTitle": "마스크",

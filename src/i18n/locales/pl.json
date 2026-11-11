@@ -704,10 +704,14 @@
       "depthRange": {
         "far": "Daleko",
         "near": "Blisko",
-        "reset": "Resetuj",
         "title": "Zakres głębi"
       },
       "dropzoneText": "Upuść tutaj, aby utworzyć nową maskę",
+      "luminanceRange": {
+        "dark": "Ciemne",
+        "light": "Jasne",
+        "title": "Zakres luminancji"
+      },
       "maskAdjustmentsTitle": "Ustawienia maski",
       "maskingTitle": "Maskowanie",
       "masksTitle": "Maski",

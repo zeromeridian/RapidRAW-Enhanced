@@ -707,10 +707,14 @@
       "depthRange": {
         "far": "Far",
         "near": "Near",
-        "reset": "Reset",
         "title": "Depth Range"
       },
       "dropzoneText": "Drop here to create a new mask",
+      "luminanceRange": {
+        "dark": "Dark",
+        "light": "Light",
+        "title": "Luminance Range"
+      },
       "maskAdjustmentsTitle": "Mask Adjustments",
       "maskingTitle": "Masking",
       "masksTitle": "Masks",

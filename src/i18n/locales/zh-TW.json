@@ -656,10 +656,14 @@
       "depthRange": {
         "far": "遠",
         "near": "近",
-        "reset": "重置",
         "title": "深度範圍"
       },
       "dropzoneText": "拖放到此處以建立新遮色片",
+      "luminanceRange": {
+        "dark": "暗",
+        "light": "亮",
+        "title": "亮度範圍"
+      },
       "maskAdjustmentsTitle": "遮色片調整",
       "maskingTitle": "遮色片",
       "masksTitle": "遮色片",
