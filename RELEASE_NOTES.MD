@@ -5,6 +5,49 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.41.6-dev-rr-gap — 2026-11-11
+
+### Fixes
+
+- **Depth masks no longer outline near objects or the photo's edge.** A
+  depth range in the middle distance used to also select a thin line
+  around everything in front of it (such as a branch against rocks) and a
+  line along the top or side of the photo. New Depth masks now separate
+  near and far cleanly at object edges. Depth maps for Lens Blur, Fog and
+  Motion Blur generated from now on are also more accurate along the
+  photo's edges. Existing masks and maps are unchanged until they are
+  regenerated.
+
+## 1.41.5-dev-rr-gap — 2026-11-11
+
+### Fixes
+
+- **Depth masks cover distant areas fully.** A new Depth mask now masks
+  its whole depth range at full strength, so a picked background (for
+  example a far waterfall) is fully selected instead of only faintly.
+  Depth masks made before this version keep their earlier look, where
+  strength fell off with distance.
+
+## 1.41.4-dev-rr-gap — 2026-11-11
+
+### Fixes
+
+- **Picking a depth no longer zooms the photo.** A click on the photo with
+  a Depth mask selected only sets the depth range, as with Color and
+  Luminance masks. Pan with the middle mouse button while picking.
+
+## 1.41.3-dev-rr-gap — 2026-11-11
+
+### Improvements
+
+- **Depth masks pick their range with a click.** A new Depth mask now
+  starts on the nearest part of the photo instead of a middle band that
+  barely covered the foreground. Click the photo, as with Color and
+  Luminance masks, and the depth range centres on that spot with soft
+  fades; click again to pick another depth. The Depth Range bar and the 3D
+  view still fine-tune it, and double-clicking the bar returns to the
+  nearest range. Existing depth masks are unchanged.
+
 ## 1.41.2-dev-rr-gap — 2026-11-11
 
 ### Fixes

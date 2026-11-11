@@ -922,6 +922,33 @@ fn generate_ai_sky_bitmap(
     Some(mask)
 }
 
+/// Mask strength at a nearness in percent (100 nearest): the depth range with its fades, scaled
+/// by the nearness itself unless the mask has `full_strength` (masks made before `1.41.5`).
+fn ai_depth_mask_weight(params: &AiDepthMaskParameters, nearness: f32) -> f32 {
+    fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
+        let t = ((x - edge0) / (edge1 - edge0).max(0.0001)).clamp(0.0, 1.0);
+        t * t * (3.0 - 2.0 * t)
+    }
+
+    let lower = smoothstep(
+        params.min_depth - params.min_fade,
+        params.min_depth,
+        nearness,
+    );
+    let upper = 1.0
+        - smoothstep(
+            params.max_depth,
+            params.max_depth + params.max_fade,
+            nearness,
+        );
+    let band = lower * upper;
+    if params.full_strength {
+        band
+    } else {
+        band * (nearness / 100.0)
+    }
+}
+
 fn generate_ai_depth_bitmap(
     params_value: &Value,
     width: u32,
@@ -932,7 +959,7 @@ fn generate_ai_depth_bitmap(
     let params: AiDepthMaskParameters = serde::Deserialize::deserialize(params_value).ok()?;
     let grow_feather: GrowFeatherParameters =
         serde::Deserialize::deserialize(params_value).unwrap_or_default();
-    let data_url = params.mask_data_base64?;
+    let data_url = params.mask_data_base64.as_deref()?;
 
     let tf = TransformParams {
         rotation: params.rotation.unwrap_or(0.0),
@@ -945,30 +972,14 @@ fn generate_ai_depth_bitmap(
         crop_offset,
     };
 
-    let depth_map = generate_ai_bitmap_from_base64(&data_url, &tf)?;
+    let depth_map = generate_ai_bitmap_from_base64(data_url, &tf)?;
 
     let (w, h) = depth_map.dimensions();
     let mut mask = GrayImage::new(w, h);
 
-    fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
-        let t = ((x - edge0) / (edge1 - edge0).max(0.0001)).clamp(0.0, 1.0);
-        t * t * (3.0 - 2.0 * t)
-    }
-
-    let min_fade = params.min_fade;
-    let max_fade = params.max_fade;
-
     for (x, y, p) in depth_map.enumerate_pixels() {
-        let val_pct = (p[0] as f32 / 255.0) * 100.0;
-
-        let lower_bound = smoothstep(params.min_depth - min_fade, params.min_depth, val_pct);
-        let upper_bound = 1.0 - smoothstep(params.max_depth, params.max_depth + max_fade, val_pct);
-        let bandpass_weight = lower_bound * upper_bound;
-
-        let depth_intensity = val_pct / 100.0;
-        let final_intensity = bandpass_weight * depth_intensity;
-
-        mask.put_pixel(x, y, Luma([(final_intensity * 255.0) as u8]));
+        let weight = ai_depth_mask_weight(&params, (p[0] as f32 / 255.0) * 100.0);
+        mask.put_pixel(x, y, Luma([(weight * 255.0) as u8]));
     }
 
     if params.feather > 0.0 {
@@ -1579,8 +1590,29 @@ pub fn get_cached_or_generate_mask(
 
 #[cfg(test)]
 mod tests {
-    use super::{MaskDefinition, mask_cache_key};
+    use super::{MaskDefinition, ai_depth_mask_weight, mask_cache_key};
+    use crate::ai_processing::AiDepthMaskParameters;
     use serde_json::json;
+
+    #[test]
+    fn full_strength_depth_masks_cover_far_ranges_fully() {
+        let far: AiDepthMaskParameters = serde_json::from_value(json!({
+            "minDepth": 2.0, "maxDepth": 18.0, "minFade": 2.0, "maxFade": 12.0,
+        }))
+        .unwrap();
+        // Masks without the flag (before `1.41.5`) keep upstream's nearness scaling.
+        assert!((ai_depth_mask_weight(&far, 10.0) - 0.1).abs() < 1e-6);
+
+        let far = AiDepthMaskParameters {
+            full_strength: true,
+            ..far
+        };
+        assert_eq!(ai_depth_mask_weight(&far, 10.0), 1.0);
+        assert_eq!(ai_depth_mask_weight(&far, 2.0), 1.0);
+        assert_eq!(ai_depth_mask_weight(&far, 40.0), 0.0);
+        let fading = ai_depth_mask_weight(&far, 24.0);
+        assert!(fading > 0.0 && fading < 1.0);
+    }
 
     fn mask(adjustments: serde_json::Value, brush_data: &str) -> MaskDefinition {
         serde_json::from_value(json!({

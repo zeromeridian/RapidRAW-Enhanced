@@ -10,8 +10,10 @@ import {
   Coord,
   MaskContainer,
   RelightLight,
+  aiDepthMaskRangeAround,
   createRelightLight,
 } from '../../../utils/adjustments';
+import { sampleDepthMap } from '../../ui/depthScope/DepthScope';
 import { Mask, SubMask, SubMaskMode, ToolType } from '../right/Masks';
 import { AppSettings, BrushSettings, Panel, SelectedImage } from '../../ui/AppProperties';
 import { RenderSize } from '../../../hooks/useImageRenderSize';
@@ -1179,7 +1181,7 @@ const MaskOverlay = memo(
       );
     }
 
-    if (subMask.type === Mask.Color || subMask.type === Mask.Luminance) {
+    if (subMask.type === Mask.Color || subMask.type === Mask.Luminance || subMask.type === Mask.AiDepth) {
       const { targetX, targetY } = p;
       if (targetX !== undefined && targetX >= 0 && targetY !== undefined && targetY >= 0) {
         return (
@@ -1816,8 +1818,11 @@ const ImageCanvas = memo(
     const isAiSubjectActive =
       (isMasking || isAiEditing) &&
       (activeSubMask?.type === Mask.AiSubject || activeSubMask?.type === Mask.QuickEraser);
+    const isDepthPickActive =
+      (isMasking || isAiEditing) && activeSubMask?.type === Mask.AiDepth && !!activeSubMask.parameters?.maskDataBase64;
     const isParametricActive =
-      (isMasking || isAiEditing) && (activeSubMask?.type === Mask.Color || activeSubMask?.type === Mask.Luminance);
+      ((isMasking || isAiEditing) && (activeSubMask?.type === Mask.Color || activeSubMask?.type === Mask.Luminance)) ||
+      isDepthPickActive;
     const isInitialDrawing = (isMasking || isAiEditing) && activeSubMask?.parameters?.isInitialDraw === true;
 
     const isToolActive = isBrushActive || isAiSubjectActive || isInitialDrawing || isParametricActive;
@@ -2074,6 +2079,24 @@ const ImageCanvas = memo(
           const x = pos.x / scale + cropX;
           const y = pos.y / scale + cropY;
 
+          const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
+
+          if (isDepthPickActive) {
+            // The map is stored in the source frame; undo the mask's rotation and orientation
+            // like `mask_generation::transform_full_mask`.
+            const { width, height } = effectiveImageDimensions;
+            const parameters = activeSubMask.parameters;
+            const [ux, uy] = rotatePoint(x, y, width / 2, height / 2, -(parameters.rotation ?? 0));
+            const [u, v] = unorientNormalizedPoint(ux / width, uy / height, parameters);
+            sampleDepthMap(parameters.maskDataBase64, u, v).then((depth) => {
+              if (depth === null) return;
+              updateSubMask(activeId, {
+                parameters: { ...parameters, ...aiDepthMaskRangeAround(depth), targetX: x, targetY: y },
+              });
+            });
+            return;
+          }
+
           let newParams = { ...activeSubMask.parameters };
           newParams.targetX = x;
           newParams.targetY = y;
@@ -2083,7 +2106,6 @@ const ImageCanvas = memo(
           newParams.orientationSteps = adjustments.orientationSteps || 0;
           delete newParams.isInitialDraw;
 
-          const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
           updateSubMask(activeId, { parameters: newParams });
           return;
         }
@@ -2274,6 +2296,8 @@ const ImageCanvas = memo(
         activeLineFlow,
         isAiSubjectActive,
         isParametricActive,
+        isDepthPickActive,
+        effectiveImageDimensions,
         brushSettings,
         onSelectMask,
         onSelectAiSubMask,

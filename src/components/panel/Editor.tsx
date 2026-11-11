@@ -643,6 +643,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     return null;
   }, [adjustments.masks, adjustments.aiPatches, activeMaskId, activeAiSubMaskId, isMasking, isAiEditing]);
 
+  // A depth mask with a map picks its range by click (`ImageCanvas` `isDepthPickActive`).
+  const isDepthPicking = activeSubMask?.type === Mask.AiDepth && !!activeSubMask.parameters?.maskDataBase64;
+
   const isPanningDisabled =
     isMaskHovered ||
     isMaskTouchInteracting ||
@@ -653,6 +656,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
         activeSubMask?.type === Mask.AiSubject ||
         activeSubMask?.type === Mask.Color ||
         activeSubMask?.type === Mask.Luminance ||
+        isDepthPicking ||
         activeSubMask?.parameters?.isInitialDraw)) ||
     (isAiEditing &&
       (activeSubMask?.type === Mask.Brush ||
@@ -663,6 +667,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
         activeSubMask?.type === Mask.QuickEraser ||
         activeSubMask?.type === Mask.Color ||
         activeSubMask?.type === Mask.Luminance ||
+        isDepthPicking ||
         activeSubMask?.parameters?.isInitialDraw)) ||
     isWbPickerActive ||
     isRelightPickerActive ||

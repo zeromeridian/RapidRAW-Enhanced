@@ -2294,11 +2294,13 @@ pub fn run_depth_anything_model(
     let rw = resized_w as usize;
     let rh = resized_h as usize;
 
-    for y in 0..rh {
-        for x in 0..rw {
+    // The padding repeats the photo's edge pixels: a flat fill made the model bend the depth of
+    // the rows next to it, which showed as a line along that edge of depth masks.
+    for dest_y in 0..DEPTH_INPUT_SIZE as usize {
+        let y = dest_y.saturating_sub(paste_y).min(rh - 1);
+        for dest_x in 0..DEPTH_INPUT_SIZE as usize {
+            let x = dest_x.saturating_sub(paste_x).min(rw - 1);
             let idx = (y * rw + x) * 3;
-            let dest_y = y + paste_y;
-            let dest_x = x + paste_x;
 
             input_tensor[[0, 0, dest_y, dest_x]] =
                 (raw_pixels[idx] as f32 / 255.0 - mean[0]) / std[0];
@@ -2354,6 +2356,85 @@ pub fn run_depth_anything_model(
         .ok_or_else(|| anyhow::anyhow!("Failed to create mask from Depth output"))?;
 
     Ok(depth_map)
+}
+
+/// Sliding minimum and maximum of `line` over `[i - radius, i + radius]`, clamped to the line.
+fn sliding_min_max(line: &[u8], radius: usize, min_out: &mut [u8], max_out: &mut [u8]) {
+    let n = line.len();
+    let mut lows = std::collections::VecDeque::new();
+    let mut highs = std::collections::VecDeque::new();
+    for j in 0..n + radius {
+        if j < n {
+            while lows.back().is_some_and(|&k: &usize| line[k] >= line[j]) {
+                lows.pop_back();
+            }
+            lows.push_back(j);
+            while highs.back().is_some_and(|&k: &usize| line[k] <= line[j]) {
+                highs.pop_back();
+            }
+            highs.push_back(j);
+        }
+        let Some(i) = j.checked_sub(radius) else {
+            continue;
+        };
+        let first = i.saturating_sub(radius);
+        while lows.front().is_some_and(|&k| k < first) {
+            lows.pop_front();
+        }
+        while highs.front().is_some_and(|&k| k < first) {
+            highs.pop_front();
+        }
+        min_out[i] = line[lows[0]];
+        max_out[i] = line[highs[0]];
+    }
+}
+
+/// Square-window minimum and maximum of `image`, separably.
+fn window_min_max(image: &GrayImage, radius: usize) -> (Vec<u8>, Vec<u8>) {
+    let (w, h) = (image.width() as usize, image.height() as usize);
+    let transpose = |src: &[u8], w: usize, h: usize| {
+        let mut out = vec![0u8; w * h];
+        out.par_chunks_mut(h).enumerate().for_each(|(x, column)| {
+            for (y, value) in column.iter_mut().enumerate() {
+                *value = src[y * w + x];
+            }
+        });
+        out
+    };
+    // Minimum of `lows` and maximum of `highs` along each line of length `len`.
+    let pass = |lows: &[u8], highs: &[u8], len: usize| {
+        let mut min_out = vec![0u8; lows.len()];
+        let mut max_out = vec![0u8; lows.len()];
+        min_out
+            .par_chunks_mut(len)
+            .zip(max_out.par_chunks_mut(len))
+            .zip(lows.par_chunks(len).zip(highs.par_chunks(len)))
+            .for_each(|((min_line, max_line), (low_line, high_line))| {
+                let mut unused = vec![0u8; len];
+                sliding_min_max(low_line, radius, min_line, &mut unused);
+                sliding_min_max(high_line, radius, &mut unused, max_line);
+            });
+        (min_out, max_out)
+    };
+    let raw = image.as_raw();
+    let (row_min, row_max) = pass(raw, raw, w);
+    let (col_min, col_max) = pass(&transpose(&row_min, w, h), &transpose(&row_max, w, h), h);
+    (transpose(&col_min, h, w), transpose(&col_max, h, w))
+}
+
+/// Snaps depth across object edges to the nearer side. The model blurs a near/far edge into a
+/// ramp several pixels wide that passes through every depth between, so a depth range in the
+/// middle outlined near objects. Pixels whose window spans more than `threshold` take the
+/// window's minimum or maximum, whichever is closer; smooth slopes stay below it and are kept.
+pub fn snap_depth_edges(depth: &GrayImage, radius: u32, threshold: u8) -> GrayImage {
+    let (lows, highs) = window_min_max(depth, radius as usize);
+    let mut out = depth.clone();
+    for ((value, &lo), &hi) in out.iter_mut().zip(&lows).zip(&highs) {
+        if hi - lo > threshold {
+            *value = if *value - lo <= hi - *value { lo } else { hi };
+        }
+    }
+    out
 }
 
 fn build_normal_depth(points: &[f32], mask: &[f32]) -> Vec<u8> {
@@ -2549,6 +2630,10 @@ pub struct AiDepthMaskParameters {
     pub max_fade: f32,
     #[serde(default)]
     pub feather: f32,
+    /// Masks the depth range at full strength. Masks made before `1.41.5` lack it and keep
+    /// upstream's strength scaled by nearness, so far ranges stay weak there.
+    #[serde(default)]
+    pub full_strength: bool,
     #[serde(default)]
     pub mask_data_base64: Option<String>,
     #[serde(default)]
@@ -2563,7 +2648,42 @@ pub struct AiDepthMaskParameters {
 
 #[cfg(test)]
 mod tests {
-    use super::{ESAM3_SKY_SCORE_THRESHOLD, ESAM3_TEXT_SCORE_THRESHOLD, select_esam3_queries};
+    use super::{
+        ESAM3_SKY_SCORE_THRESHOLD, ESAM3_TEXT_SCORE_THRESHOLD, select_esam3_queries,
+        sliding_min_max, snap_depth_edges, window_min_max,
+    };
+    use image::GrayImage;
+
+    #[test]
+    fn sliding_min_max_matches_a_brute_force_window() {
+        let line: Vec<u8> = (0..40u32).map(|i| ((i * 37 + 11) % 97) as u8).collect();
+        for radius in [0, 1, 3, 50] {
+            let (mut lo, mut hi) = (vec![0; line.len()], vec![0; line.len()]);
+            sliding_min_max(&line, radius, &mut lo, &mut hi);
+            for i in 0..line.len() {
+                let window = &line[i.saturating_sub(radius)..(i + radius + 1).min(line.len())];
+                assert_eq!(lo[i], *window.iter().min().unwrap());
+                assert_eq!(hi[i], *window.iter().max().unwrap());
+            }
+        }
+        let image = GrayImage::from_fn(9, 5, |x, y| image::Luma([(x * 10 + y * 3) as u8]));
+        let (lows, highs) = window_min_max(&image, 1);
+        assert_eq!(lows[2 * 9 + 4], 3 * 10 + 3);
+        assert_eq!(highs[2 * 9 + 4], 5 * 10 + 9);
+    }
+
+    #[test]
+    fn depth_edges_snap_to_a_side_and_slopes_are_kept() {
+        // A near object (200) beside the far background (20), with the model's ramp between.
+        let ramp = [20u8, 20, 20, 65, 110, 155, 200, 200, 200];
+        let edge = GrayImage::from_fn(9, 3, |x, _| image::Luma([ramp[x as usize]]));
+        let snapped = snap_depth_edges(&edge, 3, 24);
+        let row: Vec<u8> = (0..9).map(|x| snapped.get_pixel(x, 1)[0]).collect();
+        assert_eq!(row, [20, 20, 20, 20, 20, 200, 200, 200, 200]);
+
+        let slope = GrayImage::from_fn(9, 3, |x, _| image::Luma([100 + 2 * x as u8]));
+        assert_eq!(snap_depth_edges(&slope, 3, 24), slope);
+    }
 
     #[test]
     fn sky_masks_merge_weaker_parts_of_a_detected_sky() {

@@ -25,7 +25,7 @@ import {
   sceneOverlay,
   sceneUniforms,
 } from './scene';
-import { EFFECT_MAP_GEOMETRY_KEYS, EffectMapKey } from '../../../utils/adjustments';
+import { Adjustments, EFFECT_MAP_GEOMETRY_KEYS, EffectMapKey } from '../../../utils/adjustments';
 
 type DepthScopeProps = {
   scene: DepthScene;
@@ -115,12 +115,36 @@ const fetchPreview = (mapKey: EffectMapKey | undefined, mapValue: string, signat
   return request;
 };
 
+const geometrySignature = (adjustments: Adjustments) =>
+  EFFECT_MAP_GEOMETRY_KEYS.map((key) => JSON.stringify(adjustments[key] ?? null)).join('|');
+
+const SAMPLE_RADIUS = 1;
+
+/**
+ * Nearness in percent (100 nearest) of a mask's own depth map around a point given as fractions of
+ * the uncropped photo, read from the same cached grid as the 3D view; null when the map is unavailable.
+ */
+export const sampleDepthMap = async (mapData: string, u: number, v: number): Promise<number | null> => {
+  const signature = geometrySignature(useEditorStore.getState().adjustments);
+  const preview = await fetchPreview(undefined, mapData, signature).catch(() => null);
+  if (!preview || u < 0 || v < 0 || u > 1 || v > 1) return null;
+  const cx = Math.min(preview.width - 1, Math.floor(u * preview.width));
+  const cy = Math.min(preview.height - 1, Math.floor(v * preview.height));
+  let sum = 0;
+  let count = 0;
+  for (let y = Math.max(0, cy - SAMPLE_RADIUS); y <= Math.min(preview.height - 1, cy + SAMPLE_RADIUS); y++) {
+    for (let x = Math.max(0, cx - SAMPLE_RADIUS); x <= Math.min(preview.width - 1, cx + SAMPLE_RADIUS); x++) {
+      sum += preview.pixels[(y * preview.width + x) * 4 + 3];
+      count++;
+    }
+  }
+  return (sum / count / 255) * 100;
+};
+
 const useDepthPreview = (mapKey: EffectMapKey | undefined, mapData: string | undefined) => {
   const storeValue = useEditorStore((state) => (mapKey ? state.adjustments[mapKey] : null));
   const mapValue = mapKey ? storeValue : mapData;
-  const signature = useEditorStore((state) =>
-    EFFECT_MAP_GEOMETRY_KEYS.map((key) => JSON.stringify(state.adjustments[key] ?? null)).join('|'),
-  );
+  const signature = useEditorStore((state) => geometrySignature(state.adjustments));
   const [preview, setPreview] = useState<DepthPreview | null>(null);
 
   useEffect(() => {

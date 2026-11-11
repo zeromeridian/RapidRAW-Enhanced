@@ -330,6 +330,7 @@ export function useAiMasking() {
         minFade: parameters.minFade ?? 15,
         maxFade: parameters.maxFade ?? 15,
         feather: parameters.feather ?? 10,
+        fullStrength: parameters.fullStrength ?? false,
         flipHorizontal: adjustments.flipHorizontal,
         flipVertical: adjustments.flipVertical,
         orientationSteps: adjustments.orientationSteps,
