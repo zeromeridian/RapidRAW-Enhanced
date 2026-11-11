@@ -1578,6 +1578,7 @@ const ImageCanvas = memo(
     });
 
     const isRelightPickerActive = useEditorStore((state) => state.isRelightPickerActive);
+    const isMaskShapeDragging = useEditorStore((state) => state.isMaskShapeDragging);
     const activeRelightLightId = useEditorStore((state) => state.activeRelightLightId);
     const setEditor = useEditorStore((state) => state.setEditor);
     const isRelightToolOpen = useUIStore(
@@ -3039,7 +3040,7 @@ const ImageCanvas = memo(
 
     const currentActiveSubMaskId = activeAiSubMaskId || activeMaskId;
     const maskOpacity =
-      isShowingOriginal || (isSliderDragging && !isBrushStrokeActive) || isMaskInteractionActive
+      isShowingOriginal || (isSliderDragging && !isBrushStrokeActive && !isMaskShapeDragging) || isMaskInteractionActive
         ? 0
         : isCloneOrHealActive
           ? hoveredMarkerId === currentActiveSubMaskId || isMaskControlHovered

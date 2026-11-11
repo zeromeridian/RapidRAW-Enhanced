@@ -311,6 +311,10 @@ export default function MasksPanel() {
     (isDragging: boolean) => setEditor({ isSliderDragging: isDragging }),
     [setEditor],
   );
+  const onMaskShapeDragStateChange = useCallback(
+    (isDragging: boolean) => setEditor({ isSliderDragging: isDragging, isMaskShapeDragging: isDragging }),
+    [setEditor],
+  );
   const onSelectContainer = useCallback((id: string | null) => setEditor({ activeMaskContainerId: id }), [setEditor]);
   const onSelectMask = useCallback((id: string | null) => setEditor({ activeMaskId: id }), [setEditor]);
 
@@ -1132,6 +1136,7 @@ export default function MasksPanel() {
                   copiedSectionAdjustments={copiedSectionAdjustments}
                   setCopiedSectionAdjustments={setCopiedSectionAdjustments}
                   onDragStateChange={onDragStateChange}
+                  onMaskShapeDragStateChange={onMaskShapeDragStateChange}
                   isSettingsSectionOpen={isSettingsSectionOpen}
                   setSettingsSectionOpen={setSettingsSectionOpen}
                   presets={presets}
@@ -1580,6 +1585,7 @@ function SettingsPanel({
   copiedSectionAdjustments,
   setCopiedSectionAdjustments,
   onDragStateChange,
+  onMaskShapeDragStateChange,
   isSettingsSectionOpen,
   setSettingsSectionOpen,
   presets,
@@ -1929,7 +1935,7 @@ function SettingsPanel({
                     maxFade: activeSubMask.parameters?.maxFade ?? 15,
                   }}
                   onChange={handleSubMaskParametersChange}
-                  onDragStateChange={onDragStateChange}
+                  onDragStateChange={onMaskShapeDragStateChange}
                 />
               )}
 
@@ -1943,7 +1949,7 @@ function SettingsPanel({
                   }}
                   defaults={AI_DEPTH_MASK_RANGE_DEFAULTS}
                   onChange={(range: DepthRange) => handleSubMaskParametersChange({ ...range })}
-                  onDragStateChange={onDragStateChange}
+                  onDragStateChange={onMaskShapeDragStateChange}
                 />
               )}
 
@@ -1956,7 +1962,7 @@ function SettingsPanel({
                   value={luminanceToBar(activeSubMask.parameters)}
                   defaults={luminanceToBar(LUMINANCE_MASK_RANGE_DEFAULTS)}
                   onChange={handleLuminanceRangeChange}
-                  onDragStateChange={onDragStateChange}
+                  onDragStateChange={onMaskShapeDragStateChange}
                 />
               )}
 
@@ -1981,7 +1987,7 @@ function SettingsPanel({
                       })
                     }
                     {...(param.key !== 'grow' && { fillOrigin: 'min' })}
-                    onDragStateChange={onDragStateChange}
+                    onDragStateChange={onMaskShapeDragStateChange}
                   />
                 ))}
 

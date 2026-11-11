@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.43.1-fix-live-mask-overlay — 2026-11-11
+
+### Masks
+
+- The red mask overlay now stays on screen while you shape a mask and
+  follows the drag, as in Lightroom Classic: the Luminance and Depth range
+  bars, Tolerance, Grow, Feather and Global Feather. Dragging a mask's
+  adjustment sliders still hides it so you can judge the effect.
+
 ## 1.43.0-dev-point-color — 2026-11-11
 
 ### Develop
