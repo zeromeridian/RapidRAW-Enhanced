@@ -1,175 +1,59 @@
 # External Editor Round Trip and Photo Craft Integration Plan
 
-## Status
+## Status (revised 2026-11-10)
 
-In progress on branch `dev/photocraft-integration` (started 2026-11-01).
-Owner decisions 1, 4, and 6 were made on 2026-11-01. Decisions 2, 3, and 5
-are still open; 2 and 3 only need a hands-on check in Photo Craft.
+- **Steps 1–4 shipped** (`1.25.2`–`1.28.0`, plus **Open in** on the Develop
+  canvas in `1.29.1`) and are in `develop`. None has been checked hands-on
+  by the owner yet (checks below).
+- **Step 5, RAW integration (Phase 3): deferred.** Before starting it,
+  document and test the `--edit` exit codes.
+- **Linux Flatpak: deferred** by the owner (2026-11-02); see "Deferred:
+  Linux Flatpak".
+- **Open owner decisions:** 2 (Photo Craft's Save on a 16-bit TIFF), 3
+  (single instance, hands-on on macOS), 5 (sRGB only or also a wide-gamut
+  option); see "Owner decisions".
+- **Known gap:** a copy that is open in Develop does not reload when the
+  editor saves it again.
 
-**Owner rule (2026-11-01):** update this progress list, and `HANDOFF.md`,
-after every edit to this work, so progress and the remaining tasks are
-always current. Record shipped behaviour in `FEATURES.md` and
-`RELEASE_NOTES.MD`.
+**Owner rule (2026-11-01):** update this file and `HANDOFF.md` after every
+edit to this work. Shipped behaviour goes into `FEATURES.md` and
+`RELEASE_NOTES.MD`. The full per-step implementation and validation log is
+in `HANDOFF-ARCHIVE.md` ("Superseded EXTERNAL_EDITOR_INTEGRATION_PLAN.md
+progress", 2026-11-10).
 
-### Progress
+### What each step shipped
 
-The steps implement the phases under "Strategy". Each one ships on its own.
+1. **TIFF colour profile and shared safe write** (`1.25.2`): TIFF exports
+   embed the sRGB ICC profile; `file_management::write_file_atomically` is
+   shared.
+2. **Round-trip sessions** (`1.26.0`, `editor_round_trip.rs`): **Open in**
+   renders `<app cache>/external-edits/<uuid>/<stem>-Edit.<tif|jpg>` and
+   opens the editor; a watcher (1.5 s) promotes each settled save to
+   `<stem>-Edit.<ext>` beside the source (`-Edit-2`, … when taken) and adds
+   it to the Library, stacked; sessions survive restarts (catalog table
+   `editor_round_trips`).
+3. **Cleanup and Edit Original** (`1.27.0`): a session ends after 7 days
+   without a new save; Settings → Data Management → **Clear External Edit
+   Copies**; **Open in → Original File** edits a non-RAW file itself.
+4. **Photo Craft entry** (`1.28.0`): Settings finds Photo Craft (macOS
+   Applications folders, Windows Program Files and `%LOCALAPPDATA%\Programs`,
+   Linux `PATH`) and offers **Add**; each editor has a preferred format
+   (TIFF, JPEG, or ask); **Open in** lists editors first.
 
-1. **Step 1: TIFF colour profile and shared safe-write helper** (`1.25.2`):
-   built; waiting for the owner's hands-on checks.
-   - Done: TIFF exports embed the sRGB ICC profile (`TiffIccProfile` in
-     `export_processing.rs`, tag 34675, UNDEFINED type).
-     `file_management::write_file_atomically` is extracted from
-     `lightroom_xmp.rs`, which now uses it. The two TIFF DPI tests also
-     check that the profile is present, including after the metadata merge
-     that **Open in** uses. Release notes, version `1.25.2`, and
-     `CODE_AUDIT_FINDINGS.md` item 1 are updated.
-   - Validation: `cargo fmt -p ThisIsRAW -- --check` passes; `cargo clippy
-     --all-targets --all-features -- -D warnings` exits 0; `cargo test
-     --lib` 105 passed (Homebrew rustc 1.97.1; the pinned 1.96.1 toolchain
-     is not installed in the sandbox).
-   - Built: `1.25.2-dev-photocraft-integration` `.app` (checksums in
-     `HANDOFF.md`). Not yet committed.
-   - Remaining: the owner's hands-on checks (`sips -g profile` on
-     an exported TIFF; Photoshop or Photo Craft shows sRGB; Preview
-     Lightroom Edits still applies).
-2. **Step 2: backend session manager** (Phase 1.1–1.3 and 1.7; MINOR
-   release `1.26.0`): built; waiting for the owner's hands-on checks.
-   - Done (backend): new `src-tauri/src/editor_round_trip.rs` (named
-     "round trip" so it is not confused with the reverse `--edit`
-     `ExternalEditSession`). `start_editor_round_trip` renders through
-     `export_images_impl` into `<app cache>/external-edits/<uuid>/<stem>-Edit.<tif|jpg>`
-     (16-bit TIFF or quality-100 JPEG, metadata kept), records the rendered
-     file's size and mtime, and opens the editor with
-     `open_external_editor`. A failed render or launch removes the staging
-     folder. Sessions are kept in memory and in the new catalog table
-     `editor_round_trips` (`library_catalog::save_editor_round_trip` /
-     `load_editor_round_trips`).
-   - Watcher: `start_watcher`, started in the Tauri setup hook except for
-     headless export, resumes sessions whose staging folder still exists,
-     then polls every 1.5 s. It takes the newest supported, non-hidden image
-     in the staging folder (so PSDs and editor temporaries are ignored), and
-     promotes it once two polls see the same size and mtime and it differs
-     from the last handled file. Promotion copies it with the new
-     `file_management::copy_file_atomically` to `<stem>-Edit.<ext>` beside
-     the source (`-Edit-2`, … when taken); later saves replace that copy
-     unless the extension changed. It emits `editor-round-trip-saved`
-     `{sourcePath, outputPath, isNew}`. A failed copy is retried on the
-     next poll.
-   - Also: the shared atomic-write core now gives files normal permissions
-     (`0o666` minus umask on Unix) instead of owner-only `0o600`; the TIFF
-     metadata writer now accepts the `.tif` extension (a `.tif` export
-     previously got no EXIF); `get_file_modification_stamp` is removed.
-   - Validation so far: strict Clippy exits 0; `cargo test --lib` 109
-     passed (new: `editor_round_trip` ×3,
-     `editor_round_trips_insert_then_update_saved_state`).
-   - Done (frontend): **Open in** calls `start_editor_round_trip`
-     (`Invokes.StartEditorRoundTrip`); the `editor-round-trip-saved`
-     listener in `useTauriListeners.ts` adds a new copy to the open folder
-     view (flat or recursive) through `get_album_images`, then calls
-     `autoStackCreatedImages`; a later save drops its cached preview and
-     calls `regenerate_thumbnails`. `export-complete` now refreshes the
-     Library only when exports were tracked. Removed: `externalEditLaunch`,
-     `externalEditWatch`, the 2 s polling effect, `ExternalEditLaunch`, and
-     the `open_external_editor` and `get_file_modification_stamp` commands
-     (`open_external_editor` is now backend-only). Prettier passes; no
-     ESLint or `tsc` diagnostics on changed lines (two `tsc` errors in
-     `useAppContextMenus.ts` exist at `HEAD`).
-   - Release notes, `FEATURES.md`, and version `1.26.0` updated.
-   - Final checks: `cargo fmt --check` passes, strict Clippy exits 0,
-     `cargo test --lib` 109 passed.
-   - Built: `1.26.0-dev-photocraft-integration` `.app` (checksums in
-     `HANDOFF.md`). Not yet committed.
-   - Remaining: the owner's hands-on checks
-     (abandon an edit; save, save again; save while ThisIsRAW is closed;
-     two edits at once; recursive view; auto-stacking off). Not handled
-     yet: a copy that is open in Develop does not reload when the editor
-     saves again. The Linux Flatpak is deferred (owner decision 8).
-3. **Step 3: cleanup and Edit Original** (Phase 1.4–1.5; MINOR release
-   `1.27.0`): built; waiting for the owner's hands-on checks.
-   - Done (backend, `editor_round_trip.rs`): a session ends once it has
-     seen no new save for 7 days (`RETENTION`, measured from the last
-     handled file's mtime, so an unhandled save is always promoted first),
-     or when its staging folder is gone. Ending deletes only the staging
-     folder and the catalog row (`library_catalog::delete_editor_round_trip`);
-     promoted copies are never touched. Saved sessions expire the same way,
-     after which **Edit Original** is how the copy is edited again. On
-     start, staging folders that no session owns are removed once older
-     than 7 days. New commands: `get_editor_round_trip_cache_size`,
-     `clear_editor_round_trips` (ends every session and empties the
-     staging root), and `start_editing_original` (opens a file itself,
-     ends any round trip whose copy it is so a later staged save cannot
-     overwrite the direct edits, and watches it in memory until quit,
-     emitting `editor-round-trip-saved` with `isNew: false` after a
-     settled save). Strict Clippy exits 0; `cargo test --lib` 112 passed.
-   - Done (frontend): Settings → Data Management → **Clear External Edit
-     Copies** (size shown, confirm dialog), sharing a new
-     `useClearableCache` hook in `SettingsPanel.tsx` with the AI Denoise
-     cache control, which now uses it too. **Open in → Original File →
-     editor** (`Invokes.StartEditingOriginal`) is enabled only for a
-     non-RAW image; the existing `editor-round-trip-saved` listener
-     refreshes its thumbnail. New strings in all 12 locales. Prettier
-     passes; no ESLint or `tsc` diagnostics on changed lines; the
-     `i18n:check` output is identical to `HEAD`'s (pre-existing failures).
-   - Built: `1.27.0-dev-photocraft-integration` `.app` (checksums in
-     `HANDOFF.md`). Not yet committed.
-   - Remaining: the owner's hands-on checks (Clear External Edit Copies
-     with an edit open; Original File on a `-Edit.tif`, save, thumbnail
-     refreshes; Original File disabled for RAW). Expiry after 7 days is
-     covered by unit tests only.
-4. **Step 4: Photo Craft entry** (Phase 2; MINOR release `1.28.0`):
-   built; waiting for the owner's hands-on checks. Owner decisions 7 and 8 (2026-11-02): each editor gets a
-   preferred format, and the Linux Flatpak is deferred (see "Deferred:
-   Linux Flatpak").
-   - Install layout checked in Photo Craft `v0.19.0` packaging: macOS
-     `PhotoCraft.app` (`packaging/macos/package.sh`); Windows
-     `ArtCraft\PhotoCraft\photocraft.exe` under `ProgramFiles6432Folder`,
-     which a per-user MSI maps to `%LOCALAPPDATA%\Programs`
-     (`packaging/windows/photocraft.wxs`); Linux deb/rpm `/usr/bin/photocraft`
-     (`packaging/linux/nfpm.yaml`), tarball and AppImage wherever the user
-     puts them.
-   - Plan: `detect_external_editors` (Rust, explicit guard per platform:
-     `/Applications` and `~/Applications` on macOS; Program Files and
-     `%LOCALAPPDATA%\Programs` on Windows; `photocraft` on `PATH` on Linux),
-     run only when Settings opens and never added without a click. The
-     editor entry gains an optional `format` (`tiff`/`jpeg`; missing means
-     ask each time, so saved settings keep working); a detected Photo Craft
-     is added with `tiff`. **Open in** becomes editor-first: an editor with
-     a format opens directly, one without shows TIFF/JPEG, and **Original
-     File** stays last.
-   - Done (backend): `app_settings::ExternalEditor` gains
-     `format: Option<ExternalEditFormat>` (`tiff`/`jpeg`, omitted when
-     unset); `start_editor_round_trip` now takes that enum instead of a
-     string. `editor_round_trip::detect_external_editors` and
-     `photo_craft_candidates` (unit-tested for the platform being built).
-     Strict Clippy exits 0; `cargo test --lib` 113 passed. The Linux and
-     Windows branches were reviewed but not compiled.
-   - Done (frontend): `ExternalEditor.format`, `DetectedEditor`, and the
-     shared `EXTERNAL_EDIT_FORMATS` / `EXTERNAL_EDIT_FORMAT_LABELS` in
-     `AppProperties.tsx`. Settings → General → External Editors (strings
-     now localized in all 12 locales) runs detection when the General tab
-     opens, lists a found editor not yet added with an **Add** button, and
-     has a format dropdown per editor (Ask each time / TIFF / JPEG).
-     **Open in** lists editors first (`Photo Craft (TIFF)` opens directly;
-     an editor without a format has a TIFF/JPEG submenu), then a separator
-     and **Original File**. Prettier passes; no ESLint or `tsc`
-     diagnostics on changed lines; `i18n:check` output identical to
-     `HEAD`'s.
-   - Built: `1.28.0-dev-photocraft-integration` `.app` (checksums in
-     `HANDOFF.md`). Not yet committed.
-   - Remaining: the owner's hands-on checks (with Photo Craft in
-     `/Applications`: Settings shows "Photo Craft found", Add, the menu
-     shows `Photo Craft (TIFF)`; change a format and the menu follows; an
-     older settings file without formats still loads). Windows and Linux
-     detection need a check on those machines.
-   - Follow-up (`1.29.1-fix-top-bar`, owner report 2026-11-05): right-clicking
-     the image being edited in Develop now also shows **Open in**. The
-     menu is built once by `buildOpenInOption` in `useAppContextMenus.ts`
-     and shared by the thumbnail and editor-canvas menus; Original File is
-     disabled for a RAW in both. Built in `1.29.1-fix-top-bar` (with the
-     top-bar filter move); not run in the app.
-5. **Step 5: RAW integration** (Phase 3): deferred. Document and test the
-   `--edit` exit codes first.
+### Owner hands-on checks still pending
+
+- Step 1: `sips -g profile` on an exported TIFF shows sRGB; Photoshop or
+  Photo Craft shows sRGB; Import Lightroom Edits still applies.
+- Step 2: abandon an edit (nothing left behind); save, then save again;
+  save while ThisIsRAW is closed; two edits at once; recursive view;
+  auto-stacking off.
+- Step 3: Clear External Edit Copies with an edit open; Original File on a
+  `-Edit.tif`, save, the thumbnail refreshes; Original File disabled for a
+  RAW. (Expiry after 7 days is covered by unit tests only.)
+- Step 4: with Photo Craft in `/Applications`, Settings shows it found,
+  **Add** works and the menu shows `Photo Craft (TIFF)`; changing the
+  format changes the menu; an older settings file without formats still
+  loads. Windows and Linux detection need a check on those machines.
 
 ## Goal
 
@@ -183,50 +67,6 @@ external editor, and integrate [Photo Craft](https://github.com/storytold/photoc
 3. Later saves update the same Library image.
 4. RAW integration: Photo Craft can use ThisIsRAW to develop a RAW file, the
    way Photoshop uses Camera Raw.
-
-## Implementation before `1.26.0`
-
-Kept for reference. Step 2 replaced the **Open in** flow and the gaps
-below, except Edit Original (step 3); see "Progress".
-
-**Open in → TIFF/JPEG → editor** (Library and Develop thumbnail menus, single
-selection):
-
-- `startExternalEdit` in `src/hooks/useAppContextMenus.ts` exports a
-  full-resolution, metadata-preserving copy _beside the source_, named
-  `<stem>_thisisraw-edit-<timestamp>.<tiff|jpg>` (16-bit TIFF or quality-100
-  JPEG). It passes `trackCreatedImages: true`, so the copy is added to the
-  Library and auto-stacked with its source straight away.
-- The `export-complete` listener in `src/hooks/useTauriListeners.ts` then
-  calls `open_external_editor` (`src-tauri/src/file_management.rs`). That
-  launches the editor without a shell on macOS, Linux, and Windows. On macOS
-  it accepts a `.app` bundle or an Adobe product folder that contains exactly
-  one bundle.
-- The same file then polls `get_file_modification_stamp` every 2 s for the
-  one path in `useProcessStore.externalEditWatch`. On a change it reloads the
-  whole folder with `refreshImageList`.
-- The editors are user-managed in General Settings (`externalEditors` in
-  `AppSettings`).
-
-**Reverse protocol (ThisIsRAW as a RAW developer for another app):**
-
-- `parse_launch_args` in `src-tauri/src/launch_request.rs` accepts
-  `this-is-raw --edit <file> --output <file>`, which creates an
-  `ExternalEditSession`. `useExternalEditSession.ts` opens the image in
-  Develop. Finishing exports it to the caller's output path and exits the
-  app, which is the Camera Raw role.
-- `export <source> --output … --format … --quality …` performs a headless
-  export with process exit codes (`resolve_exit_code`).
-
-**Gaps compared with Lightroom Classic:**
-
-| Gap                                                        | Effect                                                                                                                                |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| The copy is written and catalogued before the editor opens | It appears in the Library and on disk even if never saved; abandoned edits leave `_thisisraw-edit` files next to originals            |
-| One frontend watch at a time                               | Starting a second edit stops watching the first; the watch is forgotten on restart                                                    |
-| A save reloads the whole folder                            | On network drives this runs `read_exif_for_paths` across the folder and can stall Develop (`CODE_AUDIT_FINDINGS.md` item 6)           |
-| Only the modification time is compared                     | A refresh can pick up a file the editor is still writing                                                                              |
-| No "edit the existing copy" path                           | Running **Open in** on a `_thisisraw-edit` file renders a new copy of it instead of reopening it                                      |
 
 ## Photo Craft facts (v0.19.0, checked 2026-11-01)
 
