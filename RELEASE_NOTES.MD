@@ -5,6 +5,26 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.41.0-dev-rr-gap — 2026-11-10
+
+### Develop
+
+- **Color Mixer pipette** (from RapidRAW 1.6.9): turn it on, then click a
+  spot in the photo and drag up or down. Every colour band found there
+  moves together, in the tab you have open (Hue, Saturation or
+  Luminance). Double-click a spot to reset its bands.
+- **Tone Curve pipette**: click a tone in the photo and drag up or down to
+  brighten or darken that tone in the active channel. A point is added to
+  the curve (or the nearest one is moved); with the parametric curve, the
+  slider for that tone's region moves. Double-click to remove the point or
+  reset the region.
+- Both pipettes work in masks, and Shift or Alt makes the drag finer.
+  Escape turns a pipette off.
+- The pipette cursor is a crosshair with an up/down arrow, as in Lightroom
+  Classic.
+- **Expanded Color Mixer:** the Sliders button shows all eight colour
+  bands at once for Hue, Saturation or Luminance.
+
 ## 1.40.0-dev-rr-gap — 2026-11-10
 
 ### Develop

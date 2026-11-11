@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useId } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RotateCcw, Copy, ClipboardPaste, Spline, Settings2, Save, Trash2 } from 'lucide-react';
+import { RotateCcw, Copy, ClipboardPaste, Spline, Settings2, Save, Trash2, Pipette } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   ActiveChannel,
@@ -21,6 +21,8 @@ import ConfirmModal from '../modals/ConfirmModal';
 import ToneCurvePresetModal from '../modals/ToneCurvePresetModal';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useSettingsStore } from '../../store/useSettingsStore';
+import { canvasToolState, useEditorStore } from '../../store/useEditorStore';
+import { buildParametricPoints } from '../../utils/toneCurve';
 import {
   BUILT_IN_TONE_CURVE_PRESETS,
   buildToneCurvePresetAdjustments,
@@ -54,60 +56,6 @@ interface CurveGraphProps {
   setAdjustments(updater: (prev: any) => any): void;
   theme: string;
   onDragStateChange?: (isDragging: boolean) => void;
-}
-
-function buildParametricPoints(settings: ParametricCurveSettings): Array<Coord> {
-  const vH = settings.highlights / 100;
-  const vL = settings.lights / 100;
-  const vD = settings.darks / 100;
-  const vS = settings.shadows / 100;
-
-  const blackYOffset = settings.blackLevel;
-  const whiteYOffset = settings.whiteLevel;
-
-  const s1 = settings.split1 / 100;
-  const s2 = settings.split2 / 100;
-  const s3 = settings.split3 / 100;
-
-  const xH = (s3 + 1) / 2;
-  const xS = s1 / 2;
-  const xs = [0, xS, s1, s2, s3, xH, 1];
-
-  const SLIDER_GAIN = 1.2;
-  const MAX_DISPLACEMENT = 0.35;
-
-  const response = (v: number, x: number): number => {
-    const headroom = v >= 0 ? 1 - x : x;
-    const compressedHeadroom = Math.sqrt(headroom);
-    const sigmoid = Math.tanh(v * SLIDER_GAIN);
-    return sigmoid * MAX_DISPLACEMENT * compressedHeadroom;
-  };
-
-  const ys = [
-    0,
-    xS + response(vS, xS),
-    s1 + (response(vS, s1) + response(vD, s1)) / 2,
-    s2 + (response(vD, s2) + response(vL, s2)) / 2,
-    s3 + (response(vL, s3) + response(vH, s3)) / 2,
-    xH + response(vH, xH),
-    1,
-  ];
-
-  const clamp = (v: number) => Math.max(0, Math.min(1, v));
-
-  let points = xs.map((x, i) => ({
-    x: x * 255,
-    y: clamp(ys[i]) * 255,
-  }));
-
-  if (points.length >= 2) {
-    points[0].y = Math.max(0, Math.min(255, points[0].y + blackYOffset));
-
-    const lastIndex = points.length - 1;
-    points[lastIndex].y = Math.max(0, Math.min(255, points[lastIndex].y + whiteYOffset));
-  }
-
-  return points;
 }
 
 function getCurvePath(points: Array<Coord>) {
@@ -413,8 +361,22 @@ export default function CurveGraph({
     });
   };
 
+  const isCurvePickerActive = useEditorStore((state) => state.targetedAdjustment?.tool === 'toneCurve');
+  const isCurvePickerDragging = useEditorStore(
+    (state) => state.targetedAdjustment?.tool === 'toneCurve' && state.isSliderDragging,
+  );
+  const setEditor = useEditorStore((state) => state.setEditor);
+
+  const toggleCurvePicker = () =>
+    setEditor(
+      canvasToolState(isCurvePickerActive ? {} : { targetedAdjustment: { tool: 'toneCurve', channel: activeChannel } }),
+    );
+
   useEffect(() => {
     activeChannelRef.current = activeChannel;
+    if (useEditorStore.getState().targetedAdjustment?.tool === 'toneCurve') {
+      setEditor({ targetedAdjustment: { tool: 'toneCurve', channel: activeChannel } });
+    }
     setLocalPoints(null);
     setDraggingPointIndex(null);
     setLocalParametricSettings(null);
@@ -919,26 +881,40 @@ export default function CurveGraph({
       )}
 
       <div className="flex items-center justify-between gap-2 mb-2 mt-2">
-        <div className="flex items-center gap-1 p-1 rounded-lg bg-surface-secondary shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-surface-secondary shrink-0">
+            <button
+              className={`w-8 h-8 rounded-md flex items-center justify-center transition-all ${
+                !isParametricMode ? 'bg-surface text-text-primary' : 'text-text-secondary hover:text-text-primary'
+              }`}
+              onClick={() => handleToggleMode('point')}
+              data-tooltip={t('adjustments.curves.pointCurve')}
+              type="button"
+            >
+              <Spline size={16} />
+            </button>
+            <button
+              className={`w-8 h-8 rounded-md flex items-center justify-center transition-all ${
+                isParametricMode ? 'bg-surface text-text-primary' : 'text-text-secondary hover:text-text-primary'
+              }`}
+              onClick={() => handleToggleMode('parametric')}
+              data-tooltip={t('adjustments.curves.parametricCurve')}
+              type="button"
+            >
+              <Settings2 size={16} />
+            </button>
+          </div>
           <button
-            className={`w-8 h-8 rounded-md flex items-center justify-center transition-all ${
-              !isParametricMode ? 'bg-surface text-text-primary' : 'text-text-secondary hover:text-text-primary'
+            className={`w-8 h-8 shrink-0 rounded-md flex items-center justify-center transition-colors ${
+              isCurvePickerActive
+                ? 'bg-accent text-button-text'
+                : 'bg-surface-secondary text-text-secondary hover:text-text-primary'
             }`}
-            onClick={() => handleToggleMode('point')}
-            data-tooltip={t('adjustments.curves.pointCurve')}
+            onClick={toggleCurvePicker}
+            data-tooltip={t('adjustments.curves.pickerTooltip')}
             type="button"
           >
-            <Spline size={16} />
-          </button>
-          <button
-            className={`w-8 h-8 rounded-md flex items-center justify-center transition-all ${
-              isParametricMode ? 'bg-surface text-text-primary' : 'text-text-secondary hover:text-text-primary'
-            }`}
-            onClick={() => handleToggleMode('parametric')}
-            data-tooltip={t('adjustments.curves.parametricCurve')}
-            type="button"
-          >
-            <Settings2 size={16} />
+            <Pipette size={16} />
           </button>
         </div>
 
@@ -1146,6 +1122,7 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.whiteLevel}
+                  animateValueChanges={!isCurvePickerDragging}
                   onChange={(e: any) => updateParametricValue('whiteLevel', parseFloat(e.target.value))}
                   onDragStateChange={onDragStateChange}
                 />
@@ -1156,6 +1133,7 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.highlights}
+                  animateValueChanges={!isCurvePickerDragging}
                   onChange={(e: any) => updateParametricValue('highlights', parseFloat(e.target.value))}
                   onDragStateChange={onDragStateChange}
                 />
@@ -1166,6 +1144,7 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.lights}
+                  animateValueChanges={!isCurvePickerDragging}
                   onChange={(e: any) => updateParametricValue('lights', parseFloat(e.target.value))}
                   onDragStateChange={onDragStateChange}
                 />
@@ -1176,6 +1155,7 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.darks}
+                  animateValueChanges={!isCurvePickerDragging}
                   onChange={(e: any) => updateParametricValue('darks', parseFloat(e.target.value))}
                   onDragStateChange={onDragStateChange}
                 />
@@ -1186,6 +1166,7 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.shadows}
+                  animateValueChanges={!isCurvePickerDragging}
                   onChange={(e: any) => updateParametricValue('shadows', parseFloat(e.target.value))}
                   onDragStateChange={onDragStateChange}
                 />
@@ -1196,6 +1177,7 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.blackLevel}
+                  animateValueChanges={!isCurvePickerDragging}
                   onChange={(e: any) => updateParametricValue('blackLevel', parseFloat(e.target.value))}
                   onDragStateChange={onDragStateChange}
                 />

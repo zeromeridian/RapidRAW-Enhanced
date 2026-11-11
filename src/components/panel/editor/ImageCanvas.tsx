@@ -17,6 +17,7 @@ import { AppSettings, BrushSettings, Panel, SelectedImage } from '../../ui/AppPr
 import { RenderSize } from '../../../hooks/useImageRenderSize';
 import { useImageNaturalSize } from '../../../hooks/useImageNaturalSize';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
+import { useTargetedAdjustment } from '../../../hooks/useTargetedAdjustment';
 import { useTranslation } from 'react-i18next';
 import type { OverlayMode } from '../right/CropPanel';
 import CompositionOverlays from './overlays/CompositionOverlays';
@@ -1203,6 +1204,22 @@ const MaskOverlay = memo(
   },
 );
 
+/**
+ * The targeted adjustment cursor, after Lightroom Classic's: a crosshair at the sampled
+ * point and an up/down arrow pair for the drag. Drawn white over a dark outline so it
+ * shows on light and dark photos.
+ */
+const TARGETED_ADJUSTMENT_CURSOR = (() => {
+  const shapes = `<circle cx="11" cy="11" r="4" fill="none"/>
+    <path d="M11 1v6M11 15v6M1 11h6M15 11h6" fill="none"/>
+    <path d="M25 15l-3.5 4.5h7z M25 30l-3.5-4.5h7z" stroke-linejoin="round"/>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+    <g stroke="rgba(0,0,0,0.75)" stroke-width="3" fill="rgba(0,0,0,0.75)">${shapes}</g>
+    <g stroke="white" stroke-width="1.25" fill="white">${shapes}</g>
+  </svg>`;
+  return `url('data:image/svg+xml;utf8,${encodeURIComponent(svg)}') 11 11, crosshair`;
+})();
+
 const ImageCanvas = memo(
   ({
     appSettings,
@@ -1540,6 +1557,19 @@ const ImageCanvas = memo(
       : 0;
 
     const effectiveZoomScale = transformState.scale > 0 ? transformState.scale : 1;
+
+    const {
+      isActive: isTargetedAdjustmentActive,
+      start: startTargetedAdjustment,
+      reset: resetTargetedAdjustment,
+    } = useTargetedAdjustment({
+      activeMaskContainerId,
+      getCanvasPointer,
+      imageRenderSize,
+      isMasking,
+      zoomScale: effectiveZoomScale,
+      setAdjustments,
+    });
 
     const isRelightPickerActive = useEditorStore((state) => state.isRelightPickerActive);
     const activeRelightLightId = useEditorStore((state) => state.activeRelightLightId);
@@ -2026,6 +2056,11 @@ const ImageCanvas = memo(
           return;
         }
 
+        if (isTargetedAdjustmentActive) {
+          startTargetedAdjustment(e);
+          return;
+        }
+
         if (isWbPickerActive) {
           handleWbClick(e);
           return;
@@ -2229,6 +2264,8 @@ const ImageCanvas = memo(
         activeRelightLightId,
         moveRelightLight,
         addRelightLight,
+        isTargetedAdjustmentActive,
+        startTargetedAdjustment,
         isWbPickerActive,
         handleWbClick,
         isInitialDrawing,
@@ -2260,7 +2297,7 @@ const ImageCanvas = memo(
 
     const handleMove = useCallback(
       (e: any) => {
-        if (isWbPickerActive) {
+        if (isWbPickerActive || isTargetedAdjustmentActive) {
           return;
         }
 
@@ -2429,6 +2466,7 @@ const ImageCanvas = memo(
       [
         isToolActive,
         isWbPickerActive,
+        isTargetedAdjustmentActive,
         isInitialDrawing,
         activeMaskId,
         activeAiSubMaskId,
@@ -2882,6 +2920,7 @@ const ImageCanvas = memo(
     };
 
     const effectiveCursor = useMemo(() => {
+      if (isTargetedAdjustmentActive) return TARGETED_ADJUSTMENT_CURSOR;
       if (isWbPickerActive || showRelightLights) return 'crosshair';
       if (isParametricActive) return 'crosshair';
       if (isInitialDrawing) return 'crosshair';
@@ -2907,6 +2946,7 @@ const ImageCanvas = memo(
 
       return cursorStyle;
     }, [
+      isTargetedAdjustmentActive,
       isWbPickerActive,
       showRelightLights,
       isInitialDrawing,
@@ -3166,7 +3206,7 @@ const ImageCanvas = memo(
             </div>
           </div>
 
-          {(isMasking || isAiEditing || isWbPickerActive || showRelightLights) && (
+          {(isMasking || isAiEditing || isWbPickerActive || isTargetedAdjustmentActive || showRelightLights) && (
             <div
               style={{
                 position: 'absolute',
@@ -3195,8 +3235,9 @@ const ImageCanvas = memo(
                 onTouchMove={handleMove}
                 onMouseUp={handleUp}
                 onTouchEnd={handleUp}
+                onDblClick={isTargetedAdjustmentActive ? resetTargetedAdjustment : undefined}
               >
-                <Layer listening={!showOriginal}>
+                <Layer listening={!showOriginal && !isTargetedAdjustmentActive}>
                   <Group scaleX={maxSafeScale} scaleY={maxSafeScale}>
                     <Group x={groupOffsetX} y={groupOffsetY}>
                       {(isMasking || isAiEditing) &&
@@ -3261,6 +3302,7 @@ const ImageCanvas = memo(
                         />
                       )}
                       {isBrushActive &&
+                        !isTargetedAdjustmentActive &&
                         cursorPreview.visible &&
                         (!isManualCleanupActive ||
                           (activeSubMask?.parameters?.sourceX !== undefined && !isCtrlPressed)) && (

@@ -26,6 +26,8 @@ interface SliderProps {
   trackClassName?: string;
   fillOrigin?: 'min' | 'default';
   suffix?: string;
+  /** Ease the thumb to a value set from outside (default); off while the photo itself drives it. */
+  animateValueChanges?: boolean;
 }
 
 /** The last-used slider, which Speed Edit drives from the canvas and keyboard. */
@@ -68,6 +70,7 @@ const Slider = ({
   trackClassName,
   fillOrigin = 'default',
   suffix = '',
+  animateValueChanges = true,
 }: SliderProps) => {
   const { t } = useTranslation();
   const [displayValue, setDisplayValue] = useState<number>(value);
@@ -348,7 +351,7 @@ const Slider = ({
       return;
     }
 
-    if (isWheelActivelyChangingRef.current) {
+    if (isWheelActivelyChangingRef.current || !animateValueChanges) {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
@@ -386,7 +389,7 @@ const Slider = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [value, isDragging]);
+  }, [value, isDragging, animateValueChanges]);
 
   useEffect(() => {
     if (!isEditing) {

@@ -23,6 +23,7 @@
       "ariaSelectColor": "Select {{name}} color",
       "blackAndWhite": "Black & White",
       "monochromeDesc": "Switch between color and a persisted monochrome rendering while preserving all color adjustments.",
+      "mixerPickerTooltip": "Color Mixer Picker: click and drag up or down on the photo",
       "calibration": {
         "colors": {
           "blue": "Blue",
@@ -95,6 +96,7 @@
       "selectPreset": "Tone curve preset",
       "updatePreset": "Update preset",
       "parametricCurve": "Parametric Curve",
+      "pickerTooltip": "Tone Curve Picker: click and drag up or down on the photo",
       "params": {
         "blackLevel": "Black Level",
         "darks": "Darks",

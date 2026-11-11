@@ -24,7 +24,7 @@ import { ContextMenuProvider } from './context/ContextMenuContext';
 import { useSettingsStore } from './store/useSettingsStore';
 import { getLibraryPanel, useUIStore } from './store/useUIStore';
 import { useLibraryStore } from './store/useLibraryStore';
-import { useEditorStore } from './store/useEditorStore';
+import { canvasToolState, useEditorStore } from './store/useEditorStore';
 import { useProcessStore } from './store/useProcessStore';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -650,7 +650,7 @@ function App() {
   const handleRightPanelSelect = useCallback(
     (panelId: Panel) => {
       setRightPanel(panelId);
-      setEditor({ activeMaskId: null, activeAiSubMaskId: null, isWbPickerActive: false, isRelightPickerActive: false });
+      setEditor({ activeMaskId: null, activeAiSubMaskId: null, ...canvasToolState() });
     },
     [setRightPanel, setEditor],
   );

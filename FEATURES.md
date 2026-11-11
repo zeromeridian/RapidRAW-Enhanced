@@ -273,6 +273,14 @@ details are in `RELEASE_NOTES.MD`.
   Red, Green, and Blue graphs are tinted with the channel's colour above the
   diagonal and its complement (cyan, magenta, yellow) below, as in Lightroom
   Classic.
+- **Targeted adjustment pipettes**, as in Lightroom Classic: drag up or down
+  on the photo to change what is under the cursor, double-click to reset it.
+  The **Color Mixer** pipette (from RapidRAW) moves every colour band found
+  there, in the active Hue, Saturation or Luminance tab. The **Tone Curve**
+  pipette moves the curve at that tone in the active channel: a point is
+  added or the nearest one reused; a parametric curve moves the region's
+  slider. Both work in masks too. The Color Mixer also has an expanded view
+  with all eight bands of one property.
 - AI sky masks use EfficientSAM3 and AI foreground masks use BiRefNet, as in
   upstream RapidRAW; AI subject masks are edge-refined. AI text masks select
   whatever a typed description names, such as "water" or "boat". Each mask
