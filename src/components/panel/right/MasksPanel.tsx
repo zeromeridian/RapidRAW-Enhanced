@@ -74,6 +74,7 @@ import {
   MaskContainer,
   MaskBlendMode,
   ADJUSTMENT_SECTIONS,
+  AI_DEPTH_MASK_RANGE_DEFAULTS,
 } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { OPTION_SEPARATOR, Orientation } from '../../ui/AppProperties';
@@ -453,12 +454,7 @@ export default function MasksPanel() {
     }
 
     if (type === Mask.AiDepth) {
-      if (!subMask.parameters) subMask.parameters = {};
-      subMask.parameters.minDepth = 20;
-      subMask.parameters.maxDepth = 80;
-      subMask.parameters.minFade = 15;
-      subMask.parameters.maxFade = 15;
-      subMask.parameters.feather = 10;
+      Object.assign(subMask.parameters, AI_DEPTH_MASK_RANGE_DEFAULTS, { feather: 10, fullStrength: true });
     }
     return subMask;
   };
@@ -1940,10 +1936,10 @@ function SettingsPanel({
                   maxDepth={100 - (activeSubMask.parameters?.minDepth ?? 0)}
                   minFade={activeSubMask.parameters?.maxFade ?? 15}
                   maxFade={activeSubMask.parameters?.minFade ?? 15}
-                  defaultMinDepth={20}
-                  defaultMaxDepth={80}
-                  defaultMinFade={15}
-                  defaultMaxFade={15}
+                  defaultMinDepth={100 - AI_DEPTH_MASK_RANGE_DEFAULTS.maxDepth}
+                  defaultMaxDepth={100 - AI_DEPTH_MASK_RANGE_DEFAULTS.minDepth}
+                  defaultMinFade={AI_DEPTH_MASK_RANGE_DEFAULTS.maxFade}
+                  defaultMaxFade={AI_DEPTH_MASK_RANGE_DEFAULTS.minFade}
                   onChange={handleDepthRangeChange}
                   onDragStateChange={onDragStateChange}
                 />

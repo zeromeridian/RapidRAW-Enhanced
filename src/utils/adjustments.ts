@@ -1279,6 +1279,26 @@ export const EFFECT_MAP_GEOMETRY_KEYS = [
 /** Lens Blur's focus range when an edit has none; mirrors the fallbacks in `lens_blur.rs`. */
 export const LENS_BLUR_RANGE_DEFAULTS = { minDepth: 20, maxDepth: 100, minFade: 15, maxFade: 15 } as const;
 
+/**
+ * An AI depth mask's range before a depth is picked: the nearest part of the photo. Depths are
+ * nearness in percent (100 nearest), as in `mask_generation::generate_ai_depth_bitmap`.
+ */
+export const AI_DEPTH_MASK_RANGE_DEFAULTS = { minDepth: 70, maxDepth: 100, minFade: 15, maxFade: 0 } as const;
+const AI_DEPTH_PICK_HALF_WIDTH = 8;
+const AI_DEPTH_PICK_FADE = 12;
+
+/** A depth mask range centred on a picked nearness, with soft fades that stay inside 0–100. */
+export const aiDepthMaskRangeAround = (depth: number) => {
+  const minDepth = Math.round(Math.max(0, depth - AI_DEPTH_PICK_HALF_WIDTH));
+  const maxDepth = Math.round(Math.min(100, depth + AI_DEPTH_PICK_HALF_WIDTH));
+  return {
+    minDepth,
+    maxDepth,
+    minFade: Math.min(AI_DEPTH_PICK_FADE, minDepth),
+    maxFade: Math.min(AI_DEPTH_PICK_FADE, 100 - maxDepth),
+  };
+};
+
 export const pickCropGeometry = (adjustments: Adjustments): CropGeometry =>
   Object.fromEntries(CROP_GEOMETRY_KEYS.map((key) => [key, structuredClone(adjustments[key])])) as CropGeometry;
 

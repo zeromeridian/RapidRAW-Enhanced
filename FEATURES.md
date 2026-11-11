@@ -285,7 +285,12 @@ details are in `RELEASE_NOTES.MD`.
   upstream RapidRAW; AI subject masks are edge-refined. AI text masks select
   whatever a typed description names, such as "water" or "boat". Each mask
   type downloads its model on first use, and existing masks keep their stored
-  result.
+  result. A new AI depth mask starts on the nearest part of the photo; a
+  click on the photo, as with Color and Luminance masks, centres its depth
+  range on that spot with soft fades, separates near and far cleanly at
+  object edges, and masks the whole range at full
+  strength, far ranges included (older depth masks keep their
+  distance-weighted strength).
 - **Motion Blur** in Effects (engine from RapidRAW): linear, zoom and spin
   blurs, plus smooth in masks, with Highlights (bright lights keep their
   energy in the streak) and the image's grain restored over blurred areas.

@@ -223,6 +223,10 @@ pub async fn generate_ai_text_mask(
     })
 }
 
+/// Depth difference (of 255) within the snap window that counts as an object edge; smooth
+/// slopes such as a receding riverbed change less across the window.
+const DEPTH_EDGE_THRESHOLD: u8 = 24;
+
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn generate_ai_depth_mask(
@@ -233,6 +237,7 @@ pub async fn generate_ai_depth_mask(
     min_fade: f32,
     max_fade: f32,
     feather: f32,
+    full_strength: Option<bool>,
     rotation: f32,
     flip_horizontal: bool,
     flip_vertical: bool,
@@ -296,8 +301,17 @@ pub async fn generate_ai_depth_mask(
         cached_depth.original_size.1,
         image::imageops::FilterType::Triangle,
     );
+    // New masks store a map with sharp object edges (see `snap_depth_edges`); the ramp the
+    // model leaves is about two of its pixels wide, so the window covers three.
+    let upscale =
+        cached_depth.original_size.0 as f32 / cached_depth.depth_image.width().max(1) as f32;
+    let depth_fullres = crate::ai_processing::snap_depth_edges(
+        &raw_depth_fullres,
+        (3.0 * upscale).ceil() as u32,
+        DEPTH_EDGE_THRESHOLD,
+    );
 
-    let base64_data = encode_to_base64_png(&raw_depth_fullres)?;
+    let base64_data = encode_to_base64_png(&depth_fullres)?;
 
     Ok(AiDepthMaskParameters {
         min_depth,
@@ -305,6 +319,7 @@ pub async fn generate_ai_depth_mask(
         min_fade,
         max_fade,
         feather,
+        full_strength: full_strength.unwrap_or(false),
         mask_data_base64: Some(base64_data),
         rotation: Some(rotation),
         flip_horizontal: Some(flip_horizontal),
