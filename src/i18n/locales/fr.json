@@ -412,8 +412,10 @@
     "adjustments": {
       "actions": {
         "copySectionSettings": "Copier les paramètres de la section {{section}}",
+        "customizePanels": "Personnaliser les panneaux",
         "pasteLabel": "Coller les paramètres de la section {{section}}",
         "pasteSettings": "Coller les paramètres",
+        "resetPanelLayout": "Réinitialiser par défaut",
         "resetSectionSettings": "Réinitialiser les paramètres de la section {{section}}"
       },
       "sections": {
@@ -426,6 +428,7 @@
       "title": "Ajustements",
       "tooltips": {
         "autoAdjust": "Ajustement auto de l'image",
+        "reorderTools": "Réorganiser les outils",
         "resetAdjustments": "Réinitialiser les ajustements",
         "toggleAnalytics": "Basculer l'affichage des analyses"
       }
@@ -662,6 +665,16 @@
       "exporting": "Exportation…",
       "savesTo": "Modification externe — s'enregistre dans"
     },
+    "favorites": {
+      "add": "Ajouter aux favoris",
+      "addItem": "Ajouter « {{name}} » aux favoris",
+      "dragToReorder": "Faites glisser pour réorganiser",
+      "empty": "Ajoutez une étoile à une section, un outil ou un curseur dans Ajustements pour le retrouver ici.",
+      "qualifiedLabel": "{{tool}} : {{control}}",
+      "remove": "Retirer des favoris",
+      "removeItem": "Retirer « {{name}} » des favoris",
+      "title": "Favoris"
+    },
     "masks": {
       "actions": {
         "addNewComponent": "Ajouter un nouveau composant",
@@ -861,6 +874,7 @@
         "crop": "Recadrer",
         "develop": "Développement",
         "export": "Exporter",
+        "favorites": "Favoris",
         "info": "Info",
         "inpaint": "Inpainting",
         "masks": "Masques",

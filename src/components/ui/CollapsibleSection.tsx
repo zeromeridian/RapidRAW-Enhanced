@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { ReactNode, useRef, useEffect, useState } from 'react';
 import { ChevronDown, Eye, EyeOff } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,8 @@ interface CollapsibleSectionProps {
   onToggle: any;
   onToggleVisibility?: any;
   title: string;
+  /** Shown after the title (e.g. a Favorites star, which shows when the header is hovered). */
+  titleAddon?: ReactNode;
 }
 
 export default function CollapsibleSection({
@@ -25,6 +27,7 @@ export default function CollapsibleSection({
   onToggle,
   onToggleVisibility = () => {},
   title,
+  titleAddon,
 }: CollapsibleSectionProps) {
   const { t } = useTranslation();
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -81,7 +84,7 @@ export default function CollapsibleSection({
   return (
     <div className="bg-surface rounded-lg compact:rounded-none overflow-hidden shrink-0" onContextMenu={onContextMenu}>
       <div
-        className="w-full px-4 py-3 compact:px-3 compact:py-1 flex min-h-10 compact:min-h-7 items-center justify-between text-left hover:bg-card-active transition-colors duration-200"
+        className="group/favorite w-full px-4 py-3 compact:px-3 compact:py-1 flex min-h-10 compact:min-h-7 items-center justify-between text-left hover:bg-card-active transition-colors duration-200"
         onClick={onToggle}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -94,6 +97,7 @@ export default function CollapsibleSection({
           >
             {title}
           </Text>
+          {titleAddon}
           {canToggleVisibility && (
             <div className="w-6 h-6 compact:w-5 compact:h-5 flex items-center justify-center">
               <button

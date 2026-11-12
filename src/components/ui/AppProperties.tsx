@@ -191,6 +191,7 @@ export enum Panel {
   Ai = 'ai',
   Crop = 'crop',
   Export = 'export',
+  Favorites = 'favorites',
   Geometry = 'geometry',
   LensCorrection = 'lensCorrection',
   Masks = 'masks',
@@ -255,6 +256,23 @@ export interface XmpStackMetadata {
   collapsed: boolean;
 }
 
+export interface CollapsibleSectionsState {
+  basic: boolean;
+  color: boolean;
+  curves: boolean;
+  details: boolean;
+  effects: boolean;
+}
+
+/** How the Develop adjustment panels are arranged (Customize Panels and Favorites). */
+export interface AdjustmentLayout {
+  sectionOrder?: string[];
+  toolOrder?: Record<string, string[]>;
+  openSections?: Partial<CollapsibleSectionsState>;
+  /** Starred items (`section:…`, `tool:…`, `control:…`) in the Favorites panel's order. */
+  favorites?: string[];
+}
+
 export interface AppSettings {
   catalogDirectory?: string;
   aiConnectorAddress?: string;
@@ -282,6 +300,7 @@ export interface AppSettings {
   thumbnailAspectRatio?: ThumbnailAspectRatio;
   uiVisibility?: UiVisibility;
   adjustmentVisibility?: { [key: string]: boolean };
+  adjustmentLayout?: AdjustmentLayout;
   rawHighlightCompression?: number;
   processingBackend?: string;
   linuxGpuOptimization?: boolean;

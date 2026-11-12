@@ -193,6 +193,15 @@ details are in `RELEASE_NOTES.MD`.
   resets. A and D switch between the sliders chosen in Settings → Controls,
   the arrow keys nudge, R resets, C and V copy and paste a value, and Q and E
   change photos. A small display at the pointer shows the slider and value.
+- **Favorites** tab in the Develop tool strip: star whole sections, tool
+  blocks, or single sliders (a star appears on hover beside the title or
+  label; the right-click menu offers the same) and arrange them by drag.
+  They edit the photo's own values, with the same history, XMP and Speed
+  Edit. For the photo only; masks keep their full panels.
+- **Customize Panels** (Adjustments header button or section right-click
+  menu): drag the adjustment sections and the tools inside each into a new
+  order, shared by the photo's and the masks' adjustments, with Reset to
+  Default. Open sections are remembered across restarts.
 - Readable **edit history** (right-click Undo/Redo): each step is named when
   it is made, with the changed controls and their values, mask, HSL, curve,
   and crop details; presets, Paste, Reset, and Auto Adjust are separate,

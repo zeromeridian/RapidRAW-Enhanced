@@ -12,10 +12,12 @@ export type SliderChangeEvent =
       };
     };
 
-interface SliderProps {
+export interface SliderProps {
   defaultValue?: number;
   disabled?: boolean;
   label: React.ReactNode;
+  /** Shown after the label, outside its click-to-reset area (e.g. a Favorites star). */
+  labelAddon?: React.ReactNode;
   max: number;
   min: number;
   onChange(event: SliderChangeEvent): void;
@@ -64,6 +66,7 @@ const Slider = ({
   defaultValue = 0,
   disabled = false,
   label,
+  labelAddon,
   max,
   min,
   onChange,
@@ -617,37 +620,40 @@ const Slider = ({
 
   return (
     <div
-      className={`group mb-2 compact:mb-0.5 compact:grid compact:grid-cols-[minmax(0,6.5rem)_minmax(0,1fr)_3rem] compact:items-center compact:gap-x-2 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      className={`group group/favorite mb-2 compact:mb-0.5 compact:grid compact:grid-cols-[minmax(0,6.5rem)_minmax(0,1fr)_3rem] compact:items-center compact:gap-x-2 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       ref={containerRef}
       data-speed-edit-id={speedEditId}
       onPointerDownCapture={disabled ? undefined : claimSpeedEdit}
     >
       <div className="flex justify-between items-center mb-1 compact:contents">
-        <div
-          className={`grid min-w-0 compact:col-start-1 compact:row-start-1 ${typeof label === 'string' && !disabled ? 'cursor-pointer' : ''}`}
-          onClick={typeof label === 'string' && !disabled ? handleReset : undefined}
-          onDoubleClick={typeof label === 'string' && !disabled ? handleReset : undefined}
-          onMouseEnter={typeof label === 'string' && !disabled ? () => setIsLabelHovered(true) : undefined}
-          onMouseLeave={typeof label === 'string' && !disabled ? () => setIsLabelHovered(false) : undefined}
-        >
-          <span
-            aria-hidden={isLabelHovered && typeof label === 'string'}
-            className={`col-start-1 row-start-1 text-sm compact:text-xs compact:truncate font-medium text-text-secondary select-none transition-opacity duration-200 ease-in-out ${
-              isLabelHovered && typeof label === 'string' ? 'opacity-0' : 'opacity-100'
-            }`}
+        <div className="flex items-center gap-1 min-w-0 compact:col-start-1 compact:row-start-1">
+          <div
+            className={`grid min-w-0 ${typeof label === 'string' && !disabled ? 'cursor-pointer' : ''}`}
+            onClick={typeof label === 'string' && !disabled ? handleReset : undefined}
+            onDoubleClick={typeof label === 'string' && !disabled ? handleReset : undefined}
+            onMouseEnter={typeof label === 'string' && !disabled ? () => setIsLabelHovered(true) : undefined}
+            onMouseLeave={typeof label === 'string' && !disabled ? () => setIsLabelHovered(false) : undefined}
           >
-            {label}
-          </span>
-          {typeof label === 'string' && (
             <span
-              aria-hidden={!isLabelHovered}
-              className={`col-start-1 row-start-1 text-sm compact:text-xs compact:truncate font-medium text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none ${
-                isLabelHovered ? 'opacity-100' : 'opacity-0'
+              aria-hidden={isLabelHovered && typeof label === 'string'}
+              className={`col-start-1 row-start-1 text-sm compact:text-xs compact:truncate font-medium text-text-secondary select-none transition-opacity duration-200 ease-in-out ${
+                isLabelHovered && typeof label === 'string' ? 'opacity-0' : 'opacity-100'
               }`}
             >
-              {t('ui.slider.reset')}
+              {label}
             </span>
-          )}
+            {typeof label === 'string' && (
+              <span
+                aria-hidden={!isLabelHovered}
+                className={`col-start-1 row-start-1 text-sm compact:text-xs compact:truncate font-medium text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none ${
+                  isLabelHovered ? 'opacity-100' : 'opacity-0'
+                }`}
+              >
+                {t('ui.slider.reset')}
+              </span>
+            )}
+          </div>
+          {labelAddon}
         </div>
         <div className="w-12 text-right compact:col-start-3 compact:row-start-1 compact:w-auto">
           {isEditing ? (

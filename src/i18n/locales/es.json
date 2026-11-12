@@ -412,8 +412,10 @@
     "adjustments": {
       "actions": {
         "copySectionSettings": "Copiar ajustes de {{section}}",
+        "customizePanels": "Personalizar paneles",
         "pasteLabel": "Pegar ajustes de {{section}}",
         "pasteSettings": "Pegar ajustes",
+        "resetPanelLayout": "Restablecer valores predeterminados",
         "resetSectionSettings": "Restablecer ajustes de {{section}}"
       },
       "sections": {
@@ -426,6 +428,7 @@
       "title": "Ajustes",
       "tooltips": {
         "autoAdjust": "Ajuste automático de imagen",
+        "reorderTools": "Reordenar herramientas",
         "resetAdjustments": "Restablecer ajustes",
         "toggleAnalytics": "Alternar vista de análisis"
       }
@@ -662,6 +665,16 @@
       "exporting": "Exportando…",
       "savesTo": "Edición externa: se guarda en"
     },
+    "favorites": {
+      "add": "Añadir a favoritos",
+      "addItem": "Añadir «{{name}}» a favoritos",
+      "dragToReorder": "Arrastra para reordenar",
+      "empty": "Marca con una estrella una sección, herramienta o control en Ajustes para reunirlo aquí.",
+      "qualifiedLabel": "{{tool}}: {{control}}",
+      "remove": "Quitar de favoritos",
+      "removeItem": "Quitar «{{name}}» de favoritos",
+      "title": "Favoritos"
+    },
     "masks": {
       "actions": {
         "addNewComponent": "Añadir nuevo componente",
@@ -861,6 +874,7 @@
         "crop": "Recortar",
         "develop": "Revelar",
         "export": "Exportar",
+        "favorites": "Favoritos",
         "info": "Info",
         "inpaint": "Inpainting",
         "masks": "Máscaras",

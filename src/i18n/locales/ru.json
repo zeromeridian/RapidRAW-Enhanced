@@ -430,8 +430,10 @@
     "adjustments": {
       "actions": {
         "copySectionSettings": "Копировать настройки раздела «{{section}}»",
+        "customizePanels": "Настроить панели",
         "pasteLabel": "Вставить настройки раздела «{{section}}»",
         "pasteSettings": "Вставить настройки",
+        "resetPanelLayout": "Сбросить по умолчанию",
         "resetSectionSettings": "Сбросить настройки раздела «{{section}}»"
       },
       "sections": {
@@ -444,6 +446,7 @@
       "title": "Настройки",
       "tooltips": {
         "autoAdjust": "Автонастройка изображения",
+        "reorderTools": "Изменить порядок инструментов",
         "resetAdjustments": "Сбросить настройки",
         "toggleAnalytics": "Показать/скрыть панель гистограммы"
       }
@@ -685,6 +688,16 @@
       "exporting": "Экспорт…",
       "savesTo": "Внешнее редактирование — сохраняется в"
     },
+    "favorites": {
+      "add": "Добавить в избранное",
+      "addItem": "Добавить «{{name}}» в избранное",
+      "dragToReorder": "Перетащите, чтобы изменить порядок",
+      "empty": "Отметьте звёздочкой раздел, инструмент или ползунок в Настройках, чтобы собрать их здесь.",
+      "qualifiedLabel": "{{tool}}: {{control}}",
+      "remove": "Удалить из избранного",
+      "removeItem": "Удалить «{{name}}» из избранного",
+      "title": "Избранное"
+    },
     "masks": {
       "actions": {
         "addNewComponent": "Добавить новый компонент",
@@ -885,6 +898,7 @@
         "crop": "Обрезка",
         "develop": "Обработка",
         "export": "Экспорт",
+        "favorites": "Избранное",
         "info": "Инфо",
         "inpaint": "Восстановление",
         "masks": "Маски",

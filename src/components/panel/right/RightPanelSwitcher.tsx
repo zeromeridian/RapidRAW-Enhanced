@@ -10,6 +10,7 @@ import {
   Scan,
   Aperture,
   Tag,
+  Star,
   type LucideIcon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -32,6 +33,7 @@ interface RightPanelSwitcherProps {
 const editingPanelGroups: Array<Array<PanelOptions>> = [
   [
     { id: Panel.Adjustments, icon: SlidersHorizontal, title: 'editor.switcher.tooltips.adjust' },
+    { id: Panel.Favorites, icon: Star, title: 'editor.switcher.tooltips.favorites' },
     { id: Panel.Crop, icon: Crop, title: 'editor.switcher.tooltips.crop' },
     { id: Panel.Geometry, icon: Scan, title: 'editor.switcher.tooltips.geometry' },
     { id: Panel.LensCorrection, icon: Aperture, title: 'editor.crop.tooltips.lens' },

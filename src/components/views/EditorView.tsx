@@ -8,6 +8,7 @@ import BottomBar from '../panel/BottomBar';
 import RightPanelSwitcher from '../panel/right/RightPanelSwitcher';
 import Resizer from '../ui/Resizer';
 import Controls from '../panel/right/ControlsPanel';
+import FavoritesPanel from '../panel/right/FavoritesPanel';
 import MetadataPanel from '../panel/right/MetadataPanel';
 import CropPanel from '../panel/right/CropPanel';
 import GeometryPanel from '../panel/right/GeometryPanel';
@@ -238,6 +239,7 @@ export default function EditorView({
             variants={panelVariants}
           >
             {renderedRightPanel === Panel.Adjustments && <Controls />}
+            {renderedRightPanel === Panel.Favorites && <FavoritesPanel />}
             {renderedRightPanel === Panel.Metadata && <MetadataPanel />}
             {renderedRightPanel === Panel.Crop && <CropPanel />}
             {renderedRightPanel === Panel.Geometry && <GeometryPanel />}
