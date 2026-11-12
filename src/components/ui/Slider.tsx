@@ -20,6 +20,8 @@ interface SliderProps {
   min: number;
   onChange(event: SliderChangeEvent): void;
   onDragStateChange?(state: boolean): void;
+  /** Called instead of `onChange(defaultValue)` when the slider is reset (double-click). */
+  onReset?(): void;
   speedEditId?: string;
   step: number;
   value: number;
@@ -41,6 +43,8 @@ export interface SpeedEditTarget {
   format(value: number): string;
   snap(value: number): number;
   onChange(value: number): void;
+  /** Resets the slider as a double-click on it does. */
+  reset(): void;
   onDragStateChange(isDragging: boolean): void;
 }
 
@@ -64,6 +68,7 @@ const Slider = ({
   min,
   onChange,
   onDragStateChange = () => {},
+  onReset,
   speedEditId,
   step = 1,
   value,
@@ -127,17 +132,22 @@ const Slider = ({
   );
 
   const onChangeRef = useRef(onChange);
+  const onResetRef = useRef(onReset);
   const onDragStateChangeRef = useRef(onDragStateChange);
   const snapToStepRef = useRef(snapToStep);
   const rangeRef = useRef({ min, max });
 
   onChangeRef.current = onChange;
+  onResetRef.current = onReset;
   onDragStateChangeRef.current = onDragStateChange;
   snapToStepRef.current = snapToStep;
   rangeRef.current = { min, max };
 
   const numericValue = isNaN(Number(value)) ? 0 : Number(value);
   const formatValue = (val: number) => (decimalPlaces > 0 && val === 0 ? '0' : val.toFixed(decimalPlaces));
+
+  const resetValue = () =>
+    onResetRef.current ? onResetRef.current() : onChangeRef.current({ target: { value: defaultValue } });
 
   const speedEditLabel = SPEED_EDIT_ADJUSTMENTS.find((adjustment) => adjustment.id === speedEditId)?.label;
   const speedEditTargetRef = useRef<SpeedEditTarget | null>(null);
@@ -153,6 +163,7 @@ const Slider = ({
         format: (val) => `${formatValue(val)}${suffix}`,
         snap: snapToStep,
         onChange: (val) => onChangeRef.current({ target: { value: val } }),
+        reset: resetValue,
         onDragStateChange: (isDraggingNext) => onDragStateChangeRef.current(isDraggingNext),
       };
 
@@ -405,14 +416,7 @@ const Slider = ({
   }, [isEditing]);
 
   const handleReset = () => {
-    if (disabled) return;
-
-    const syntheticEvent = {
-      target: {
-        value: defaultValue,
-      },
-    };
-    onChange(syntheticEvent);
+    if (!disabled) resetValue();
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

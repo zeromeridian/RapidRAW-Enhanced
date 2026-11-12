@@ -1753,8 +1753,10 @@ pub struct MaskAdjustments {
     pub grain_size: f32,
     pub grain_roughness: f32,
     pub gaussian_blur_amount: f32,
-    _pad_motion_blur1: f32,
-    _pad_motion_blur2: f32,
+    /// The mask's glow colour, as the global `glow_hue`/`glow_saturation`; the global values
+    /// when the mask has none of its own.
+    pub glow_hue: f32,
+    pub glow_saturation: f32,
 
     pub hue: f32,
     pub color_grading_shadows: ColorGradeSettings,
@@ -1777,7 +1779,9 @@ pub struct MaskAdjustments {
     pub red_curve_count: u32,
     pub green_curve_count: u32,
     pub blue_curve_count: u32,
-    _pad_end4: f32,
+    /// The mask's halation colour, as the global `halation_hue_shift`; the global value when
+    /// the mask has none of its own.
+    pub halation_hue_shift: f32,
     _pad_end5: f32,
     _pad_end6: f32,
     _pad_end7: f32,
@@ -2704,7 +2708,12 @@ fn get_global_adjustments_from_json(
     }
 }
 
-fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
+/// A mask's adjustments for the shader. Its glow and halation colours fall back to `global`'s
+/// for each key the mask does not set, so a mask without colours of its own follows the photo.
+fn get_mask_adjustments_from_json(
+    adj: &serde_json::Value,
+    global: &GlobalAdjustments,
+) -> MaskAdjustments {
     if adj.is_null() {
         return MaskAdjustments::default();
     }
@@ -2723,6 +2732,12 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         } else {
             0.0
         }
+    };
+    let own_or_global = |key: &str, scale: f32, offset: f32, global_value: f32| -> f32 {
+        adj[key]
+            .as_f64()
+            .filter(|_| is_visible("effects"))
+            .map_or(global_value, |value| value as f32 / scale - offset)
     };
 
     let curves_obj = adj.get("curves").cloned().unwrap_or_default();
@@ -2795,8 +2810,8 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         grain_roughness: adj["grainRoughness"].as_f64().unwrap_or(50.0) as f32
             / SCALES.grain_roughness,
         gaussian_blur_amount: get_val("effects", "gaussianBlurAmount", 100.0),
-        _pad_motion_blur1: 0.0,
-        _pad_motion_blur2: 0.0,
+        glow_hue: own_or_global("glowHue", 1.0, 0.0, global.glow_hue),
+        glow_saturation: own_or_global("glowSaturation", 100.0, 0.0, global.glow_saturation),
 
         hue: get_val("color", "hue", 1.0),
         color_grading_shadows: if is_visible("color") {
@@ -2868,7 +2883,12 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         red_curve_count: red_points.len() as u32,
         green_curve_count: green_points.len() as u32,
         blue_curve_count: blue_points.len() as u32,
-        _pad_end4: 0.0,
+        halation_hue_shift: own_or_global(
+            "halationHue",
+            1.0,
+            DEFAULT_HALATION_HUE as f32,
+            global.halation_hue_shift,
+        ),
         _pad_end5: 0.0,
         _pad_end6: 0.0,
         _pad_end7: 0.0,
@@ -2895,7 +2915,7 @@ pub fn get_all_adjustments_from_json(
         .enumerate()
         .take(MAX_MASKS)
     {
-        mask_adjustments[i] = get_mask_adjustments_from_json(&mask_def.adjustments);
+        mask_adjustments[i] = get_mask_adjustments_from_json(&mask_def.adjustments, &global);
         mask_adjustments[i].blend_mode = match mask_def.blend_mode.as_str() {
             "darken" => 1,
             "multiply" => 2,
@@ -4008,7 +4028,8 @@ mod tests {
 
     #[test]
     fn phase_one_mask_adjustments_parse_with_expected_scales() {
-        let adjustments = get_mask_adjustments_from_json(&json!({
+        let adjustments = get_mask_adjustments_from_json(
+            &json!({
             "monochrome": true,
             "colorCalibration": {
                 "shadowsTint": 40,
@@ -4028,7 +4049,9 @@ mod tests {
             "grainSize": 25,
             "grainRoughness": 50,
             "gaussianBlurAmount": 65
-        }));
+            }),
+            &GlobalAdjustments::default(),
+        );
 
         assert_eq!(adjustments.monochrome, 1);
         assert!((adjustments.color_calibration.shadows_tint - 0.1).abs() < f32::EPSILON);
@@ -4048,7 +4071,8 @@ mod tests {
 
     #[test]
     fn hidden_mask_sections_disable_phase_one_adjustments() {
-        let adjustments = get_mask_adjustments_from_json(&json!({
+        let adjustments = get_mask_adjustments_from_json(
+            &json!({
             "monochrome": true,
             "colorCalibration": { "redHue": 100 },
             "flareAmount": 100,
@@ -4061,7 +4085,9 @@ mod tests {
                 "color": false,
                 "effects": false
             }
-        }));
+            }),
+            &GlobalAdjustments::default(),
+        );
 
         assert_eq!(adjustments.monochrome, 0);
         assert_eq!(adjustments.color_calibration.red_hue, 0.0);
@@ -4112,6 +4138,33 @@ mod tests {
         assert_eq!(coloured.glow_hue, 200.0);
         assert!((coloured.glow_saturation - 0.6).abs() < 1e-6);
         assert_eq!(coloured.halation_hue_shift, 120.0);
+    }
+
+    #[test]
+    fn mask_glow_and_halation_colours_follow_the_photo_unless_set() {
+        let global = get_global_adjustments_from_json(
+            &json!({ "glowHue": 200, "glowSaturation": 60, "halationHue": 130 }),
+            true,
+            None,
+        );
+
+        let following = get_mask_adjustments_from_json(&json!({ "glowAmount": 50 }), &global);
+        assert_eq!(following.glow_hue, global.glow_hue);
+        assert_eq!(following.glow_saturation, global.glow_saturation);
+        assert_eq!(following.halation_hue_shift, global.halation_hue_shift);
+
+        let own =
+            get_mask_adjustments_from_json(&json!({ "glowHue": 90, "halationHue": 40 }), &global);
+        assert_eq!(own.glow_hue, 90.0);
+        assert_eq!(own.glow_saturation, global.glow_saturation);
+        assert_eq!(own.halation_hue_shift, 30.0);
+
+        let hidden = get_mask_adjustments_from_json(
+            &json!({ "glowHue": 90, "glowSaturation": 10, "sectionVisibility": { "effects": false } }),
+            &global,
+        );
+        assert_eq!(hidden.glow_hue, global.glow_hue);
+        assert_eq!(hidden.glow_saturation, global.glow_saturation);
     }
 
     #[test]
