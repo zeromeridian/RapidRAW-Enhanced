@@ -196,6 +196,22 @@ export default function EffectsPanel({
   const motionBlurDepthMap = useEditorStore((state) => state.adjustments.motionBlurDepthMap);
   const { setAdjustments: setImageAdjustments } = useEditorActions();
   const { showContextMenu } = useContextMenu();
+  // A mask's glow and halation colours follow the photo's until one is moved; resetting it
+  // follows the photo again. The photo's own sliders reset to the built-in colour.
+  const photoGlowHue = useEditorStore((state) => state.adjustments.glowHue ?? DEFAULT_GLOW_HUE);
+  const photoGlowSaturation = useEditorStore((state) => state.adjustments.glowSaturation ?? 0);
+  const photoHalationHue = useEditorStore((state) => state.adjustments.halationHue ?? DEFAULT_HALATION_HUE);
+  const colourResetProps = (key: CreativeAdjustment, photoValue: number, builtInValue: number) =>
+    isForMask
+      ? {
+          defaultValue: photoValue,
+          onReset: () =>
+            setAdjustments((prev: Adjustments) => {
+              const { [key]: _, ...followingPhoto } = prev;
+              return followingPhoto as Adjustments;
+            }),
+        }
+      : { defaultValue: builtInValue };
 
   const handleGenerateEffectMap = async (mapKey: SectionMapKey) => {
     const { command, enabledKey, errorLabel } = EFFECT_MAPS[mapKey];
@@ -379,34 +395,30 @@ export default function EffectsPanel({
           value={adjustments.glowAmount}
           onDragStateChange={onDragStateChange}
         />
-        {/* Glow and halation colours are global; mask glow and halation use them too. */}
-        {!isForMask && (
-          <>
-            <Slider
-              defaultValue={DEFAULT_GLOW_HUE}
-              label={t('adjustments.color.hue')}
-              max={360}
-              min={0}
-              onChange={(e: SliderChangeEvent) => handleAdjustmentChange(CreativeAdjustment.GlowHue, e.target.value)}
-              step={1}
-              value={adjustments.glowHue ?? DEFAULT_GLOW_HUE}
-              trackClassName="hue-range-track"
-              onDragStateChange={onDragStateChange}
-            />
-            <Slider
-              label={t('adjustments.color.saturation')}
-              max={100}
-              min={0}
-              onChange={(e: SliderChangeEvent) =>
-                handleAdjustmentChange(CreativeAdjustment.GlowSaturation, e.target.value)
-              }
-              step={1}
-              value={adjustments.glowSaturation ?? 0}
-              onDragStateChange={onDragStateChange}
-              fillOrigin="min"
-            />
-          </>
-        )}
+        <Slider
+          {...colourResetProps(CreativeAdjustment.GlowHue, photoGlowHue, DEFAULT_GLOW_HUE)}
+          label={t('adjustments.color.hue')}
+          max={360}
+          min={0}
+          onChange={(e: SliderChangeEvent) => handleAdjustmentChange(CreativeAdjustment.GlowHue, e.target.value)}
+          speedEditId={CreativeAdjustment.GlowHue}
+          step={1}
+          value={adjustments.glowHue ?? photoGlowHue}
+          trackClassName="hue-range-track"
+          onDragStateChange={onDragStateChange}
+        />
+        <Slider
+          {...colourResetProps(CreativeAdjustment.GlowSaturation, photoGlowSaturation, 0)}
+          label={t('adjustments.color.saturation')}
+          max={100}
+          min={0}
+          onChange={(e: SliderChangeEvent) => handleAdjustmentChange(CreativeAdjustment.GlowSaturation, e.target.value)}
+          speedEditId={CreativeAdjustment.GlowSaturation}
+          step={1}
+          value={adjustments.glowSaturation ?? photoGlowSaturation}
+          onDragStateChange={onDragStateChange}
+          fillOrigin="min"
+        />
       </div>
 
       <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
@@ -422,19 +434,18 @@ export default function EffectsPanel({
           value={adjustments.halationAmount}
           onDragStateChange={onDragStateChange}
         />
-        {!isForMask && (
-          <Slider
-            defaultValue={DEFAULT_HALATION_HUE}
-            label={t('adjustments.color.hue')}
-            max={360}
-            min={0}
-            onChange={(e: SliderChangeEvent) => handleAdjustmentChange(CreativeAdjustment.HalationHue, e.target.value)}
-            step={1}
-            value={adjustments.halationHue ?? DEFAULT_HALATION_HUE}
-            trackClassName="hue-range-track"
-            onDragStateChange={onDragStateChange}
-          />
-        )}
+        <Slider
+          {...colourResetProps(CreativeAdjustment.HalationHue, photoHalationHue, DEFAULT_HALATION_HUE)}
+          label={t('adjustments.color.hue')}
+          max={360}
+          min={0}
+          onChange={(e: SliderChangeEvent) => handleAdjustmentChange(CreativeAdjustment.HalationHue, e.target.value)}
+          speedEditId={CreativeAdjustment.HalationHue}
+          step={1}
+          value={adjustments.halationHue ?? photoHalationHue}
+          trackClassName="hue-range-track"
+          onDragStateChange={onDragStateChange}
+        />
       </div>
 
       <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">

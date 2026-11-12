@@ -537,10 +537,14 @@ export interface MaskAdjustments {
   flareAmount: number;
   gaussianBlurAmount: number;
   glowAmount: number;
+  /** The mask's own glow and halation colour; when a key is missing the photo's is used. */
+  glowHue?: number;
+  glowSaturation?: number;
   grainAmount: number;
   grainRoughness: number;
   grainSize: number;
   halationAmount: number;
+  halationHue?: number;
   highlights: number;
   hsl: Hsl;
   hue: number;
@@ -1272,6 +1276,9 @@ export const SPEED_EDIT_ADJUSTMENTS = [
   { id: DetailsAdjustment.Clarity, label: 'adjustments.details.clarity' },
   { id: DetailsAdjustment.Dehaze, label: 'adjustments.details.dehaze' },
   { id: DetailsAdjustment.Structure, label: 'adjustments.details.structure' },
+  { id: CreativeAdjustment.GlowHue, label: 'adjustments.effects.glowHue' },
+  { id: CreativeAdjustment.GlowSaturation, label: 'adjustments.effects.glowSaturation' },
+  { id: CreativeAdjustment.HalationHue, label: 'adjustments.effects.halationHue' },
   { id: Effect.VignetteAmount, label: 'adjustments.effects.vignette' },
   { id: SPEED_EDIT_ROTATION, label: 'editor.crop.rotationHeading' },
 ] as const;

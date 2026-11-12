@@ -180,8 +180,8 @@ struct MaskAdjustments {
     grain_size: f32,
     grain_roughness: f32,
     gaussian_blur_amount: f32,
-    _pad_motion_blur1: f32,
-    _pad_motion_blur2: f32,
+    glow_hue: f32,
+    glow_saturation: f32,
 
     hue: f32,
     color_grading_shadows: ColorGradeSettings,
@@ -204,7 +204,7 @@ struct MaskAdjustments {
     red_curve_count: u32,
     green_curve_count: u32,
     blue_curve_count: u32,
-    _pad_end4: f32,
+    halation_hue_shift: f32,
     _pad_end5: f32,
     _pad_end6: f32,
     _pad_end7: f32,
@@ -1594,6 +1594,18 @@ fn sample_lut_tetrahedral(uv: vec3<f32>) -> vec3<f32> {
     return res;
 }
 
+// A hue (degrees) with a strength as a 2D vector, so colours can be averaged around the hue circle.
+fn hue_vector(hue: f32, strength: f32) -> vec2<f32> {
+    let angle = radians(hue);
+    return vec2<f32>(cos(angle), sin(angle)) * strength;
+}
+
+// The hue (0–360 degrees) a `hue_vector` sum points to.
+fn vector_hue(v: vec2<f32>) -> f32 {
+    let hue = degrees(atan2(v.y, v.x));
+    return select(hue, hue + 360.0, hue < 0.0);
+}
+
 // Rotates a colour's hue by `shift` degrees at the same saturation and luminance,
 // so a tint keeps its strength whatever hue it is turned to.
 fn rotate_hue(color: vec3<f32>, shift: f32) -> vec3<f32> {
@@ -1790,6 +1802,12 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     var t_structure = adjustments.global.structure;
     var t_glow = adjustments.global.glow_amount;
     var t_halation = adjustments.global.halation_amount;
+    // Glow and halation colours, weighted by each contribution's amount. They are used only
+    // when a mask brings a colour of its own, so the photo's colour alone renders unchanged.
+    var glow_tint = hue_vector(adjustments.global.glow_hue, adjustments.global.glow_saturation) * max(t_glow, 0.0);
+    var halation_tint = hue_vector(adjustments.global.halation_hue_shift, 1.0) * max(t_halation, 0.0);
+    var glow_colour_mixed = false;
+    var halation_colour_mixed = false;
     var t_flare = adjustments.global.flare_amount;
     var t_sharpness = adjustments.global.sharpness;
     var t_hue = adjustments.global.hue;
@@ -1827,8 +1845,21 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             t_dehaze += m.dehaze * influence;
             t_structure += m.structure * influence;
 
-            t_glow += m.glow_amount * influence;
-            t_halation += m.halation_amount * influence;
+            let glow_weight = m.glow_amount * influence;
+            t_glow += glow_weight;
+            if (glow_weight > 0.0) {
+                glow_tint += hue_vector(m.glow_hue, m.glow_saturation) * glow_weight;
+                glow_colour_mixed = glow_colour_mixed
+                    || m.glow_hue != adjustments.global.glow_hue
+                    || m.glow_saturation != adjustments.global.glow_saturation;
+            }
+            let halation_weight = m.halation_amount * influence;
+            t_halation += halation_weight;
+            if (halation_weight > 0.0) {
+                halation_tint += hue_vector(m.halation_hue_shift, 1.0) * halation_weight;
+                halation_colour_mixed = halation_colour_mixed
+                    || m.halation_hue_shift != adjustments.global.halation_hue_shift;
+            }
             t_flare += m.flare_amount * influence;
             t_hue += m.hue * influence;
 
@@ -1903,17 +1934,26 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     var processed_rgb = apply_linear_exposure(locally_contrasted_rgb, t_exposure);
 
     if (t_glow > 0.0) {
+        var glow_hue = adjustments.global.glow_hue;
+        var glow_saturation = adjustments.global.glow_saturation;
+        if (glow_colour_mixed) {
+            glow_hue = vector_hue(glow_tint);
+            glow_saturation = length(glow_tint) / t_glow;
+        }
         processed_rgb = apply_glow_bloom(
             processed_rgb, structure_blurred, t_glow, is_raw,
             t_exposure, t_brightness, t_contrast, t_whites,
-            adjustments.global.glow_hue, adjustments.global.glow_saturation
+            glow_hue, glow_saturation
         );
     }
     if (t_halation > 0.0) {
+        let halation_hue_shift = select(
+            adjustments.global.halation_hue_shift, vector_hue(halation_tint), halation_colour_mixed
+        );
         processed_rgb = apply_halation(
             processed_rgb, clarity_blurred, t_halation, is_raw,
             t_exposure, t_brightness, t_contrast, t_whites,
-            adjustments.global.halation_hue_shift
+            halation_hue_shift
         );
     }
     if (t_flare > 0.0) {

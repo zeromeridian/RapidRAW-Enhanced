@@ -320,8 +320,11 @@ details are in `RELEASE_NOTES.MD`.
   grey when nothing clips, white when every channel clips, and the clipped
   channels' colour otherwise; clicking one toggles the clipping warning.
 - Effects has separate **Glow**, **Halation**, and **Light Flares** sections.
-  Glow has a colour (Hue and Saturation) and Halation a Hue; mask glow and
-  halation use the same colours.
+  Glow has a colour (Hue and Saturation) and Halation a Hue. Masks have the
+  same colour sliders; a mask follows the photo's colours until one is
+  moved (double-click follows the photo again), and overlapping glows
+  blend their colours by amount. The three colour sliders can be Speed
+  Edit sliders.
 - Mask overlays can be hidden without disabling the selected mask through a
   dedicated Masking-panel control or configurable `O` shortcut. The
   overlay stays visible and follows the drag while range bars, Tolerance,

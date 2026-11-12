@@ -296,7 +296,7 @@ export default function SpeedEditOverlay() {
       }
       if (e.repeat) return;
       if (key === RESET_KEY) {
-        if (target && !drag) target.onChange(target.defaultValue);
+        if (target && !drag) target.reset();
         return;
       }
       if (key === COPY_KEY) {
@@ -386,7 +386,7 @@ export default function SpeedEditOverlay() {
     e.stopPropagation();
     const target = speedEditTarget?.current;
     markUsed();
-    target?.onChange(target.defaultValue);
+    target?.reset();
   };
 
   const isActive = isSpeedEditing || isDragging;

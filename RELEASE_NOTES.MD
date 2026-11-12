@@ -5,6 +5,22 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.44.0-dev-mask-glow-color — 2026-11-11
+
+### Masks
+
+- **Glow and Halation colours in masks**: a mask's Glow now has its own
+  Hue and Saturation, and its Halation its own Hue. Until you move them, a
+  mask follows the photo's colours; double-click a slider to make it
+  follow the photo again. Where a mask's glow overlaps the photo's, the
+  colours blend by their amounts.
+- Masks made before this version look exactly as before.
+
+### Speed Edit
+
+- Glow Hue, Glow Saturation and Halation Hue can be chosen as Speed Edit
+  sliders in Settings.
+
 ## 1.43.1-fix-live-mask-overlay — 2026-11-11
 
 ### Masks
