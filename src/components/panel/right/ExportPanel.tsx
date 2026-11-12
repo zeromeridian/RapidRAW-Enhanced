@@ -37,6 +37,9 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { getEnabledExportSuffix } from '../../../utils/outputNaming';
 import { formatBytes } from '../../../utils/formatBytes';
 
+/** Formats whose exports carry the source photo's EXIF (TIFF writes it while encoding). */
+const carriesSourceExif = (format: string) => format === FileFormats.Jpeg || format === FileFormats.Tiff;
+
 interface ExportPanelProps {
   exportState: ExportState;
   multiSelectedPaths: Array<string>;
@@ -481,7 +484,7 @@ export default function ExportPanel({
       jpegQuality,
       tiffBitDepth,
       keepMetadata,
-      inheritAllExif: keepMetadata && fileFormat === FileFormats.Jpeg,
+      inheritAllExif: keepMetadata && carriesSourceExif(fileFormat),
       preserveTimestamps,
       preserveFolders,
       exportToSourceFolder,
@@ -586,7 +589,7 @@ export default function ExportPanel({
       jpegQuality,
       tiffBitDepth,
       keepMetadata,
-      inheritAllExif: keepMetadata && fileFormat === FileFormats.Jpeg,
+      inheritAllExif: keepMetadata && carriesSourceExif(fileFormat),
       preserveTimestamps,
       preserveFolders,
       exportToSourceFolder,
@@ -1081,7 +1084,7 @@ export default function ExportPanel({
                         )}
                         {fileFormat !== FileFormats.Cube && (
                           <>
-                            {[FileFormats.Jpeg, FileFormats.Tiff].includes(fileFormat as FileFormats) && (
+                            {carriesSourceExif(fileFormat) && (
                               <>
                                 <Switch
                                   checked={keepMetadata}

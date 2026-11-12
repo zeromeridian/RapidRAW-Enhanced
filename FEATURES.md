@@ -109,7 +109,8 @@ details are in `RELEASE_NOTES.MD`.
 - The selection advances when a rating, flag, label, or tag change hides the
   active image under the current filter.
 - `{original_filename_number}` naming token for rename, import, and export,
-  with a warning when a multi-file template is not unique.
+  with a warning when a multi-file template is not unique; `{ss}` adds the
+  capture time's seconds.
 - Caps Lock auto-advance after applying ratings, color labels, or flags.
 - Main Settings access from both Library and Develop.
 - Optional launch directly into the last library, bypassing the splash screen.
@@ -341,7 +342,9 @@ details are in `RELEASE_NOTES.MD`.
   using an AI-generated surface normal map, with ambient, softness, shine,
   optional cast shadows, and per-light color, temperature, tint, intensity,
   depth, falloff, angle, elevation, cone, and feather. Lights are placed,
-  moved, aimed, and duplicated directly on the image. Light settings travel in
+  moved, aimed, and duplicated directly on the image; turning Relight on
+  selects the first light (or adds one), and new edits start with Ambient
+  −50 so the lights stand out. Light settings travel in
   XMP; the image-derived normal map stays local and can be regenerated on
   another device.
 - **Fog** in Effects adds depth-aware atmospheric haze from an AI depth map,
@@ -381,8 +384,10 @@ details are in `RELEASE_NOTES.MD`.
 - Several preset files can be imported at once, and the LUT browser lists
   HALD image LUTs.
 - Consolidated EXIF export controls with optional GPS removal.
-- Complete readable EXIF preservation for JPEG and a safe allowlist for TIFF,
-  with ThisIsRAW recorded as the exporting software.
+- Complete readable EXIF preservation for JPEG and TIFF (TIFF exports write
+  their EXIF and GPS blocks while encoding, with UTF-8 text), with ThisIsRAW
+  recorded as the exporting software. Denoised, negative-converted, panorama
+  and HDR images embed their source's EXIF too.
 - XMP synchronization for ratings, color labels, keywords, physical-image
   flags, and physical stack membership, order, cover, and collapsed state.
   Keywords are written and read in Lightroom Classic's format, including the

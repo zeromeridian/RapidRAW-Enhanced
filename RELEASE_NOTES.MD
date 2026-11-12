@@ -5,6 +5,28 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.45.0-dev-small-items — 2026-11-11
+
+### Develop
+
+- Basic panel labels follow RapidRAW: **EV Shift** is now called
+  **Exposure**, and the former **Exposure** slider is now **Brightness**,
+  placed below Blacks. Edits are unchanged.
+- **Relight**: turning it on selects the first light, or adds one if there
+  is none, so you can place it right away. New edits start with Ambient at
+  −50 and new lights at intensity 40; existing edits look as before.
+
+### Export
+
+- With **Include EXIF metadata** on, TIFF exports now keep the photo's EXIF
+  just like JPEG exports: image description, white balance, metering,
+  sub-second times, serial numbers and more, with non-English text intact.
+  Turning on GPS removal still removes the location.
+- Denoised, negative-converted, panorama and HDR images now carry the
+  source photo's EXIF, so other applications see the camera, lens and
+  capture details.
+- New `{ss}` filename token for the capture time's seconds.
+
 ## 1.44.0-dev-mask-glow-color — 2026-11-11
 
 ### Masks

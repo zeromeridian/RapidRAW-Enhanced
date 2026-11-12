@@ -2,8 +2,8 @@
   "adjustments": {
     "basic": {
       "blacks": "黒レベル",
+      "brightness": "明るさ",
       "contrast": "コントラスト",
-      "evShift": "露出補正",
       "exposure": "露光量",
       "highlights": "ハイライト",
       "mappers": {
