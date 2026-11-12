@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs;
-use std::io::{Cursor, Seek, Write};
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -20,8 +20,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::Emitter;
 use tauri::Manager;
-use tiff::encoder::{Rational, TiffEncoder, TiffValue, colortype};
-use tiff::tags::{ResolutionUnit, Tag, Type};
 
 use crate::AppState;
 use crate::exif_processing;
@@ -40,6 +38,7 @@ use crate::lut_processing::{
     convert_image_to_cube_lut, generate_identity_lut_image, get_or_load_lut,
 };
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
+use crate::tiff_metadata::{TiffSamples, encode_tiff_with_metadata};
 
 use crate::cache_utils::{calculate_full_job_hash, calculate_transform_hash};
 use crate::{
@@ -1133,7 +1132,19 @@ fn save_image_with_metadata(
         .unwrap_or("")
         .to_lowercase();
 
-    let mut image_bytes = encode_image_to_bytes(image, &extension, export_settings)?;
+    let tiff_metadata = (export_settings.keep_metadata
+        && matches!(extension.as_str(), "tif" | "tiff"))
+    .then(|| {
+        exif_processing::collect_export_metadata(
+            source_path_str,
+            export_settings.strip_gps,
+            export_settings.inherit_all_exif,
+            true,
+        )
+    })
+    .flatten();
+    let mut image_bytes =
+        encode_image_to_bytes(image, &extension, export_settings, tiff_metadata.as_ref())?;
 
     exif_processing::write_image_with_metadata(
         &mut image_bytes,
@@ -1233,27 +1244,13 @@ fn encode_grayscale_to_png(bitmap: &GrayImage) -> Result<Vec<u8>, String> {
 /// Exports are sRGB-encoded; tagging them lets color-managed apps read them correctly.
 const SRGB_ICC_PROFILE: &[u8] = include_bytes!("../icc/sRGB-v2-magic.icc");
 
-/// An ICC profile for TIFF tag 34675, which the TIFF/EP and Photoshop
-/// specifications type as UNDEFINED rather than the crate's default BYTE.
-struct TiffIccProfile(&'static [u8]);
-
-impl TiffValue for TiffIccProfile {
-    const BYTE_LEN: u8 = 1;
-    const FIELD_TYPE: Type = Type::UNDEFINED;
-
-    fn count(&self) -> usize {
-        self.0.len()
-    }
-
-    fn data(&self) -> Cow<'_, [u8]> {
-        Cow::Borrowed(self.0)
-    }
-}
-
+/// Encodes an export. A TIFF gets `tiff_metadata` written by its encoder; the other formats
+/// get their metadata afterwards from `exif_processing::write_image_with_metadata`.
 fn encode_image_to_bytes(
     image: &DynamicImage,
     output_format: &str,
     export_settings: &ExportSettings,
+    tiff_metadata: Option<&little_exif::metadata::Metadata>,
 ) -> Result<Vec<u8>, String> {
     let jpeg_quality = export_settings.jpeg_quality;
     let mut image_bytes = Vec::new();
@@ -1336,24 +1333,17 @@ fn encode_image_to_bytes(
             }
         }
         "tif" | "tiff" => {
-            let (width, height) = image.dimensions();
-            let mut encoder = TiffEncoder::new(&mut cursor).map_err(|e| e.to_string())?;
-            match export_settings.tiff_bit_depth {
-                TiffBitDepth::Eight => write_tiff::<colortype::RGB8, _>(
-                    &mut encoder,
-                    width,
-                    height,
-                    image.to_rgb8().as_raw(),
-                    export_settings.dpi,
-                )?,
-                TiffBitDepth::Sixteen => write_tiff::<colortype::RGB16, _>(
-                    &mut encoder,
-                    width,
-                    height,
-                    image.to_rgb16().as_raw(),
-                    export_settings.dpi,
-                )?,
-            }
+            let samples = match export_settings.tiff_bit_depth {
+                TiffBitDepth::Eight => TiffSamples::Eight,
+                TiffBitDepth::Sixteen => TiffSamples::Sixteen,
+            };
+            return encode_tiff_with_metadata(
+                image,
+                samples,
+                tiff_metadata,
+                Some(SRGB_ICC_PROFILE),
+                export_settings.dpi,
+            );
         }
         "avif" => {
             image
@@ -1363,35 +1353,6 @@ fn encode_image_to_bytes(
         _ => return Err(format!("Unsupported file format: {}", output_format)),
     };
     Ok(image_bytes)
-}
-
-fn write_tiff<C: colortype::ColorType, W: Write + Seek>(
-    encoder: &mut TiffEncoder<W>,
-    width: u32,
-    height: u32,
-    data: &[C::Inner],
-    dpi: Option<u16>,
-) -> Result<(), String>
-where
-    [C::Inner]: TiffValue,
-{
-    let mut image = encoder
-        .new_image::<C>(width, height)
-        .map_err(|e| e.to_string())?;
-    image
-        .encoder()
-        .write_tag(Tag::IccProfile, TiffIccProfile(SRGB_ICC_PROFILE))
-        .map_err(|e| e.to_string())?;
-    if let Some(dpi) = dpi {
-        image.resolution(
-            ResolutionUnit::Inch,
-            Rational {
-                n: dpi.into(),
-                d: 1,
-            },
-        );
-    }
-    image.write_data(data).map_err(|e| e.to_string())
 }
 
 /// Inserts a PNG pHYs chunk (pixels per metre) right after IHDR.
@@ -2357,7 +2318,7 @@ pub async fn estimate_export_sizes(
         )?;
 
         let preview_bytes =
-            encode_image_to_bytes(&processed_preview, &output_format, &export_settings)?;
+            encode_image_to_bytes(&processed_preview, &output_format, &export_settings, None)?;
         let preview_byte_size = preview_bytes.len();
 
         let (transformed_full_res, _) =
@@ -2498,7 +2459,7 @@ pub async fn estimate_export_sizes(
         )?;
 
         let preview_bytes =
-            encode_image_to_bytes(&processed_preview, &output_format, &export_settings)?;
+            encode_image_to_bytes(&processed_preview, &output_format, &export_settings, None)?;
         let single_image_estimated_size = preview_bytes.len();
 
         let full_w = (shrunk_w as f32 / raw_scale_factor).round() as u32;
@@ -2575,15 +2536,17 @@ mod tests {
             ..serde_json::from_value(legacy_export_settings_json()).expect("legacy settings")
         };
 
-        let encoded_8 = encode_image_to_bytes(&source, "tiff", &settings(TiffBitDepth::Eight))
-            .expect("encode RGB8 TIFF");
+        let encoded_8 =
+            encode_image_to_bytes(&source, "tiff", &settings(TiffBitDepth::Eight), None)
+                .expect("encode RGB8 TIFF");
         let decoded_8 = image::load_from_memory_with_format(&encoded_8, ImageFormat::Tiff)
             .expect("decode RGB8 TIFF");
         assert_eq!(decoded_8.color(), ColorType::Rgb8);
         assert_eq!(decoded_8.to_rgb8(), source.to_rgb8());
 
-        let encoded_16 = encode_image_to_bytes(&source, "tiff", &settings(TiffBitDepth::Sixteen))
-            .expect("encode RGB16 TIFF");
+        let encoded_16 =
+            encode_image_to_bytes(&source, "tiff", &settings(TiffBitDepth::Sixteen), None)
+                .expect("encode RGB16 TIFF");
         let decoded_16 = image::load_from_memory_with_format(&encoded_16, ImageFormat::Tiff)
             .expect("decode RGB16 TIFF");
         assert_eq!(decoded_16.color(), ColorType::Rgb16);
@@ -2618,7 +2581,8 @@ mod tests {
             ..serde_json::from_value(legacy_export_settings_json()).expect("legacy settings")
         };
 
-        let tiff_bytes = encode_image_to_bytes(&source, "tiff", &settings).expect("encode TIFF");
+        let tiff_bytes =
+            encode_image_to_bytes(&source, "tiff", &settings, None).expect("encode TIFF");
         let mut decoder =
             tiff::decoder::Decoder::new(Cursor::new(&tiff_bytes)).expect("decode TIFF");
         let x_resolution = decoder
@@ -2632,7 +2596,7 @@ mod tests {
             SRGB_ICC_PROFILE
         );
 
-        let png_bytes = encode_image_to_bytes(&source, "png", &settings).expect("encode PNG");
+        let png_bytes = encode_image_to_bytes(&source, "png", &settings, None).expect("encode PNG");
         let phys = png_bytes
             .windows(4)
             .position(|window| window == b"pHYs")
@@ -2643,13 +2607,14 @@ mod tests {
         );
         image::load_from_memory_with_format(&png_bytes, ImageFormat::Png).expect("valid PNG");
 
-        let jpeg_bytes = encode_image_to_bytes(&source, "jpeg", &settings).expect("encode JPEG");
+        let jpeg_bytes =
+            encode_image_to_bytes(&source, "jpeg", &settings, None).expect("encode JPEG");
         assert_eq!(&jpeg_bytes[6..11], b"JFIF\0");
         assert_eq!(&jpeg_bytes[13..18], &[1, 1, 44, 1, 44]);
     }
 
     #[test]
-    fn tiff_metadata_merge_keeps_requested_dpi() {
+    fn tiff_export_metadata_keeps_requested_dpi_and_profile() {
         let folder = tempfile::tempdir().expect("temp dir");
         let source_path = folder.path().join("source.jpg");
         let source =
@@ -2660,18 +2625,14 @@ mod tests {
             ..serde_json::from_value(legacy_export_settings_json()).expect("legacy settings")
         };
 
-        let mut tiff_bytes =
-            encode_image_to_bytes(&source, "tiff", &settings).expect("encode TIFF");
-        exif_processing::write_image_with_metadata(
-            &mut tiff_bytes,
+        let metadata = exif_processing::collect_export_metadata(
             source_path.to_str().unwrap(),
-            "tiff",
+            false,
+            false,
             true,
-            false,
-            false,
-            settings.dpi,
-        )
-        .expect("write metadata");
+        );
+        let tiff_bytes = encode_image_to_bytes(&source, "tiff", &settings, metadata.as_ref())
+            .expect("encode TIFF");
 
         let mut decoder =
             tiff::decoder::Decoder::new(Cursor::new(&tiff_bytes)).expect("decode TIFF");
@@ -2687,6 +2648,15 @@ mod tests {
                 .expect("ICC profile tag"),
             SRGB_ICC_PROFILE
         );
+        let written = little_exif::metadata::Metadata::new_from_vec(
+            &tiff_bytes,
+            little_exif::filetype::FileExtension::TIFF,
+        )
+        .expect("read TIFF metadata");
+        assert!(written.into_iter().any(|tag| matches!(
+            tag,
+            little_exif::exif_tag::ExifTag::Software(value) if value == "ThisIsRAW"
+        )));
     }
 
     #[test]

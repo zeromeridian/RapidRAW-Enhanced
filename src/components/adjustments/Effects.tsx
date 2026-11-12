@@ -17,7 +17,9 @@ import {
   DEFAULT_HALATION_HUE,
   DEFAULT_MOTION_BLUR_DEPTH,
   DEFAULT_MOTION_BLUR_HIGHLIGHTS,
+  DEFAULT_RELIGHT_INTENSITY,
   EffectMapKey,
+  INITIAL_ADJUSTMENTS,
   MotionBlurLayer,
   MotionBlurType,
   LENS_BLUR_RANGE_DEFAULTS,
@@ -219,6 +221,8 @@ export default function EffectsPanel({
     try {
       const b64: string = await invoke(command);
       setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [mapKey]: b64 }));
+      const { relightEnabled, relightLights: lights } = useEditorStore.getState().adjustments;
+      if (mapKey === 'relightNormalMap' && relightEnabled) focusRelightLight(lights);
     } catch (e) {
       toast.error(`Failed to generate ${errorLabel}: ${e}`);
       setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [enabledKey]: false }));
@@ -291,6 +295,8 @@ export default function EffectsPanel({
     handleSpatialEffectToggle('relightNormalMap')(enabled);
     if (!enabled) {
       setEditor({ isRelightPickerActive: false });
+    } else if (adjustments.relightNormalMap) {
+      focusRelightLight(relightLights);
     }
   };
 
@@ -316,6 +322,12 @@ export default function EffectsPanel({
       relightLights: [...(prev.relightLights || []), light],
     }));
     activateLight(light.id);
+  };
+
+  /** Turning Relight on puts the first light in hand (adding one if there is none). */
+  const focusRelightLight = (lights: Array<RelightLight> = []) => {
+    if (lights.length === 0) handleAddLight();
+    else activateLight(lights[0].id);
   };
 
   const handleLightPatch = (patch: Partial<RelightLight>) => {
@@ -567,6 +579,7 @@ export default function EffectsPanel({
               label={t('adjustments.effects.relightAmbient')}
               max={100}
               min={-100}
+              defaultValue={INITIAL_ADJUSTMENTS.relightAmbient}
               onChange={(e: SliderChangeEvent) => handleAdjustmentChange(Effect.RelightAmbient, e.target.value)}
               step={1}
               value={adjustments.relightAmbient ?? 0}
@@ -687,7 +700,7 @@ export default function EffectsPanel({
                     label={t('adjustments.effects.relightIntensity')}
                     max={100}
                     min={0}
-                    defaultValue={60}
+                    defaultValue={DEFAULT_RELIGHT_INTENSITY}
                     onChange={handleLightSliderChange('intensity')}
                     step={1}
                     value={activeLight.intensity}

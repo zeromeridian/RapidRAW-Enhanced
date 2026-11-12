@@ -1244,6 +1244,22 @@ mod output_naming_tests {
     }
 
     #[test]
+    fn seconds_token_uses_the_capture_seconds() {
+        use chrono::TimeZone;
+        let date = chrono::Utc
+            .with_ymd_and_hms(2026, 11, 11, 10, 20, 37)
+            .unwrap();
+        let name = generate_filename_from_template(
+            "shot_{ss}",
+            std::path::Path::new("IMG_1.CR3"),
+            1,
+            1,
+            &date,
+        );
+        assert_eq!(name, "shot_37");
+    }
+
+    #[test]
     fn ai_text_masks_round_trip_through_xmp() {
         let folder = tempfile::tempdir().unwrap();
         let image = folder.path().join("lake.raw");
@@ -6197,6 +6213,7 @@ pub fn generate_filename_from_template(
     result = result.replace("{DD}", &local_date.format("%d").to_string());
     result = result.replace("{hh}", &local_date.format("%H").to_string());
     result = result.replace("{mm}", &local_date.format("%M").to_string());
+    result = result.replace("{ss}", &local_date.format("%S").to_string());
 
     result
 }

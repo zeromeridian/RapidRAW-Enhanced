@@ -146,13 +146,16 @@ export interface RelightLight {
   color: string;
 }
 
+/** Strength of a newly added Relight light. */
+export const DEFAULT_RELIGHT_INTENSITY = 40;
+
 export const createRelightLight = (x: number, y: number): RelightLight => ({
   id: uuidv4(),
   type: 'point',
   x,
   y,
   depth: 0,
-  intensity: 60,
+  intensity: DEFAULT_RELIGHT_INTENSITY,
   radius: 30,
   angle: 135,
   elevation: 60,
@@ -851,7 +854,8 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   motionBlurAmount: 0,
   motionBlurAngle: 0,
   orientationSteps: 0,
-  relightAmbient: 0,
+  // New edits start darker so the lights stand out; older edits keep their stored value.
+  relightAmbient: -50,
   relightEnabled: false,
   relightLights: [],
   relightNormalMap: null,
@@ -1263,7 +1267,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
 export const SPEED_EDIT_ROTATION = 'rotation';
 
 export const SPEED_EDIT_ADJUSTMENTS = [
-  { id: BasicAdjustment.Exposure, label: 'adjustments.basic.evShift' },
+  { id: BasicAdjustment.Exposure, label: 'adjustments.basic.exposure' },
   { id: BasicAdjustment.Contrast, label: 'adjustments.basic.contrast' },
   { id: BasicAdjustment.Highlights, label: 'adjustments.basic.highlights' },
   { id: BasicAdjustment.Shadows, label: 'adjustments.basic.shadows' },
