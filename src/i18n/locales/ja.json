@@ -394,8 +394,10 @@
     "adjustments": {
       "actions": {
         "copySectionSettings": "{{section}}設定をコピー",
+        "customizePanels": "パネルをカスタマイズ",
         "pasteLabel": "{{section}}設定を貼り付け",
         "pasteSettings": "設定を貼り付け",
+        "resetPanelLayout": "デフォルトに戻す",
         "resetSectionSettings": "{{section}}設定をリセット"
       },
       "sections": {
@@ -408,6 +410,7 @@
       "title": "補正",
       "tooltips": {
         "autoAdjust": "画像を自動補正",
+        "reorderTools": "ツールを並べ替え",
         "resetAdjustments": "補正設定をリセット",
         "toggleAnalytics": "アナリティクス表示の切り替え"
       }
@@ -637,6 +640,16 @@
       "exporting": "書き出し中…",
       "savesTo": "外部編集 — 保存先"
     },
+    "favorites": {
+      "add": "お気に入りに追加",
+      "addItem": "「{{name}}」をお気に入りに追加",
+      "dragToReorder": "ドラッグして並べ替え",
+      "empty": "補正でセクション・ツール・スライダーに星を付けると、ここに集まります。",
+      "qualifiedLabel": "{{tool}}：{{control}}",
+      "remove": "お気に入りから削除",
+      "removeItem": "「{{name}}」をお気に入りから削除",
+      "title": "お気に入り"
+    },
     "masks": {
       "actions": {
         "addNewComponent": "新しいコンポーネントを追加",
@@ -835,6 +848,7 @@
         "crop": "切り抜き",
         "develop": "現像",
         "export": "書き出し",
+        "favorites": "お気に入り",
         "info": "情報",
         "inpaint": "インペイント",
         "masks": "マスク",

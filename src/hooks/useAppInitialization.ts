@@ -7,7 +7,7 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { THEMES, DEFAULT_THEME_ID, ThemeProps } from '../utils/themes';
-import { COPYABLE_ADJUSTMENT_KEYS } from '../utils/adjustments';
+import { COPYABLE_ADJUSTMENT_KEYS, withAdjustmentLayout } from '../utils/adjustments';
 import {
   DEFAULT_PANEL_DENSITY,
   FilterCriteria,
@@ -83,9 +83,10 @@ export const useAppInitialization = ({
     })),
   );
 
-  const { uiVisibility, setUI } = useUIStore(
+  const { uiVisibility, collapsibleSectionsState, setUI } = useUIStore(
     useShallow((state) => ({
       uiVisibility: state.uiVisibility,
+      collapsibleSectionsState: state.collapsibleSectionsState,
       setUI: state.setUI,
     })),
   );
@@ -191,6 +192,11 @@ export const useAppInitialization = ({
 
         if (settings?.uiVisibility)
           setUI((state) => ({ uiVisibility: { ...state.uiVisibility, ...settings.uiVisibility } }));
+
+        const openSections = settings?.adjustmentLayout?.openSections;
+        if (openSections) {
+          setUI((state) => ({ collapsibleSectionsState: { ...state.collapsibleSectionsState, ...openSections } }));
+        }
 
         if (settings?.isWaveformVisible !== undefined) setEditor({ isWaveformVisible: settings.isWaveformVisible });
         if (settings?.activeWaveformChannel) setEditor({ activeWaveformChannel: settings.activeWaveformChannel });
@@ -300,6 +306,17 @@ export const useAppInitialization = ({
       handleSettingsChange({ ...appSettings, uiVisibility });
     }
   }, [uiVisibility, appSettings, handleSettingsChange]);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) return;
+    const savedOpenSections = appSettings.adjustmentLayout?.openSections ?? {};
+    const isSaved = Object.entries(collapsibleSectionsState).every(
+      ([section, isOpen]) => savedOpenSections[section as keyof typeof savedOpenSections] === isOpen,
+    );
+    if (!isSaved) {
+      handleSettingsChange(withAdjustmentLayout(appSettings, { openSections: collapsibleSectionsState }));
+    }
+  }, [collapsibleSectionsState, appSettings, handleSettingsChange]);
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings) return;

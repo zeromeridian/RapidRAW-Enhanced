@@ -5,6 +5,23 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.46.0-dev-reorder-favourites — 2026-11-12
+
+### Develop
+
+- **Favorites**: a new Favorites tab (star icon) in the Develop tool strip
+  collects the sections, tools and sliders you use most. Hover a section
+  title, a tool's heading or a slider's label and click the star that
+  appears, or right-click it and choose Add to Favorites. Drag the
+  favorites into any order; they change the same values as in
+  Adjustments, with the same undo history and Speed Edit.
+- **Customize Panels**: reorder the adjustment sections (Basic, Curves,
+  Color, Details, Effects) and the tools inside each one by dragging, from
+  the new button in the Adjustments header or from a section's right-click
+  menu. Reset to Default restores the original order. The order applies to
+  masks too.
+- The adjustment sections you leave open now stay open after a restart.
+
 ## 1.45.0-dev-small-items — 2026-11-11
 
 ### Develop

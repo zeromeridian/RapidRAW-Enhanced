@@ -15,6 +15,7 @@ import {
   createRelightLight,
   luminanceMaskRangeAround,
 } from '../../../utils/adjustments';
+import { favoriteKey } from '../../../utils/adjustmentControls';
 import { sampleDepthMap } from '../../ui/depthScope/DepthScope';
 import { Mask, SubMask, SubMaskMode, ToolType } from '../right/Masks';
 import { AppSettings, BrushSettings, Invokes, Panel, SelectedImage } from '../../ui/AppProperties';
@@ -27,6 +28,7 @@ import type { OverlayMode } from '../right/CropPanel';
 import CompositionOverlays from './overlays/CompositionOverlays';
 import RelightLightShape, { RelightBasis } from './overlays/RelightLightShape';
 import { useEditorStore } from '../../../store/useEditorStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { orientNormalizedPoint, rotatePoint, unorientNormalizedPoint } from '../../../utils/cropUtils';
 import { lightsOutTarget } from '../../../utils/lightsOut';
@@ -47,6 +49,7 @@ interface DrawnLine {
   tool: ToolType;
 }
 
+const RELIGHT_FAVORITES = [favoriteKey('tool', 'relight'), favoriteKey('section', 'effects')];
 const STROKE_SMOOTHING_SPACING = 4;
 const STROKE_SMOOTHING_MAX_STEPS = 16;
 
@@ -1581,8 +1584,14 @@ const ImageCanvas = memo(
     const isMaskShapeDragging = useEditorStore((state) => state.isMaskShapeDragging);
     const activeRelightLightId = useEditorStore((state) => state.activeRelightLightId);
     const setEditor = useEditorStore((state) => state.setEditor);
+    // Relight's lights are placed from its panel, which Favorites can also show.
+    const hasRelightFavorite = useSettingsStore((state) =>
+      RELIGHT_FAVORITES.some((key) => state.appSettings?.adjustmentLayout?.favorites?.includes(key)),
+    );
     const isRelightToolOpen = useUIStore(
-      (state) => state.activeRightPanel === Panel.Adjustments && state.collapsibleSectionsState.effects,
+      (state) =>
+        (state.activeRightPanel === Panel.Adjustments && state.collapsibleSectionsState.effects) ||
+        (state.activeRightPanel === Panel.Favorites && hasRelightFavorite),
     );
     const activeRotation = liveRotation ?? adjustments.rotation ?? 0;
 

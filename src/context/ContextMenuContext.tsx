@@ -39,10 +39,21 @@ function SubMenu({ cancelCloseSubmenu, closeSubmenu, hideContextMenu, options, p
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [style, setStyle] = useState<any>({ opacity: 0 });
   const [safeAreaPath, setSafeAreaPath] = useState<string | null>(null);
+  const [menuHeight, setMenuHeight] = useState(0);
 
   const customOption = options.length === 1 && options[0].customComponent ? options[0] : null;
   const CustomComponent = customOption?.customComponent;
   const isInteractiveSubmenu = Boolean(customOption);
+
+  // An interactive submenu can grow (an expanded list), so it is placed again when its height changes.
+  useEffect(() => {
+    if (!menuRef.current) {
+      return;
+    }
+    const resizeObserver = new ResizeObserver(([entry]) => setMenuHeight(entry.contentRect.height));
+    resizeObserver.observe(menuRef.current);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   useLayoutEffect(() => {
     if (parentRef?.current && menuRef?.current) {
@@ -97,7 +108,7 @@ function SubMenu({ cancelCloseSubmenu, closeSubmenu, hideContextMenu, options, p
       }
       setSafeAreaPath(path);
     }
-  }, [parentRef, options]);
+  }, [parentRef, options, menuHeight]);
 
   const menuMarkup = (
     <>

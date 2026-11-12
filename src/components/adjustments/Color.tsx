@@ -20,6 +20,8 @@ import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { canvasToolState, useEditorStore } from '../../store/useEditorStore';
 import { HSL_MIXER_BANDS, HslMixerBand, HslMixerProperty } from '../../utils/hslMixer';
 import PointColorPanel from './PointColor';
+import AdjustmentSlider from './AdjustmentSlider';
+import AdjustmentTool from './AdjustmentTool';
 
 interface ColorProps {
   color: string;
@@ -287,10 +289,7 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
   const trackSuffix = `${activePrimary}s`;
 
   return (
-    <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md mt-4 compact:mt-2">
-      <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
-        {t('adjustments.color.calibration.title')}
-      </Text>
+    <AdjustmentTool id="colorCalibration">
       <div>
         <Text color={TextColors.primary} weight={TextWeights.medium} className="mb-1">
           {t('adjustments.color.calibration.shadows')}
@@ -346,7 +345,7 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
           trackClassName={`sat-slider-${trackSuffix}`}
         />
       </div>
-    </div>
+    </AdjustmentTool>
   );
 };
 
@@ -429,10 +428,6 @@ export default function ColorPanel({
     if (isMixerPickerActive) setEditor({ targetedAdjustment: { tool: 'colorMixer', property } });
   };
 
-  const handleAdjustmentChange = (key: ColorAdjustment, value: string) => {
-    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: parseFloat(value) }));
-  };
-
   const handleMonochromeChange = (monochrome: boolean) => {
     setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, monochrome }));
   };
@@ -465,21 +460,24 @@ export default function ColorPanel({
     />
   );
 
+  const sliderProps = { adjustments, setAdjustments, isForMask, onDragStateChange };
+
   return (
-    <div className="space-y-4 compact:space-y-2">
-      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
+    <div className="flex flex-col gap-4 compact:gap-2">
+      <AdjustmentTool id="blackAndWhite" isUntitled>
         <Switch
           checked={!!adjustments.monochrome}
           label={t('adjustments.color.blackAndWhite')}
           onChange={handleMonochromeChange}
           tooltip={t('adjustments.color.monochromeDesc')}
         />
-      </div>
+      </AdjustmentTool>
 
-      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
-        <div className="flex justify-between items-center mb-2">
-          <Text variant={TextVariants.heading}>{t('adjustments.color.whiteBalance')}</Text>
-          {!isForMask && toggleWbPicker && (
+      <AdjustmentTool
+        id="whiteBalance"
+        actions={
+          !isForMask &&
+          toggleWbPicker && (
             <button
               onClick={toggleWbPicker}
               disabled={isWgpuEnabled}
@@ -494,91 +492,35 @@ export default function ColorPanel({
             >
               <Pipette size={16} />
             </button>
-          )}
-        </div>
-        <Slider
-          label={t('adjustments.color.temperature')}
-          max={100}
-          min={-100}
-          onChange={(e: any) => handleAdjustmentChange(ColorAdjustment.Temperature, e.target.value)}
-          speedEditId={ColorAdjustment.Temperature}
-          step={1}
-          value={adjustments.temperature || 0}
-          trackClassName="temperature-gradient-track"
-          onDragStateChange={onDragStateChange}
-        />
-        <Slider
-          label={t('adjustments.color.tint')}
-          max={100}
-          min={-100}
-          onChange={(e: any) => handleAdjustmentChange(ColorAdjustment.Tint, e.target.value)}
-          speedEditId={ColorAdjustment.Tint}
-          step={1}
-          value={adjustments.tint || 0}
-          trackClassName="tint-gradient-track"
-          onDragStateChange={onDragStateChange}
-        />
-      </div>
+          )
+        }
+      >
+        <AdjustmentSlider control={ColorAdjustment.Temperature} {...sliderProps} />
+        <AdjustmentSlider control={ColorAdjustment.Tint} {...sliderProps} />
+      </AdjustmentTool>
 
-      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
-          {t('adjustments.color.presence')}
-        </Text>
-        <Slider
-          label={t('adjustments.color.vibrance')}
-          max={100}
-          min={-100}
-          onChange={(e: any) => handleAdjustmentChange(ColorAdjustment.Vibrance, e.target.value)}
-          speedEditId={ColorAdjustment.Vibrance}
-          step={1}
-          value={adjustments.vibrance || 0}
-          onDragStateChange={onDragStateChange}
-        />
-        <Slider
-          label={t('adjustments.color.saturation')}
-          max={100}
-          min={-100}
-          onChange={(e: any) => handleAdjustmentChange(ColorAdjustment.Saturation, e.target.value)}
-          speedEditId={ColorAdjustment.Saturation}
-          step={1}
-          value={adjustments.saturation || 0}
-          onDragStateChange={onDragStateChange}
-        />
-      </div>
+      <AdjustmentTool id="colorPresence">
+        <AdjustmentSlider control={ColorAdjustment.Vibrance} {...sliderProps} />
+        <AdjustmentSlider control={ColorAdjustment.Saturation} {...sliderProps} />
+      </AdjustmentTool>
 
-      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
-          {isForMask ? t('adjustments.color.localHue') : t('adjustments.color.hue')}
-        </Text>
-        <Slider
-          label={t('adjustments.color.hue')}
-          max={180}
-          min={-180}
-          onChange={(e: any) => handleAdjustmentChange(ColorAdjustment.Hue, e.target.value)}
-          step={1}
-          value={adjustments.hue || 0}
-          trackClassName="hue-range-track"
-          onDragStateChange={onDragStateChange}
-        />
-      </div>
+      <AdjustmentTool id="hue" title={isForMask ? t('adjustments.color.localHue') : undefined}>
+        <AdjustmentSlider control={ColorAdjustment.Hue} {...sliderProps} />
+      </AdjustmentTool>
 
-      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.heading} className="mb-3 compact:mb-1 compact:text-sm">
-          {t('adjustments.color.colorGrading')}
-        </Text>
+      <AdjustmentTool id="colorGrading" titleClassName="mb-3 compact:mb-1">
         <ColorGradingPanel
           adjustments={adjustments}
           setAdjustments={setAdjustments}
           appSettings={appSettings}
           onDragStateChange={onDragStateChange}
         />
-      </div>
+      </AdjustmentTool>
 
-      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
-        <div className="flex justify-between items-center mb-3 compact:mb-1">
-          <Text variant={TextVariants.heading} className="compact:text-sm">
-            {t('adjustments.color.colorMixer')}
-          </Text>
+      <AdjustmentTool
+        id="colorMixer"
+        titleClassName="mb-3 compact:mb-1"
+        actions={
           <div className="flex items-center gap-1">
             {isPointColorMode ? (
               <button
@@ -612,7 +554,8 @@ export default function ColorPanel({
               </>
             )}
           </div>
-        </div>
+        }
+      >
         {!isForMask && (
           <div className="grid grid-cols-2 gap-1 mb-3 compact:mb-2">
             {(['mixer', 'pointColor'] as const).map((mode) => (
@@ -671,7 +614,7 @@ export default function ColorPanel({
             </>
           )}
         </div>
-      </div>
+      </AdjustmentTool>
 
       {adjustmentVisibility.colorCalibration !== false && (
         <ColorCalibrationPanel

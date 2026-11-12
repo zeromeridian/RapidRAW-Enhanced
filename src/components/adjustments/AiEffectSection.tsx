@@ -1,4 +1,4 @@
-import { HTMLAttributes, ReactNode } from 'react';
+import { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
 import Button from '../ui/Button';
@@ -6,8 +6,11 @@ import Switch from '../ui/Switch';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
 import { useProcessStore } from '../../store/useProcessStore';
+import AdjustmentTool from './AdjustmentTool';
 
-interface AiEffectSectionProps extends HTMLAttributes<HTMLDivElement> {
+interface AiEffectSectionProps {
+  /** Its `ADJUSTMENT_SECTION_TOOLS` id. */
+  toolId: string;
   title: string;
   enabled: boolean;
   onEnabledChange(enabled: boolean): void;
@@ -91,6 +94,7 @@ export function EffectMapStatus({
 
 /** A toggled adjustment section whose result depends on an AI model run. */
 export default function AiEffectSection({
+  toolId,
   title,
   enabled,
   onEnabledChange,
@@ -102,14 +106,9 @@ export default function AiEffectSection({
   generateMapLabel,
   onGenerateMap,
   children,
-  ...props
 }: AiEffectSectionProps) {
   return (
-    <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md" {...props}>
-      <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
-        {title}
-      </Text>
-
+    <AdjustmentTool id={toolId}>
       <Switch label={title} checked={enabled} onChange={onEnabledChange} />
 
       <div
@@ -134,6 +133,6 @@ export default function AiEffectSection({
           </div>
         </div>
       </div>
-    </div>
+    </AdjustmentTool>
   );
 }

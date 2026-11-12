@@ -394,8 +394,10 @@
     "adjustments": {
       "actions": {
         "copySectionSettings": "{{section}} 설정 복사",
+        "customizePanels": "패널 사용자 지정",
         "pasteLabel": "{{section}} 설정 붙여넣기",
         "pasteSettings": "설정 붙여넣기",
+        "resetPanelLayout": "기본값으로 초기화",
         "resetSectionSettings": "{{section}} 설정 초기화"
       },
       "sections": {
@@ -408,6 +410,7 @@
       "title": "조정",
       "tooltips": {
         "autoAdjust": "이미지 자동 조정",
+        "reorderTools": "도구 순서 변경",
         "resetAdjustments": "조정값 초기화",
         "toggleAnalytics": "분석 표시 전환"
       }
@@ -637,6 +640,16 @@
       "exporting": "내보내는 중…",
       "savesTo": "외부 편집 — 저장 위치:"
     },
+    "favorites": {
+      "add": "즐겨찾기에 추가",
+      "addItem": "'{{name}}'을(를) 즐겨찾기에 추가",
+      "dragToReorder": "드래그하여 순서 변경",
+      "empty": "조정에서 섹션, 도구 또는 슬라이더에 별표를 표시하면 여기에 모입니다.",
+      "qualifiedLabel": "{{tool}}: {{control}}",
+      "remove": "즐겨찾기에서 제거",
+      "removeItem": "'{{name}}'을(를) 즐겨찾기에서 제거",
+      "title": "즐겨찾기"
+    },
     "masks": {
       "actions": {
         "addNewComponent": "새 구성 요소 추가",
@@ -835,6 +848,7 @@
         "crop": "자르기",
         "develop": "현상",
         "export": "내보내기",
+        "favorites": "즐겨찾기",
         "info": "정보",
         "inpaint": "인페인팅",
         "masks": "마스크",

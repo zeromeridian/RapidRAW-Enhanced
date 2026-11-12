@@ -430,8 +430,10 @@
     "adjustments": {
       "actions": {
         "copySectionSettings": "Kopiuj ustawienia sekcji {{section}}",
+        "customizePanels": "Dostosuj panele",
         "pasteLabel": "Wklej ustawienia sekcji {{section}}",
         "pasteSettings": "Wklej ustawienia",
+        "resetPanelLayout": "Przywróć domyślne",
         "resetSectionSettings": "Resetuj ustawienia sekcji {{section}}"
       },
       "sections": {
@@ -444,6 +446,7 @@
       "title": "Ustawienia",
       "tooltips": {
         "autoAdjust": "Auto-korekta obrazu",
+        "reorderTools": "Zmień kolejność narzędzi",
         "resetAdjustments": "Resetuj ustawienia",
         "toggleAnalytics": "Przełącz widok analityki"
       }
@@ -685,6 +688,16 @@
       "exporting": "Eksportowanie…",
       "savesTo": "Zewnętrzna edycja — zapisuje do"
     },
+    "favorites": {
+      "add": "Dodaj do ulubionych",
+      "addItem": "Dodaj „{{name}}” do ulubionych",
+      "dragToReorder": "Przeciągnij, aby zmienić kolejność",
+      "empty": "Oznacz gwiazdką sekcję, narzędzie lub suwak w Ustawieniach, aby zebrać je tutaj.",
+      "qualifiedLabel": "{{tool}}: {{control}}",
+      "remove": "Usuń z ulubionych",
+      "removeItem": "Usuń „{{name}}” z ulubionych",
+      "title": "Ulubione"
+    },
     "masks": {
       "actions": {
         "addNewComponent": "Dodaj nowy komponent",
@@ -885,6 +898,7 @@
         "crop": "Kadruj",
         "develop": "Wywoływanie",
         "export": "Eksportuj",
+        "favorites": "Ulubione",
         "info": "Informacje",
         "inpaint": "Inpaint",
         "masks": "Maski",

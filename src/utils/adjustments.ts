@@ -1,6 +1,7 @@
 import { Crop } from 'react-image-crop';
 import { v4 as uuidv4 } from 'uuid';
 import { SubMask, SubMaskMode } from '../components/panel/right/Masks';
+import type { AdjustmentLayout, AppSettings } from '../components/ui/AppProperties';
 
 export enum ActiveChannel {
   Blue = 'blue',
@@ -1515,3 +1516,68 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     Effect.FogTint,
   ],
 };
+
+const reconcileOrder = (defaultOrder: string[], order: string[] = []): string[] => {
+  const savedOrder = order.filter((id, index) => defaultOrder.includes(id) && order.indexOf(id) === index);
+  return [...savedOrder, ...defaultOrder.filter((id) => !savedOrder.includes(id))];
+};
+
+/** The sections in the order Customize Panels set; unknown ids are dropped and new sections appended. */
+export const getAdjustmentSectionOrder = (order?: string[]): string[] =>
+  reconcileOrder(Object.keys(ADJUSTMENT_SECTIONS), order);
+
+export const withAdjustmentLayout = (settings: AppSettings, changes: Partial<AdjustmentLayout>): AppSettings => ({
+  ...settings,
+  adjustmentLayout: { ...settings.adjustmentLayout, ...changes },
+});
+
+export interface AdjustmentSectionTool {
+  id: string;
+  label: string;
+}
+
+/** The blocks inside each section, in their default order; Basic and Curves are single blocks. */
+export const ADJUSTMENT_SECTION_TOOLS: Record<string, Array<AdjustmentSectionTool>> = {
+  color: [
+    { id: 'blackAndWhite', label: 'adjustments.color.blackAndWhite' },
+    { id: 'whiteBalance', label: 'adjustments.color.whiteBalance' },
+    { id: 'colorPresence', label: 'adjustments.color.presence' },
+    { id: 'hue', label: 'adjustments.color.hue' },
+    { id: 'colorGrading', label: 'adjustments.color.colorGrading' },
+    { id: 'colorMixer', label: 'adjustments.color.colorMixer' },
+    { id: 'colorCalibration', label: 'adjustments.color.calibration.title' },
+  ],
+  details: [
+    { id: 'sharpening', label: 'adjustments.details.sharpening' },
+    { id: 'presence', label: 'adjustments.details.presence' },
+    { id: 'noiseReduction', label: 'adjustments.details.noiseReduction' },
+    { id: 'aiDenoise', label: 'adjustments.details.aiDenoise' },
+    { id: 'chromaticAberration', label: 'adjustments.details.chromaticAberration' },
+  ],
+  effects: [
+    { id: 'glow', label: 'adjustments.effects.glow' },
+    { id: 'halation', label: 'adjustments.effects.halation' },
+    { id: 'lightFlares', label: 'adjustments.effects.lightFlares' },
+    { id: 'lensBlur', label: 'adjustments.effects.lensBlur' },
+    { id: 'relight', label: 'adjustments.effects.relight' },
+    { id: 'fog', label: 'adjustments.effects.fog' },
+    { id: 'lut', label: 'adjustments.effects.lut' },
+    { id: 'gaussianBlur', label: 'adjustments.effects.gaussianBlur' },
+    { id: 'motionBlur', label: 'adjustments.effects.motionBlur' },
+    { id: 'vignette', label: 'adjustments.effects.vignette' },
+    { id: 'grain', label: 'adjustments.effects.grain' },
+  ],
+};
+
+export const ADJUSTMENT_TOOLS_BY_ID: Record<string, AdjustmentSectionTool & { section: string }> = Object.fromEntries(
+  Object.entries(ADJUSTMENT_SECTION_TOOLS).flatMap(([section, tools]) =>
+    tools.map((tool) => [tool.id, { ...tool, section }]),
+  ),
+);
+
+/** A section's blocks in the order Customize Panels set; unknown ids are dropped and new blocks appended. */
+export const getAdjustmentToolOrder = (section: string, toolOrder?: Record<string, string[]>): string[] =>
+  reconcileOrder(
+    (ADJUSTMENT_SECTION_TOOLS[section] ?? []).map((tool) => tool.id),
+    toolOrder?.[section],
+  );

@@ -28,6 +28,8 @@ import {
   getRelightLightColor,
 } from '../../utils/adjustments';
 import Dropdown from '../ui/Dropdown';
+import AdjustmentSlider from './AdjustmentSlider';
+import AdjustmentTool from './AdjustmentTool';
 import LUTControl from '../ui/LUTControl';
 import ColorField, { normalizeHexColor, useParsedTextField } from '../ui/ColorField';
 import { ColorSwatch } from '../ui/ColorSwatch';
@@ -391,93 +393,44 @@ export default function EffectsPanel({
   };
 
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
+  const sliderProps = { adjustments, setAdjustments, isForMask, onDragStateChange };
 
   return (
-    <div className="space-y-4 compact:space-y-2">
-      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
-          {t('adjustments.effects.glow')}
-        </Text>
-        <Slider
-          label={t('adjustments.effects.amount')}
-          max={100}
-          min={0}
-          onChange={(e: any) => handleAdjustmentChange(CreativeAdjustment.GlowAmount, e.target.value)}
-          step={1}
-          value={adjustments.glowAmount}
-          onDragStateChange={onDragStateChange}
-        />
-        <Slider
+    <div className="flex flex-col gap-4 compact:gap-2">
+      <AdjustmentTool id="glow">
+        <AdjustmentSlider control={CreativeAdjustment.GlowAmount} {...sliderProps} />
+        <AdjustmentSlider
+          control={CreativeAdjustment.GlowHue}
+          {...sliderProps}
           {...colourResetProps(CreativeAdjustment.GlowHue, photoGlowHue, DEFAULT_GLOW_HUE)}
-          label={t('adjustments.color.hue')}
-          max={360}
-          min={0}
-          onChange={(e: SliderChangeEvent) => handleAdjustmentChange(CreativeAdjustment.GlowHue, e.target.value)}
-          speedEditId={CreativeAdjustment.GlowHue}
-          step={1}
           value={adjustments.glowHue ?? photoGlowHue}
-          trackClassName="hue-range-track"
-          onDragStateChange={onDragStateChange}
         />
-        <Slider
+        <AdjustmentSlider
+          control={CreativeAdjustment.GlowSaturation}
+          {...sliderProps}
           {...colourResetProps(CreativeAdjustment.GlowSaturation, photoGlowSaturation, 0)}
-          label={t('adjustments.color.saturation')}
-          max={100}
-          min={0}
-          onChange={(e: SliderChangeEvent) => handleAdjustmentChange(CreativeAdjustment.GlowSaturation, e.target.value)}
-          speedEditId={CreativeAdjustment.GlowSaturation}
-          step={1}
           value={adjustments.glowSaturation ?? photoGlowSaturation}
-          onDragStateChange={onDragStateChange}
-          fillOrigin="min"
         />
-      </div>
+      </AdjustmentTool>
 
-      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
-          {t('adjustments.effects.halation')}
-        </Text>
-        <Slider
-          label={t('adjustments.effects.amount')}
-          max={100}
-          min={0}
-          onChange={(e: any) => handleAdjustmentChange(CreativeAdjustment.HalationAmount, e.target.value)}
-          step={1}
-          value={adjustments.halationAmount}
-          onDragStateChange={onDragStateChange}
-        />
-        <Slider
+      <AdjustmentTool id="halation">
+        <AdjustmentSlider control={CreativeAdjustment.HalationAmount} {...sliderProps} />
+        <AdjustmentSlider
+          control={CreativeAdjustment.HalationHue}
+          {...sliderProps}
           {...colourResetProps(CreativeAdjustment.HalationHue, photoHalationHue, DEFAULT_HALATION_HUE)}
-          label={t('adjustments.color.hue')}
-          max={360}
-          min={0}
-          onChange={(e: SliderChangeEvent) => handleAdjustmentChange(CreativeAdjustment.HalationHue, e.target.value)}
-          speedEditId={CreativeAdjustment.HalationHue}
-          step={1}
           value={adjustments.halationHue ?? photoHalationHue}
-          trackClassName="hue-range-track"
-          onDragStateChange={onDragStateChange}
         />
-      </div>
+      </AdjustmentTool>
 
-      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
-          {t('adjustments.effects.lightFlares')}
-        </Text>
-        <Slider
-          label={t('adjustments.effects.amount')}
-          max={100}
-          min={0}
-          onChange={(e: any) => handleAdjustmentChange(CreativeAdjustment.FlareAmount, e.target.value)}
-          step={1}
-          value={adjustments.flareAmount}
-          onDragStateChange={onDragStateChange}
-        />
-      </div>
+      <AdjustmentTool id="lightFlares">
+        <AdjustmentSlider control={CreativeAdjustment.FlareAmount} {...sliderProps} />
+      </AdjustmentTool>
 
       {!isForMask && (
-        <div className="space-y-4 compact:space-y-2">
+        <>
           <AiEffectSection
+            toolId="lensBlur"
             title={t('adjustments.effects.lensBlur')}
             enabled={!!adjustments.lensBlurEnabled}
             onEnabledChange={handleSpatialEffectToggle('lensBlurDepthMap')}
@@ -548,6 +501,7 @@ export default function EffectsPanel({
           </AiEffectSection>
 
           <AiEffectSection
+            toolId="relight"
             title={t('adjustments.effects.relight')}
             enabled={!!adjustments.relightEnabled}
             onEnabledChange={handleRelightToggle}
@@ -824,6 +778,7 @@ export default function EffectsPanel({
           </AiEffectSection>
 
           <AiEffectSection
+            toolId="fog"
             title={t('adjustments.effects.fog')}
             enabled={!!adjustments.fogEnabled}
             onEnabledChange={handleSpatialEffectToggle('fogDepthMap')}
@@ -951,10 +906,7 @@ export default function EffectsPanel({
             />
           </AiEffectSection>
 
-          <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
-            <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
-              {t('adjustments.effects.lut')}
-            </Text>
+          <AdjustmentTool id="lut">
             <LUTControl
               lutPath={adjustments.lutPath || null}
               lutName={adjustments.lutName || null}
@@ -965,15 +917,12 @@ export default function EffectsPanel({
               onClear={handleLutClear}
               onDragStateChange={onDragStateChange}
             />
-          </div>
-        </div>
+          </AdjustmentTool>
+        </>
       )}
 
       {isForMask && (
-        <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
-            {t('adjustments.effects.gaussianBlur')}
-          </Text>
+        <AdjustmentTool id="gaussianBlur">
           <Slider
             label={t('adjustments.effects.amount')}
             max={100}
@@ -985,24 +934,11 @@ export default function EffectsPanel({
             onDragStateChange={onDragStateChange}
             fillOrigin="min"
           />
-        </div>
+        </AdjustmentTool>
       )}
 
-      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
-          {t('adjustments.effects.motionBlur')}
-        </Text>
-        <Slider
-          label={t('adjustments.effects.amount')}
-          max={100}
-          min={0}
-          defaultValue={0}
-          onChange={(e: SliderChangeEvent) => handleAdjustmentChange(Effect.MotionBlurAmount, e.target.value)}
-          step={1}
-          value={adjustments.motionBlurAmount ?? 0}
-          onDragStateChange={onDragStateChange}
-          fillOrigin="min"
-        />
+      <AdjustmentTool id="motionBlur">
+        <AdjustmentSlider control={Effect.MotionBlurAmount} {...sliderProps} />
         {motionBlurType === 'linear' && (
           <div className="flex items-center gap-3">
             <div className="flex-1 min-w-0">
@@ -1119,95 +1055,24 @@ export default function EffectsPanel({
             )}
           </>
         )}
-      </div>
+      </AdjustmentTool>
 
       {/* Masks offer no vignette; an older mask that has one keeps the controls to change or remove it. */}
       {adjustmentVisibility.vignette !== false && (!isForMask || !!adjustments.vignetteAmount) && (
-        <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
-            {t('adjustments.effects.vignette')}
-          </Text>
-          <Slider
-            label={t('adjustments.effects.amount')}
-            max={100}
-            min={-100}
-            onChange={(e: any) => handleAdjustmentChange(Effect.VignetteAmount, e.target.value)}
-            speedEditId={Effect.VignetteAmount}
-            step={1}
-            value={adjustments.vignetteAmount}
-            onDragStateChange={onDragStateChange}
-          />
-          <Slider
-            defaultValue={50}
-            label={t('adjustments.effects.midpoint')}
-            max={100}
-            min={0}
-            onChange={(e: any) => handleAdjustmentChange(Effect.VignetteMidpoint, e.target.value)}
-            step={1}
-            value={adjustments.vignetteMidpoint}
-            onDragStateChange={onDragStateChange}
-            fillOrigin="min"
-          />
-          <Slider
-            label={t('adjustments.effects.roundness')}
-            max={100}
-            min={-100}
-            onChange={(e: any) => handleAdjustmentChange(Effect.VignetteRoundness, e.target.value)}
-            step={1}
-            value={adjustments.vignetteRoundness}
-            onDragStateChange={onDragStateChange}
-          />
-          <Slider
-            defaultValue={50}
-            label={t('adjustments.effects.feather')}
-            max={100}
-            min={0}
-            onChange={(e: any) => handleAdjustmentChange(Effect.VignetteFeather, e.target.value)}
-            step={1}
-            value={adjustments.vignetteFeather}
-            onDragStateChange={onDragStateChange}
-            fillOrigin="min"
-          />
-        </div>
+        <AdjustmentTool id="vignette">
+          <AdjustmentSlider control={Effect.VignetteAmount} {...sliderProps} />
+          <AdjustmentSlider control={Effect.VignetteMidpoint} {...sliderProps} />
+          <AdjustmentSlider control={Effect.VignetteRoundness} {...sliderProps} />
+          <AdjustmentSlider control={Effect.VignetteFeather} {...sliderProps} />
+        </AdjustmentTool>
       )}
 
       {adjustmentVisibility.grain !== false && (
-        <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
-            {t('adjustments.effects.grain')}
-          </Text>
-          <Slider
-            label={t('adjustments.effects.amount')}
-            max={100}
-            min={0}
-            onChange={(e: any) => handleAdjustmentChange(Effect.GrainAmount, e.target.value)}
-            step={1}
-            value={adjustments.grainAmount}
-            onDragStateChange={onDragStateChange}
-          />
-          <Slider
-            defaultValue={25}
-            label={t('adjustments.effects.size')}
-            max={100}
-            min={0}
-            onChange={(e: any) => handleAdjustmentChange(Effect.GrainSize, e.target.value)}
-            step={1}
-            value={adjustments.grainSize}
-            onDragStateChange={onDragStateChange}
-            fillOrigin="min"
-          />
-          <Slider
-            defaultValue={50}
-            label={t('adjustments.effects.roughness')}
-            max={100}
-            min={0}
-            onChange={(e: any) => handleAdjustmentChange(Effect.GrainRoughness, e.target.value)}
-            step={1}
-            value={adjustments.grainRoughness}
-            onDragStateChange={onDragStateChange}
-            fillOrigin="min"
-          />
-        </div>
+        <AdjustmentTool id="grain">
+          <AdjustmentSlider control={Effect.GrainAmount} {...sliderProps} />
+          <AdjustmentSlider control={Effect.GrainSize} {...sliderProps} />
+          <AdjustmentSlider control={Effect.GrainRoughness} {...sliderProps} />
+        </AdjustmentTool>
       )}
     </div>
   );

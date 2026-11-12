@@ -44,11 +44,8 @@ import Slider from '../../ui/Slider';
 import Dropdown from '../../ui/Dropdown';
 import Input from '../../ui/Input';
 import Button from '../../ui/Button';
-import BasicAdjustments from '../../adjustments/Basic';
-import CurveGraph from '../../adjustments/Curves';
-import ColorPanel from '../../adjustments/Color';
-import DetailsPanel from '../../adjustments/Details';
-import EffectsPanel from '../../adjustments/Effects';
+import { ADJUSTMENT_SECTION_COMPONENTS } from '../../adjustments/sectionComponents';
+import { customizePanelsMenuOption } from './AdjustmentSectionsSubMenu';
 import Waveform from '../editor/Waveform';
 import Resizer from '../../ui/Resizer';
 import { type DepthRange, DepthRangePicker, RangePicker, type RangeValues } from '../../ui/RangePicker';
@@ -74,6 +71,7 @@ import {
   MaskContainer,
   MaskBlendMode,
   ADJUSTMENT_SECTIONS,
+  getAdjustmentSectionOrder,
   AI_DEPTH_MASK_RANGE_DEFAULTS,
   LUMINANCE_MASK_RANGE_DEFAULTS,
 } from '../../../utils/adjustments';
@@ -1785,6 +1783,8 @@ function SettingsPanel({
         label: t('editor.masks.settings.resetSectionSettings', { section: sectionTitle }),
         onClick: handleReset,
       },
+      { type: OPTION_SEPARATOR },
+      customizePanelsMenuOption(t('editor.adjustments.actions.customizePanels')),
     ]);
   };
 
@@ -2019,14 +2019,8 @@ function SettingsPanel({
         onMouseLeave={() => setIsMaskControlHovered(false)}
         className="flex flex-col gap-2"
       >
-        {Object.keys(ADJUSTMENT_SECTIONS).map((sectionName) => {
-          const SectionComponent: any = {
-            basic: BasicAdjustments,
-            curves: CurveGraph,
-            color: ColorPanel,
-            details: DetailsPanel,
-            effects: EffectsPanel,
-          }[sectionName];
+        {getAdjustmentSectionOrder(appSettings?.adjustmentLayout?.sectionOrder).map((sectionName) => {
+          const SectionComponent = ADJUSTMENT_SECTION_COMPONENTS[sectionName];
           const title = sectionName.charAt(0).toUpperCase() + sectionName.slice(1);
           return (
             <CollapsibleSection

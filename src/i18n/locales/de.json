@@ -394,8 +394,10 @@
     "adjustments": {
       "actions": {
         "copySectionSettings": "{{section}}-Einstellungen kopieren",
+        "customizePanels": "Panels anpassen",
         "pasteLabel": "{{section}}-Einstellungen einfügen",
         "pasteSettings": "Einstellungen einfügen",
+        "resetPanelLayout": "Auf Standard zurücksetzen",
         "resetSectionSettings": "{{section}}-Einstellungen zurücksetzen"
       },
       "sections": {
@@ -408,6 +410,7 @@
       "title": "Anpassungen",
       "tooltips": {
         "autoAdjust": "Bild autom. anpassen",
+        "reorderTools": "Werkzeuge neu anordnen",
         "resetAdjustments": "Anpassungen zurücksetzen",
         "toggleAnalytics": "Analyseanzeige umschalten"
       }
@@ -639,6 +642,16 @@
       "exporting": "Exportieren…",
       "savesTo": "Externe Bearbeitung — speichert in"
     },
+    "favorites": {
+      "add": "Zu Favoriten hinzufügen",
+      "addItem": "„{{name}}“ zu Favoriten hinzufügen",
+      "dragToReorder": "Zum Neuordnen ziehen",
+      "empty": "Markiere einen Bereich, ein Werkzeug oder einen Regler in Anpassungen mit einem Stern, um ihn hier zu sammeln.",
+      "qualifiedLabel": "{{tool}}: {{control}}",
+      "remove": "Aus Favoriten entfernen",
+      "removeItem": "„{{name}}“ aus Favoriten entfernen",
+      "title": "Favoriten"
+    },
     "masks": {
       "actions": {
         "addNewComponent": "Neue Komponente hinzufügen",
@@ -837,6 +850,7 @@
         "crop": "Zuschnitt",
         "develop": "Entwickeln",
         "export": "Exportieren",
+        "favorites": "Favoriten",
         "info": "Info",
         "inpaint": "Reparieren",
         "masks": "Masken",

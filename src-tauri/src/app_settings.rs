@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -225,6 +225,18 @@ pub fn default_included_adjustments() -> HashSet<String> {
     }
 
     defaults
+}
+
+/// How the Develop adjustment panels are arranged; the frontend reconciles the ids
+/// against its known sections and tools, so unknown ids are ignored.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct AdjustmentLayout {
+    pub section_order: Vec<String>,
+    pub tool_order: HashMap<String, Vec<String>>,
+    pub open_sections: BTreeMap<String, bool>,
+    /// Starred sections, tools and controls in the order of the Favorites panel.
+    pub favorites: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -574,6 +586,8 @@ pub struct AppSettings {
     pub ai_gpu_acceleration: bool,
     #[serde(default = "default_adjustment_visibility")]
     pub adjustment_visibility: HashMap<String, bool>,
+    #[serde(default)]
+    pub adjustment_layout: AdjustmentLayout,
     #[serde(default = "default_open_tree_sections")]
     pub open_tree_sections: Vec<String>,
     #[serde(default)]
@@ -766,6 +780,7 @@ impl Default for AppSettings {
             ai_provider: Some("cpu".to_string()),
             ai_gpu_acceleration: true,
             adjustment_visibility: default_adjustment_visibility(),
+            adjustment_layout: AdjustmentLayout::default(),
             open_tree_sections: default_open_tree_sections(),
             copy_paste_settings: CopyPasteSettings::default(),
             raw_highlight_compression: Some(2.5),
@@ -1085,5 +1100,27 @@ mod tests {
 
         let restored = serde_json::to_value(&settings).expect("settings should serialize");
         assert_eq!(restored["speedEditAdjustments"], adjustments);
+    }
+
+    #[test]
+    fn adjustment_layout_round_trips_and_fills_missing_fields() {
+        let layout = json!({
+            "sectionOrder": ["color", "basic"],
+            "toolOrder": { "details": ["presence", "sharpening"] },
+            "openSections": { "basic": true, "color": false },
+            "favorites": ["control:clarity", "tool:colorGrading"]
+        });
+        let settings: AppSettings =
+            serde_json::from_value(json!({ "adjustmentLayout": layout.clone() }))
+                .expect("settings with an adjustment layout should deserialize");
+        let restored = serde_json::to_value(&settings).expect("settings should serialize");
+        assert_eq!(restored["adjustmentLayout"], layout);
+
+        let partial: AppSettings = serde_json::from_value(
+            json!({ "adjustmentLayout": { "favorites": ["section:curves"] } }),
+        )
+        .expect("a partial adjustment layout should deserialize");
+        assert!(partial.adjustment_layout.section_order.is_empty());
+        assert_eq!(partial.adjustment_layout.favorites, ["section:curves"]);
     }
 }

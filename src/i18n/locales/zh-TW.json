@@ -394,8 +394,10 @@
     "adjustments": {
       "actions": {
         "copySectionSettings": "複製 {{section}} 設定",
+        "customizePanels": "自訂面板",
         "pasteLabel": "貼上 {{section}} 設定",
         "pasteSettings": "貼上設定",
+        "resetPanelLayout": "重置為預設值",
         "resetSectionSettings": "重置 {{section}} 設定"
       },
       "sections": {
@@ -408,6 +410,7 @@
       "title": "調整",
       "tooltips": {
         "autoAdjust": "自動調整影像",
+        "reorderTools": "重新排列工具",
         "resetAdjustments": "重置調整",
         "toggleAnalytics": "切換分析顯示"
       }
@@ -637,6 +640,16 @@
       "exporting": "正在匯出…",
       "savesTo": "外部編輯 — 儲存至"
     },
+    "favorites": {
+      "add": "加入收藏",
+      "addItem": "將「{{name}}」加入收藏",
+      "dragToReorder": "拖曳以重新排序",
+      "empty": "在調整中為區段、工具或滑桿加上星號，即可將其收集到這裡。",
+      "qualifiedLabel": "{{tool}}：{{control}}",
+      "remove": "從收藏中移除",
+      "removeItem": "從收藏中移除「{{name}}」",
+      "title": "收藏"
+    },
     "masks": {
       "actions": {
         "addNewComponent": "新增新元件",
@@ -835,6 +848,7 @@
         "crop": "裁剪",
         "develop": "編輯相片",
         "export": "匯出",
+        "favorites": "收藏",
         "info": "資訊",
         "inpaint": "修復",
         "masks": "遮色片",

@@ -420,8 +420,10 @@
     "adjustments": {
       "actions": {
         "copySectionSettings": "Copy {{section}} Settings",
+        "customizePanels": "Customize Panels",
         "pasteLabel": "Paste {{section}} Settings",
         "pasteSettings": "Paste Settings",
+        "resetPanelLayout": "Reset to Default",
         "resetSectionSettings": "Reset {{section}} Settings"
       },
       "sections": {
@@ -434,6 +436,7 @@
       "title": "Adjustments",
       "tooltips": {
         "autoAdjust": "Auto Adjust Image",
+        "reorderTools": "Reorder tools",
         "resetAdjustments": "Reset Adjustments",
         "toggleAnalytics": "Toggle Analytics Display"
       }
@@ -666,6 +669,16 @@
         "vertical": "Detect and correct converging vertical lines"
       }
     },
+    "favorites": {
+      "add": "Add to Favorites",
+      "addItem": "Add “{{name}}” to Favorites",
+      "dragToReorder": "Drag to reorder",
+      "empty": "Star a section, tool or slider in Adjustments to collect it here.",
+      "qualifiedLabel": "{{tool}}: {{control}}",
+      "remove": "Remove from Favorites",
+      "removeItem": "Remove “{{name}}” from Favorites",
+      "title": "Favorites"
+    },
     "geometry": {
       "guided": {
         "angleRejected": "The line is too far from vertical or horizontal",
@@ -887,6 +900,7 @@
         "crop": "Crop",
         "develop": "Develop",
         "export": "Export",
+        "favorites": "Favorites",
         "geometry": "Geometry",
         "info": "Info",
         "inpaint": "Inpaint",

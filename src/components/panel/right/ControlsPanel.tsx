@@ -3,11 +3,9 @@ import { RotateCcw, Copy, ClipboardPaste, Aperture, ChartArea } from 'lucide-rea
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
-import BasicAdjustments from '../../adjustments/Basic';
-import CurveGraph from '../../adjustments/Curves';
-import ColorPanel from '../../adjustments/Color';
-import DetailsPanel from '../../adjustments/Details';
-import EffectsPanel from '../../adjustments/Effects';
+import { ADJUSTMENT_SECTION_COMPONENTS } from '../../adjustments/sectionComponents';
+import { CustomizePanelsButton, customizePanelsMenuOption } from './AdjustmentSectionsSubMenu';
+import { AdjustmentPanelContext, FavoriteStar } from '../../adjustments/AdjustmentTool';
 import CollapsibleSection from '../../ui/CollapsibleSection';
 import Waveform from '../editor/Waveform';
 import Resizer from '../../ui/Resizer';
@@ -16,31 +14,32 @@ import {
   SectionVisibility,
   INITIAL_ADJUSTMENTS,
   ADJUSTMENT_SECTIONS,
+  getAdjustmentSectionOrder,
   getInitialAdjustments,
 } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { OPTION_SEPARATOR, Orientation } from '../../ui/AppProperties';
 import PanelHeader from '../../ui/PanelHeader';
 import { useShallow } from 'zustand/react/shallow';
-import { canvasToolState, useEditorStore } from '../../../store/useEditorStore';
-import { useSettingsStore } from '../../../store/useSettingsStore';
+import { useEditorStore } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useWaveformControls } from '../../../hooks/useWaveformControls';
+import { useAdjustmentSectionProps } from '../../../hooks/useAdjustmentSectionProps';
+import { useFavorites } from '../../../hooks/useFavorites';
+import { favoriteKey } from '../../../utils/adjustmentControls';
+
+const PHOTO_PANEL_CONTEXT = { canFavorite: true };
 
 export default function Controls() {
   const { t } = useTranslation();
   const { showContextMenu } = useContextMenu();
   const { isResizingWaveform, onToggleWaveform, setActiveWaveformChannel, handleWaveformResize } =
     useWaveformControls();
-  const { setAdjustments, handleAutoAdjustments, handleLutSelect, setLutPreviewOverride } = useEditorActions();
-
-  const { appSettings, theme } = useSettingsStore(
-    useShallow((state) => ({
-      appSettings: state.appSettings,
-      theme: state.theme,
-    })),
-  );
+  const { handleAutoAdjustments } = useEditorActions();
+  const sectionProps = useAdjustmentSectionProps();
+  const { adjustments, appSettings, histogram, setAdjustments, theme } = sectionProps;
+  const { getFavoriteMenuOptions } = useFavorites();
 
   const { collapsibleSectionsState, setUI } = useUIStore(
     useShallow((state) => ({
@@ -50,11 +49,8 @@ export default function Controls() {
   );
 
   const {
-    adjustments,
     copiedSectionAdjustments,
-    histogram,
     selectedImage,
-    isWbPickerActive,
     isWaveformVisible,
     waveform,
     activeWaveformChannel,
@@ -62,11 +58,8 @@ export default function Controls() {
     setEditor,
   } = useEditorStore(
     useShallow((state) => ({
-      adjustments: state.adjustments,
       copiedSectionAdjustments: state.copiedSectionAdjustments,
-      histogram: state.histogram,
       selectedImage: state.selectedImage,
-      isWbPickerActive: state.isWbPickerActive,
       isWaveformVisible: state.isWaveformVisible,
       waveform: state.waveform,
       activeWaveformChannel: state.activeWaveformChannel,
@@ -77,16 +70,6 @@ export default function Controls() {
 
   const setCopiedSectionAdjustments = useCallback(
     (val: any) => setEditor({ copiedSectionAdjustments: val }),
-    [setEditor],
-  );
-
-  const toggleWbPicker = useCallback(
-    () => setEditor((state) => canvasToolState({ isWbPickerActive: !state.isWbPickerActive })),
-    [setEditor],
-  );
-
-  const onDragStateChange = useCallback(
-    (isDragging: boolean) => setEditor({ isSliderDragging: isDragging }),
     [setEditor],
   );
 
@@ -212,6 +195,10 @@ export default function Controls() {
         icon: RotateCcw,
         onClick: handleReset,
       },
+      { type: OPTION_SEPARATOR },
+      ...getFavoriteMenuOptions(event.target, sectionName),
+      { type: OPTION_SEPARATOR },
+      customizePanelsMenuOption(t('editor.adjustments.actions.customizePanels')),
     ];
 
     showContextMenu(event.clientX, event.clientY, options);
@@ -241,6 +228,7 @@ export default function Controls() {
             >
               <ChartArea size={18} />
             </button>
+            <CustomizePanelsButton />
             <button
               className="p-2 rounded-full hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               disabled={!selectedImage}
@@ -283,46 +271,32 @@ export default function Controls() {
         )}
       </AnimatePresence>
 
-      <div className="grow overflow-y-scroll p-4 compact:p-0 flex flex-col gap-2 compact:gap-2.5">
-        {Object.keys(ADJUSTMENT_SECTIONS).map((sectionName: string) => {
-          const SectionComponent: any = {
-            basic: BasicAdjustments,
-            curves: CurveGraph,
-            color: ColorPanel,
-            details: DetailsPanel,
-            effects: EffectsPanel,
-          }[sectionName];
+      <AdjustmentPanelContext.Provider value={PHOTO_PANEL_CONTEXT}>
+        <div className="grow overflow-y-scroll p-4 compact:p-0 flex flex-col gap-2 compact:gap-2.5">
+          {getAdjustmentSectionOrder(appSettings?.adjustmentLayout?.sectionOrder).map((sectionName: string) => {
+            const SectionComponent = ADJUSTMENT_SECTION_COMPONENTS[sectionName];
 
-          const title = t(`editor.adjustments.sections.${sectionName}`);
-          const sectionVisibility = adjustments.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
+            const title = t(`editor.adjustments.sections.${sectionName}`);
+            const sectionVisibility = adjustments.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
 
-          return (
-            <div className="shrink-0 group" key={sectionName}>
-              <CollapsibleSection
-                isContentVisible={sectionVisibility[sectionName as keyof SectionVisibility]}
-                isOpen={collapsibleSectionsState[sectionName as keyof typeof collapsibleSectionsState]}
-                onContextMenu={(e: any) => handleSectionContextMenu(e, sectionName)}
-                onToggle={() => handleToggleSection(sectionName)}
-                onToggleVisibility={() => handleToggleVisibility(sectionName)}
-                title={title}
-              >
-                <SectionComponent
-                  adjustments={adjustments}
-                  setAdjustments={setAdjustments}
-                  histogram={histogram}
-                  theme={theme}
-                  handleLutSelect={handleLutSelect}
-                  onLutHover={setLutPreviewOverride}
-                  appSettings={appSettings}
-                  isWbPickerActive={isWbPickerActive}
-                  toggleWbPicker={toggleWbPicker}
-                  onDragStateChange={onDragStateChange}
-                />
-              </CollapsibleSection>
-            </div>
-          );
-        })}
-      </div>
+            return (
+              <div className="shrink-0 group" key={sectionName}>
+                <CollapsibleSection
+                  isContentVisible={sectionVisibility[sectionName as keyof SectionVisibility]}
+                  isOpen={collapsibleSectionsState[sectionName as keyof typeof collapsibleSectionsState]}
+                  onContextMenu={(e: any) => handleSectionContextMenu(e, sectionName)}
+                  onToggle={() => handleToggleSection(sectionName)}
+                  onToggleVisibility={() => handleToggleVisibility(sectionName)}
+                  title={title}
+                  titleAddon={<FavoriteStar favorite={favoriteKey('section', sectionName)} />}
+                >
+                  <SectionComponent {...sectionProps} />
+                </CollapsibleSection>
+              </div>
+            );
+          })}
+        </div>
+      </AdjustmentPanelContext.Provider>
     </div>
   );
 }

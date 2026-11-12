@@ -1,5 +1,12 @@
 import { create } from 'zustand';
-import { ImageFile, LibraryViewMode, Panel, UiVisibility, CullingSuggestions } from '../components/ui/AppProperties';
+import {
+  CollapsibleSectionsState,
+  ImageFile,
+  LibraryViewMode,
+  Panel,
+  UiVisibility,
+  CullingSuggestions,
+} from '../components/ui/AppProperties';
 import { pickCropGeometry } from '../utils/adjustments';
 import { useEditorStore } from './useEditorStore';
 
@@ -19,6 +26,7 @@ const updateCropSession = (current: Panel | null, next: Panel | null) => {
 const RIGHT_PANEL_ORDER = [
   Panel.Metadata,
   Panel.Adjustments,
+  Panel.Favorites,
   Panel.Crop,
   Panel.Geometry,
   Panel.LensCorrection,
@@ -28,14 +36,6 @@ const RIGHT_PANEL_ORDER = [
   Panel.Presets,
   Panel.Export,
 ];
-
-export interface CollapsibleSectionsState {
-  basic: boolean;
-  color: boolean;
-  curves: boolean;
-  details: boolean;
-  effects: boolean;
-}
 
 export type LightsOutMode = 'off' | 'dim' | 'out';
 
