@@ -3,9 +3,9 @@
 Status (2026-11-13): **steps 1 (`1.49.0`, owner commit `59e355b6`), 2
 (`1.50.0`, owner commit `65c00ea1`), 3 (`1.51.0`, owner commit
 `a5b55723`), 4 (`1.52.0`, owner commit `90583026`) and 5 (`1.53.0`,
-uncommitted) done** on `dev/orbit-blend-pad`: all five steps built.
-Remaining: the owner's hands-on checks and merge; the "Not scheduled"
-ideas below.
+uncommitted) done** on `dev/orbit-blend-pad`: all five planned steps
+built. Next: steps 6–8 below (owner, 2026-11-13); the owner's hands-on
+checks and merge whenever they choose.
 `UPSTREAM_FEATURE_GAP.md` Plan item 27.
 
 **Owner decisions (2026-11-13):** brought forward, ahead of the remaining
@@ -88,8 +88,31 @@ full at the start.
    without the puck), load, rename, overwrite, delete, export and import
    JSON, cleaned by the resolver's sanitising, versioned.
 
-Not scheduled (concept note, later): pads per mask, heavier tools
-(updates on release), more blend modes, drag recording.
+**Further steps (owner, 2026-11-13: schedule these), smallest first:**
+6. **Remember each tool's target** (`1.54.0`, S): an anchor keeps the
+   last target per tool, so switching Exposure → Contrast → Exposure
+   restores the Exposure target instead of converting the share. Stored
+   with the anchor (pad format stays version 1, the extra field is
+   optional; Rust ignores it).
+7. **Blend modes** (`1.55.0`, M): besides Axis (today), **Normalized**
+   (inverse-distance weights that always sum to 1: crossfades between
+   tools, never neutral; guard the puck exactly on an anchor) and
+   **Polar** (direction picks the blend of the two nearest anchors,
+   distance from the centre sets strength). One `mode` field on the pad,
+   resolved in Rust with the TS mirror and new shared vectors; mode
+   picker in the panel; presets carry it.
+8. **A pad per mask** (`1.56.0`, L): each mask can have its own pad that
+   drives that mask's sliders (`MaskAdjustments`), resolved in
+   `get_mask_adjustments_from_json` like the photo's; the pad panel edits
+   the selected mask's pad when a mask is active; copy/paste and presets
+   of masks carry it; check the mask parameter list (masks' slider
+   ranges differ, e.g. noise reduction) and the "edited" check.
+
+**Deferred (owner, 2026-11-13):** heavier tools on the pad (Motion Blur,
+Lens Blur, Color Mixer channels, curve handles; would update on release).
+Restart: when the owner asks.
+**Not wanted for now (owner, 2026-11-13):** drag recording and playback;
+more shapes (ellipse, custom outline). Restart: when the owner asks.
 
 **Progress:**
 - Step 1 (`1.49.0`, 2026-11-13, owner commit `59e355b6`):
