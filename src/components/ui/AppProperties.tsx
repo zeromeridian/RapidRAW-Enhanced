@@ -89,6 +89,8 @@ export enum Invokes {
   GetPinnedFolderTrees = 'get_pinned_folder_trees',
   GetSupportedFileTypes = 'get_supported_file_types',
   GetBlendPadParameters = 'get_blend_pad_parameters',
+  ExportBlendPadPresets = 'export_blend_pad_presets',
+  ImportBlendPadPresets = 'import_blend_pad_presets',
   HandleExportPresetsToFile = 'handle_export_presets_to_file',
   HandleImportPresetsFromFile = 'handle_import_presets_from_file',
   HandleImportPresetsFromFiles = 'handle_import_presets_from_files',
@@ -357,6 +359,8 @@ export interface AppSettings {
   copyNameSuffixEnabled?: boolean;
   copyNameSuffix?: string;
   toneCurvePresets?: ToneCurvePreset[];
+  /** Orbit Blend Pad presets as saved; read them through `sanitizeBlendPadPresets`. */
+  blendPadPresets?: Array<unknown>;
   leftPanelWidth?: number;
   rightPanelWidth?: number;
   lightsOutDimLevel?: LightsOutDimLevel;

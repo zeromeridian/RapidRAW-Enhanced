@@ -1,18 +1,39 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
 import Text from '../ui/Text';
 import { TextColors, TextVariants } from '../../types/typography';
-import { normalizeToneCurvePresetName } from '../../utils/toneCurvePresets';
+import { normalizePresetName } from '../../utils/toneCurvePresets';
 
-interface ToneCurvePresetModalProps {
+interface PresetNameModalProps {
+  /** Names already taken (case and outer spaces ignored). */
   existingNames: string[];
+  /** The name the field starts with, e.g. when renaming. */
+  initialName?: string;
   isOpen: boolean;
+  /** Shown when the name is taken. */
+  conflictMessage: string;
+  confirmLabel: string;
+  title: string;
+  /** Extra options below the name. */
+  children?: ReactNode;
   onClose(): void;
   onSave(name: string): void;
 }
 
-export default function ToneCurvePresetModal({ existingNames, isOpen, onClose, onSave }: ToneCurvePresetModalProps) {
+/** Asks for a unique preset name (tone curve and Orbit Blend Pad presets). */
+export default function PresetNameModal({
+  existingNames,
+  initialName = '',
+  isOpen,
+  conflictMessage,
+  confirmLabel,
+  title,
+  children,
+  onClose,
+  onSave,
+}: PresetNameModalProps) {
   const { t } = useTranslation();
   const [name, setName] = useState('');
   const [isMounted, setIsMounted] = useState(false);
@@ -20,7 +41,7 @@ export default function ToneCurvePresetModal({ existingNames, isOpen, onClose, o
 
   useEffect(() => {
     if (isOpen) {
-      setName('');
+      setName(initialName);
       setIsMounted(true);
       const timer = setTimeout(() => setShow(true), 10);
       return () => clearTimeout(timer);
@@ -32,20 +53,15 @@ export default function ToneCurvePresetModal({ existingNames, isOpen, onClose, o
       setName('');
     }, 300);
     return () => clearTimeout(timer);
-  }, [isOpen]);
+  }, [isOpen, initialName]);
 
   const trimmedName = name.trim();
-  const normalizedName = normalizeToneCurvePresetName(name);
+  const normalizedName = normalizePresetName(name);
   const hasConflict = useMemo(
-    () =>
-      !!normalizedName && existingNames.some((existing) => normalizeToneCurvePresetName(existing) === normalizedName),
+    () => !!normalizedName && existingNames.some((existing) => normalizePresetName(existing) === normalizedName),
     [existingNames, normalizedName],
   );
-  const error = !trimmedName
-    ? t('adjustments.curves.presetNameRequired')
-    : hasConflict
-      ? t('adjustments.curves.presetNameConflict')
-      : '';
+  const error = !trimmedName ? t('adjustments.curves.presetNameRequired') : hasConflict ? conflictMessage : '';
 
   const handleSave = useCallback(() => {
     if (error) return;
@@ -84,7 +100,7 @@ export default function ToneCurvePresetModal({ existingNames, isOpen, onClose, o
         onClick={(event) => event.stopPropagation()}
       >
         <Text variant={TextVariants.title} className="mb-4">
-          {t('adjustments.curves.savePresetTitle')}
+          {title}
         </Text>
         <input
           aria-invalid={!!error}
@@ -103,12 +119,13 @@ export default function ToneCurvePresetModal({ existingNames, isOpen, onClose, o
         >
           {error || t('adjustments.curves.presetNameUniqueHint')}
         </Text>
+        {children && <div className="mt-3">{children}</div>}
         <div className="flex justify-end gap-3 mt-4">
           <Button variant="ghost" onClick={onClose}>
             {t('modals.confirm.cancel')}
           </Button>
           <Button disabled={!!error} onClick={handleSave}>
-            {t('adjustments.curves.savePreset')}
+            {confirmLabel}
           </Button>
         </div>
       </div>

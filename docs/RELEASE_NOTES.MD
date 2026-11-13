@@ -5,6 +5,17 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.53.0-dev-orbit-blend-pad — 2026-11-13
+
+### Develop
+
+- **Orbit Blend Pad presets**: save the pad under a name and load it on
+  any photo. With the puck position included, a preset is a finished
+  look; without it, it is a set of tools to explore, starting at the
+  centre. Presets can be updated, renamed and deleted, and exported or
+  imported as JSON files, one or all at once. They hold only the pad;
+  regular presets still include the pad as part of a whole look.
+
 ## 1.52.0-dev-orbit-blend-pad — 2026-11-13
 
 ### Develop

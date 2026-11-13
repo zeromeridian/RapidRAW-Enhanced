@@ -87,11 +87,12 @@ export const cloneToneCurveParametric = (curve: unknown): ParametricCurve => {
   };
 };
 
-export const normalizeToneCurvePresetName = (name: string) => name.trim().toLowerCase();
+/** A preset name as compared for clashes: case and outer spaces ignored. */
+export const normalizePresetName = (name: string) => name.trim().toLowerCase();
 
 export const hasToneCurvePresetNameConflict = (name: string, presets: ToneCurvePreset[]) => {
-  const normalizedName = normalizeToneCurvePresetName(name);
-  return !!normalizedName && presets.some((preset) => normalizeToneCurvePresetName(preset.name) === normalizedName);
+  const normalizedName = normalizePresetName(name);
+  return !!normalizedName && presets.some((preset) => normalizePresetName(preset.name) === normalizedName);
 };
 
 export const getToneCurvePresetData = (adjustments: Adjustments): ToneCurvePresetData => ({
@@ -160,7 +161,7 @@ export const normalizeToneCurvePresets = (presets: unknown): ToneCurvePreset[] =
     const preset = candidate as Partial<ToneCurvePreset>;
     const id = typeof preset.id === 'string' ? preset.id.trim() : '';
     const name = typeof preset.name === 'string' ? preset.name.trim() : '';
-    const normalizedName = normalizeToneCurvePresetName(name);
+    const normalizedName = normalizePresetName(name);
     if (!id || !normalizedName || ids.has(id) || names.has(normalizedName)) continue;
 
     ids.add(id);

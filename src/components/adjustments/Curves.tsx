@@ -18,7 +18,7 @@ import Text from '../ui/Text';
 import Slider from '../ui/Slider';
 import Dropdown from '../ui/Dropdown';
 import ConfirmModal from '../modals/ConfirmModal';
-import ToneCurvePresetModal from '../modals/ToneCurvePresetModal';
+import PresetNameModal from '../modals/PresetNameModal';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { canvasToolState, useEditorStore } from '../../store/useEditorStore';
@@ -1189,8 +1189,11 @@ export default function CurveGraph({
 
       {!isForMask && (
         <>
-          <ToneCurvePresetModal
+          <PresetNameModal
+            conflictMessage={t('adjustments.curves.presetNameConflict')}
+            confirmLabel={t('adjustments.curves.savePreset')}
             existingNames={toneCurvePresets.map((preset) => preset.name)}
+            title={t('adjustments.curves.savePresetTitle')}
             isOpen={isSavePresetOpen}
             onClose={() => setIsSavePresetOpen(false)}
             onSave={handleSavePreset}

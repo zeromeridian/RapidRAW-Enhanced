@@ -129,6 +129,46 @@ pub fn get_blend_pad_parameters() -> [Parameter; PARAMETERS.len()] {
     PARAMETERS
 }
 
+/// Marks a file of exported pad presets.
+const PRESET_FILE_FORMAT: &str = "ThisIsRAW Blend Pad presets";
+const PRESET_FILE_VERSION: u32 = 1;
+
+/// Writes pad presets to a JSON file. The pad panel builds and cleans the presets
+/// (`utils/blendPad.ts`); this only wraps them with the file's format and version.
+#[tauri::command]
+pub fn export_blend_pad_presets(presets: Vec<Value>, file_path: String) -> Result<(), String> {
+    let file = serde_json::json!({
+        "format": PRESET_FILE_FORMAT,
+        "version": PRESET_FILE_VERSION,
+        "presets": presets,
+    });
+    let text = serde_json::to_string_pretty(&file)
+        .map_err(|e| format!("Failed to write the blend pad presets: {e}"))?;
+    std::fs::write(&file_path, text).map_err(|e| format!("Failed to save {file_path}: {e}"))
+}
+
+/// Reads the presets of a pad preset file: an exported file, a bare list, or a single preset.
+/// The pad panel cleans every preset before it keeps any.
+#[tauri::command]
+pub fn import_blend_pad_presets(file_path: String) -> Result<Vec<Value>, String> {
+    let text = std::fs::read_to_string(&file_path)
+        .map_err(|e| format!("Failed to open {file_path}: {e}"))?;
+    let value: Value =
+        serde_json::from_str(&text).map_err(|e| format!("{file_path} is not valid JSON: {e}"))?;
+    Ok(presets_in_file(value))
+}
+
+fn presets_in_file(value: Value) -> Vec<Value> {
+    match value {
+        Value::Array(presets) => presets,
+        Value::Object(mut file) => match file.remove("presets") {
+            Some(Value::Array(presets)) => presets,
+            _ => vec![Value::Object(file)],
+        },
+        _ => Vec::new(),
+    }
+}
+
 fn parameter_index(id: &str) -> Option<usize> {
     PARAMETERS.iter().position(|parameter| parameter.id == id)
 }
@@ -491,6 +531,31 @@ mod tests {
             assert_eq!(Shape::Circle.axis_weight(t, Point::default()), 0.0);
             assert!((Shape::Circle.axis_weight(t, opposite) + 1.0).abs() < 1e-12);
         }
+    }
+
+    #[test]
+    fn preset_files_round_trip_and_accept_lists_and_single_presets() {
+        let preset = json!({ "id": "a", "name": "Moody", "pad": { "version": 1 } });
+        let path = std::env::temp_dir().join(format!("tir-blend-pad-{}.json", std::process::id()));
+        let path_text = path.to_string_lossy().to_string();
+        export_blend_pad_presets(vec![preset.clone()], path_text.clone()).unwrap();
+        let written: Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(written["format"], PRESET_FILE_FORMAT);
+        assert_eq!(written["version"], PRESET_FILE_VERSION);
+        assert_eq!(
+            import_blend_pad_presets(path_text.clone()).unwrap(),
+            vec![preset.clone()]
+        );
+        std::fs::remove_file(&path).unwrap();
+
+        assert_eq!(
+            presets_in_file(json!([preset.clone()])),
+            vec![preset.clone()]
+        );
+        assert_eq!(presets_in_file(preset.clone()), vec![preset]);
+        assert!(presets_in_file(json!(3)).is_empty());
+        assert!(import_blend_pad_presets(path_text).is_err());
     }
 
     const SHAPES: [Shape; 6] = [

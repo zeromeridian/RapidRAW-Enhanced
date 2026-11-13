@@ -29,10 +29,73 @@ for (const shape of BLEND_PAD_SHAPES) {
   }
 }
 
+// Presets: saving and loading gives the same values; bad input is cleaned, never trusted.
+{
+  const { createBlendPadPreset, loadBlendPadPreset, sanitizeBlendPad, sanitizeBlendPadPresets, isBlendPadPresetDirty } =
+    await import(resolve(repositoryRoot, 'src', 'utils', 'blendPad.ts'));
+  const check = (condition, message) => condition || failures.push(`presets: ${message}`);
+  const parameters = vectors.parameters;
+  for (const testCase of vectors.cases.filter((candidate) => candidate.pad.enabled)) {
+    const saved = createBlendPadPreset('Look', testCase.pad, true);
+    const [restored] = sanitizeBlendPadPresets(JSON.parse(JSON.stringify([saved])), parameters);
+    const expected = JSON.stringify(resolveBlendPad(testCase.pad, parameters));
+    const anchorsUsable = testCase.pad.anchors.some((anchor) => parameters.some((p) => p.id === anchor.param));
+    if (!anchorsUsable) continue;
+    check(
+      restored && JSON.stringify(resolveBlendPad(loadBlendPadPreset(restored), parameters)) === expected,
+      `${testCase.name} does not round-trip`,
+    );
+    // The panel holds cleaned pads (the puck inside the shape, known tools only).
+    const held = sanitizeBlendPad(testCase.pad, parameters);
+    check(restored && !isBlendPadPresetDirty(restored, held), `${testCase.name} looks modified after loading`);
+  }
+  const pad = vectors.cases[0].pad;
+  const tools = createBlendPadPreset('Tools', { ...pad, puck: { x: 0.4, y: 0.4 } }, false);
+  check(tools.pad.puck.x === 0 && tools.pad.puck.y === 0, 'a preset without the puck keeps a puck position');
+  check(
+    !isBlendPadPresetDirty(tools, { ...pad, puck: { x: -0.3, y: 0.1 } }),
+    'a preset without the puck counts a moved puck as a change',
+  );
+  const many = { ...pad, anchors: Array.from({ length: 12 }, (_, i) => ({ ...pad.anchors[0], id: `a${i}` })) };
+  const [limited] = sanitizeBlendPadPresets([{ name: 'Many', pad: many }], parameters);
+  check(limited?.pad.anchors.length === 8, 'the anchor limit is not enforced');
+  const [cleaned] = sanitizeBlendPadPresets(
+    [
+      {
+        name: ' Odd ',
+        pad: {
+          shape: 'spiral',
+          amount: 7,
+          puck: { x: 9, y: 'x' },
+          anchors: [
+            { param: 'fade', t: 0.2, target: 10 },
+            { param: 'contrast', t: 1.25, target: 900, curve: 'wobbly' },
+          ],
+        },
+      },
+    ],
+    parameters,
+  );
+  check(cleaned?.name === 'Odd', 'names are not trimmed');
+  check(cleaned?.pad.shape === 'circle' && cleaned.pad.amount === 1, 'bad shape or amount kept');
+  check(cleaned?.pad.anchors.length === 1, 'an unknown tool was kept');
+  const [anchor] = cleaned?.pad.anchors ?? [];
+  check(anchor?.target === 100 && anchor.t === 0.25 && anchor.curve === 'linear', 'anchor values not cleaned');
+  check(
+    sanitizeBlendPadPresets([{ name: 'X', pad: { version: 2, anchors: pad.anchors } }], parameters).length === 0,
+    'a newer version was accepted',
+  );
+  check(sanitizeBlendPadPresets('nonsense', parameters).length === 0, 'non-list input gave presets');
+  const renamed = sanitizeBlendPadPresets([{ name: 'look', pad }], parameters, [
+    createBlendPadPreset('Look', pad, true),
+  ]);
+  check(renamed[0]?.name === 'look 2', 'a clashing import name was not made unique');
+}
+
 if (failures.length > 0) {
   console.error(failures.join('\n'));
   process.exit(1);
 }
 console.log(
-  `Blend pad vectors: ${vectors.cases.length} cases match; positions round-trip on ${BLEND_PAD_SHAPES.length} shapes.`,
+  `Blend pad vectors: ${vectors.cases.length} cases match; positions round-trip on ${BLEND_PAD_SHAPES.length} shapes; presets round-trip and clean bad input.`,
 );

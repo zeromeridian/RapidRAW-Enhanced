@@ -216,7 +216,10 @@ details are in `RELEASE_NOTES.MD`.
   combined value in brackets where the pad moves them. Six shapes
   (circle, triangle, square, rectangle, pentagon, hexagon); tools keep
   their place along the edge when the shape changes, and each reaches its
-  full reverse at its opposite edge point. Saved with the edit and in XMP, copy/paste and presets;
+  full reverse at its opposite edge point. Pad presets in the panel:
+  named pad setups in the app settings, with or without the puck
+  position; load, update, rename, delete, export and import JSON.
+  Saved with the edit and in XMP, copy/paste and regular presets;
   previews, exports and thumbnails apply it. For the photo only.
 - **Gaussian Blur** for the whole photo in Effects (masks had it before).
 - **Customize Panels** (Adjustments header button or section right-click

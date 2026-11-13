@@ -2,8 +2,10 @@
 
 Status (2026-11-13): **steps 1 (`1.49.0`, owner commit `59e355b6`), 2
 (`1.50.0`, owner commit `65c00ea1`), 3 (`1.51.0`, owner commit
-`a5b55723`) and 4 (`1.52.0`, uncommitted) done** on `dev/orbit-blend-pad`;
-step 5 next.
+`a5b55723`), 4 (`1.52.0`, owner commit `90583026`) and 5 (`1.53.0`,
+uncommitted) done** on `dev/orbit-blend-pad`: all five steps built.
+Remaining: the owner's hands-on checks and merge; the "Not scheduled"
+ideas below.
 `UPSTREAM_FEATURE_GAP.md` Plan item 27.
 
 **Owner decisions (2026-11-13):** brought forward, ahead of the remaining
@@ -130,7 +132,7 @@ Not scheduled (concept note, later): pads per mask, heavier tools
   the photo's sliders (`Slider.ghostValue`, from `blendPadValue`).
   Vectors: 13 cases. Agent choices: a new tool's target is 40 % of its
   reach; a target's double-click reset returns there too.
-- Step 4 (`1.52.0`, 2026-11-13, uncommitted): `Shape` gains Triangle,
+- Step 4 (`1.52.0`, 2026-11-13, owner commit `90583026`): `Shape` gains Triangle,
   Square, Rectangle (3:2), Pentagon, Hexagon from one definition
   (`corners`, `perimeter_path`, `point_at` by arc length from where the
   +x ray meets the outline, `edge_distance` by ray–edge intersection,
@@ -149,6 +151,27 @@ Not scheduled (concept note, later): pads per mask, heavier tools
   square and rectangle sit flat; the rectangle is 3:2 landscape; the
   puck is clamped toward the centre (radially), not to the nearest edge
   point.
+- Step 5 (`1.53.0`, 2026-11-13, uncommitted). Owner decision
+  2026-11-13: pad presets hold only the pad and live in the pad panel,
+  stored like the tone curve presets (app settings,
+  `AppSettings.blend_pad_presets`); regular presets keep including the
+  pad. `utils/blendPad.ts`: `sanitizeBlendPad` (never trusts input:
+  version 1 only, unknown tools and bad values dropped, targets within
+  reach and on the step, ≤ 8 anchors, puck inside the shape),
+  `BlendPadPreset` (`includesPuck`; without it the puck is stored and
+  loaded at the centre), create/load/update/dirty helpers,
+  `sanitizeBlendPadPresets` (also makes ids and names unique, "Name 2").
+  `BlendPadPresetBar.tsx`: preset picker (modified "*"), Save/Update
+  button, "more" menu (Save as new, Rename, Delete, Export one, Export
+  all, Import). Rust `export_blend_pad_presets` / `import_blend_pad_presets`
+  write and read the JSON file (format marker and version; import also
+  takes a bare list or one preset). The curve name modal became the
+  shared `PresetNameModal` (texts as props, optional extra controls;
+  `normalizeToneCurvePresetName` renamed `normalizePresetName`); Curves
+  looks and works as before. Tests: Rust settings and file round trips;
+  the Node check round-trips every vector case through a preset and
+  checks the cleaning (unknown tool, limit, bad values, newer version,
+  clashing names).
 
 ## Owner's specification (2026-11-13; verbatim, headings one level down)
 
