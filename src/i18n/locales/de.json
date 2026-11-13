@@ -668,6 +668,15 @@
       "mute": "Stummschalten",
       "remove": "Werkzeug entfernen",
       "reset": "Pad zurücksetzen",
+      "shape": "Form",
+      "shapes": {
+        "circle": "Kreis",
+        "hexagon": "Sechseck",
+        "pentagon": "Fünfeck",
+        "rectangle": "Rechteck",
+        "square": "Quadrat",
+        "triangle": "Dreieck"
+      },
       "target": "Ziel",
       "title": "Blend-Pad",
       "unmute": "Wieder einschalten"
@@ -2194,7 +2203,8 @@
     },
     "slider": {
       "clickToEdit": "Zum Bearbeiten klicken",
-      "reset": "Zurücksetzen"
+      "reset": "Zurücksetzen",
+      "withBlendPad": "Mit Blend-Pad"
     },
     "waveform": {
       "tooltips": {

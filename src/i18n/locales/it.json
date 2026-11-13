@@ -692,6 +692,15 @@
       "mute": "Disattiva",
       "remove": "Rimuovi strumento",
       "reset": "Reimposta il pad",
+      "shape": "Forma",
+      "shapes": {
+        "circle": "Cerchio",
+        "hexagon": "Esagono",
+        "pentagon": "Pentagono",
+        "rectangle": "Rettangolo",
+        "square": "Quadrato",
+        "triangle": "Triangolo"
+      },
       "target": "Obiettivo",
       "title": "Blend Pad",
       "unmute": "Riattiva"
@@ -2242,7 +2251,8 @@
     },
     "slider": {
       "clickToEdit": "Clicca per modificare",
-      "reset": "Ripristina"
+      "reset": "Ripristina",
+      "withBlendPad": "Con il Blend Pad"
     },
     "waveform": {
       "tooltips": {

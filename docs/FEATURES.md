@@ -212,8 +212,11 @@ details are in `RELEASE_NOTES.MD`.
   global sliders, including Gaussian Blur, Glow, Light Flare and Grain),
   drag them along the edge, set target, curve, mute or remove; Amount,
   on/off, Shift for finer drags, arrow keys, double-click to centre.
-  Bake writes the values into the sliders; sliders show a mark where the
-  pad moves them. Saved with the edit and in XMP, copy/paste and presets;
+  Bake writes the values into the sliders; sliders show a mark and the
+  combined value in brackets where the pad moves them. Six shapes
+  (circle, triangle, square, rectangle, pentagon, hexagon); tools keep
+  their place along the edge when the shape changes, and each reaches its
+  full reverse at its opposite edge point. Saved with the edit and in XMP, copy/paste and presets;
   previews, exports and thumbnails apply it. For the photo only.
 - **Gaussian Blur** for the whole photo in Effects (masks had it before).
 - **Customize Panels** (Adjustments header button or section right-click

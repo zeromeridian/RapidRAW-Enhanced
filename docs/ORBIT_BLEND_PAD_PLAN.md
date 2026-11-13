@@ -1,8 +1,9 @@
 # Orbit Blend Pad Plan
 
 Status (2026-11-13): **steps 1 (`1.49.0`, owner commit `59e355b6`), 2
-(`1.50.0`, owner commit `65c00ea1`) and 3 (`1.51.0`, uncommitted) done**
-on `dev/orbit-blend-pad`; step 4 next.
+(`1.50.0`, owner commit `65c00ea1`), 3 (`1.51.0`, owner commit
+`a5b55723`) and 4 (`1.52.0`, uncommitted) done** on `dev/orbit-blend-pad`;
+step 5 next.
 `UPSTREAM_FEATURE_GAP.md` Plan item 27.
 
 **Owner decisions (2026-11-13):** brought forward, ahead of the remaining
@@ -113,7 +114,7 @@ Not scheduled (concept note, later): pads per mask, heavier tools
   (`node scripts/check-blend-pad.mjs`, 12 cases). Slider labels shared
   with Favorites through the new `useControlLabel`. Copy/paste group
   "Blend Pad" (presets follow it), history label, strings in 12 locales.
-- Step 3 (`1.51.0`, 2026-11-13, uncommitted): **photo-wide Gaussian
+- Step 3 (`1.51.0`, 2026-11-13, owner commit `a5b55723`): **photo-wide Gaussian
   Blur** (`GlobalAdjustments.gaussian_blur_amount` in the retired
   `_pad_motion_blur1` slot, no layout change; shader mixes toward the
   cached structure blur before the masks' blur; Effects slider for photo
@@ -129,6 +130,25 @@ Not scheduled (concept note, later): pads per mask, heavier tools
   the photo's sliders (`Slider.ghostValue`, from `blendPadValue`).
   Vectors: 13 cases. Agent choices: a new tool's target is 40 % of its
   reach; a target's double-click reset returns there too.
+- Step 4 (`1.52.0`, 2026-11-13, uncommitted): `Shape` gains Triangle,
+  Square, Rectangle (3:2), Pentagon, Hexagon from one definition
+  (`corners`, `perimeter_path`, `point_at` by arc length from where the
+  +x ray meets the outline, `edge_distance` by ray–edge intersection,
+  radial `clamp`); `utils/blendPad.ts` mirrors it step for step, plus
+  the UI-only `positionOf` (pointer → perimeter position, its inverse)
+  and `oppositePoint`. Panel: Shape picker (keeps `t`, re-clamps the
+  puck), outline/clip/gradients/opposite rings follow the shape, labels
+  placed from each dot. Sliders show the combined value as "[60] 20"
+  (`Slider.ghostValue`, tooltip "With the Blend Pad"). Tests: every
+  shape gives +1 at the anchor (corners included), −1 at the opposite
+  point, 0 at the centre, clamps inside and keeps weights in −1…1; the
+  triangle's two sides differ; vectors 18 cases (square, triangle,
+  hexagon); the Node check also round-trips `positionOf` on every
+  shape. Agent choices: every shape fits the unit circle (labels keep
+  their room); triangle, pentagon, hexagon have a corner at the top,
+  square and rectangle sit flat; the rectangle is 3:2 landscape; the
+  puck is clamped toward the centre (radially), not to the nearest edge
+  point.
 
 ## Owner's specification (2026-11-13; verbatim, headings one level down)
 

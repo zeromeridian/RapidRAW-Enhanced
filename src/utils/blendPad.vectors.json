@@ -140,6 +140,76 @@
       "offsets": { "glowAmount": -40, "gaussianBlurAmount": 30 }
     },
     {
+      "name": "a square's corner and edge middle",
+      "pad": {
+        "version": 1,
+        "enabled": true,
+        "shape": "square",
+        "amount": 1,
+        "puck": { "x": 0.7, "y": 0.7 },
+        "anchors": [
+          { "id": "a", "param": "contrast", "t": 0.125, "target": 60, "curve": "linear", "muted": false },
+          { "id": "b", "param": "temperature", "t": 0.25, "target": 40, "curve": "linear", "muted": false }
+        ]
+      },
+      "offsets": { "contrast": 59, "temperature": 40 }
+    },
+    {
+      "name": "a square's reverse sides",
+      "pad": {
+        "version": 1,
+        "enabled": true,
+        "shape": "square",
+        "amount": 1,
+        "puck": { "x": 0, "y": -0.7 },
+        "anchors": [
+          { "id": "a", "param": "contrast", "t": 0.125, "target": 60, "curve": "linear", "muted": false },
+          { "id": "b", "param": "temperature", "t": 0.25, "target": 40, "curve": "linear", "muted": false }
+        ]
+      },
+      "offsets": { "contrast": -30, "temperature": -40 }
+    },
+    {
+      "name": "a triangle's short side reaches the full reverse",
+      "pad": {
+        "version": 1,
+        "enabled": true,
+        "shape": "triangle",
+        "amount": 1,
+        "puck": { "x": 0, "y": -0.5 },
+        "anchors": [
+          { "id": "a", "param": "contrast", "t": 0.2222222222222222, "target": 60, "curve": "linear", "muted": false }
+        ]
+      },
+      "offsets": { "contrast": -60 }
+    },
+    {
+      "name": "a triangle's long side reaches half",
+      "pad": {
+        "version": 1,
+        "enabled": true,
+        "shape": "triangle",
+        "amount": 1,
+        "puck": { "x": 0, "y": 0.5 },
+        "anchors": [
+          { "id": "a", "param": "contrast", "t": 0.2222222222222222, "target": 60, "curve": "linear", "muted": false }
+        ]
+      },
+      "offsets": { "contrast": 30 }
+    },
+    {
+      "name": "a puck outside a hexagon is pulled onto its edge",
+      "pad": {
+        "version": 1,
+        "enabled": true,
+        "shape": "hexagon",
+        "amount": 1,
+        "puck": { "x": 0, "y": 2 },
+        "anchors": [{ "id": "a", "param": "contrast", "t": 0.25, "target": 60, "curve": "linear", "muted": false }]
+      },
+      "offsets": { "contrast": 60 }
+    },
+    {
       "name": "hue wraps",
       "pad": {
         "version": 1,

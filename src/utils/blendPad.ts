@@ -3,7 +3,7 @@
  * stays the source of truth for every render. Both are checked against `blendPad.vectors.json`
  * (`node scripts/check-blend-pad.mjs` and `cargo test`). Type imports only, so Node can run it.
  */
-import type { BlendPad, BlendPadAnchor, BlendPadCurve, Coord } from './adjustments';
+import type { BlendPad, BlendPadAnchor, BlendPadCurve, BlendPadShape, Coord } from './adjustments';
 
 /** A slider the pad can drive, as `blend_pad::Parameter` (read with `get_blend_pad_parameters`). */
 export interface BlendPadParameter {
@@ -27,34 +27,142 @@ const CURVES: Record<BlendPadCurve, (x: number) => number> = {
   easeIn: (x) => x * x,
 };
 
-/** The circle's edge point at perimeter position `t` (0–1, from the right, anticlockwise). */
-export const anchorPoint = (t: number): Coord => ({ x: Math.cos(TAU * t), y: Math.sin(TAU * t) });
+/** Every pad shape, in the order the panel offers them. */
+export const BLEND_PAD_SHAPES: Array<BlendPadShape> = [
+  'circle',
+  'triangle',
+  'square',
+  'rectangle',
+  'pentagon',
+  'hexagon',
+];
 
-/** `Point::scale`: multiplies by the factor, as Rust does, so both round alike. */
+/** The rectangle's width to height (`blend_pad::RECTANGLE_ASPECT`). */
+const RECTANGLE_ASPECT = 1.5;
+
+// `Point`'s helpers, in the same arithmetic order as Rust so both round alike.
 const scale = (point: Coord, factor: number): Coord => ({ x: point.x * factor, y: point.y * factor });
+const add = (a: Coord, b: Coord): Coord => ({ x: a.x + b.x, y: a.y + b.y });
+const sub = (a: Coord, b: Coord): Coord => ({ x: a.x - b.x, y: a.y - b.y });
+const cross = (a: Coord, b: Coord) => a.x * b.y - a.y * b.x;
+const lengthOf = (point: Coord) => Math.hypot(point.x, point.y);
+/** `f64::rem_euclid(1.0)`. */
+const wrapTurn = (t: number) => {
+  const rest = t % 1;
+  return rest < 0 ? rest + 1 : rest;
+};
 
-/** The nearest point inside the circle. */
-export const clampToPad = (point: Coord): Coord => {
-  const radius = Math.hypot(point.x, point.y);
-  return radius > 1 ? scale(point, 1 / radius) : point;
+/**
+ * The corners anticlockwise from the first past the right, all on the unit circle; `null` for
+ * the circle (`Shape::corners`).
+ */
+export const shapeCorners = (shape: BlendPadShape): Array<Coord> | null => {
+  const regular = (sides: number, firstTurn: number) =>
+    Array.from({ length: sides }, (_, k) => {
+      const angle = TAU * (firstTurn + k / sides);
+      return { x: Math.cos(angle), y: Math.sin(angle) };
+    });
+  let corners: Array<Coord>;
+  switch (shape) {
+    case 'circle':
+      return null;
+    case 'triangle':
+      corners = regular(3, 0.25);
+      break;
+    case 'square':
+      corners = regular(4, 0.125);
+      break;
+    case 'pentagon':
+      corners = regular(5, 0.25);
+      break;
+    case 'hexagon':
+      corners = regular(6, 0.25);
+      break;
+    case 'rectangle': {
+      const diagonal = Math.hypot(RECTANGLE_ASPECT, 1);
+      const x = RECTANGLE_ASPECT / diagonal;
+      const y = 1 / diagonal;
+      corners = [
+        { x, y },
+        { x: -x, y },
+        { x: -x, y: -y },
+        { x, y: -y },
+      ];
+      break;
+    }
+  }
+  const turn = (point: Coord) => {
+    const angle = Math.atan2(point.y, point.x);
+    return angle <= 0 ? angle + TAU : angle;
+  };
+  return corners.sort((a, b) => turn(a) - turn(b));
+};
+
+/** How far from the centre the ray in the unit `direction` leaves the shape (`Shape::edge_distance`). */
+const edgeDistance = (shape: BlendPadShape, direction: Coord): number => {
+  const corners = shapeCorners(shape);
+  if (!corners) return 1;
+  let nearest = Infinity;
+  corners.forEach((corner, index) => {
+    const edge = sub(corners[(index + 1) % corners.length], corner);
+    const denominator = cross(direction, edge);
+    if (Math.abs(denominator) < EPSILON) return;
+    const distance = cross(corner, edge) / denominator;
+    const alongEdge = cross(corner, direction) / denominator;
+    if (distance > 0 && alongEdge >= -EPSILON && alongEdge <= 1 + EPSILON) nearest = Math.min(nearest, distance);
+  });
+  return nearest;
+};
+
+/** The edge point at perimeter position `t` (0–1 along the outline from the right, anticlockwise). */
+export const anchorPoint = (shape: BlendPadShape, t: number): Coord => {
+  const corners = shapeCorners(shape);
+  if (!corners) return { x: Math.cos(TAU * t), y: Math.sin(TAU * t) };
+  const start = { x: edgeDistance(shape, { x: 1, y: 0 }), y: 0 };
+  const path = [start, ...corners, start];
+  const lengths = path.slice(1).map((point, index) => lengthOf(sub(point, path[index])));
+  let remaining = wrapTurn(t) * lengths.reduce((sum, length) => sum + length, 0);
+  for (let index = 0; index < lengths.length; index += 1) {
+    if (remaining <= lengths[index]) {
+      return add(path[index], scale(sub(path[index + 1], path[index]), remaining / lengths[index]));
+    }
+    remaining -= lengths[index];
+  }
+  return path[0];
+};
+
+/** The point pulled inside the shape toward the centre, if it lies outside (`Shape::clamp`). */
+export const clampToPad = (shape: BlendPadShape, point: Coord): Coord => {
+  const radius = lengthOf(point);
+  if (radius < EPSILON) return point;
+  const edge = edgeDistance(shape, scale(point, 1 / radius));
+  return radius > edge ? scale(point, edge / radius) : point;
+};
+
+/** The point opposite the anchor at `t`, where its reverse is strongest. */
+export const oppositePoint = (shape: BlendPadShape, t: number): Coord => {
+  const anchor = anchorPoint(shape, t);
+  const reach = lengthOf(anchor);
+  if (reach < EPSILON) return anchor;
+  const away = scale(anchor, -1 / reach);
+  return scale(away, edgeDistance(shape, away));
 };
 
 /** +1 at the anchor, 0 at the centre, −1 at the opposite edge point (`Shape::axis_weight`). */
-export const axisWeight = (t: number, puck: Coord): number => {
-  const anchor = anchorPoint(t);
-  const reach = Math.hypot(anchor.x, anchor.y);
+export const axisWeight = (shape: BlendPadShape, t: number, puck: Coord): number => {
+  const anchor = anchorPoint(shape, t);
+  const reach = lengthOf(anchor);
   if (reach < EPSILON) return 0;
   const direction = scale(anchor, 1 / reach);
   const along = puck.x * direction.x + puck.y * direction.y;
-  // The circle's opposite edge point is 1 from the centre.
-  const weight = along >= 0 ? along / reach : along;
+  const weight = along >= 0 ? along / reach : along / edgeDistance(shape, scale(direction, -1));
   return Math.min(1, Math.max(-1, weight));
 };
 
 /** What one anchor adds at the puck before stacking, limiting and rounding. */
-export const anchorValue = (anchor: BlendPadAnchor, puck: Coord, amount: number): number => {
+export const anchorValue = (shape: BlendPadShape, anchor: BlendPadAnchor, puck: Coord, amount: number): number => {
   if (anchor.muted) return 0;
-  const weight = axisWeight(anchor.t, clampToPad(puck));
+  const weight = axisWeight(shape, anchor.t, clampToPad(shape, puck));
   const value = anchor.target * CURVES[anchor.curve](Math.abs(weight)) * Math.sign(weight) * amount;
   return value === 0 ? 0 : value;
 };
@@ -89,7 +197,7 @@ export const resolveBlendPad = (
   if (pad?.enabled && pad.version === 1) {
     const amount = Math.min(1, Math.max(0, pad.amount));
     for (const anchor of pad.anchors.slice(0, MAX_BLEND_PAD_ANCHORS)) {
-      if (anchor.param in sums) sums[anchor.param] += anchorValue(anchor, pad.puck, amount);
+      if (anchor.param in sums) sums[anchor.param] += anchorValue(pad.shape, anchor, pad.puck, amount);
     }
   }
   return Object.fromEntries(
@@ -170,10 +278,34 @@ export const largestGapPosition = (anchors: Array<BlendPadAnchor>): number => {
   return (best.start + best.length / 2) % 1;
 };
 
-/** The perimeter position of a point in pad space (0–1, from the right, anticlockwise). */
-export const positionOf = (point: Coord): number => {
+/**
+ * The perimeter position (0–1) where the ray from the centre toward a point meets the outline,
+ * the inverse of `anchorPoint`; dragging an anchor uses it.
+ */
+export const positionOf = (shape: BlendPadShape, point: Coord): number => {
   const turns = Math.atan2(point.y, point.x) / TAU;
-  return turns < 0 ? turns + 1 : turns;
+  const corners = shapeCorners(shape);
+  if (!corners) return turns < 0 ? turns + 1 : turns;
+  // Where the ray toward the point meets the outline, as a share of the outline's length.
+  const radius = lengthOf(point);
+  if (radius < EPSILON) return 0;
+  const direction = scale(point, 1 / radius);
+  const edgePoint = scale(direction, edgeDistance(shape, direction));
+  const start = { x: edgeDistance(shape, { x: 1, y: 0 }), y: 0 };
+  const path = [start, ...corners, start];
+  const lengths = path.slice(1).map((next, index) => lengthOf(sub(next, path[index])));
+  const total = lengths.reduce((sum, length) => sum + length, 0);
+  let travelled = 0;
+  for (let index = 0; index < lengths.length; index += 1) {
+    const segment = sub(path[index + 1], path[index]);
+    const offset = sub(edgePoint, path[index]);
+    const along = (offset.x * segment.x + offset.y * segment.y) / (lengths[index] * lengths[index]);
+    if (Math.abs(cross(offset, segment)) < 1e-6 && along >= -EPSILON && along <= 1 + EPSILON) {
+      return wrapTurn((travelled + along * lengths[index]) / total);
+    }
+    travelled += lengths[index];
+  }
+  return wrapTurn(turns);
 };
 
 /** A target of the same share of the slider's reach (Contrast +60 becomes Exposure +3.00). */

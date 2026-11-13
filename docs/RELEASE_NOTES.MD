@@ -5,6 +5,18 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.52.0-dev-orbit-blend-pad — 2026-11-13
+
+### Develop
+
+- **Orbit Blend Pad shapes**: choose a circle, triangle, square,
+  rectangle, pentagon or hexagon. Tools keep their place along the edge
+  when the shape changes, and every tool still reaches its full target at
+  its anchor and its full reverse on the opposite edge, even where that
+  edge is closer to the centre.
+- Sliders the pad moves now also show the combined value in brackets next
+  to their own value, e.g. **[60] 20**.
+
 ## 1.51.0-dev-orbit-blend-pad — 2026-11-13
 
 ### Develop
