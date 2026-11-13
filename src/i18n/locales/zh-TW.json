@@ -666,6 +666,15 @@
       "mute": "停用",
       "remove": "移除工具",
       "reset": "重設混合板",
+      "shape": "形狀",
+      "shapes": {
+        "circle": "圓形",
+        "hexagon": "六邊形",
+        "pentagon": "五邊形",
+        "rectangle": "矩形",
+        "square": "正方形",
+        "triangle": "三角形"
+      },
       "target": "目標值",
       "title": "混合板",
       "unmute": "重新啟用"
@@ -2192,7 +2201,8 @@
     },
     "slider": {
       "clickToEdit": "點選編輯",
-      "reset": "重置"
+      "reset": "重置",
+      "withBlendPad": "含混合板"
     },
     "waveform": {
       "tooltips": {

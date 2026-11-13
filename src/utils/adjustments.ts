@@ -516,6 +516,9 @@ export const createPointColor = (hue: number, saturation: number, luminance: num
 /** How an anchor's offset grows along its axis, the same on both sides of the centre. */
 export type BlendPadCurve = 'linear' | 'soft' | 'easeIn';
 
+/** The pad's outline (`blend_pad::Shape`); every shape fits the unit circle. */
+export type BlendPadShape = 'circle' | 'triangle' | 'square' | 'rectangle' | 'pentagon' | 'hexagon';
+
 /** An Orbit Blend Pad anchor: one slider and the offset it reaches at the anchor. */
 export interface BlendPadAnchor {
   id: string;
@@ -537,7 +540,7 @@ export interface BlendPad {
   /** `blend_pad::BLEND_PAD_VERSION`. */
   version: 1;
   enabled: boolean;
-  shape: 'circle';
+  shape: BlendPadShape;
   /** Master strength, 0–1. */
   amount: number;
   puck: Coord;

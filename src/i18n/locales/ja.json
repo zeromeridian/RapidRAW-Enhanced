@@ -666,6 +666,15 @@
       "mute": "ミュート",
       "remove": "ツールを削除",
       "reset": "パッドをリセット",
+      "shape": "形状",
+      "shapes": {
+        "circle": "円",
+        "hexagon": "六角形",
+        "pentagon": "五角形",
+        "rectangle": "長方形",
+        "square": "正方形",
+        "triangle": "三角形"
+      },
       "target": "目標値",
       "title": "ブレンドパッド",
       "unmute": "ミュート解除"
@@ -2192,7 +2201,8 @@
     },
     "slider": {
       "clickToEdit": "クリックして編集",
-      "reset": "リセット"
+      "reset": "リセット",
+      "withBlendPad": "ブレンドパッド適用後"
     },
     "waveform": {
       "tooltips": {

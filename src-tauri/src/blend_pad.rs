@@ -154,6 +154,24 @@ impl Point {
             y: self.y * factor,
         }
     }
+
+    fn add(self, other: Point) -> Point {
+        Point {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+
+    fn sub(self, other: Point) -> Point {
+        Point {
+            x: self.x - other.x,
+            y: self.y - other.y,
+        }
+    }
+
+    fn cross(self, other: Point) -> f64 {
+        self.x * other.y - self.y * other.x
+    }
 }
 
 /// The pad's outline, centred on (0, 0) in normalised space with y up.
@@ -163,38 +181,137 @@ pub enum Shape {
     /// Radius 1.
     #[default]
     Circle,
+    Triangle,
+    Square,
+    /// 3:2, landscape.
+    Rectangle,
+    Pentagon,
+    Hexagon,
 }
 
+/// The rectangle's width to height.
+const RECTANGLE_ASPECT: f64 = 1.5;
+
 impl Shape {
-    /// The edge point at perimeter position `t` (0–1, from the right, anticlockwise).
+    /// The corners, anticlockwise from the first one past the right (angle 0), all on the unit
+    /// circle so every shape fits the same space; `None` for the circle. The triangle, pentagon
+    /// and hexagon have a corner at the top; the square and the rectangle sit flat.
+    fn corners(self) -> Option<Vec<Point>> {
+        let regular = |sides: u32, first_turn: f64| -> Vec<Point> {
+            (0..sides)
+                .map(|k| {
+                    let angle = TAU * (first_turn + f64::from(k) / f64::from(sides));
+                    Point {
+                        x: angle.cos(),
+                        y: angle.sin(),
+                    }
+                })
+                .collect()
+        };
+        let mut corners = match self {
+            Shape::Circle => return None,
+            Shape::Triangle => regular(3, 0.25),
+            Shape::Square => regular(4, 0.125),
+            Shape::Pentagon => regular(5, 0.25),
+            Shape::Hexagon => regular(6, 0.25),
+            Shape::Rectangle => {
+                let diagonal = RECTANGLE_ASPECT.hypot(1.0);
+                let (x, y) = (RECTANGLE_ASPECT / diagonal, 1.0 / diagonal);
+                [(x, y), (-x, y), (-x, -y), (x, -y)]
+                    .map(|(x, y)| Point { x, y })
+                    .to_vec()
+            }
+        };
+        let turn = |point: &Point| {
+            let angle = point.y.atan2(point.x);
+            if angle <= 0.0 { angle + TAU } else { angle }
+        };
+        corners.sort_by(|a, b| turn(a).total_cmp(&turn(b)));
+        Some(corners)
+    }
+
+    /// The outline as a closed path from where it crosses the right (+x), anticlockwise.
+    fn perimeter_path(self, corners: &[Point]) -> Vec<Point> {
+        let start = Point {
+            x: self.edge_distance(Point { x: 1.0, y: 0.0 }),
+            y: 0.0,
+        };
+        let mut path = Vec::with_capacity(corners.len() + 2);
+        path.push(start);
+        path.extend_from_slice(corners);
+        path.push(start);
+        path
+    }
+
+    /// The edge point at perimeter position `t` (0–1 along the outline from the right,
+    /// anticlockwise), so anchors keep their place when the shape changes.
     pub fn point_at(self, t: f64) -> Point {
-        match self {
-            Shape::Circle => Point {
+        let Some(corners) = self.corners() else {
+            return Point {
                 x: (TAU * t).cos(),
                 y: (TAU * t).sin(),
-            },
+            };
+        };
+        let path = self.perimeter_path(&corners);
+        let lengths: Vec<f64> = path
+            .windows(2)
+            .map(|pair| pair[1].sub(pair[0]).length())
+            .collect();
+        let mut remaining = t.rem_euclid(1.0) * lengths.iter().sum::<f64>();
+        for (pair, length) in path.windows(2).zip(&lengths) {
+            if remaining <= *length {
+                return pair[0].add(pair[1].sub(pair[0]).scale(remaining / length));
+            }
+            remaining -= length;
         }
+        path[0]
     }
 
     /// How far from the centre the ray in the unit `direction` leaves the shape.
-    fn edge_distance(self, _direction: Point) -> f64 {
-        match self {
-            Shape::Circle => 1.0,
+    fn edge_distance(self, direction: Point) -> f64 {
+        let Some(corners) = self.corners() else {
+            return 1.0;
+        };
+        let mut nearest = f64::INFINITY;
+        for (index, corner) in corners.iter().enumerate() {
+            let edge = corners[(index + 1) % corners.len()].sub(*corner);
+            let denominator = direction.cross(edge);
+            if denominator.abs() < EPSILON {
+                continue;
+            }
+            let distance = corner.cross(edge) / denominator;
+            let along_edge = corner.cross(direction) / denominator;
+            if distance > 0.0 && (-EPSILON..=1.0 + EPSILON).contains(&along_edge) {
+                nearest = nearest.min(distance);
+            }
+        }
+        nearest
+    }
+
+    /// The point pulled inside the shape toward the centre, if it lies outside.
+    pub fn clamp(self, point: Point) -> Point {
+        let radius = point.length();
+        if radius < EPSILON {
+            return point;
+        }
+        let edge = self.edge_distance(point.scale(1.0 / radius));
+        if radius > edge {
+            point.scale(edge / radius)
+        } else {
+            point
         }
     }
 
-    /// The nearest point inside the shape.
-    pub fn clamp(self, point: Point) -> Point {
-        match self {
-            Shape::Circle => {
-                let radius = point.length();
-                if radius > 1.0 {
-                    point.scale(1.0 / radius)
-                } else {
-                    point
-                }
-            }
+    /// The point opposite the anchor at `t`, where its reverse is strongest.
+    #[cfg(test)]
+    fn opposite_point(self, t: f64) -> Point {
+        let anchor = self.point_at(t);
+        let reach = anchor.length();
+        if reach < EPSILON {
+            return anchor;
         }
+        let away = anchor.scale(-1.0 / reach);
+        away.scale(self.edge_distance(away))
     }
 
     /// The anchor's weight for a puck inside the shape: +1 at the anchor, 0 at the centre and
@@ -373,6 +490,99 @@ mod tests {
             assert!((Shape::Circle.axis_weight(t, at) - 1.0).abs() < 1e-12);
             assert_eq!(Shape::Circle.axis_weight(t, Point::default()), 0.0);
             assert!((Shape::Circle.axis_weight(t, opposite) + 1.0).abs() < 1e-12);
+        }
+    }
+
+    const SHAPES: [Shape; 6] = [
+        Shape::Circle,
+        Shape::Triangle,
+        Shape::Square,
+        Shape::Rectangle,
+        Shape::Pentagon,
+        Shape::Hexagon,
+    ];
+
+    #[test]
+    fn every_shape_gives_one_at_the_anchor_minus_one_opposite_and_zero_at_the_centre() {
+        for shape in SHAPES {
+            // Corners included: every shape has one near 1/n of the way round, and these
+            // positions land on the triangle's and the square's.
+            for t in [
+                0.0,
+                0.1,
+                0.125,
+                2.0 / 9.0,
+                0.25,
+                0.37,
+                0.5,
+                0.625,
+                0.8,
+                0.99,
+            ] {
+                let at = shape.point_at(t);
+                assert!(
+                    (shape.axis_weight(t, at) - 1.0).abs() < 1e-9,
+                    "{shape:?} at {t}"
+                );
+                assert!(
+                    (shape.axis_weight(t, shape.opposite_point(t)) + 1.0).abs() < 1e-9,
+                    "{shape:?} opposite {t}"
+                );
+                assert_eq!(shape.axis_weight(t, Point::default()), 0.0);
+                assert!(at.length() <= 1.0 + 1e-9, "{shape:?} fits the unit circle");
+            }
+        }
+    }
+
+    #[test]
+    fn every_shape_clamps_the_puck_inside_and_keeps_weights_in_range() {
+        for shape in SHAPES {
+            for i in -15..=15 {
+                for j in -15..=15 {
+                    let puck = shape.clamp(Point {
+                        x: f64::from(i) / 10.0,
+                        y: f64::from(j) / 10.0,
+                    });
+                    let radius = puck.length();
+                    if radius > EPSILON {
+                        let edge = shape.edge_distance(puck.scale(1.0 / radius));
+                        assert!(radius <= edge + 1e-9, "{shape:?} clamps {i},{j}");
+                    }
+                    for t in [0.0, 0.2, 0.45, 0.7] {
+                        let weight = shape.axis_weight(t, puck);
+                        assert!((-1.0..=1.0).contains(&weight), "{shape:?} {t}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_triangle_measures_each_side_of_the_centre_on_its_own() {
+        // The top corner is 1 from the centre, the bottom edge only 0.5.
+        let top = 2.0 / 9.0;
+        let at = Shape::Triangle.point_at(top);
+        assert!(at.x.abs() < 1e-9 && (at.y - 1.0).abs() < 1e-9);
+        let half_up = Shape::Triangle.axis_weight(top, Point { x: 0.0, y: 0.5 });
+        let half_down = Shape::Triangle.axis_weight(top, Point { x: 0.0, y: -0.5 });
+        assert!((half_up - 0.5).abs() < 1e-9);
+        assert!((half_down + 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn anchors_keep_their_position_when_the_shape_changes() {
+        let mut adjustments = pad((0.0, 0.5), vec![anchor("contrast", TOP, 60.0)]);
+        for shape in [
+            "circle",
+            "triangle",
+            "square",
+            "rectangle",
+            "pentagon",
+            "hexagon",
+        ] {
+            adjustments["blendPad"]["shape"] = json!(shape);
+            let resolved = Offsets::from_adjustments(&adjustments);
+            assert!(resolved.offset("contrast") > 0.0, "{shape}");
         }
     }
 

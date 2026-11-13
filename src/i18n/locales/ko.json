@@ -666,6 +666,15 @@
       "mute": "끄기",
       "remove": "도구 제거",
       "reset": "패드 초기화",
+      "shape": "모양",
+      "shapes": {
+        "circle": "원",
+        "hexagon": "육각형",
+        "pentagon": "오각형",
+        "rectangle": "직사각형",
+        "square": "정사각형",
+        "triangle": "삼각형"
+      },
       "target": "목표값",
       "title": "블렌드 패드",
       "unmute": "다시 켜기"
@@ -2192,7 +2201,8 @@
     },
     "slider": {
       "clickToEdit": "클릭하여 편집",
-      "reset": "초기화"
+      "reset": "초기화",
+      "withBlendPad": "블렌드 패드 적용 후"
     },
     "waveform": {
       "tooltips": {

@@ -32,7 +32,10 @@ export interface SliderProps {
   suffix?: string;
   /** Ease the thumb to a value set from outside (default); off while the photo itself drives it. */
   animateValueChanges?: boolean;
-  /** A tick on the track where the photo's value really is (the Orbit Blend Pad adds to it). */
+  /**
+   * Where the photo's value really is when the Orbit Blend Pad adds to the slider: a tick on the
+   * track and the value in brackets.
+   */
   ghostValue?: number;
 }
 
@@ -660,7 +663,9 @@ const Slider = ({
           </div>
           {labelAddon}
         </div>
-        <div className="w-12 text-right compact:col-start-3 compact:row-start-1 compact:w-auto">
+        <div
+          className={`${ghostValue === undefined ? 'w-12' : 'min-w-12 whitespace-nowrap'} text-right compact:col-start-3 compact:row-start-1 compact:w-auto`}
+        >
           {isEditing ? (
             <input
               className="w-full text-sm compact:text-xs text-right bg-card-active border border-gray-500 rounded-sm px-1 py-0 outline-none focus:ring-1 focus:ring-blue-500 text-text-primary"
@@ -682,6 +687,11 @@ const Slider = ({
               onDoubleClick={disabled ? undefined : handleReset}
               data-tooltip={disabled ? undefined : t('ui.slider.clickToEdit')}
             >
+              {ghostValue !== undefined && (
+                <span className="text-accent mr-1" data-tooltip={t('ui.slider.withBlendPad')}>
+                  [{formatValue(ghostValue)}]
+                </span>
+              )}
               {formatValue(numericValue)}
               {suffix && <span className="text-[10px] align-top inline-block mt-0.5 ml-0.5">{suffix}</span>}
             </span>

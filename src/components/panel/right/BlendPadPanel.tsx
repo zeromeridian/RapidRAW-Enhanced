@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent, PointerEvent } from 'react';
+import type { KeyboardEvent, PointerEvent, SVGProps } from 'react';
 import { Crosshair, Eye, EyeOff, RotateCcw, Stamp, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
@@ -15,8 +15,9 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useBlendPadParameters } from '../../../hooks/useBlendPadParameters';
 import { useControlLabel } from '../../../hooks/useControlLabel';
-import type { BlendPad, BlendPadAnchor, BlendPadCurve, Coord } from '../../../utils/adjustments';
+import type { BlendPad, BlendPadAnchor, BlendPadCurve, BlendPadShape, Coord } from '../../../utils/adjustments';
 import {
+  BLEND_PAD_SHAPES,
   MAX_BLEND_PAD_ANCHORS,
   anchorPoint,
   anchorValue,
@@ -24,8 +25,10 @@ import {
   clampToPad,
   createBlendPad,
   largestGapPosition,
+  oppositePoint,
   positionOf,
   resolveBlendPad,
+  shapeCorners,
   shareOf,
   targetWithShare,
 } from '../../../utils/blendPad';
@@ -96,7 +99,16 @@ function PadField({
   const pendingUpdate = useRef<(() => void) | null>(null);
   const frame = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
-  const puck = clampToPad(pad.puck);
+  const { shape } = pad;
+  const puck = clampToPad(shape, pad.puck);
+  const corners = shapeCorners(shape);
+  /** The pad's outline, for the clip and the stroke. */
+  const outline = (props: SVGProps<SVGCircleElement> & SVGProps<SVGPolygonElement>) =>
+    corners ? (
+      <polygon points={corners.map((corner) => `${corner.x},${-corner.y}`).join(' ')} {...props} />
+    ) : (
+      <circle r={1} {...props} />
+    );
 
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
@@ -125,7 +137,7 @@ function PadField({
 
   const anchorAt = (point: Coord) =>
     pad.anchors.find((anchor) => {
-      const at = anchorPoint(anchor.t);
+      const at = anchorPoint(shape, anchor.t);
       return Math.hypot(point.x - at.x, point.y - at.y) <= ANCHOR_GRAB_RADIUS;
     });
 
@@ -154,7 +166,7 @@ function PadField({
     if (!current) return;
     const point = toPad(event);
     if (current.kind === 'anchor') {
-      scheduleUpdate(() => onAnchorMove(current.id, positionOf(point)));
+      scheduleUpdate(() => onAnchorMove(current.id, positionOf(shape, point)));
       return;
     }
     const factor = event.shiftKey ? FINE_DRAG : 1;
@@ -163,7 +175,7 @@ function PadField({
       y: current.virtual.y + (point.y - current.last.y) * factor,
     };
     drag.current = { kind: 'puck', last: point, virtual };
-    scheduleUpdate(() => onPuckChange(clampToPad(virtual)));
+    scheduleUpdate(() => onPuckChange(clampToPad(shape, virtual)));
   };
 
   const endDrag = () => {
@@ -182,7 +194,7 @@ function PadField({
     if (!direction) return;
     event.preventDefault();
     const step = event.shiftKey ? FINE_NUDGE : NUDGE;
-    onPuckChange(clampToPad({ x: puck.x + direction.x * step, y: puck.y + direction.y * step }));
+    onPuckChange(clampToPad(shape, { x: puck.x + direction.x * step, y: puck.y + direction.y * step }));
   };
 
   const puckView = toView(puck);
@@ -207,11 +219,10 @@ function PadField({
       viewBox={`${-VIEW_HALF} ${-VIEW_HALF} ${VIEW_SIZE} ${VIEW_SIZE}`}
     >
       <defs>
-        <clipPath id={`${gradientId}-clip`}>
-          <circle r={1} />
-        </clipPath>
+        <clipPath id={`${gradientId}-clip`}>{outline({})}</clipPath>
         {pad.anchors.map((anchor) => {
-          const at = toView(anchorPoint(anchor.t));
+          const at = toView(anchorPoint(shape, anchor.t));
+          const opposite = toView(oppositePoint(shape, anchor.t));
           const [toward, away] = anchor.target >= 0 ? [WARM, COOL] : [COOL, WARM];
           return (
             <linearGradient
@@ -219,9 +230,9 @@ function PadField({
               id={`${gradientId}-${anchor.id}`}
               key={anchor.id}
               x1={at.x}
-              x2={-at.x}
+              x2={opposite.x}
               y1={at.y}
-              y2={-at.y}
+              y2={opposite.y}
             >
               <stop offset={0} stopColor={toward} stopOpacity={anchor.muted ? 0 : 0.2} />
               <stop offset={0.5} stopColor={toward} stopOpacity={0} />
@@ -236,12 +247,17 @@ function PadField({
           <rect fill={`url(#${gradientId}-${anchor.id})`} height={2} key={anchor.id} width={2} x={-1} y={-1} />
         ))}
       </g>
-      <circle className="fill-none stroke-text-secondary" r={1} strokeOpacity={0.6} strokeWidth={0.008} />
+      {outline({
+        className: 'fill-none stroke-text-secondary',
+        strokeLinejoin: 'round',
+        strokeOpacity: 0.6,
+        strokeWidth: 0.008,
+      })}
       <path className="stroke-text-secondary" d="M -0.05 0 H 0.05 M 0 -0.05 V 0.05" strokeWidth={0.008} />
 
       {/* Where each anchor's reverse sits. */}
       {pad.anchors.map((anchor) => {
-        const opposite = toView(anchorPoint(anchor.t + 0.5));
+        const opposite = toView(oppositePoint(shape, anchor.t));
         return (
           <circle
             className="fill-none stroke-text-secondary"
@@ -256,17 +272,19 @@ function PadField({
       })}
 
       {pad.anchors.map((anchor) => {
-        const direction = anchorPoint(anchor.t);
-        const at = toView(direction);
+        const point = anchorPoint(shape, anchor.t);
+        const at = toView(point);
+        const reach = Math.hypot(point.x, point.y) || 1;
+        const direction = { x: point.x / reach, y: point.y / reach };
         const isCorner = Math.abs(direction.x) > 0.3 && Math.abs(direction.y) > 0.3;
         // Corner anchors label above or below the dot; others outward, so no label leaves the pad.
         const labelAt = isCorner
           ? { x: at.x, y: at.y + (direction.y > 0 ? -0.12 : 0.18) }
-          : { x: direction.x * 1.18, y: -direction.y * 1.18 };
+          : { x: at.x + direction.x * 0.18, y: at.y - direction.y * 0.18 };
         const textAnchor = isCorner || Math.abs(direction.x) <= 0.3 ? 'middle' : direction.x > 0 ? 'start' : 'end';
         const isAbove = direction.y > 0.3;
         const value = isDragging
-          ? formatSigned(anchorValue(anchor, puck, pad.amount), getStep(anchor))
+          ? formatSigned(anchorValue(shape, anchor, puck, pad.amount), getStep(anchor))
           : `→ ${formatSigned(anchor.target, getStep(anchor))}`;
         return (
           <g className="cursor-grab" key={anchor.id} opacity={anchor.muted ? 0.4 : 1}>
@@ -342,6 +360,10 @@ export default function BlendPadPanel() {
   );
   const curveOptions = useMemo(
     () => CURVES.map((curve) => ({ label: t(`editor.blendPad.curves.${curve}`), value: curve })),
+    [t],
+  );
+  const shapeOptions = useMemo(
+    () => BLEND_PAD_SHAPES.map((shape) => ({ label: t(`editor.blendPad.shapes.${shape}`), value: shape })),
     [t],
   );
   const canBake = useMemo(
@@ -488,6 +510,20 @@ export default function BlendPadPanel() {
             label={t('editor.blendPad.enabled')}
             onChange={(enabled: boolean) => updatePad((current) => ({ ...current, enabled }))}
           />
+          <div className="flex items-center gap-2">
+            <Text variant={TextVariants.label} className="w-16 shrink-0 text-text-secondary">
+              {t('editor.blendPad.shape')}
+            </Text>
+            <Dropdown
+              className="grow min-w-0"
+              onChange={(shape: BlendPadShape) =>
+                // Anchors keep their place along the outline; the puck stays inside the new one.
+                updatePad((current) => ({ ...current, shape, puck: clampToPad(shape, current.puck) }))
+              }
+              options={shapeOptions}
+              value={pad.shape}
+            />
+          </div>
           <Slider
             defaultValue={100}
             fillOrigin="min"

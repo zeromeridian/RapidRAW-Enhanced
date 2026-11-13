@@ -716,6 +716,15 @@
       "mute": "Отключить",
       "remove": "Удалить инструмент",
       "reset": "Сбросить пэд",
+      "shape": "Форма",
+      "shapes": {
+        "circle": "Круг",
+        "hexagon": "Шестиугольник",
+        "pentagon": "Пятиугольник",
+        "rectangle": "Прямоугольник",
+        "square": "Квадрат",
+        "triangle": "Треугольник"
+      },
       "target": "Цель",
       "title": "Blend Pad",
       "unmute": "Включить снова"
@@ -2290,7 +2299,8 @@
     },
     "slider": {
       "clickToEdit": "Нажмите для точного ввода",
-      "reset": "Сбросить значение"
+      "reset": "Сбросить значение",
+      "withBlendPad": "С учётом Blend Pad"
     },
     "waveform": {
       "tooltips": {
