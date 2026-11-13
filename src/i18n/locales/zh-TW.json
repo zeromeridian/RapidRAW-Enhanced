@@ -406,6 +406,7 @@
       },
       "sections": {
         "basic": "基礎",
+        "blendPad": "混合板",
         "color": "顏色",
         "curves": "曲線",
         "details": "細節",
@@ -647,6 +648,19 @@
       "done": "完成",
       "exporting": "正在匯出…",
       "savesTo": "外部編輯 — 儲存至"
+    },
+    "blendPad": {
+      "center": "將滑塊置中",
+      "enabled": "啟用混合板",
+      "hint": "拖曳滑塊以混合各工具。按住 Shift 可微調，方向鍵可輕移，按兩下滑塊可回到中心。",
+      "reset": "重設混合板",
+      "slots": {
+        "bottomLeft": "左下",
+        "bottomRight": "右下",
+        "top": "上"
+      },
+      "target": "目標值",
+      "title": "混合板"
     },
     "favorites": {
       "add": "加入收藏",

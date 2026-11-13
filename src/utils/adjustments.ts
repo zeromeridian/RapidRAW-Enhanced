@@ -1297,6 +1297,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     },
   ],
   masks: [{ label: 'modals.copyPaste.groups.masks', keys: ['masks'] }],
+  blendPad: [{ label: 'editor.blendPad.title', keys: ['blendPad'] }],
 };
 
 export const SPEED_EDIT_ROTATION = 'rotation';

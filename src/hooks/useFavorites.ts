@@ -5,15 +5,9 @@ import type { ParseKeys } from 'i18next';
 import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { ADJUSTMENT_TOOLS_BY_ID, withAdjustmentLayout } from '../utils/adjustments';
-import {
-  ADJUSTMENT_CONTROLS_BY_ID,
-  Favorite,
-  favoriteKey,
-  getFavorites,
-  parseFavorite,
-  withFavoriteToggled,
-} from '../utils/adjustmentControls';
+import { Favorite, favoriteKey, getFavorites, parseFavorite, withFavoriteToggled } from '../utils/adjustmentControls';
 import { FAVORITE_DATA_ATTRIBUTE } from '../components/adjustments/AdjustmentTool';
+import { useControlLabel } from './useControlLabel';
 
 /** The photo's Favorites: the saved list, their labels, and adding, removing and reordering them. */
 export function useFavorites() {
@@ -23,20 +17,15 @@ export function useFavorites() {
   );
   const favorites = useMemo(() => getFavorites(appSettings?.adjustmentLayout), [appSettings?.adjustmentLayout]);
 
-  const sectionLabel = useCallback((section: string) => t(`editor.adjustments.sections.${section}` as ParseKeys), [t]);
+  const { controlLabel, sectionLabel } = useControlLabel();
 
   const getLabel = useCallback(
     (favorite: Favorite): string => {
       if (favorite.kind === 'section') return sectionLabel(favorite.id);
       if (favorite.kind === 'tool') return t(ADJUSTMENT_TOOLS_BY_ID[favorite.id].label as ParseKeys);
-      const control = ADJUSTMENT_CONTROLS_BY_ID[favorite.id];
-      const label = t(control.label as ParseKeys);
-      if (!control.qualify) return label;
-      const parent = ADJUSTMENT_TOOLS_BY_ID[control.parent];
-      const tool = parent ? t(parent.label as ParseKeys) : sectionLabel(control.parent);
-      return t('editor.favorites.qualifiedLabel', { tool, control: label });
+      return controlLabel(favorite.id);
     },
-    [t, sectionLabel],
+    [t, controlLabel, sectionLabel],
   );
 
   const toggleFavorite = useCallback(

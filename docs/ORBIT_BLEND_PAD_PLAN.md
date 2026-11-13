@@ -1,7 +1,7 @@
 # Orbit Blend Pad Plan
 
-Status (2026-11-13): **step 1 done (`1.49.0`, uncommitted)** on
-`dev/orbit-blend-pad`; step 2 next.
+Status (2026-11-13): **steps 1 (`1.49.0`, owner commit `59e355b6`) and 2
+(`1.50.0`, uncommitted) done** on `dev/orbit-blend-pad`; step 3 next.
 `UPSTREAM_FEATURE_GAP.md` Plan item 27.
 
 **Owner decisions (2026-11-13):** brought forward, ahead of the remaining
@@ -15,9 +15,12 @@ as a classic script, `npx serve`, README) no longer apply.
 full at the start.
 
 **Design (agent, from the concept note):**
-- The pad **adds on top of the sliders**: its offsets are added to the
-  slider values, so with the puck at the centre the photo looks as the
-  sliders set it. The stored edit keeps the pad (shape, anchors, puck,
+- The pad **adds on top of the sliders** (confirmed by the owner,
+  2026-11-13: keep it this way): its offsets are added to the slider
+  values, so they combine or cancel out, the total kept within the
+  slider's range (hue wraps); with the puck at the centre the photo looks
+  as the sliders set it. The pad never moves a slider; only Bake (step 3)
+  writes its offsets into them. The stored edit keeps the pad (shape, anchors, puck,
   amount), never the computed values.
 - **Rust is the source of truth.** `blend_pad.rs` resolves the pad inside
   `get_all_adjustments_from_json`, so preview, export, thumbnails, batch
@@ -51,9 +54,14 @@ full at the start.
    wins, Shift 4× finer, arrow keys, double-click to centre, the puck
    moves only when grabbed), live values, Amount, on/off, Before (`\`)
    as today, one undo step per drag, copy/paste and presets carry it, the
-   TypeScript resolver with the shared vectors. Open: where the panel
-   lives.
-3. **Anchor editing** (`1.51.0`): add a tool at the largest free gap,
+   TypeScript resolver with the shared vectors. The panel is its own tab
+   in the right-panel switcher, like Favorites (owner, 2026-11-13).
+3. **Anchor editing** (`1.51.0`). **Also new tools (owner, 2026-11-13):
+   Blur, Glow, Light Flare and Grain** on the pad. Check first how each
+   reaches the shader (Glow and Flare have their own generation pass,
+   Blur likely too), so a drag stays fast or updates on release, and
+   which slider "Blur" means (Gaussian Blur Amount is the candidate).
+   Then: add a tool at the largest free gap,
    drag anchors along the edge, an inspector (target, curve, mute,
    remove), opposite-point markers, a ghost marker on each slider for the
    pad's offset, Bake (write the offsets into the sliders, centre the
@@ -69,7 +77,7 @@ Not scheduled (concept note, later): pads per mask, heavier tools
 (updates on release), more blend modes, drag recording.
 
 **Progress:**
-- Step 1 (`1.49.0`, 2026-11-13, uncommitted on `dev/orbit-blend-pad`):
+- Step 1 (`1.49.0`, 2026-11-13, owner commit `59e355b6`):
   `src-tauri/src/blend_pad.rs` (`PARAMETERS`, `Shape::Circle` with
   `point_at`/`clamp`/`axis_weight`, `Curve`, `Offsets`), resolved in
   `get_global_adjustments_from_json`'s `get_val` (no copy of the
@@ -78,6 +86,21 @@ Not scheduled (concept note, later): pads per mask, heavier tools
   default in `src/utils/adjustments.ts`. 14 tests (12 in `blend_pad`, 2 in
   `image_processing`). Copy/paste group, history label and the
   TypeScript resolver come with the panel in step 2.
+- Step 2 (`1.50.0`, 2026-11-13, uncommitted): `BlendPadPanel.tsx`, a
+  right-panel tab after Favorites (`Panel.BlendPad`, Orbit icon). The pad
+  is an SVG (theme colours, axis gradients, labels inside the view box,
+  live values while dragging); the puck moves only when grabbed, one
+  update per animation frame, Shift ×0.25, arrows 0.02 (Shift 0.005),
+  double-click centres; drag sets `isSliderDragging`, so history merges
+  a drag into one step. Per slot: tool dropdown and target slider; a new
+  tool keeps the target's share of its range (agent's choice). Amount,
+  on/off, header Centre and Reset. A photo without a pad shows the
+  default one; the first change stores it. Parameters come from Rust
+  (`get_blend_pad_parameters`, `useBlendPadParameters`); `utils/blendPad.ts`
+  mirrors the maths, checked with Rust against `blendPad.vectors.json`
+  (`node scripts/check-blend-pad.mjs`, 12 cases). Slider labels shared
+  with Favorites through the new `useControlLabel`. Copy/paste group
+  "Blend Pad" (presets follow it), history label, strings in 12 locales.
 
 ## Owner's specification (2026-11-13; verbatim, headings one level down)
 

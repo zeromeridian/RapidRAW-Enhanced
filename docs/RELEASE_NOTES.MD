@@ -5,6 +5,19 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.50.0-dev-orbit-blend-pad — 2026-11-13
+
+### Develop
+
+- New **Orbit Blend Pad** tab: three tools sit on a circle, and dragging
+  one puck blends them all at once. Moving toward a tool brings it to its
+  target, moving away reverses it, and the centre leaves the photo as the
+  sliders set it. Choose each tool (Exposure, Contrast, white balance,
+  Saturation, Clarity, Dehaze and more) and its target, set the overall
+  Amount, or switch the pad off. Hold Shift for finer moves, nudge with the
+  arrow keys, and double-click the puck to centre it. The pad is saved with
+  the edit and travels with copy/paste, presets and XMP.
+
 ## 1.49.0-dev-orbit-blend-pad — 2026-11-13
 
 ### Develop

@@ -7,7 +7,7 @@
 //! the photo looks as the sliders set it. The stored edit keeps the pad, never the computed
 //! values; [`Offsets`] resolves it for every render, export and thumbnail.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::f64::consts::TAU;
 
@@ -24,8 +24,9 @@ pub const MAX_ANCHORS: usize = 8;
 const EPSILON: f64 = 1e-9;
 
 /// A slider the pad can drive, with the range and step of its slider (`ADJUSTMENT_CONTROLS` in
-/// `utils/adjustmentControls.ts`).
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// `utils/adjustmentControls.ts`). The pad panel reads this list through
+/// [`get_blend_pad_parameters`] (`BlendPadParameter` in `utils/blendPad.ts`).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct Parameter {
     pub id: &'static str,
     pub min: f64,
@@ -94,6 +95,12 @@ pub const PARAMETERS: [Parameter; 17] = [
     Parameter::signed("centré"),
     Parameter::signed("vignetteAmount"),
 ];
+
+/// The sliders the pad can drive, so the pad panel offers and resolves exactly these.
+#[tauri::command]
+pub fn get_blend_pad_parameters() -> [Parameter; PARAMETERS.len()] {
+    PARAMETERS
+}
 
 fn parameter_index(id: &str) -> Option<usize> {
     PARAMETERS.iter().position(|parameter| parameter.id == id)
@@ -457,6 +464,50 @@ mod tests {
         other_shape["blendPad"]["shape"] = json!("spiral");
         for adjustments in [disabled, newer, other_shape, json!({}), Value::Null] {
             assert_eq!(Offsets::from_adjustments(&adjustments), Offsets::default());
+        }
+    }
+
+    /// The vectors `utils/blendPad.ts` is checked against too (`scripts/check-blend-pad.mjs`).
+    #[test]
+    fn shared_vectors_match() {
+        let vectors: Value =
+            serde_json::from_str(include_str!("../../src/utils/blendPad.vectors.json")).unwrap();
+        let listed = vectors["parameters"].as_array().unwrap();
+        assert_eq!(listed.len(), PARAMETERS.len());
+        for (entry, parameter) in listed.iter().zip(&PARAMETERS) {
+            assert_eq!(entry["id"], parameter.id);
+            assert_eq!(
+                entry["min"].as_f64(),
+                Some(parameter.min),
+                "{}",
+                parameter.id
+            );
+            assert_eq!(
+                entry["max"].as_f64(),
+                Some(parameter.max),
+                "{}",
+                parameter.id
+            );
+            assert_eq!(
+                entry["step"].as_f64(),
+                Some(parameter.step),
+                "{}",
+                parameter.id
+            );
+            assert_eq!(entry["wraps"], parameter.wraps, "{}", parameter.id);
+        }
+        for case in vectors["cases"].as_array().unwrap() {
+            let resolved = Offsets::from_adjustments(&json!({ "blendPad": case["pad"] }));
+            for parameter in &PARAMETERS {
+                let expected = case["offsets"][parameter.id].as_f64().unwrap_or(0.0);
+                assert!(
+                    (resolved.offset(parameter.id) - expected).abs() < 1e-9,
+                    "{}: {} is {}, expected {expected}",
+                    case["name"],
+                    parameter.id,
+                    resolved.offset(parameter.id)
+                );
+            }
         }
     }
 

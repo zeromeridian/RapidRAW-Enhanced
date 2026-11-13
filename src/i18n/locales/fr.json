@@ -425,6 +425,7 @@
       },
       "sections": {
         "basic": "Basique",
+        "blendPad": "Blend Pad",
         "color": "Couleur",
         "curves": "Courbes",
         "details": "Détails",
@@ -673,6 +674,19 @@
       "done": "Terminé",
       "exporting": "Exportation…",
       "savesTo": "Modification externe — s'enregistre dans"
+    },
+    "blendPad": {
+      "center": "Centrer le palet",
+      "enabled": "Blend Pad activé",
+      "hint": "Faites glisser le palet pour mélanger les outils. Maj pour des mouvements plus fins, flèches pour le déplacer, double-clic sur le palet pour le recentrer.",
+      "reset": "Réinitialiser le pad",
+      "slots": {
+        "bottomLeft": "En bas à gauche",
+        "bottomRight": "En bas à droite",
+        "top": "En haut"
+      },
+      "target": "Cible",
+      "title": "Blend Pad"
     },
     "favorites": {
       "add": "Ajouter aux favoris",

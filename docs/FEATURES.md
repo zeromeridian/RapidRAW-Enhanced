@@ -204,6 +204,14 @@ details are in `RELEASE_NOTES.MD`.
   label; the right-click menu offers the same) and arrange them by drag.
   They edit the photo's own values, with the same history, XMP and Speed
   Edit. For the photo only; masks keep their full panels.
+- **Orbit Blend Pad** tab in the Develop tool strip: three tools sit on a
+  circle (default Contrast, Temperature, Saturation), each with a target;
+  dragging one puck adds their values on top of the sliders, full target
+  at a tool's anchor and its reverse on the opposite side, nothing at the
+  centre. Pick the tool and target per anchor (17 global sliders), Amount,
+  on/off, Shift for finer drags, arrow keys, double-click to centre. Saved
+  with the edit and in XMP, copy/paste and presets; previews, exports and
+  thumbnails apply it. For the photo only.
 - **Customize Panels** (Adjustments header button or section right-click
   menu): drag the adjustment sections and the tools inside each into a new
   order, shared by the photo's and the masks' adjustments, with Reset to
