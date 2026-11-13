@@ -705,6 +705,9 @@ pub struct AppSettings {
     pub copy_name_suffix: String,
     #[serde(default)]
     pub tone_curve_presets: Vec<Value>,
+    /// Named Orbit Blend Pad setups (`BlendPadPreset` in `utils/blendPad.ts`), cleaned there.
+    #[serde(default)]
+    pub blend_pad_presets: Vec<Value>,
     #[serde(default)]
     pub left_panel_width: Option<u32>,
     #[serde(default)]
@@ -851,6 +854,7 @@ impl Default for AppSettings {
             copy_name_suffix_enabled: false,
             copy_name_suffix: String::new(),
             tone_curve_presets: Vec::new(),
+            blend_pad_presets: Vec::new(),
             left_panel_width: None,
             right_panel_width: None,
             catalog_directory: None,
@@ -1072,6 +1076,28 @@ mod tests {
         let restored: AppSettings =
             serde_json::from_str(&serialized).expect("settings should deserialize");
         assert_eq!(restored.tone_curve_presets, settings.tone_curve_presets);
+    }
+
+    #[test]
+    fn blend_pad_presets_round_trip_through_settings() {
+        let settings = AppSettings {
+            blend_pad_presets: vec![json!({
+                "id": "pad-1",
+                "name": "Moody",
+                "includesPuck": true,
+                "pad": { "version": 1, "shape": "triangle", "anchors": [] }
+            })],
+            ..AppSettings::default()
+        };
+
+        let serialized = serde_json::to_string(&settings).expect("settings should serialize");
+        assert!(serialized.contains("\"blendPadPresets\""));
+
+        let restored: AppSettings =
+            serde_json::from_str(&serialized).expect("settings should deserialize");
+        assert_eq!(restored.blend_pad_presets, settings.blend_pad_presets);
+        let older: AppSettings = serde_json::from_str("{}").expect("older settings load");
+        assert!(older.blend_pad_presets.is_empty());
     }
 
     #[test]

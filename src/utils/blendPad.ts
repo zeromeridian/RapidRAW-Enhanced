@@ -318,3 +318,127 @@ export const targetWithShare = (share: number, parameter: BlendPadParameter): nu
 /** The share of the slider's reach a target is. */
 export const shareOf = (target: number, parameter: BlendPadParameter): number =>
   target / Math.max(Math.abs(parameter.min), Math.abs(parameter.max));
+
+const CURVE_NAMES = Object.keys(CURVES) as Array<BlendPadCurve>;
+const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
+const finiteOr = (value: unknown, fallback: number) =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+/**
+ * A pad from untrusted data (a preset file, settings), never trusted as is: unknown tools,
+ * bad values and anchors past the limit are dropped, targets kept within reach. `null` when
+ * nothing usable is left or the pad has another format version.
+ */
+export const sanitizeBlendPad = (value: unknown, parameters: Array<BlendPadParameter>): BlendPad | null => {
+  if (!isRecord(value) || (value.version !== undefined && value.version !== 1)) return null;
+  const parametersById = new Map(parameters.map((parameter) => [parameter.id, parameter]));
+  const shape = BLEND_PAD_SHAPES.includes(value.shape as BlendPadShape) ? (value.shape as BlendPadShape) : 'circle';
+  const ids = new Set<string>();
+  const anchors = (Array.isArray(value.anchors) ? value.anchors : [])
+    .flatMap((candidate): Array<BlendPadAnchor> => {
+      if (!isRecord(candidate) || typeof candidate.param !== 'string') return [];
+      const parameter = parametersById.get(candidate.param);
+      if (!parameter || !Number.isFinite(candidate.t) || !Number.isFinite(candidate.target)) return [];
+      const reach = Math.max(Math.abs(parameter.min), Math.abs(parameter.max));
+      const target = Math.round((candidate.target as number) / parameter.step) * parameter.step;
+      const id =
+        typeof candidate.id === 'string' && candidate.id && !ids.has(candidate.id) ? candidate.id : crypto.randomUUID();
+      ids.add(id);
+      return [
+        {
+          id,
+          param: parameter.id,
+          t: wrapTurn(candidate.t as number),
+          target: Math.min(reach, Math.max(-reach, target)),
+          curve: CURVE_NAMES.includes(candidate.curve as BlendPadCurve) ? (candidate.curve as BlendPadCurve) : 'linear',
+          muted: candidate.muted === true,
+        },
+      ];
+    })
+    .slice(0, MAX_BLEND_PAD_ANCHORS);
+  if (anchors.length === 0) return null;
+  const puck = isRecord(value.puck) ? { x: finiteOr(value.puck.x, 0), y: finiteOr(value.puck.y, 0) } : { x: 0, y: 0 };
+  return {
+    version: 1,
+    enabled: value.enabled !== false,
+    shape,
+    amount: Math.min(1, Math.max(0, finiteOr(value.amount, 1))),
+    puck: clampToPad(shape, puck),
+    anchors,
+  };
+};
+
+/** A named pad setup, kept in the app settings: with the puck it is a look, without it a set of tools. */
+export interface BlendPadPreset {
+  id: string;
+  name: string;
+  /** Whether loading it also moves the puck; without, the puck goes to the centre. */
+  includesPuck: boolean;
+  pad: BlendPad;
+}
+
+/** `normalizePresetName` in `toneCurvePresets.ts`, repeated so this file stays free of runtime imports. */
+const normalizePresetName = (name: string) => name.trim().toLowerCase();
+
+const CENTRE: Coord = { x: 0, y: 0 };
+
+/** The preset's pad as it is saved: the puck kept only when the preset includes it. */
+const presetPad = (pad: BlendPad, includesPuck: boolean): BlendPad => ({
+  ...pad,
+  puck: includesPuck ? pad.puck : CENTRE,
+});
+
+export const createBlendPadPreset = (name: string, pad: BlendPad, includesPuck: boolean): BlendPadPreset => ({
+  id: crypto.randomUUID(),
+  name: name.trim(),
+  includesPuck,
+  pad: presetPad(pad, includesPuck),
+});
+
+/** The pad a preset loads. */
+export const loadBlendPadPreset = (preset: BlendPadPreset): BlendPad => presetPad(preset.pad, preset.includesPuck);
+
+/** Overwrites a preset with the current pad, keeping its name and whether it includes the puck. */
+export const updateBlendPadPreset = (preset: BlendPadPreset, pad: BlendPad): BlendPadPreset => ({
+  ...preset,
+  pad: presetPad(pad, preset.includesPuck),
+});
+
+/** Whether the current pad differs from the preset (anchor ids and, without the puck, its position aside). */
+export const isBlendPadPresetDirty = (preset: BlendPadPreset, pad: BlendPad) => {
+  const comparable = (candidate: BlendPad) => {
+    const { puck, anchors, ...rest } = presetPad(candidate, preset.includesPuck);
+    return JSON.stringify({ ...rest, puck, anchors: anchors.map(({ id: _id, ...anchor }) => anchor) });
+  };
+  return comparable(preset.pad) !== comparable(pad);
+};
+
+/**
+ * Presets from untrusted data (settings or a file): each cleaned with `sanitizeBlendPad`;
+ * those without a name or a usable pad dropped; ids and names made unique against `existing`,
+ * a clashing name getting " 2", " 3"…
+ */
+export const sanitizeBlendPadPresets = (
+  values: unknown,
+  parameters: Array<BlendPadParameter>,
+  existing: Array<BlendPadPreset> = [],
+): Array<BlendPadPreset> => {
+  const ids = new Set(existing.map((preset) => preset.id));
+  const names = new Set(existing.map((preset) => normalizePresetName(preset.name)));
+  const presets: Array<BlendPadPreset> = [];
+  for (const candidate of Array.isArray(values) ? values : []) {
+    if (!isRecord(candidate) || typeof candidate.name !== 'string' || !candidate.name.trim()) continue;
+    const pad = sanitizeBlendPad(candidate.pad, parameters);
+    if (!pad) continue;
+    const baseName = candidate.name.trim();
+    let name = baseName;
+    for (let suffix = 2; names.has(normalizePresetName(name)); suffix += 1) name = `${baseName} ${suffix}`;
+    const id =
+      typeof candidate.id === 'string' && candidate.id && !ids.has(candidate.id) ? candidate.id : crypto.randomUUID();
+    ids.add(id);
+    names.add(normalizePresetName(name));
+    const includesPuck = candidate.includesPuck === true;
+    presets.push({ id, name, includesPuck, pad: presetPad(pad, includesPuck) });
+  }
+  return presets;
+};

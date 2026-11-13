@@ -6,6 +6,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { v4 as uuidv4 } from 'uuid';
 import clsx from 'clsx';
 import PanelHeader from '../../ui/PanelHeader';
+import BlendPadPresetBar from './BlendPadPresetBar';
 import Slider from '../../ui/Slider';
 import Dropdown from '../../ui/Dropdown';
 import Switch from '../../ui/Switch';
@@ -25,6 +26,7 @@ import {
   clampToPad,
   createBlendPad,
   largestGapPosition,
+  loadBlendPadPreset,
   oppositePoint,
   positionOf,
   resolveBlendPad,
@@ -488,6 +490,14 @@ export default function BlendPadPanel() {
         }
       />
       <div className="grow overflow-y-auto p-4 compact:p-3 flex flex-col gap-4 compact:gap-3">
+        <BlendPadPresetBar
+          onLoad={(preset) => {
+            updatePad(() => loadBlendPadPreset(preset), preset.name);
+            setSelectedId(null);
+          }}
+          pad={pad}
+          parameters={parameters}
+        />
         <div className={clsx('transition-opacity', !pad.enabled && 'opacity-40')}>
           <PadField
             getLabel={getLabel}

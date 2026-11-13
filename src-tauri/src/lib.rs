@@ -2757,6 +2757,8 @@ pub fn run() {
             file_management::update_exif_fields,
             file_management::get_supported_file_types,
             blend_pad::get_blend_pad_parameters,
+            blend_pad::export_blend_pad_presets,
+            blend_pad::import_blend_pad_presets,
             file_management::read_exif_for_paths,
             file_management::read_xmp_from_folder,
             lightroom_xmp::preview_lightroom_xmp_edits,
