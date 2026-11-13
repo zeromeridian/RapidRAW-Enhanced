@@ -2396,12 +2396,13 @@ fn get_global_adjustments_from_json(
             .unwrap_or(true)
     };
 
+    let blend_pad = crate::blend_pad::Offsets::from_adjustments(js_adjustments);
     let get_val = |section: &str, key: &str, scale: f32, default: Option<f64>| -> f32 {
         if is_visible(section) {
-            js_adjustments[key]
+            let value = js_adjustments[key]
                 .as_f64()
-                .unwrap_or(default.unwrap_or(0.0)) as f32
-                / scale
+                .unwrap_or(default.unwrap_or(0.0));
+            blend_pad.apply(key, value) as f32 / scale
         } else {
             if let Some(d) = default {
                 d as f32 / scale
@@ -4216,6 +4217,46 @@ mod tests {
         // A point is still an edit with no shift, as a mask without adjustments is.
         assert!(is_image_edited(&point(0), true, None));
         assert!(!is_image_edited(&json!({ "pointColors": [] }), true, None));
+    }
+
+    fn blend_pad_at(puck_y: f64, extra: serde_json::Value) -> serde_json::Value {
+        let mut adjustments = json!({
+            "contrast": 20,
+            "blendPad": {
+                "version": 1, "enabled": true, "shape": "circle", "amount": 1,
+                "puck": { "x": 0, "y": puck_y },
+                "anchors": [{ "id": "a", "param": "contrast", "t": 0.25, "target": 60 }],
+            },
+        });
+        if let (Some(target), Some(extra)) = (adjustments.as_object_mut(), extra.as_object()) {
+            target.extend(extra.clone());
+        }
+        adjustments
+    }
+
+    #[test]
+    fn the_blend_pad_adds_to_the_sliders_it_drives() {
+        let resolved = get_global_adjustments_from_json(&blend_pad_at(1.0, json!({})), true, None);
+        let expected = get_global_adjustments_from_json(&json!({ "contrast": 80 }), true, None);
+        assert_eq!(resolved.contrast, expected.contrast);
+
+        let centred = get_global_adjustments_from_json(&blend_pad_at(0.0, json!({})), true, None);
+        let sliders = get_global_adjustments_from_json(&json!({ "contrast": 20 }), true, None);
+        assert_eq!(centred.contrast, sliders.contrast);
+
+        let hidden = get_global_adjustments_from_json(
+            &blend_pad_at(1.0, json!({ "sectionVisibility": { "basic": false } })),
+            true,
+            None,
+        );
+        assert_eq!(hidden.contrast, 0.0);
+    }
+
+    #[test]
+    fn a_moved_blend_pad_counts_as_an_edit() {
+        let only_pad = |puck_y: f64| blend_pad_at(puck_y, json!({ "contrast": 0 }));
+        assert!(is_image_edited(&only_pad(0.5), true, None));
+        assert!(!is_image_edited(&only_pad(0.0), true, None));
     }
 
     #[test]

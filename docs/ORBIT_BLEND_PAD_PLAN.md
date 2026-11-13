@@ -1,26 +1,83 @@
 # Orbit Blend Pad Plan
 
-Status (2026-11-13): **not started.** `UPSTREAM_FEATURE_GAP.md` Plan item 27
-(P0, owner 2026-11-13: start after the remaining P1 items). Phases run in
-order; each must work and pass its tests before the next starts.
+Status (2026-11-13): **step 1 done (`1.49.0`, uncommitted)** on
+`dev/orbit-blend-pad`; step 2 next.
+`UPSTREAM_FEATURE_GAP.md` Plan item 27.
 
-**Open before Phase 1** (ask the owner when the item starts):
-- The Phase 1 reference `orbit-blend-pad.html` (owner, 2026-11-13) is in
-  `docs/`, tracked: one self-contained page ("Orbit Blend Pad · Phase 1",
-  473 lines, inline script, a Blend → Axis mode). Read it fully before
-  Phase 1; decide with the owner whether it moves next to the prototype.
-- `Orbit Blend Pad.md` (owner, 2026-11-13): the owner's feasibility and
-  concept note for the control inside TIR (up to 8 anchors, effort,
-  preview speed, storage). Background for porting the prototype later;
-  read it before Phase 1.
-- Where the prototype lives (for example `prototypes/orbit-blend-pad/` in
-  this repository, or a separate folder) and whether it is committed.
-- "Run with `npx serve`" conflicts with the no-npm-registry rule for agents
-  (owner, 2026-11-04): agents verify by opening the file (or a local static
-  server that needs no download); the README may still mention `npx serve`.
+**Owner decisions (2026-11-13):** brought forward, ahead of the remaining
+P1 items (14–16). **No standalone prototype:** the pad is built inside
+ThisIsRAW in five steps, one MINOR version each. The owner's prototype
+specification below stays as the reference for the value model, the
+interaction and the tests; its standalone-page parts (WebGL page, `pad.js`
+as a classic script, `npx serve`, README) no longer apply.
+`docs/orbit-blend-pad.html` (the owner's Phase 1 reference page) and
+`docs/Orbit Blend Pad.md` (the owner's concept note for TIR) were read in
+full at the start.
 
-**Progress:** none yet. Record each finished phase here (date, what passed,
-what felt wrong) and keep the README in step.
+**Design (agent, from the concept note):**
+- The pad **adds on top of the sliders**: its offsets are added to the
+  slider values, so with the puck at the centre the photo looks as the
+  sliders set it. The stored edit keeps the pad (shape, anchors, puck,
+  amount), never the computed values.
+- **Rust is the source of truth.** `blend_pad.rs` resolves the pad inside
+  `get_all_adjustments_from_json`, so preview, export, thumbnails, batch
+  and the "edited" check all see it; XMP sync carries `blendPad` with the
+  rest of the adjustments. The UI gets a TypeScript copy of the maths for
+  live readouts (step 2), kept in step by shared test vectors.
+- Value model: the specification's axis model with two-sided
+  normalisation (`w = ±1` at the anchor and at its opposite edge point,
+  curve on |w|, × target × amount). Anchors on one parameter add; the sum
+  is clamped to the slider's range (hue wraps), rounded to the slider's
+  step, then added to the slider and clamped again.
+- Parameters (step 1): the cheap global sliders, all uniforms in the main
+  shader: Exposure, Brightness, Contrast, Highlights, Shadows, Whites,
+  Blacks, Temperature, Tint, Vibrance, Saturation, Hue, Clarity, Dehaze,
+  Structure, Centré, Vignette Amount. A hidden section (eye off) also
+  hides the pad's offsets on it.
+- Agent defaults, to confirm with the owner when the step that uses them
+  starts: at most **8 anchors** (concept note; the prototype spec said 5),
+  perimeter position `t` from the right, anticlockwise (top = 0.25).
+
+**Steps:**
+1. **Resolver and data** (`1.49.0`): `blendPad` in the adjustments,
+   `blend_pad.rs` with the parameter list and the circle, applied in
+   `get_all_adjustments_from_json`; tests from the specification (±1 and
+   0, defaults at the top give Contrast +60 / Temperature −25 /
+   Saturation +30, stacking and clamping, hue wrap, deterministic grid,
+   muted and unknown anchors). No UI: no visible change yet.
+2. **Pad panel** (`1.50.0`): the circle with three fixed anchors
+   (defaults Contrast +60 top, Temperature +50 bottom-right, Saturation
+   −60 bottom-left), tool and target per anchor, puck drag (latest frame
+   wins, Shift 4× finer, arrow keys, double-click to centre, the puck
+   moves only when grabbed), live values, Amount, on/off, Before (`\`)
+   as today, one undo step per drag, copy/paste and presets carry it, the
+   TypeScript resolver with the shared vectors. Open: where the panel
+   lives.
+3. **Anchor editing** (`1.51.0`): add a tool at the largest free gap,
+   drag anchors along the edge, an inspector (target, curve, mute,
+   remove), opposite-point markers, a ghost marker on each slider for the
+   pad's offset, Bake (write the offsets into the sliders, centre the
+   puck).
+4. **Shapes** (`1.52.0`): triangle, square, rectangle, pentagon, hexagon,
+   from one shape definition (outline, clamp, opposite points) in Rust
+   with its TypeScript copy; anchors keep `t` when the shape changes.
+5. **Pad presets** (`1.53.0`): named presets (shape and anchors, with or
+   without the puck), load, rename, overwrite, delete, export and import
+   JSON, cleaned by the resolver's sanitising, versioned.
+
+Not scheduled (concept note, later): pads per mask, heavier tools
+(updates on release), more blend modes, drag recording.
+
+**Progress:**
+- Step 1 (`1.49.0`, 2026-11-13, uncommitted on `dev/orbit-blend-pad`):
+  `src-tauri/src/blend_pad.rs` (`PARAMETERS`, `Shape::Circle` with
+  `point_at`/`clamp`/`axis_weight`, `Curve`, `Offsets`), resolved in
+  `get_global_adjustments_from_json`'s `get_val` (no copy of the
+  adjustments JSON per frame; a slider the pad does not move keeps its
+  value exactly). `BlendPad`/`BlendPadAnchor` types and `blendPad: null`
+  default in `src/utils/adjustments.ts`. 14 tests (12 in `blend_pad`, 2 in
+  `image_processing`). Copy/paste group, history label and the
+  TypeScript resolver come with the panel in step 2.
 
 ## Owner's specification (2026-11-13; verbatim, headings one level down)
 
