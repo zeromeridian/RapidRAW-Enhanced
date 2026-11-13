@@ -259,6 +259,7 @@ export interface Adjustments {
   aiPatches: Array<AiPatch>;
   aspectRatio: number | null;
   blacks: number;
+  blendPad: BlendPad | null;
   brightness: number;
   centré: number;
   clarity: number;
@@ -510,6 +511,37 @@ export const createPointColor = (hue: number, saturation: number, luminance: num
   variance: DEFAULT_POINT_COLOR_VARIANCE,
   ...POINT_COLOR_RANGE_DEFAULTS,
 });
+
+/** How an anchor's offset grows along its axis, the same on both sides of the centre. */
+export type BlendPadCurve = 'linear' | 'soft' | 'easeIn';
+
+/** An Orbit Blend Pad anchor: one slider and the offset it reaches at the anchor. */
+export interface BlendPadAnchor {
+  id: string;
+  /** The adjustment key it drives, one of `blend_pad::PARAMETERS`. */
+  param: string;
+  /** Perimeter position, 0–1 from the right, anticlockwise (top = 0.25). */
+  t: number;
+  /** The offset at the anchor; the opposite edge gives its reverse. */
+  target: number;
+  curve: BlendPadCurve;
+  muted: boolean;
+}
+
+/**
+ * The Orbit Blend Pad, resolved by `blend_pad.rs`: the puck's position adds an offset from every
+ * anchor to its slider. Normalised space centred on (0, 0), y up; the centre adds nothing.
+ */
+export interface BlendPad {
+  /** `blend_pad::BLEND_PAD_VERSION`. */
+  version: 1;
+  enabled: boolean;
+  shape: 'circle';
+  /** Master strength, 0–1. */
+  amount: number;
+  puck: Coord;
+  anchors: BlendPadAnchor[];
+}
 
 interface Hsl {
   [index: string]: HueSatLum;
@@ -773,6 +805,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   aiPatches: [],
   aspectRatio: null,
   blacks: 0,
+  blendPad: null,
   brightness: 0,
   centré: 0,
   clarity: 0,
@@ -1097,6 +1130,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     colorGrading: { ...INITIAL_ADJUSTMENTS.colorGrading, ...(loadedAdjustments.colorGrading || {}) },
     hsl: { ...INITIAL_ADJUSTMENTS.hsl, ...(loadedAdjustments.hsl || {}) },
     pointColors: loadedAdjustments.pointColors ?? INITIAL_ADJUSTMENTS.pointColors,
+    blendPad: loadedAdjustments.blendPad ?? INITIAL_ADJUSTMENTS.blendPad,
     curves: loadedAdjustments.curves ? deepCloneCurves(loadedAdjustments.curves) : getDefaultCurves(),
     pointCurves: loadedAdjustments.pointCurves ? deepCloneCurves(loadedAdjustments.pointCurves) : getDefaultCurves(),
     parametricCurve: loadedAdjustments.parametricCurve

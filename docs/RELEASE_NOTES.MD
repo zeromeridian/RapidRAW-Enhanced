@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.49.0-dev-orbit-blend-pad — 2026-11-13
+
+### Develop
+
+- Groundwork for the upcoming **Orbit Blend Pad**, a control that blends
+  several sliders by dragging one point: edits can now carry a blend pad,
+  and previews, exports, thumbnails and XMP sync all apply it. The pad's
+  panel follows in a later version, so nothing changes on screen yet.
+
 ## 1.48.1-fix-subject-mask-box — 2026-11-13
 
 ### Develop

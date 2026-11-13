@@ -52,5 +52,7 @@ CODE_AUDIT_FINDINGS.md
 /.cargo/.package-cache
 /.cargo/registry/
 /.rustup/
+# Repo-local Rust toolchain, crates and build output for the agent sandbox (CLAUDE.md)
+/.rust-cache/
 RapidRAW-Enhanced-ToDo-List.md
 UPSTREAM_FEATURE_GAP.md
