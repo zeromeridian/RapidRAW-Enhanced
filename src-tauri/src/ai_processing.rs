@@ -1661,11 +1661,83 @@ pub fn generate_image_embeddings(
     })
 }
 
+/// Signed distance from a pixel centre to a convex quadrilateral, in pixels: negative inside,
+/// positive outside (the largest distance past any edge, so the outline keeps square corners).
+/// `None` when the quadrilateral has no area.
+fn quad_edge_distances(corners: &[(f64, f64); 4]) -> Option<[(f64, f64, f64); 4]> {
+    let doubled_area: f64 = (0..4)
+        .map(|i| {
+            let (a, b) = (corners[i], corners[(i + 1) % 4]);
+            a.0 * b.1 - b.0 * a.1
+        })
+        .sum();
+    if doubled_area.abs() < 2.0 {
+        return None;
+    }
+    let orientation = doubled_area.signum();
+    let mut edges = [(0.0, 0.0, 0.0); 4];
+    for (i, edge) in edges.iter_mut().enumerate() {
+        let (a, b) = (corners[i], corners[(i + 1) % 4]);
+        let length = (b.0 - a.0).hypot(b.1 - a.1);
+        if length < 1e-9 {
+            return None;
+        }
+        // Outward unit normal (nx, ny) and offset c, so that nx * x + ny * y - c is the distance.
+        let nx = orientation * (b.1 - a.1) / length;
+        let ny = -orientation * (b.0 - a.0) / length;
+        *edge = (nx, ny, nx * a.0 + ny * a.1);
+    }
+    Some(edges)
+}
+
+/// Keeps an AI subject mask inside the box the user drew (SAM treats the box only as a hint):
+/// pixels inside the box are kept, and outside it the mask fades to zero over a margin of 2 % of
+/// the box's longer side (at least 4 px), so a subject cut by the box edge ends softly.
+/// `corners` are in the mask's pixel coordinates.
+fn clip_mask_to_box(mask: &mut GrayImage, corners: &[(f64, f64); 4]) {
+    let Some(edges) = quad_edge_distances(corners) else {
+        return;
+    };
+    let longer_side = (0..2)
+        .map(|i| {
+            let (a, b) = (corners[i], corners[i + 1]);
+            (b.0 - a.0).hypot(b.1 - a.1)
+        })
+        .fold(0.0, f64::max);
+    let margin = (longer_side * 0.02).max(4.0);
+    let width = mask.width() as usize;
+    if width == 0 {
+        return;
+    }
+
+    mask.par_chunks_mut(width).enumerate().for_each(|(y, row)| {
+        let py = y as f64 + 0.5;
+        for (x, value) in row.iter_mut().enumerate() {
+            if *value == 0 {
+                continue;
+            }
+            let px = x as f64 + 0.5;
+            let distance = edges
+                .iter()
+                .map(|&(nx, ny, c)| nx * px + ny * py - c)
+                .fold(f64::NEG_INFINITY, f64::max);
+            if distance <= 0.0 {
+                continue;
+            }
+            let t = (distance / margin).min(1.0);
+            let keep = 1.0 - t * t * (3.0 - 2.0 * t);
+            *value = (*value as f64 * keep).round() as u8;
+        }
+    });
+}
+
+/// Runs SAM on a click (all four corners equal) or on the drawn box, given by its corners in the
+/// embedded image's pixels (a rotated quadrilateral when the photo is shown rotated). The box is
+/// the prompt of both decoder passes and the result is clipped to it.
 pub fn run_sam_decoder(
     decoder: &Mutex<Session>,
     embeddings: &ImageEmbeddings,
-    start_point: (f64, f64),
-    end_point: (f64, f64),
+    box_corners: [(f64, f64); 4],
     original_image: Option<&DynamicImage>,
 ) -> Result<GrayImage> {
     let (orig_width, orig_height) = embeddings.original_size;
@@ -1674,24 +1746,29 @@ pub fn run_sam_decoder(
 
     let iters = 2;
 
-    let is_point =
-        (start_point.0 - end_point.0).abs() < 1e-6 && (start_point.1 - end_point.1).abs() < 1e-6;
+    let box_min = box_corners
+        .iter()
+        .fold((f64::INFINITY, f64::INFINITY), |m, p| {
+            (m.0.min(p.0), m.1.min(p.1))
+        });
+    let box_max = box_corners
+        .iter()
+        .fold((f64::NEG_INFINITY, f64::NEG_INFINITY), |m, p| {
+            (m.0.max(p.0), m.1.max(p.1))
+        });
+    let is_point = (box_max.0 - box_min.0).abs() < 1e-6 && (box_max.1 - box_min.1).abs() < 1e-6;
     let mut point_coords = Vec::new();
     let mut point_labels = Vec::new();
+    let box_prompt = [
+        ((box_min.0 * scale) as f32, (box_min.1 * scale) as f32),
+        ((box_max.0 * scale) as f32, (box_max.1 * scale) as f32),
+    ];
 
     if is_point {
-        point_coords.push((
-            (start_point.0 * scale) as f32,
-            (start_point.1 * scale) as f32,
-        ));
+        point_coords.push(box_prompt[0]);
         point_labels.push(1.0f32);
     } else {
-        let x1 = (start_point.0.min(end_point.0) * scale) as f32;
-        let y1 = (start_point.1.min(end_point.1) * scale) as f32;
-        let x2 = (start_point.0.max(end_point.0) * scale) as f32;
-        let y2 = (start_point.1.max(end_point.1) * scale) as f32;
-        point_coords.push((x1, y1));
-        point_coords.push((x2, y2));
+        point_coords.extend(box_prompt);
         point_labels.push(2.0f32);
         point_labels.push(3.0f32);
     }
@@ -1813,9 +1890,28 @@ pub fn run_sam_decoder(
         }
         let mut dt_out = edt_2d(&rev_mask, w, h);
 
+        // The negative point is searched within the user's box (a click has none, so the first
+        // result's bounds stand in for it), so the second pass never looks outside it.
+        let (search_min, search_max) = if is_point {
+            ((min_x, min_y), (max_x, max_y))
+        } else {
+            let to_mask = |v: f64, size: usize, orig: u32| {
+                ((v * size as f64 / orig as f64).floor().max(0.0) as usize).min(size - 1)
+            };
+            (
+                (
+                    to_mask(box_min.0, w, orig_width),
+                    to_mask(box_min.1, h, orig_height),
+                ),
+                (
+                    to_mask(box_max.0, w, orig_width),
+                    to_mask(box_max.1, h, orig_height),
+                ),
+            )
+        };
         for y in 0..h {
             for x in 0..w {
-                if x < min_x || x > max_x || y < min_y || y > max_y {
+                if x < search_min.0 || x > search_max.0 || y < search_min.1 || y > search_max.1 {
                     dt_out[y * w + x] = 0.0;
                 }
             }
@@ -1837,11 +1933,19 @@ pub fn run_sam_decoder(
 
         point_coords.push(((pos_x as f64 * scale) as f32, (pos_y as f64 * scale) as f32));
         point_labels.push(1.0);
-        point_coords.push(((neg_x as f64 * scale) as f32, (neg_y as f64 * scale) as f32));
-        point_labels.push(0.0);
-        point_coords.push(((min_x as f64 * scale) as f32, (min_y as f64 * scale) as f32));
+        // With the mask covering the whole search area there is no background to point at.
+        if max_out > 0.0 {
+            point_coords.push(((neg_x as f64 * scale) as f32, (neg_y as f64 * scale) as f32));
+            point_labels.push(0.0);
+        }
+        // The user's box stays the prompt; only a click falls back to the first result's bounds.
+        if is_point {
+            point_coords.push(((min_x as f64 * scale) as f32, (min_y as f64 * scale) as f32));
+            point_coords.push(((max_x as f64 * scale) as f32, (max_y as f64 * scale) as f32));
+        } else {
+            point_coords.extend(box_prompt);
+        }
         point_labels.push(2.0);
-        point_coords.push(((max_x as f64 * scale) as f32, (max_y as f64 * scale) as f32));
         point_labels.push(3.0);
 
         let mut gaus_dt = vec![0.0f32; area];
@@ -1888,7 +1992,7 @@ pub fn run_sam_decoder(
     let gray_mask = GrayImage::from_raw(final_w as u32, final_h as u32, final_mask_data)
         .ok_or_else(|| anyhow::anyhow!("Failed to create mask image from raw data"))?;
 
-    if let Some(img) = original_image {
+    let mut final_mask = if let Some(img) = original_image {
         let (orig_width, orig_height) = img.dimensions();
         let guide_hr = img.to_luma8();
 
@@ -1908,19 +2012,27 @@ pub fn run_sam_decoder(
             p[0] = (((v - 0.03) / 0.94).clamp(0.0, 1.0) * 255.0).round() as u8;
         }
 
-        Ok(refined_mask)
+        refined_mask
     } else {
         let feathered_mask = image::imageops::blur(&gray_mask, 2.0);
-        let (orig_width, orig_height) = embeddings.original_size;
-        let final_mask = image::imageops::resize(
+        image::imageops::resize(
             &feathered_mask,
             orig_width,
             orig_height,
             FilterType::Triangle,
-        );
+        )
+    };
 
-        Ok(final_mask)
+    // Clip after the edge refinement, which could otherwise spread the mask past the box again.
+    if !is_point {
+        let (sx, sy) = (
+            final_mask.width() as f64 / orig_width as f64,
+            final_mask.height() as f64 / orig_height as f64,
+        );
+        clip_mask_to_box(&mut final_mask, &box_corners.map(|(x, y)| (x * sx, y * sy)));
     }
+
+    Ok(final_mask)
 }
 
 fn sigmoid(value: f32) -> f32 {
@@ -2649,10 +2761,49 @@ pub struct AiDepthMaskParameters {
 #[cfg(test)]
 mod tests {
     use super::{
-        ESAM3_SKY_SCORE_THRESHOLD, ESAM3_TEXT_SCORE_THRESHOLD, select_esam3_queries,
-        sliding_min_max, snap_depth_edges, window_min_max,
+        ESAM3_SKY_SCORE_THRESHOLD, ESAM3_TEXT_SCORE_THRESHOLD, clip_mask_to_box,
+        select_esam3_queries, sliding_min_max, snap_depth_edges, window_min_max,
     };
     use image::GrayImage;
+
+    #[test]
+    fn subject_mask_is_clipped_to_the_drawn_box_with_a_soft_margin() {
+        // A 400 px box: the margin is 8 px (2 % of its longer side).
+        let corners = [(50.0, 50.0), (50.0, 450.0), (450.0, 450.0), (450.0, 50.0)];
+        for corners in [corners, [corners[3], corners[2], corners[1], corners[0]]] {
+            let mut mask = GrayImage::from_pixel(500, 500, image::Luma([255]));
+            clip_mask_to_box(&mut mask, &corners);
+            assert_eq!(mask.get_pixel(50, 250)[0], 255, "inside the box");
+            assert_eq!(mask.get_pixel(449, 449)[0], 255, "inside corner");
+            let fading = mask.get_pixel(453, 250)[0];
+            assert!(fading > 0 && fading < 255, "fading margin, got {fading}");
+            assert!(mask.get_pixel(452, 250)[0] > mask.get_pixel(455, 250)[0]);
+            assert_eq!(mask.get_pixel(458, 250)[0], 0, "past the margin");
+            assert_eq!(mask.get_pixel(20, 20)[0], 0, "outside a corner");
+        }
+    }
+
+    #[test]
+    fn subject_mask_follows_a_rotated_box_and_ignores_a_box_without_area() {
+        // A diamond (the drawn box rotated by 45°) centred at (250, 250), 141 px from centre to corner.
+        let diamond = [
+            (250.0, 109.0),
+            (391.0, 250.0),
+            (250.0, 391.0),
+            (109.0, 250.0),
+        ];
+        let mut mask = GrayImage::from_pixel(500, 500, image::Luma([255]));
+        clip_mask_to_box(&mut mask, &diamond);
+        assert_eq!(mask.get_pixel(250, 250)[0], 255);
+        assert_eq!(mask.get_pixel(380, 250)[0], 255);
+        // Inside the box containing the diamond, but outside the diamond itself.
+        assert_eq!(mask.get_pixel(130, 130)[0], 0);
+
+        let line = [(50.0, 50.0), (50.0, 450.0), (50.0, 450.0), (50.0, 50.0)];
+        let mut untouched = GrayImage::from_pixel(100, 100, image::Luma([200]));
+        clip_mask_to_box(&mut untouched, &line);
+        assert!(untouched.pixels().all(|p| p[0] == 200));
+    }
 
     #[test]
     fn sliding_min_max_matches_a_brute_force_window() {

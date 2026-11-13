@@ -306,7 +306,8 @@ details are in `RELEASE_NOTES.MD`.
   slider. Both work in masks too. The Color Mixer also has an expanded view
   with all eight bands of one property.
 - AI sky masks use EfficientSAM3 and AI foreground masks use BiRefNet, as in
-  upstream RapidRAW; AI subject masks are edge-refined. AI text masks select
+  upstream RapidRAW; AI subject masks are edge-refined and stay inside the
+  drawn box (a short soft fade at its edge). AI text masks select
   whatever a typed description names, such as "water" or "boat". Each mask
   type downloads its model on first use, and existing masks keep their stored
   result. A new AI depth mask starts on the nearest part of the photo; a

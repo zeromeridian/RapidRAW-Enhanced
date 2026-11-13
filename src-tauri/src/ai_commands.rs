@@ -521,18 +521,8 @@ pub async fn generate_ai_subject_mask(
         }
     };
 
-    let ucrp1 = un_coarse_rotate(ufp1);
-    let ucrp2 = un_coarse_rotate(ufp2);
-    let ucrp3 = un_coarse_rotate(ufp3);
-    let ucrp4 = un_coarse_rotate(ufp4);
-
-    let min_x = ucrp1.0.min(ucrp2.0).min(ucrp3.0).min(ucrp4.0);
-    let min_y = ucrp1.1.min(ucrp2.1).min(ucrp3.1).min(ucrp4.1);
-    let max_x = ucrp1.0.max(ucrp2.0).max(ucrp3.0).max(ucrp4.0);
-    let max_y = ucrp1.1.max(ucrp2.1).max(ucrp3.1).max(ucrp4.1);
-
-    let unrotated_start_point = (min_x, min_y);
-    let unrotated_end_point = (max_x, max_y);
+    // The drawn box's corners in the embedded image, in order around it (rotated by `rotation`).
+    let box_corners = [ufp1, ufp2, ufp3, ufp4].map(un_coarse_rotate);
 
     let refinement_image = if skip_refinement.unwrap_or(false) {
         None
@@ -542,8 +532,7 @@ pub async fn generate_ai_subject_mask(
     let mask_bitmap = run_sam_decoder(
         &*models.sam_decoder().map_err(|e| e.to_string())?,
         &embeddings,
-        unrotated_start_point,
-        unrotated_end_point,
+        box_corners,
         refinement_image.as_deref(),
     )
     .map_err(|e| e.to_string())?;

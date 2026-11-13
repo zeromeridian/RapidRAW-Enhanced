@@ -5,6 +5,14 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.48.1-fix-subject-mask-box — 2026-11-13
+
+### Develop
+
+- **AI subject masks** now stay inside the box you draw: the mask ends at
+  the box edge with a short soft fade instead of spilling onto nearby
+  objects, also on a rotated photo. Masks made before keep their shape.
+
 ## 1.48.0-dev-edit-in-borrowings — 2026-11-13
 
 ### Library
