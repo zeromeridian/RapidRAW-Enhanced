@@ -5,6 +5,10 @@
 - **Steps 1–4 shipped** (`1.25.2`–`1.28.0`, plus **Open in** on the Develop
   canvas in `1.29.1`) and are in `develop`. None has been checked hands-on
   by the owner yet (checks below).
+- **Upstream borrowings** (`1.48.0`, 2026-11-13, Plan item 12, on
+  `dev/edit-in-borrowings`): saves in a subfolder of the staging folder
+  count, and an editor that quits with an error within 10 s of starting
+  ends its session with an error toast. Not yet checked hands-on.
 - **Step 5, RAW integration (Phase 3): deferred.** Before starting it,
   document and test the `--edit` exit codes.
 - **Linux Flatpak: deferred** by the owner (2026-11-02); see "Deferred:

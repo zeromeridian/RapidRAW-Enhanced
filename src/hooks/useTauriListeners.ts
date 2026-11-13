@@ -47,6 +47,12 @@ interface EditorRoundTripSaved {
   isNew: boolean;
 }
 
+/** Payload of the backend's `editor-round-trip-failed` event: the editor quit right after starting. */
+interface EditorRoundTripFailed {
+  sourcePath: string;
+  message: string;
+}
+
 /** Whether `path` belongs in the open folder view, flat or recursive. */
 const isShownInLibrary = (path: string) => {
   const folder = useLibraryStore.getState().currentFolderPath;
@@ -333,6 +339,9 @@ export function useTauriListeners({
           }
         }
         await autoStackCreatedImages([{ sourcePath, outputPath }]);
+      }),
+      listen<EditorRoundTripFailed>('editor-round-trip-failed', (event) => {
+        if (isEffectActive) toast.error(event.payload.message);
       }),
       listen('export-error', (event: any) => {
         if (isEffectActive) {

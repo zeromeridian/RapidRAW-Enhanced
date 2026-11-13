@@ -5,6 +5,17 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.48.0-dev-edit-in-borrowings — 2026-11-13
+
+### Library
+
+- **Open in** (external editors): a save the editor writes into a subfolder
+  of its working folder, as some editors do when exporting, is now picked
+  up like any other save.
+- When an external editor quits with an error right after it was started,
+  ThisIsRAW now says so and stops waiting for a save, instead of keeping
+  the edit open for a week.
+
 ## 1.47.0-dev-quick-wins — 2026-11-13
 
 ### Develop
