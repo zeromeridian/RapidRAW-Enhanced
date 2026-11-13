@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.46.1-fix-lensfun-db — 2026-11-13
+
+### Develop
+
+- **Lens Correction**: updated lens profile database with many new cameras
+  and lenses (among them OM System, Nikon Z, Sigma, Tamron, Fujifilm,
+  Canon RF, Sony, Leica and Panasonic) and corrected entries for some
+  Sony and Tamron lenses.
+
 ## 1.46.0-dev-reorder-favourites — 2026-11-12
 
 ### Develop
