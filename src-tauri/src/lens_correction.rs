@@ -640,7 +640,92 @@ pub fn get_lensfun_lenses_for_maker(
     }
 }
 
+fn any_name_matches(names: &[MultiName], needle: &str) -> bool {
+    names
+        .iter()
+        .any(|n| n.value.trim().eq_ignore_ascii_case(needle))
+}
+
+/// Finds the built-in lens of a fixed-lens camera (Ricoh GR, Fujifilm X100,
+/// ...) through its Lensfun mount, which such cameras share with exactly one
+/// lens. Gives up when the mount carries more than one lens.
+fn find_lens_by_camera_mount<'a>(
+    db: &'a LensDatabase,
+    camera_maker: &str,
+    camera_model: &str,
+) -> Option<&'a Lens> {
+    let clean_maker = camera_maker.trim().trim_matches('"');
+    let clean_model = camera_model.trim().trim_matches('"');
+
+    if clean_maker.is_empty() || clean_model.is_empty() {
+        return None;
+    }
+
+    let mounts: Vec<&str> = db
+        .cameras
+        .iter()
+        .filter(|c| {
+            any_name_matches(&c.maker, clean_maker) && any_name_matches(&c.model, clean_model)
+        })
+        .map(|c| c.mount.trim())
+        .filter(|m| !m.is_empty())
+        .collect();
+
+    if mounts.is_empty() {
+        return None;
+    }
+
+    let mut hits = db.lenses.iter().filter(|lens| {
+        lens.mount
+            .iter()
+            .any(|m| mounts.iter().any(|c| m.trim().eq_ignore_ascii_case(c)))
+    });
+    let lens = hits.next()?;
+    if hits.next().is_some() {
+        log::info!(
+            "Mount fallback for {} {}: more than one lens on the mount, giving up.",
+            clean_maker,
+            clean_model
+        );
+        return None;
+    }
+
+    log::info!(
+        "Mount fallback for {} {}: using fixed lens {} {}",
+        clean_maker,
+        clean_model,
+        lens.get_maker(),
+        lens.get_full_model_name()
+    );
+    Some(lens)
+}
+
+fn lens_result(db: &LensDatabase, lens: &Lens) -> (String, String) {
+    let lens_maker = lens.get_maker();
+    let maker_lenses = lenses_for_maker(db, &lens_maker);
+    (lens_maker, lens.get_display_name(&maker_lenses))
+}
+
+/// Matches EXIF lens data to a Lensfun lens: by the lens model first, then,
+/// for fixed-lens cameras, through the camera's mount.
 pub fn find_best_lens_match(
+    db: &LensDatabase,
+    maker: &str,
+    model: &str,
+    camera_model: &str,
+) -> Option<(String, String)> {
+    let clean_model = model.trim().trim_matches('"');
+
+    if !clean_model.is_empty()
+        && let Some(hit) = find_lens_by_fuzzy_model(db, maker, clean_model)
+    {
+        return Some(hit);
+    }
+
+    find_lens_by_camera_mount(db, maker, camera_model).map(|lens| lens_result(db, lens))
+}
+
+fn find_lens_by_fuzzy_model(
     db: &LensDatabase,
     maker: &str,
     model: &str,
@@ -713,19 +798,14 @@ pub fn find_best_lens_match(
         })
         .max_by_key(|(score, _): &(i64, _)| *score);
 
-    if let Some((_, best_lens)) = best_match_fallback {
-        let lens_maker = best_lens.get_maker();
-        let maker_lenses = lenses_for_maker(db, &lens_maker);
-        return Some((lens_maker, best_lens.get_display_name(&maker_lenses)));
-    }
-
-    None
+    best_match_fallback.map(|(_, best_lens)| lens_result(db, best_lens))
 }
 
 #[tauri::command]
 pub fn autodetect_lens(
     maker: String,
     model: String,
+    camera_model: Option<String>,
     state: tauri::State<AppState>,
 ) -> Result<Option<(String, String)>, String> {
     let db_guard = state
@@ -733,7 +813,12 @@ pub fn autodetect_lens(
         .lock()
         .map_err(|e| format!("Lock poisoned: {}", e))?;
     if let Some(db) = &*db_guard {
-        Ok(find_best_lens_match(db, &maker, &model))
+        Ok(find_best_lens_match(
+            db,
+            &maker,
+            &model,
+            camera_model.as_deref().unwrap_or(""),
+        ))
     } else {
         Ok(None)
     }
@@ -786,15 +871,17 @@ pub fn resolve_lens_params(
 
 #[cfg(test)]
 mod tests {
-    use super::LensDatabase;
+    use super::{LensDatabase, find_best_lens_match};
     use std::path::Path;
 
-    #[test]
-    fn bundled_lensfun_db_files_all_parse() {
+    /// The bundled database, parsed file by file like `load_lensfun_db`;
+    /// panics on a file that does not parse.
+    fn bundled_lens_db() -> LensDatabase {
         let db_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("lensfun_db");
-        let mut files = 0;
-        let mut lenses = 0;
-        let mut cameras = 0;
+        let mut combined = LensDatabase {
+            cameras: Vec::new(),
+            lenses: Vec::new(),
+        };
 
         for entry in std::fs::read_dir(&db_dir).unwrap() {
             let path = entry.unwrap().path();
@@ -802,14 +889,44 @@ mod tests {
                 continue;
             }
             let xml = std::fs::read_to_string(&path).unwrap();
-            let db: LensDatabase = quick_xml::de::from_str(&xml)
+            let mut db: LensDatabase = quick_xml::de::from_str(&xml)
                 .unwrap_or_else(|e| panic!("{} does not parse: {e}", path.display()));
-            files += 1;
-            lenses += db.lenses.len();
-            cameras += db.cameras.len();
+            combined.cameras.append(&mut db.cameras);
+            combined.lenses.append(&mut db.lenses);
         }
+        combined
+    }
 
-        assert!(files > 0, "no Lensfun XML files in {}", db_dir.display());
-        assert!(lenses > 0 && cameras > 0);
+    #[test]
+    fn bundled_lensfun_db_files_all_parse() {
+        let db = bundled_lens_db();
+        assert!(!db.lenses.is_empty() && !db.cameras.is_empty());
+    }
+
+    #[test]
+    fn fixed_lens_cameras_match_through_their_mount() {
+        let db = bundled_lens_db();
+
+        let x100v = find_best_lens_match(&db, "FUJIFILM", "", "X100V");
+        assert_eq!(x100v.map(|(maker, _)| maker), Some("Fujifilm".to_string()));
+
+        let gr3 = find_best_lens_match(&db, "RICOH IMAGING COMPANY, LTD.", "", "GR III");
+        assert_eq!(
+            gr3.map(|(maker, _)| maker),
+            Some("Ricoh imaging company, ltd.".to_string())
+        );
+    }
+
+    #[test]
+    fn mount_fallback_skips_interchangeable_lens_mounts() {
+        let db = bundled_lens_db();
+        assert_eq!(find_best_lens_match(&db, "Canon", "", "Canon EOS R5"), None);
+    }
+
+    #[test]
+    fn lens_model_match_comes_before_the_mount() {
+        let db = bundled_lens_db();
+        let by_model = find_best_lens_match(&db, "Canon", "RF 50mm F1.4 L VCM", "Canon EOS R5");
+        assert_eq!(by_model.map(|(maker, _)| maker), Some("Canon".to_string()));
     }
 }

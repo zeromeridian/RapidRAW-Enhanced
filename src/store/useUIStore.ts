@@ -235,6 +235,10 @@ export const isModalOpen = (ui: UIState) =>
   ui.denoiseModalState.isOpen ||
   ui.negativeModalState.isOpen;
 
+export const DEFAULT_LEFT_PANEL_WIDTH = 240;
+export const DEFAULT_RIGHT_PANEL_WIDTH = 296;
+export const DEFAULT_BOTTOM_PANEL_HEIGHT = 144;
+
 export const useUIStore = create<UIState>((set, get) => ({
   activeView: 'library',
   isFullScreen: false,
@@ -247,9 +251,9 @@ export const useUIStore = create<UIState>((set, get) => ({
   isSettingsOpen: false,
   lightsOutMode: 'off',
 
-  leftPanelWidth: 240,
-  rightPanelWidth: 296,
-  bottomPanelHeight: 144,
+  leftPanelWidth: DEFAULT_LEFT_PANEL_WIDTH,
+  rightPanelWidth: DEFAULT_RIGHT_PANEL_WIDTH,
+  bottomPanelHeight: DEFAULT_BOTTOM_PANEL_HEIGHT,
   compactEditorPanelHeightOverride: null,
 
   activeRightPanel: Panel.Adjustments,

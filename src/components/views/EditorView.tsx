@@ -58,6 +58,7 @@ interface EditorViewProps {
   sortedImageList: ImageFile[];
   groupBadgeInfo: Map<string, GroupBadgeInfo> | null;
   createResizeHandler: (stateKey: string, startSize: number) => (e: ReactPointerEvent<HTMLDivElement>) => void;
+  createResizeResetHandler: (stateKey: string) => () => void;
   handleBackToLibrary: () => void;
   handleEditorContextMenu: (...args: any) => void;
   handleThumbnailContextMenu: (...args: any) => void;
@@ -86,6 +87,7 @@ export default function EditorView({
   sortedImageList,
   groupBadgeInfo,
   createResizeHandler,
+  createResizeResetHandler,
   handleBackToLibrary,
   handleEditorContextMenu,
   handleThumbnailContextMenu,
@@ -219,7 +221,11 @@ export default function EditorView({
       }}
     >
       {!isCompactPortrait && (
-        <Resizer direction={Orientation.Horizontal} onMouseDown={createResizeHandler('bottom', bottomPanelHeight)} />
+        <Resizer
+          direction={Orientation.Horizontal}
+          onMouseDown={createResizeHandler('bottom', bottomPanelHeight)}
+          onDoubleClick={createResizeResetHandler('bottom')}
+        />
       )}
       {editorBottomBarComponent}
     </div>
@@ -304,6 +310,7 @@ export default function EditorView({
               <Resizer
                 direction={Orientation.Horizontal}
                 onMouseDown={createResizeHandler('compact', compactEditorPanelHeight)}
+                onDoubleClick={createResizeResetHandler('compact')}
               />
             )}
             <div className="min-h-0 flex-1 overflow-hidden">{editorRightPanelContent}</div>
@@ -320,7 +327,11 @@ export default function EditorView({
           </>
         ) : (
           <>
-            <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
+            <Resizer
+              direction={Orientation.Vertical}
+              onMouseDown={createResizeHandler('right', rightPanelWidth)}
+              onDoubleClick={createResizeResetHandler('right')}
+            />
             <div className="flex bg-bg-secondary rounded-lg h-full">
               <div
                 className={clsx(

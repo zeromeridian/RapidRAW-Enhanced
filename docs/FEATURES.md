@@ -187,7 +187,10 @@ details are in `RELEASE_NOTES.MD`.
   source ratio remains available as an explicit preset. Custom aspect ratios
   can be saved as presets. In Crop, Enter or a double-click inside the crop
   frame keeps the crop and Escape restores the crop, ratio, rotation, and
-  flips from when Crop was opened (undoable).
+  flips from when Crop was opened (undoable). In Crop, Ctrl/Cmd on a handle
+  resizes from the centre, Ctrl/Cmd+scroll zooms the frame around the
+  pointer, and Ctrl/Cmd+drag outside the frame moves it; a **Center**
+  overlay marks the middle.
 - **Speed Edit**: hold W (or tap it to keep it on) and drag anywhere on the
   photo to change the last-used slider; Shift drags finely and a double-click
   resets. A and D switch between the sliders chosen in Settings → Controls,
@@ -245,7 +248,10 @@ details are in `RELEASE_NOTES.MD`.
   manually selected Lensfun profile directly to the full Develop image, with
   independent distortion, chromatic-aberration, and vignetting controls. Lens
   settings, including Auto mode, persist in Tool and Style presets without
-  requiring crop and transform data to be included.
+  requiring crop and transform data to be included. Auto finds the built-in
+  lens of fixed-lens cameras (Ricoh GR, Fujifilm X100) through the camera's
+  mount; **Auto Lens Correction** in the right-click Productivity menu turns
+  it on for the photo or a whole selection.
 - **Apply Lens Profile Automatically** (Settings → My Lenses, on by default)
   starts unedited RAW images in Auto lens correction with the profile detected
   from EXIF, in Develop, exports, and thumbnails. Images without a matching

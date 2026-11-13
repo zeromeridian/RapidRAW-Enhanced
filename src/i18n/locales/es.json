@@ -274,6 +274,7 @@
     },
     "editor": {
       "autoAdjust": "Ajuste automático de imagen",
+      "autoLensCorrection": "Corrección de lente automática",
       "cancel": "Cancelar",
       "colorLabel": "Etiqueta de color",
       "confirmReset": "Confirmar restablecimiento",
@@ -346,6 +347,9 @@
       "autoAdjust_many": "Ajuste automático de imágenes",
       "autoAdjust_one": "Ajuste automático de imagen",
       "autoAdjust_other": "Ajuste automático de imágenes",
+      "autoLensCorrection_many": "Corrección de lente automática",
+      "autoLensCorrection_one": "Corrección de lente automática",
+      "autoLensCorrection_other": "Corrección de lente automática",
       "collage_many": "Crear collage",
       "collage_one": "Enmarcar imagen",
       "collage_other": "Crear collage",
@@ -396,6 +400,7 @@
       "couldNotShowFolder": "No se pudo mostrar la carpeta: {{err}}",
       "failedAddToAlbum": "No se pudo agregar al álbum: {{err}}",
       "failedApplyAuto": "Error al aplicar ajustes automáticos: {{err}}",
+      "failedApplyAutoLensCorrection": "Error al aplicar la corrección de lente automática: {{err}}",
       "failedChangeIcon": "Error al cambiar el icono: {{err}}",
       "failedCopy": "Error al copiar los archivos: {{err}}",
       "failedCreateVirtualCopy": "Error al crear la copia virtual: {{err}}",
@@ -571,6 +576,10 @@
         "armature": {
           "desc": "Armadura",
           "name": "Armadura"
+        },
+        "center": {
+          "desc": "Líneas centrales",
+          "name": "Centro"
         },
         "diagonal": {
           "desc": "Líneas diagonales",

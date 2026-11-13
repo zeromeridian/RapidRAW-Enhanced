@@ -275,6 +275,7 @@
     },
     "editor": {
       "autoAdjust": "Auto Adjust Image",
+      "autoLensCorrection": "Auto Lens Correction",
       "cancel": "Cancel",
       "colorLabel": "Color Label",
       "confirmReset": "Confirm Reset",
@@ -338,6 +339,8 @@
       "addToAlbum": "Add to Album",
       "autoAdjust_one": "Auto Adjust Image",
       "autoAdjust_other": "Auto Adjust Images",
+      "autoLensCorrection_one": "Auto Lens Correction",
+      "autoLensCorrection_other": "Auto Lens Correction",
       "collage_one": "Frame Image",
       "collage_other": "Create Collage",
       "confirmDelete": "Confirm Delete",
@@ -386,6 +389,7 @@
       "couldNotShowFolder": "Could not show folder: {{err}}",
       "failedAddToAlbum": "Failed to add to album: {{err}}",
       "failedApplyAuto": "Failed to apply auto adjustments: {{err}}",
+      "failedApplyAutoLensCorrection": "Failed to apply auto lens correction: {{err}}",
       "failedChangeIcon": "Failed to change icon: {{err}}",
       "failedCopy": "Failed to copy files: {{err}}",
       "failedCreateVirtualCopy": "Failed to create virtual copy: {{err}}",
@@ -574,6 +578,10 @@
         "armature": {
           "desc": "Armature",
           "name": "Armature"
+        },
+        "center": {
+          "desc": "Center Lines",
+          "name": "Center"
         },
         "diagonal": {
           "desc": "Diagonal Lines",

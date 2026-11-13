@@ -274,6 +274,7 @@
     },
     "editor": {
       "autoAdjust": "이미지 자동 조정",
+      "autoLensCorrection": "자동 렌즈 교정",
       "cancel": "취소",
       "colorLabel": "색상 레이블",
       "confirmReset": "초기화 확인",
@@ -339,6 +340,8 @@
       "addToAlbum": "앨범에 추가",
       "autoAdjust_one": "이미지 자동 조정",
       "autoAdjust_other": "이미지 자동 조정",
+      "autoLensCorrection_one": "자동 렌즈 교정",
+      "autoLensCorrection_other": "자동 렌즈 교정",
       "collage_one": "이미지 프레임",
       "collage_other": "콜라주 만들기",
       "confirmDelete": "삭제 확인",
@@ -378,6 +381,7 @@
       "couldNotShowFolder": "폴더를 표시할 수 없습니다: {{err}}",
       "failedAddToAlbum": "앨범에 추가하지 못했습니다: {{err}}",
       "failedApplyAuto": "자동 조정을 적용하지 못했습니다: {{err}}",
+      "failedApplyAutoLensCorrection": "자동 렌즈 교정을 적용하지 못했습니다: {{err}}",
       "failedChangeIcon": "아이콘을 변경하지 못했습니다: {{err}}",
       "failedCopy": "파일을 복사하지 못했습니다: {{err}}",
       "failedCreateVirtualCopy": "가상 복사본을 만들지 못했습니다: {{err}}",
@@ -546,6 +550,10 @@
         "armature": {
           "desc": "골격선 구도",
           "name": "골격선"
+        },
+        "center": {
+          "desc": "중앙선",
+          "name": "중앙"
         },
         "diagonal": {
           "desc": "대각선",

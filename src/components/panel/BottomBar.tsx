@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
-  Aperture,
   Check,
   ChevronDown,
   ChevronUp,
@@ -14,6 +13,7 @@ import {
   Images,
   LayoutTemplate,
   Layers,
+  PencilSparkles,
   ListCollapse,
   Settings,
   SlidersHorizontal,
@@ -47,8 +47,8 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useUIStore } from '../../store/useUIStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { COLOR_LABELS, normalizeLoadedAdjustments } from '../../utils/adjustments';
-import { globalImageCache } from '../../utils/ImageLRUCache';
+import { COLOR_LABELS } from '../../utils/adjustments';
+import { applyBatchEditToPaths } from '../../hooks/useEditorActions';
 import { findImageStack, toggleImageStack, unstackImagePaths } from '../../utils/imageStacks';
 import {
   getStackTargetPath,
@@ -265,7 +265,6 @@ export default function BottomBar({
       setUI({ mainPaneBounds: null });
     };
   }, [setUI]);
-  const setEditor = useEditorStore((state) => state.setEditor);
   const { appSettings, handleSettingsChange } = useSettingsStore(
     useShallow((state) => ({
       appSettings: state.appSettings,
@@ -381,30 +380,10 @@ export default function BottomBar({
   };
 
   const handleAutoAdjust = () => {
-    if (productivityCount === 0) return;
-    productivityPaths.forEach((path) => globalImageCache.delete(path));
-
-    invoke(Invokes.ApplyAutoAdjustmentsToPaths, { paths: productivityPaths })
-      .then(async () => {
-        if (selectedImage && productivityPaths.includes(selectedImage.path)) {
-          const metadata: any = await invoke(Invokes.LoadMetadata, { path: selectedImage.path });
-          if (metadata.adjustments && !metadata.adjustments.is_null) {
-            const normalized = normalizeLoadedAdjustments(metadata.adjustments);
-            setEditor({ adjustments: normalized });
-            useEditorStore.getState().resetHistory(normalized);
-          }
-        }
-        if (libraryActivePath && productivityPaths.includes(libraryActivePath)) {
-          const metadata: any = await invoke(Invokes.LoadMetadata, { path: libraryActivePath });
-          if (metadata.adjustments && !metadata.adjustments.is_null) {
-            setLibrary({ libraryActiveAdjustments: normalizeLoadedAdjustments(metadata.adjustments) });
-          }
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to apply auto adjustments to paths:', err);
-        toast.error(t('contextMenus.toasts.failedApplyAuto', { err }));
-      });
+    applyBatchEditToPaths(Invokes.ApplyAutoAdjustmentsToPaths, productivityPaths).catch((err) => {
+      console.error('Failed to apply auto adjustments to paths:', err);
+      toast.error(t('contextMenus.toasts.failedApplyAuto', { err }));
+    });
   };
 
   const openDenoise = () =>
@@ -862,7 +841,7 @@ export default function BottomBar({
                 onClick={handleAutoAdjust}
                 data-tooltip={t('contextMenus.thumbnail.autoAdjust', { count: productivityCount })}
               >
-                <Aperture size={18} />
+                <PencilSparkles size={18} />
               </button>
             )}
             {isToolbarItemVisible('denoise') && (

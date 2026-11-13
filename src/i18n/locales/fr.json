@@ -274,6 +274,7 @@
     },
     "editor": {
       "autoAdjust": "Ajustement auto de l'image",
+      "autoLensCorrection": "Correction d'objectif automatique",
       "cancel": "Annuler",
       "colorLabel": "Étiquette de couleur",
       "confirmReset": "Confirmer la réinitialisation",
@@ -346,6 +347,9 @@
       "autoAdjust_many": "Ajustement auto des images",
       "autoAdjust_one": "Ajustement auto de l'image",
       "autoAdjust_other": "Ajustement auto des images",
+      "autoLensCorrection_many": "Corrections d'objectif automatiques",
+      "autoLensCorrection_one": "Correction d'objectif automatique",
+      "autoLensCorrection_other": "Corrections d'objectif automatiques",
       "collage_many": "Créer un collage",
       "collage_one": "Encadrer l'image",
       "collage_other": "Créer un collage",
@@ -396,6 +400,7 @@
       "couldNotShowFolder": "Impossible d'afficher le dossier : {{err}}",
       "failedAddToAlbum": "Échec de l'ajout à l'album : {{err}}",
       "failedApplyAuto": "Échec de l'ajustement automatique : {{err}}",
+      "failedApplyAutoLensCorrection": "Échec de la correction d'objectif automatique : {{err}}",
       "failedChangeIcon": "Échec de la modification de l'icône : {{err}}",
       "failedCopy": "Échec de la copie des fichiers : {{err}}",
       "failedCreateVirtualCopy": "Échec de la création de la copie virtuelle : {{err}}",
@@ -571,6 +576,10 @@
         "armature": {
           "desc": "Armature",
           "name": "Armature"
+        },
+        "center": {
+          "desc": "Lignes centrales",
+          "name": "Centre"
         },
         "diagonal": {
           "desc": "Lignes diagonales",

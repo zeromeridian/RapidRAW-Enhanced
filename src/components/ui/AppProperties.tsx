@@ -38,6 +38,7 @@ export enum Invokes {
   ApplyAdjustmentsToPaths = 'apply_adjustments_to_paths',
   ApplyPresetBatch = 'apply_preset_batch',
   ApplyAutoAdjustmentsToPaths = 'apply_auto_adjustments_to_paths',
+  ApplyAutoLensCorrectionToPaths = 'apply_auto_lens_correction_to_paths',
   ApplyDenoising = 'apply_denoising',
   ApplyApprovedLightroomXmpEdits = 'apply_approved_lightroom_xmp_edits',
   CalculateAutoAdjustments = 'calculate_auto_adjustments',

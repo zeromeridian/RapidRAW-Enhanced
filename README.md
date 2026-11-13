@@ -24,7 +24,7 @@ architecture. Development aims to:
 - Improve professional editing, culling, organization, and productivity
   workflows.
 
-See [FEATURES.md](FEATURES.md) for the concise feature inventory maintained for
+See [FEATURES.md](docs/FEATURES.md) for the concise feature inventory maintained for
 this version.
 
 ## Versioning

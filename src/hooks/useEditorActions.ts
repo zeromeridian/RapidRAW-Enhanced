@@ -70,6 +70,42 @@ export const cancelCrop = () => {
   debouncedSetHistory.flush();
 };
 
+/**
+ * Runs a backend batch edit (Auto Adjust, Auto Lens Correction) on `paths`, then reloads the saved
+ * adjustments of the photo open in Develop and of the Library's active photo if either was edited.
+ */
+export const applyBatchEditToPaths = async (
+  command: Invokes.ApplyAutoAdjustmentsToPaths | Invokes.ApplyAutoLensCorrectionToPaths,
+  paths: string[],
+) => {
+  if (paths.length === 0) return;
+  paths.forEach((p) => globalImageCache.delete(p));
+  await invoke(command, { paths });
+
+  const { selectedImage, setEditor, resetHistory } = useEditorStore.getState();
+  const { libraryActivePath, setLibrary } = useLibraryStore.getState();
+  const loadAdjustments = async (path: string) => {
+    const metadata = await invoke<{ adjustments?: Adjustments & { is_null?: boolean } }>(Invokes.LoadMetadata, {
+      path,
+    });
+    return metadata.adjustments && !metadata.adjustments.is_null
+      ? (normalizeLoadedAdjustments(metadata.adjustments) as Adjustments)
+      : null;
+  };
+
+  if (selectedImage && paths.includes(selectedImage.path)) {
+    const adjustments = await loadAdjustments(selectedImage.path);
+    if (adjustments) {
+      setEditor({ adjustments });
+      resetHistory(adjustments);
+    }
+  }
+  if (libraryActivePath && paths.includes(libraryActivePath)) {
+    const adjustments = await loadAdjustments(libraryActivePath);
+    if (adjustments) setLibrary({ libraryActiveAdjustments: adjustments });
+  }
+};
+
 export function useEditorActions() {
   const { t } = useTranslation();
   const setEditor = useEditorStore((s) => s.setEditor);

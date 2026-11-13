@@ -22,7 +22,13 @@ import LibraryView from './components/views/LibraryView';
 
 import { ContextMenuProvider } from './context/ContextMenuContext';
 import { useSettingsStore } from './store/useSettingsStore';
-import { getLibraryPanel, useUIStore } from './store/useUIStore';
+import {
+  DEFAULT_BOTTOM_PANEL_HEIGHT,
+  DEFAULT_LEFT_PANEL_WIDTH,
+  DEFAULT_RIGHT_PANEL_WIDTH,
+  getLibraryPanel,
+  useUIStore,
+} from './store/useUIStore';
 import { useLibraryStore } from './store/useLibraryStore';
 import { canvasToolState, useEditorStore } from './store/useEditorStore';
 import { useProcessStore } from './store/useProcessStore';
@@ -563,6 +569,17 @@ function App() {
     };
   }, [aiConnectorAddress, setEditor]);
 
+  const savePanelWidths = (stateKey: string) => {
+    if (appSettings && (stateKey === 'left' || stateKey === 'right')) {
+      const { leftPanelWidth: savedLeftPanelWidth, rightPanelWidth: savedRightPanelWidth } = useUIStore.getState();
+      void handleSettingsChange({
+        ...appSettings,
+        leftPanelWidth: savedLeftPanelWidth,
+        rightPanelWidth: savedRightPanelWidth,
+      });
+    }
+  };
+
   const createResizeHandler = (stateKey: string, startSize: number) => (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
@@ -617,15 +634,7 @@ function App() {
       window.removeEventListener('pointerup', stopDrag);
       window.removeEventListener('pointercancel', stopDrag);
       setIsResizing(false);
-
-      if (appSettings && (stateKey === 'left' || stateKey === 'right')) {
-        const { leftPanelWidth: savedLeftPanelWidth, rightPanelWidth: savedRightPanelWidth } = useUIStore.getState();
-        void handleSettingsChange({
-          ...appSettings,
-          leftPanelWidth: savedLeftPanelWidth,
-          rightPanelWidth: savedRightPanelWidth,
-        });
-      }
+      savePanelWidths(stateKey);
     };
     document.documentElement.style.cursor =
       stateKey === 'bottom' || stateKey === 'compact' ? 'row-resize' : 'col-resize';
@@ -633,6 +642,25 @@ function App() {
     window.addEventListener('pointermove', doDrag, { passive: false });
     window.addEventListener('pointerup', stopDrag);
     window.addEventListener('pointercancel', stopDrag);
+  };
+
+  const createResizeResetHandler = (stateKey: string) => () => {
+    if (stateKey === 'left') {
+      setUI((state) => ({
+        leftPanelWidth: DEFAULT_LEFT_PANEL_WIDTH,
+        uiVisibility: { ...state.uiVisibility, folderTree: true },
+      }));
+    } else if (stateKey === 'right') {
+      setUI({ rightPanelWidth: DEFAULT_RIGHT_PANEL_WIDTH });
+    } else if (stateKey === 'bottom') {
+      setUI((state) => ({
+        bottomPanelHeight: DEFAULT_BOTTOM_PANEL_HEIGHT,
+        uiVisibility: { ...state.uiVisibility, filmstrip: true },
+      }));
+    } else if (stateKey === 'compact') {
+      setUI({ compactEditorPanelHeightOverride: null });
+    }
+    savePanelWidths(stateKey);
   };
 
   useEffect(() => {
@@ -724,7 +752,11 @@ function App() {
           style={{ width: uiVisibility.folderTree ? `${leftPanelWidth}px` : '32px' }}
           isInstantTransition={isInstantTransition}
         />
-        <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('left', leftPanelWidth)} />
+        <Resizer
+          direction={Orientation.Vertical}
+          onMouseDown={createResizeHandler('left', leftPanelWidth)}
+          onDoubleClick={createResizeResetHandler('left')}
+        />
       </div>
     );
   };
@@ -794,6 +826,7 @@ function App() {
                   sortedImageList={sortedImageList}
                   groupBadgeInfo={groupBadgeInfo}
                   createResizeHandler={createResizeHandler}
+                  createResizeResetHandler={createResizeResetHandler}
                   handleBackToLibrary={handleBackToLibrary}
                   handleEditorContextMenu={handleEditorContextMenu}
                   handleThumbnailContextMenu={handleThumbnailContextMenu}
@@ -856,7 +889,11 @@ function App() {
               )}
             </div>
             {!selectedImage && libraryRightPanel && (
-              <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
+              <Resizer
+                direction={Orientation.Vertical}
+                onMouseDown={createResizeHandler('right', rightPanelWidth)}
+                onDoubleClick={createResizeResetHandler('right')}
+              />
             )}
             <div
               className={clsx(

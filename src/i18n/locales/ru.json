@@ -274,6 +274,7 @@
     },
     "editor": {
       "autoAdjust": "Автонастройка изображения",
+      "autoLensCorrection": "Автокоррекция объектива",
       "cancel": "Отмена",
       "colorLabel": "Цветовая метка",
       "confirmReset": "Подтвердить сброс",
@@ -353,6 +354,10 @@
       "autoAdjust_many": "Автонастройка изображений",
       "autoAdjust_one": "Автонастройка изображения",
       "autoAdjust_other": "Автонастройка изображений",
+      "autoLensCorrection_few": "Автокоррекция объектива",
+      "autoLensCorrection_many": "Автокоррекция объектива",
+      "autoLensCorrection_one": "Автокоррекция объектива",
+      "autoLensCorrection_other": "Автокоррекция объектива",
       "collage_few": "Создать коллаж",
       "collage_many": "Создать коллаж",
       "collage_one": "Добавить рамку",
@@ -414,6 +419,7 @@
       "couldNotShowFolder": "Не удалось показать папку: {{err}}",
       "failedAddToAlbum": "Не удалось добавить в альбом: {{err}}",
       "failedApplyAuto": "Не удалось применить автонастройки: {{err}}",
+      "failedApplyAutoLensCorrection": "Не удалось применить автокоррекцию объектива: {{err}}",
       "failedChangeIcon": "Не удалось изменить значок: {{err}}",
       "failedCopy": "Не удалось скопировать файлы: {{err}}",
       "failedCreateVirtualCopy": "Не удалось создать виртуальную копию: {{err}}",
@@ -594,6 +600,10 @@
         "armature": {
           "desc": "Гармоническая сетка (Диагонали)",
           "name": "Диагонали"
+        },
+        "center": {
+          "desc": "Центральные линии",
+          "name": "Центр"
         },
         "diagonal": {
           "desc": "Диагональные линии",
