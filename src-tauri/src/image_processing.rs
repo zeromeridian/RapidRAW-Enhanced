@@ -1699,9 +1699,9 @@ pub struct GlobalAdjustments {
     pub flare_amount: f32,
     pub sharpness_threshold: f32,
 
-    /// Formerly TIR's in-shader motion blur; motion blur now runs before the main shader
-    /// (`motion_blur.rs`).
-    _pad_motion_blur1: f32,
+    /// The whole photo's Gaussian Blur (0–1), a mix toward the structure blur as in masks.
+    /// Takes the slot of TIR's former in-shader motion blur (now `motion_blur.rs`).
+    pub gaussian_blur_amount: f32,
     _pad_motion_blur2: f32,
     /// Glow colour hue in degrees and how far the glow moves toward it (0–1).
     pub glow_hue: f32,
@@ -2693,7 +2693,7 @@ fn get_global_adjustments_from_json(
             Some(15.0),
         ),
 
-        _pad_motion_blur1: 0.0,
+        gaussian_blur_amount: get_val("effects", "gaussianBlurAmount", 100.0, None),
         _pad_motion_blur2: 0.0,
         glow_hue: get_val("effects", "glowHue", 1.0, Some(DEFAULT_GLOW_HUE)),
         glow_saturation: get_val("effects", "glowSaturation", 100.0, None),
@@ -4250,6 +4250,28 @@ mod tests {
             None,
         );
         assert_eq!(hidden.contrast, 0.0);
+    }
+
+    #[test]
+    fn the_photo_has_its_own_gaussian_blur() {
+        let blurred =
+            get_global_adjustments_from_json(&json!({ "gaussianBlurAmount": 40 }), true, None);
+        assert!((blurred.gaussian_blur_amount - 0.4).abs() < f32::EPSILON);
+        assert!(is_image_edited(
+            &json!({ "gaussianBlurAmount": 40 }),
+            true,
+            None
+        ));
+        let hidden = get_global_adjustments_from_json(
+            &json!({ "gaussianBlurAmount": 40, "sectionVisibility": { "effects": false } }),
+            true,
+            None,
+        );
+        assert_eq!(hidden.gaussian_blur_amount, 0.0);
+        assert_eq!(
+            get_global_adjustments_from_json(&json!({}), true, None).gaussian_blur_amount,
+            0.0
+        );
     }
 
     #[test]

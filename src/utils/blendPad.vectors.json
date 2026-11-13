@@ -17,7 +17,11 @@
     { "id": "dehaze", "min": -100, "max": 100, "step": 1, "wraps": false },
     { "id": "structure", "min": -100, "max": 100, "step": 1, "wraps": false },
     { "id": "centré", "min": -100, "max": 100, "step": 1, "wraps": false },
-    { "id": "vignetteAmount", "min": -100, "max": 100, "step": 1, "wraps": false }
+    { "id": "vignetteAmount", "min": -100, "max": 100, "step": 1, "wraps": false },
+    { "id": "gaussianBlurAmount", "min": 0, "max": 100, "step": 1, "wraps": false },
+    { "id": "glowAmount", "min": 0, "max": 100, "step": 1, "wraps": false },
+    { "id": "flareAmount", "min": 0, "max": 100, "step": 1, "wraps": false },
+    { "id": "grainAmount", "min": 0, "max": 100, "step": 1, "wraps": false }
   ],
   "cases": [
     {
@@ -105,7 +109,7 @@
       "offsets": {}
     },
     {
-      "name": "shared parameters add, then clamp",
+      "name": "shared parameters add up to the slider's whole span",
       "pad": {
         "version": 1,
         "enabled": true,
@@ -114,10 +118,26 @@
         "puck": { "x": 0, "y": 1 },
         "anchors": [
           { "id": "a", "param": "contrast", "t": 0.25, "target": 80, "curve": "linear", "muted": false },
-          { "id": "b", "param": "contrast", "t": 0.25, "target": 80, "curve": "linear", "muted": false }
+          { "id": "b", "param": "contrast", "t": 0.25, "target": 80, "curve": "linear", "muted": false },
+          { "id": "c", "param": "contrast", "t": 0.25, "target": 80, "curve": "linear", "muted": false }
         ]
       },
-      "offsets": { "contrast": 100 }
+      "offsets": { "contrast": 200 }
+    },
+    {
+      "name": "a one-sided tool goes negative on its reverse side",
+      "pad": {
+        "version": 1,
+        "enabled": true,
+        "shape": "circle",
+        "amount": 1,
+        "puck": { "x": 0, "y": -1 },
+        "anchors": [
+          { "id": "a", "param": "glowAmount", "t": 0.25, "target": 40, "curve": "linear", "muted": false },
+          { "id": "b", "param": "gaussianBlurAmount", "t": 0.75, "target": 30, "curve": "linear", "muted": false }
+        ]
+      },
+      "offsets": { "glowAmount": -40, "gaussianBlurAmount": 30 }
     },
     {
       "name": "hue wraps",

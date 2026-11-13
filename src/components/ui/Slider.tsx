@@ -32,6 +32,8 @@ export interface SliderProps {
   suffix?: string;
   /** Ease the thumb to a value set from outside (default); off while the photo itself drives it. */
   animateValueChanges?: boolean;
+  /** A tick on the track where the photo's value really is (the Orbit Blend Pad adds to it). */
+  ghostValue?: number;
 }
 
 /** The last-used slider, which Speed Edit drives from the canvas and keyboard. */
@@ -79,6 +81,7 @@ const Slider = ({
   fillOrigin = 'default',
   suffix = '',
   animateValueChanges = true,
+  ghostValue,
 }: SliderProps) => {
   const { t } = useTranslation();
   const [displayValue, setDisplayValue] = useState<number>(value);
@@ -114,6 +117,8 @@ const Slider = ({
     };
   }, []);
 
+  const toPercentage = (amount: number) =>
+    max !== min ? ((Math.min(max, Math.max(min, amount)) - min) / (max - min)) * 100 : 0;
   const fillPercentage = max !== min ? ((displayValue - min) / (max - min)) * 100 : 0;
   const originPercentage = useMemo(() => {
     if (fillOrigin === 'min') {
@@ -697,6 +702,12 @@ const Slider = ({
             width: `${Math.abs(fillPercentage - originPercentage)}%`,
           }}
         />
+        {ghostValue !== undefined && (
+          <div
+            className="absolute w-0.5 h-3 -translate-x-1/2 rounded-full pointer-events-none bg-accent"
+            style={{ left: `${toPercentage(ghostValue)}%`, top: 'calc(50% - 4.5px)' }}
+          />
+        )}
         <input
           ref={rangeInputRef}
           className={`absolute top-1/2 left-0 w-full h-1.5 appearance-none bg-transparent cursor-pointer m-0 p-0 slider-input compact:slider-thumb-sm z-10 ${

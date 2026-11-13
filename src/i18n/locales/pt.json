@@ -676,17 +676,25 @@
       "savesTo": "Edição externa — salva em"
     },
     "blendPad": {
+      "addTool": "Adicionar ferramenta",
+      "bake": "Aplicar aos controles",
+      "bakeTooltip": "Aplicar aos controles: grava os valores do pad nos controles e centraliza o disco",
       "center": "Centralizar o disco",
-      "enabled": "Blend Pad ativado",
-      "hint": "Arraste o disco para misturar as ferramentas. Shift para movimentos mais finos, setas para deslocar e clique duplo no disco para centralizá-lo.",
-      "reset": "Redefinir o pad",
-      "slots": {
-        "bottomLeft": "Inferior esquerdo",
-        "bottomRight": "Inferior direito",
-        "top": "Superior"
+      "curve": "Curva",
+      "curves": {
+        "easeIn": "Início suave",
+        "linear": "Linear",
+        "soft": "Suave"
       },
+      "enabled": "Blend Pad ativado",
+      "hint": "Arraste o disco para misturar as ferramentas; arraste uma âncora pela borda para movê-la. Shift para movimentos mais finos, setas para deslocar e clique duplo no disco para centralizá-lo.",
+      "maxTools": "No máximo {{count}} ferramentas",
+      "mute": "Silenciar",
+      "remove": "Remover ferramenta",
+      "reset": "Redefinir o pad",
       "target": "Alvo",
-      "title": "Blend Pad"
+      "title": "Blend Pad",
+      "unmute": "Reativar"
     },
     "favorites": {
       "add": "Adicionar aos favoritos",

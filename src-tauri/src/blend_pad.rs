@@ -57,6 +57,17 @@ impl Parameter {
         }
     }
 
+    /// A 0–100 slider such as Glow Amount.
+    const fn positive(id: &'static str) -> Self {
+        Self {
+            id,
+            min: 0.0,
+            max: 100.0,
+            step: 1.0,
+            wraps: false,
+        }
+    }
+
     /// Brings a value into the slider's range.
     fn limit(&self, value: f64) -> f64 {
         if self.wraps {
@@ -66,11 +77,23 @@ impl Parameter {
             value.clamp(self.min, self.max)
         }
     }
+
+    /// Bounds the anchors' summed offset: at most the slider's whole span either way, so a
+    /// negative offset can still lower a one-sided slider (Glow 50 with −30 gives 20); only
+    /// the slider plus the offset is kept in the slider's range.
+    fn limit_offset(&self, offset: f64) -> f64 {
+        if self.wraps {
+            self.limit(offset)
+        } else {
+            let span = self.max - self.min;
+            offset.clamp(-span, span)
+        }
+    }
 }
 
-/// The sliders the pad can drive: global sliders that only change a uniform of the main shader,
-/// so a drag stays fast.
-pub const PARAMETERS: [Parameter; 17] = [
+/// The sliders the pad can drive: global sliders that change a uniform of the main shader (Light
+/// Flare also its generation pass, as its slider does), so a drag stays fast.
+pub const PARAMETERS: [Parameter; 21] = [
     Parameter::exposure("exposure"),
     Parameter::exposure("brightness"),
     Parameter::signed("contrast"),
@@ -94,6 +117,10 @@ pub const PARAMETERS: [Parameter; 17] = [
     Parameter::signed("structure"),
     Parameter::signed("centré"),
     Parameter::signed("vignetteAmount"),
+    Parameter::positive("gaussianBlurAmount"),
+    Parameter::positive("glowAmount"),
+    Parameter::positive("flareAmount"),
+    Parameter::positive("grainAmount"),
 ];
 
 /// The sliders the pad can drive, so the pad panel offers and resolves exactly these.
@@ -277,7 +304,7 @@ impl Offsets {
         }
         let mut offsets = [0.0; PARAMETERS.len()];
         for ((offset, sum), parameter) in offsets.iter_mut().zip(sums).zip(&PARAMETERS) {
-            let rounded = (parameter.limit(sum) / parameter.step).round() * parameter.step;
+            let rounded = (parameter.limit_offset(sum) / parameter.step).round() * parameter.step;
             // No negative zero, so an anchor at the centre leaves the slider untouched.
             *offset = if rounded == 0.0 { 0.0 } else { rounded };
         }
@@ -363,17 +390,25 @@ mod tests {
     }
 
     #[test]
-    fn shared_parameters_add_then_clamp() {
+    fn shared_parameters_add_and_only_the_slider_total_clamps() {
         let stacked = offsets(
             (0.0, 1.0),
             vec![anchor("contrast", TOP, 40.0), anchor("contrast", TOP, 30.0)],
         );
         assert_eq!(stacked.offset("contrast"), 70.0);
-        let clamped = offsets(
+        let large = offsets(
             (0.0, 1.0),
             vec![anchor("contrast", TOP, 80.0), anchor("contrast", TOP, 80.0)],
         );
-        assert_eq!(clamped.offset("contrast"), 100.0);
+        assert_eq!(large.offset("contrast"), 160.0);
+        assert_eq!(large.apply("contrast", 0.0), 100.0);
+        // The whole offset still counts against a slider set the other way.
+        assert_eq!(large.apply("contrast", -80.0), 80.0);
+        let beyond = offsets(
+            (0.0, 1.0),
+            (0..3).map(|_| anchor("contrast", TOP, 100.0)).collect(),
+        );
+        assert_eq!(beyond.offset("contrast"), 200.0);
     }
 
     #[test]
@@ -396,13 +431,15 @@ mod tests {
     }
 
     #[test]
-    fn a_one_sided_range_stops_at_zero_on_the_reverse_side() {
-        let fade = Parameter {
-            min: 0.0,
-            ..Parameter::signed("fade")
-        };
-        assert_eq!(fade.limit(-30.0), 0.0);
-        assert_eq!(fade.limit(40.0), 40.0);
+    fn a_one_sided_slider_combines_and_cancels_but_stops_at_zero() {
+        // Glow +40 at the top; the puck at the bottom gives −40.
+        let reverse = offsets((0.0, -1.0), vec![anchor("glowAmount", TOP, 40.0)]);
+        assert_eq!(reverse.offset("glowAmount"), -40.0);
+        assert_eq!(reverse.apply("glowAmount", 50.0), 10.0);
+        assert_eq!(reverse.apply("glowAmount", 30.0), 0.0);
+        assert_eq!(reverse.apply("glowAmount", 0.0), 0.0);
+        let toward = offsets((0.0, 1.0), vec![anchor("glowAmount", TOP, 40.0)]);
+        assert_eq!(toward.apply("glowAmount", 80.0), 100.0);
     }
 
     #[test]

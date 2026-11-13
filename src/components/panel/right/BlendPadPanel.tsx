@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent } from 'react';
-import { Crosshair, RotateCcw } from 'lucide-react';
+import { Crosshair, Eye, EyeOff, RotateCcw, Stamp, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
+import { v4 as uuidv4 } from 'uuid';
 import clsx from 'clsx';
 import PanelHeader from '../../ui/PanelHeader';
 import Slider from '../../ui/Slider';
@@ -14,27 +15,36 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useBlendPadParameters } from '../../../hooks/useBlendPadParameters';
 import { useControlLabel } from '../../../hooks/useControlLabel';
-import type { BlendPad, BlendPadAnchor, Coord } from '../../../utils/adjustments';
+import type { BlendPad, BlendPadAnchor, BlendPadCurve, Coord } from '../../../utils/adjustments';
 import {
-  BLEND_PAD_SLOTS,
-  type BlendPadParameter,
+  MAX_BLEND_PAD_ANCHORS,
   anchorPoint,
   anchorValue,
+  bakeBlendPad,
   clampToPad,
   createBlendPad,
+  largestGapPosition,
+  positionOf,
+  resolveBlendPad,
+  shareOf,
+  targetWithShare,
 } from '../../../utils/blendPad';
 
 /** The pad's drawing space: the unit circle with room around it for the labels. */
 const VIEW_HALF = 1.6;
 const VIEW_SIZE = VIEW_HALF * 2;
 const PUCK_RADIUS = 0.07;
-/** How close to the puck a press must be to grab it. */
+/** How close to the puck or an anchor a press must be to grab it. */
 const PUCK_GRAB_RADIUS = 0.15;
+const ANCHOR_GRAB_RADIUS = 0.12;
 const FINE_DRAG = 0.25;
 const NUDGE = 0.02;
 const FINE_NUDGE = 0.005;
+/** A new tool's target: this share of its slider's reach. */
+const NEW_TOOL_SHARE = 0.4;
 const WARM = 'rgb(199 144 61)';
 const COOL = 'rgb(80 140 134)';
+const CURVES: Array<BlendPadCurve> = ['linear', 'soft', 'easeIn'];
 
 const ARROW_NUDGES: Record<string, Coord> = {
   ArrowLeft: { x: -1, y: 0 },
@@ -55,43 +65,54 @@ const formatSigned = (value: number, step: number) => {
 /** The pad in drawing space, y down. */
 const toView = (point: Coord) => ({ x: point.x, y: -point.y });
 
+type Drag = { kind: 'puck'; last: Coord; virtual: Coord } | { kind: 'anchor'; id: string };
+
 interface PadFieldProps {
   pad: BlendPad;
+  selectedId: string | null;
   getLabel(anchor: BlendPadAnchor): string;
   getStep(anchor: BlendPadAnchor): number;
+  onAnchorMove(id: string, t: number): void;
   onDragStateChange(isDragging: boolean): void;
   onPuckChange(puck: Coord): void;
+  onSelect(id: string): void;
 }
 
-/** The circle with its anchors and the puck; dragging the puck blends every anchor. */
-function PadField({ pad, getLabel, getStep, onDragStateChange, onPuckChange }: PadFieldProps) {
+/** The circle with its anchors and the puck: drag the puck to blend, an anchor to move it. */
+function PadField({
+  pad,
+  selectedId,
+  getLabel,
+  getStep,
+  onAnchorMove,
+  onDragStateChange,
+  onPuckChange,
+  onSelect,
+}: PadFieldProps) {
   const { t } = useTranslation();
   const gradientId = useId();
   const svgRef = useRef<SVGSVGElement>(null);
-  const drag = useRef<{ last: Coord; virtual: Coord } | null>(null);
-  const pendingPuck = useRef<Coord | null>(null);
+  const drag = useRef<Drag | null>(null);
+  const pendingUpdate = useRef<(() => void) | null>(null);
   const frame = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
   const puck = clampToPad(pad.puck);
 
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
-  /** Only the latest position of a frame is applied. */
-  const schedulePuck = useCallback(
-    (next: Coord) => {
-      pendingPuck.current = next;
-      if (frame.current) return;
-      frame.current = requestAnimationFrame(() => {
-        frame.current = 0;
-        if (pendingPuck.current) onPuckChange(pendingPuck.current);
-        pendingPuck.current = null;
-      });
-    },
-    [onPuckChange],
-  );
+  /** Only the latest change of a frame is applied. */
+  const scheduleUpdate = useCallback((update: () => void) => {
+    pendingUpdate.current = update;
+    if (frame.current) return;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = 0;
+      pendingUpdate.current?.();
+      pendingUpdate.current = null;
+    });
+  }, []);
 
   /** The pointer in pad space (y up). */
-  const toPad = (event: PointerEvent | { clientX: number; clientY: number }): Coord => {
+  const toPad = (event: { clientX: number; clientY: number }): Coord => {
     const rect = svgRef.current!.getBoundingClientRect();
     const scale = VIEW_SIZE / rect.width;
     return {
@@ -102,26 +123,47 @@ function PadField({ pad, getLabel, getStep, onDragStateChange, onPuckChange }: P
 
   const isOnPuck = (point: Coord) => Math.hypot(point.x - puck.x, point.y - puck.y) <= PUCK_GRAB_RADIUS;
 
-  const handlePointerDown = (event: PointerEvent<SVGSVGElement>) => {
-    const point = toPad(event);
-    // The puck moves only when grabbed; a press on empty pad space does nothing.
-    if (!isOnPuck(point)) return;
+  const anchorAt = (point: Coord) =>
+    pad.anchors.find((anchor) => {
+      const at = anchorPoint(anchor.t);
+      return Math.hypot(point.x - at.x, point.y - at.y) <= ANCHOR_GRAB_RADIUS;
+    });
+
+  const startDrag = (event: PointerEvent<SVGSVGElement>, next: Drag) => {
     event.currentTarget.setPointerCapture(event.pointerId);
-    drag.current = { last: point, virtual: puck };
+    drag.current = next;
     setIsDragging(true);
     onDragStateChange(true);
   };
 
-  const handlePointerMove = (event: PointerEvent<SVGSVGElement>) => {
-    if (!drag.current) return;
+  const handlePointerDown = (event: PointerEvent<SVGSVGElement>) => {
     const point = toPad(event);
+    if (isOnPuck(point)) {
+      startDrag(event, { kind: 'puck', last: point, virtual: puck });
+      return;
+    }
+    const anchor = anchorAt(point);
+    // The puck moves only when grabbed; a press on empty pad space does nothing.
+    if (!anchor) return;
+    onSelect(anchor.id);
+    startDrag(event, { kind: 'anchor', id: anchor.id });
+  };
+
+  const handlePointerMove = (event: PointerEvent<SVGSVGElement>) => {
+    const current = drag.current;
+    if (!current) return;
+    const point = toPad(event);
+    if (current.kind === 'anchor') {
+      scheduleUpdate(() => onAnchorMove(current.id, positionOf(point)));
+      return;
+    }
     const factor = event.shiftKey ? FINE_DRAG : 1;
     const virtual = {
-      x: drag.current.virtual.x + (point.x - drag.current.last.x) * factor,
-      y: drag.current.virtual.y + (point.y - drag.current.last.y) * factor,
+      x: current.virtual.x + (point.x - current.last.x) * factor,
+      y: current.virtual.y + (point.y - current.last.y) * factor,
     };
-    drag.current = { last: point, virtual };
-    schedulePuck(clampToPad(virtual));
+    drag.current = { kind: 'puck', last: point, virtual };
+    scheduleUpdate(() => onPuckChange(clampToPad(virtual)));
   };
 
   const endDrag = () => {
@@ -197,6 +239,22 @@ function PadField({ pad, getLabel, getStep, onDragStateChange, onPuckChange }: P
       <circle className="fill-none stroke-text-secondary" r={1} strokeOpacity={0.6} strokeWidth={0.008} />
       <path className="stroke-text-secondary" d="M -0.05 0 H 0.05 M 0 -0.05 V 0.05" strokeWidth={0.008} />
 
+      {/* Where each anchor's reverse sits. */}
+      {pad.anchors.map((anchor) => {
+        const opposite = toView(anchorPoint(anchor.t + 0.5));
+        return (
+          <circle
+            className="fill-none stroke-text-secondary"
+            cx={opposite.x}
+            cy={opposite.y}
+            key={anchor.id}
+            r={0.025}
+            strokeOpacity={anchor.id === selectedId ? 0.9 : 0.35}
+            strokeWidth={0.008}
+          />
+        );
+      })}
+
       {pad.anchors.map((anchor) => {
         const direction = anchorPoint(anchor.t);
         const at = toView(direction);
@@ -211,7 +269,10 @@ function PadField({ pad, getLabel, getStep, onDragStateChange, onPuckChange }: P
           ? formatSigned(anchorValue(anchor, puck, pad.amount), getStep(anchor))
           : `→ ${formatSigned(anchor.target, getStep(anchor))}`;
         return (
-          <g key={anchor.id} opacity={anchor.muted ? 0.4 : 1}>
+          <g className="cursor-grab" key={anchor.id} opacity={anchor.muted ? 0.4 : 1}>
+            {anchor.id === selectedId && (
+              <circle className="fill-none stroke-accent" cx={at.x} cy={at.y} r={0.065} strokeWidth={0.015} />
+            )}
             <circle className="fill-text-primary" cx={at.x} cy={at.y} r={0.035} />
             <text
               className="fill-text-primary font-medium uppercase"
@@ -257,7 +318,7 @@ function PadField({ pad, getLabel, getStep, onDragStateChange, onPuckChange }: P
   );
 }
 
-/** The Orbit Blend Pad: three fixed tools on a circle, blended by dragging one puck. */
+/** The Orbit Blend Pad: tools on a circle, blended by dragging one puck. */
 export default function BlendPadPanel() {
   const { t } = useTranslation();
   const { setAdjustments } = useEditorActions();
@@ -269,6 +330,7 @@ export default function BlendPadPanel() {
   const defaultPad = useMemo(createBlendPad, []);
   // A photo without a pad shows the default one; the first change stores it.
   const pad = blendPad ?? defaultPad;
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const parametersById = useMemo(
     () => Object.fromEntries(parameters.map((parameter) => [parameter.id, parameter])),
@@ -278,6 +340,15 @@ export default function BlendPadPanel() {
     () => parameters.map((parameter) => ({ label: controlLabel(parameter.id), value: parameter.id })),
     [parameters, controlLabel],
   );
+  const curveOptions = useMemo(
+    () => CURVES.map((curve) => ({ label: t(`editor.blendPad.curves.${curve}`), value: curve })),
+    [t],
+  );
+  const canBake = useMemo(
+    () => Object.values(resolveBlendPad(pad, parameters)).some((offset) => offset !== 0),
+    [pad, parameters],
+  );
+  const canAddTool = pad.anchors.length < MAX_BLEND_PAD_ANCHORS;
 
   const updatePad = useCallback(
     (change: (current: BlendPad) => BlendPad, label?: string) =>
@@ -301,16 +372,61 @@ export default function BlendPadPanel() {
 
   const handlePuckChange = useCallback((puck: Coord) => updatePad((current) => ({ ...current, puck })), [updatePad]);
 
+  const handleAnchorMove = useCallback(
+    (id: string, position: number) => updateAnchor(id, { t: position }),
+    [updateAnchor],
+  );
+
   /** A new tool keeps the target's share of its range, so the anchor stays as strong. */
   const handleToolChange = (anchor: BlendPadAnchor, param: string) => {
     const before = parametersById[anchor.param];
     const after = parametersById[param];
     if (!after) return;
-    const reach = (parameter: BlendPadParameter) => Math.max(Math.abs(parameter.min), Math.abs(parameter.max));
-    const share = before ? anchor.target / reach(before) : 0;
-    const target = Math.round((share * reach(after)) / after.step) * after.step;
-    updateAnchor(anchor.id, { param, target: Math.min(after.max, Math.max(after.min, target)) });
+    updateAnchor(anchor.id, { param, target: targetWithShare(before ? shareOf(anchor.target, before) : 0, after) });
   };
+
+  const handleAddTool = (param: string) => {
+    const parameter = parametersById[param];
+    if (!parameter || !canAddTool) return;
+    const id = uuidv4();
+    updatePad(
+      (current) => ({
+        ...current,
+        anchors: [
+          ...current.anchors,
+          {
+            id,
+            param,
+            t: largestGapPosition(current.anchors),
+            target: targetWithShare(NEW_TOOL_SHARE, parameter),
+            curve: 'linear',
+            muted: false,
+          },
+        ],
+      }),
+      t('editor.blendPad.addTool'),
+    );
+    setSelectedId(id);
+  };
+
+  const handleRemove = (id: string) => {
+    updatePad(
+      (current) => ({ ...current, anchors: current.anchors.filter((anchor) => anchor.id !== id) }),
+      t('editor.blendPad.remove'),
+    );
+    if (selectedId === id) setSelectedId(null);
+  };
+
+  /** Writes the pad's offsets into the sliders and centres the puck: the photo looks the same. */
+  const handleBake = () =>
+    setAdjustments(
+      (prev) => ({
+        ...prev,
+        ...bakeBlendPad(prev, prev.blendPad, parameters),
+        blendPad: prev.blendPad && { ...prev.blendPad, puck: { x: 0, y: 0 } },
+      }),
+      t('editor.blendPad.bake'),
+    );
 
   const getStep = useCallback((anchor: BlendPadAnchor) => parametersById[anchor.param]?.step ?? 1, [parametersById]);
   const getLabel = useCallback((anchor: BlendPadAnchor) => controlLabel(anchor.param), [controlLabel]);
@@ -329,9 +445,20 @@ export default function BlendPadPanel() {
               <Crosshair size={18} />
             </button>
             <button
+              className="p-2 rounded-full hover:bg-surface transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
+              data-tooltip={t('editor.blendPad.bakeTooltip')}
+              disabled={!canBake}
+              onClick={handleBake}
+            >
+              <Stamp size={18} />
+            </button>
+            <button
               className="p-2 rounded-full hover:bg-surface transition-colors"
               data-tooltip={t('editor.blendPad.reset')}
-              onClick={() => updatePad(createBlendPad, t('editor.blendPad.reset'))}
+              onClick={() => {
+                updatePad(createBlendPad, t('editor.blendPad.reset'));
+                setSelectedId(null);
+              }}
             >
               <RotateCcw size={18} />
             </button>
@@ -343,9 +470,12 @@ export default function BlendPadPanel() {
           <PadField
             getLabel={getLabel}
             getStep={getStep}
+            onAnchorMove={handleAnchorMove}
             onDragStateChange={handleDragStateChange}
             onPuckChange={handlePuckChange}
+            onSelect={setSelectedId}
             pad={pad}
+            selectedId={selectedId}
           />
         </div>
         <Text variant={TextVariants.small} className="text-text-secondary">
@@ -371,36 +501,77 @@ export default function BlendPadPanel() {
           />
         </div>
 
-        {BLEND_PAD_SLOTS.map((slot) => {
-          const anchor = pad.anchors.find((candidate) => candidate.id === slot.id);
-          const parameter = anchor && parametersById[anchor.param];
-          if (!anchor || !parameter) return null;
+        {pad.anchors.map((anchor) => {
+          const parameter = parametersById[anchor.param];
+          if (!parameter) return null;
+          const reach = Math.max(Math.abs(parameter.min), Math.abs(parameter.max));
           return (
-            <div className="flex flex-col gap-2 pt-3 compact:pt-2 border-t border-surface" key={slot.id}>
-              <div className="flex items-center gap-2">
-                <Text variant={TextVariants.label} className="w-24 shrink-0 text-text-secondary">
-                  {t(`editor.blendPad.slots.${slot.id}`)}
-                </Text>
+            <div
+              className={clsx(
+                'flex flex-col gap-2 p-3 compact:p-2 rounded-md border bg-surface transition-colors',
+                anchor.id === selectedId ? 'border-accent' : 'border-transparent',
+                anchor.muted && 'opacity-60',
+              )}
+              key={anchor.id}
+              onPointerDown={() => setSelectedId(anchor.id)}
+            >
+              <div className="flex items-center gap-1">
                 <Dropdown
                   className="grow min-w-0"
                   onChange={(param: string) => handleToolChange(anchor, param)}
                   options={toolOptions}
                   value={anchor.param}
                 />
+                <button
+                  className="p-1.5 rounded-full hover:bg-bg-primary transition-colors text-text-secondary"
+                  data-tooltip={t(anchor.muted ? 'editor.blendPad.unmute' : 'editor.blendPad.mute')}
+                  onClick={() => updateAnchor(anchor.id, { muted: !anchor.muted })}
+                >
+                  {anchor.muted ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+                <button
+                  className="p-1.5 rounded-full hover:bg-bg-primary transition-colors text-text-secondary disabled:opacity-40 disabled:hover:bg-transparent"
+                  data-tooltip={t('editor.blendPad.remove')}
+                  disabled={pad.anchors.length <= 1}
+                  onClick={() => handleRemove(anchor.id)}
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
               <Slider
-                defaultValue={anchor.param === slot.param ? slot.target : 0}
+                defaultValue={targetWithShare(NEW_TOOL_SHARE, parameter)}
                 label={t('editor.blendPad.target')}
-                max={parameter.max}
-                min={parameter.min}
+                max={reach}
+                min={-reach}
                 onChange={(event) => updateAnchor(anchor.id, { target: Number(event.target.value) })}
                 onDragStateChange={handleDragStateChange}
                 step={parameter.step}
                 value={anchor.target}
               />
+              <div className="flex items-center gap-2">
+                <Text variant={TextVariants.label} className="w-16 shrink-0 text-text-secondary">
+                  {t('editor.blendPad.curve')}
+                </Text>
+                <Dropdown
+                  className="grow min-w-0"
+                  onChange={(curve: BlendPadCurve) => updateAnchor(anchor.id, { curve })}
+                  options={curveOptions}
+                  value={anchor.curve}
+                />
+              </div>
             </div>
           );
         })}
+
+        <div data-tooltip={canAddTool ? undefined : t('editor.blendPad.maxTools', { count: MAX_BLEND_PAD_ANCHORS })}>
+          <Dropdown
+            disabled={!canAddTool}
+            onChange={handleAddTool}
+            options={toolOptions}
+            placeholder={t('editor.blendPad.addTool')}
+            value={null}
+          />
+        </div>
       </div>
     </div>
   );

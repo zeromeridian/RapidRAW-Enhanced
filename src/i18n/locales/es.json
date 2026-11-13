@@ -676,17 +676,25 @@
       "savesTo": "Edición externa: se guarda en"
     },
     "blendPad": {
+      "addTool": "Añadir herramienta",
+      "bake": "Aplicar a los controles",
+      "bakeTooltip": "Aplicar a los controles: escribe los valores del pad en los controles y centra el disco",
       "center": "Centrar el disco",
-      "enabled": "Blend Pad activado",
-      "hint": "Arrastra el disco para mezclar las herramientas. Mayús para movimientos más finos, flechas para desplazarlo y doble clic en el disco para centrarlo.",
-      "reset": "Restablecer el pad",
-      "slots": {
-        "bottomLeft": "Abajo a la izquierda",
-        "bottomRight": "Abajo a la derecha",
-        "top": "Arriba"
+      "curve": "Curva",
+      "curves": {
+        "easeIn": "Entrada suave",
+        "linear": "Lineal",
+        "soft": "Suave"
       },
+      "enabled": "Blend Pad activado",
+      "hint": "Arrastra el disco para mezclar las herramientas; arrastra un ancla por el borde para moverla. Mayús para movimientos más finos, flechas para desplazarlo y doble clic en el disco para centrarlo.",
+      "maxTools": "Hasta {{count}} herramientas",
+      "mute": "Silenciar",
+      "remove": "Quitar herramienta",
+      "reset": "Restablecer el pad",
       "target": "Objetivo",
-      "title": "Blend Pad"
+      "title": "Blend Pad",
+      "unmute": "Reactivar"
     },
     "favorites": {
       "add": "Añadir a favoritos",

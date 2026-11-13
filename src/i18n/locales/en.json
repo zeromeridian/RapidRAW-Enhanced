@@ -679,17 +679,25 @@
       }
     },
     "blendPad": {
+      "addTool": "Add tool",
+      "bake": "Bake into sliders",
+      "bakeTooltip": "Bake into sliders: write the pad's values into the sliders and center the puck",
       "center": "Center the puck",
-      "enabled": "Blend Pad on",
-      "hint": "Drag the puck to blend the tools. Hold Shift for finer moves, use the arrow keys to nudge, and double-click the puck to center it.",
-      "reset": "Reset the pad",
-      "slots": {
-        "bottomLeft": "Bottom left",
-        "bottomRight": "Bottom right",
-        "top": "Top"
+      "curve": "Curve",
+      "curves": {
+        "easeIn": "Ease in",
+        "linear": "Linear",
+        "soft": "Soft"
       },
+      "enabled": "Blend Pad on",
+      "hint": "Drag the puck to blend the tools; drag an anchor along the edge to move it. Hold Shift for finer moves, use the arrow keys to nudge, and double-click the puck to center it.",
+      "maxTools": "Up to {{count}} tools",
+      "mute": "Mute",
+      "remove": "Remove tool",
+      "reset": "Reset the pad",
       "target": "Target",
-      "title": "Blend Pad"
+      "title": "Blend Pad",
+      "unmute": "Unmute"
     },
     "favorites": {
       "add": "Add to Favorites",

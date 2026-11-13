@@ -1,7 +1,8 @@
 # Orbit Blend Pad Plan
 
-Status (2026-11-13): **steps 1 (`1.49.0`, owner commit `59e355b6`) and 2
-(`1.50.0`, uncommitted) done** on `dev/orbit-blend-pad`; step 3 next.
+Status (2026-11-13): **steps 1 (`1.49.0`, owner commit `59e355b6`), 2
+(`1.50.0`, owner commit `65c00ea1`) and 3 (`1.51.0`, uncommitted) done**
+on `dev/orbit-blend-pad`; step 4 next.
 `UPSTREAM_FEATURE_GAP.md` Plan item 27.
 
 **Owner decisions (2026-11-13):** brought forward, ahead of the remaining
@@ -57,16 +58,27 @@ full at the start.
    TypeScript resolver with the shared vectors. The panel is its own tab
    in the right-panel switcher, like Favorites (owner, 2026-11-13).
 3. **Anchor editing** (`1.51.0`). **Also new tools (owner, 2026-11-13):
-   Blur, Glow, Light Flare and Grain** on the pad. Check first how each
-   reaches the shader (Glow and Flare have their own generation pass,
-   Blur likely too), so a drag stays fast or updates on release, and
-   which slider "Blur" means (Gaussian Blur Amount is the candidate).
+   Blur, Glow, Light Flare and Grain** on the pad. Checked: Grain and Glow
+   are plain uniforms; Flare's generation pass already runs every frame
+   while Flare is above 0, so a pad drag costs what a slider drag does.
+   **Blur = a new photo-wide Gaussian Blur** (owner, 2026-11-13): the
+   masks' Gaussian Blur (one Amount slider, 0–100, a mix toward the cached
+   ~40 px structure blur) brought to the whole photo as an Effects slider,
+   then put on the pad. Motion Blur and Lens Blur stay off the pad.
+   **At most 8 anchors** (owner, 2026-11-13). One-sided tools (Glow,
+   Flare, Grain, Blur, 0–100) must still combine and cancel with their
+   slider, so the anchors' sum is no longer clamped to the slider's range
+   (that dropped every negative offset); only the slider plus the sum is.
    Then: add a tool at the largest free gap,
    drag anchors along the edge, an inspector (target, curve, mute,
    remove), opposite-point markers, a ghost marker on each slider for the
    pad's offset, Bake (write the offsets into the sliders, centre the
    puck).
-4. **Shapes** (`1.52.0`): triangle, square, rectangle, pentagon, hexagon,
+4. **Shapes** (`1.52.0`). **Also (owner, 2026-11-13):** a slider the pad
+   moves shows the combined value (slider + pad) next to its own value,
+   in brackets, e.g. "+20 [+60]", only while the pad moves it; it goes
+   with the ghost tick from step 3 (same `blendPadValue`).
+   Then: triangle, square, rectangle, pentagon, hexagon,
    from one shape definition (outline, clamp, opposite points) in Rust
    with its TypeScript copy; anchors keep `t` when the shape changes.
 5. **Pad presets** (`1.53.0`): named presets (shape and anchors, with or
@@ -86,7 +98,7 @@ Not scheduled (concept note, later): pads per mask, heavier tools
   default in `src/utils/adjustments.ts`. 14 tests (12 in `blend_pad`, 2 in
   `image_processing`). Copy/paste group, history label and the
   TypeScript resolver come with the panel in step 2.
-- Step 2 (`1.50.0`, 2026-11-13, uncommitted): `BlendPadPanel.tsx`, a
+- Step 2 (`1.50.0`, 2026-11-13, owner commit `65c00ea1`): `BlendPadPanel.tsx`, a
   right-panel tab after Favorites (`Panel.BlendPad`, Orbit icon). The pad
   is an SVG (theme colours, axis gradients, labels inside the view box,
   live values while dragging); the puck moves only when grabbed, one
@@ -101,6 +113,22 @@ Not scheduled (concept note, later): pads per mask, heavier tools
   (`node scripts/check-blend-pad.mjs`, 12 cases). Slider labels shared
   with Favorites through the new `useControlLabel`. Copy/paste group
   "Blend Pad" (presets follow it), history label, strings in 12 locales.
+- Step 3 (`1.51.0`, 2026-11-13, uncommitted): **photo-wide Gaussian
+  Blur** (`GlobalAdjustments.gaussian_blur_amount` in the retired
+  `_pad_motion_blur1` slot, no layout change; shader mixes toward the
+  cached structure blur before the masks' blur; Effects slider for photo
+  and masks through `AdjustmentSlider`, copy/paste group, Effects reset
+  list). **21 pad tools** (`gaussianBlurAmount`, `glowAmount`,
+  `flareAmount`, `grainAmount` added). **Sum limit:** the anchors' sum is
+  bounded by the slider's whole span (`limit_offset`), only slider + sum
+  by its range, so one-sided tools combine and cancel. **Panel:** anchor
+  cards (tool, target ±reach, curve, mute, remove; min 1), Add tool
+  (largest free gap, 40 % of the reach, max 8), drag a dot along the edge,
+  selection ring, opposite-point rings, Bake (header stamp; offsets into
+  the sliders, puck centred, one labelled history step), ghost tick on
+  the photo's sliders (`Slider.ghostValue`, from `blendPadValue`).
+  Vectors: 13 cases. Agent choices: a new tool's target is 40 % of its
+  reach; a target's double-click reset returns there too.
 
 ## Owner's specification (2026-11-13; verbatim, headings one level down)
 
