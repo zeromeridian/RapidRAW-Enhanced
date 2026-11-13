@@ -9,13 +9,18 @@
 //! [`RETENTION`]. Ending a session deletes only its staging folder.
 //!
 //! Edit Original opens a non-RAW file itself and watches it in place.
+//!
+//! An editor that quits with an error right after it was started (for example
+//! a launcher that cannot open the file) ends its session and reports why,
+//! instead of leaving it waiting for a save.
 
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Child;
 use std::sync::{LazyLock, Mutex};
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use serde_json::Value;
@@ -35,11 +40,15 @@ use crate::library_catalog::{self, EditorRoundTripRow};
 const STAGING_FOLDER: &str = "external-edits";
 const EDIT_SUFFIX: &str = "-Edit";
 const SAVED_EVENT: &str = "editor-round-trip-saved";
+const FAILED_EVENT: &str = "editor-round-trip-failed";
 /// Editors write a save in several steps. A file counts as saved once two
 /// consecutive polls see the same size and modification time. Polling, rather
 /// than change notifications, also works on network volumes.
 const POLL_INTERVAL: Duration = Duration::from_millis(1500);
 const RETENTION: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+/// A launcher (macOS `open`, a wrapper script) hands the file over and exits;
+/// only a failure within this time counts as the editor not starting.
+const LAUNCH_WINDOW: Duration = Duration::from_secs(10);
 
 static SESSIONS: LazyLock<Mutex<Vec<EditorRoundTripRow>>> = LazyLock::new(Default::default);
 /// Files opened with Edit Original and the stamp last reported for each. They
@@ -50,6 +59,13 @@ static ORIGINALS: LazyLock<Mutex<HashMap<String, FileStamp>>> = LazyLock::new(De
 struct FileStamp {
     len: u64,
     modified: u64,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct RoundTripFailed {
+    source_path: String,
+    message: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -136,12 +152,12 @@ pub async fn start_editor_round_trip(
         }
         let stamp = file_stamp(&staged_file)
             .ok_or_else(|| "The copy for the external editor was not written".to_string())?;
-        open_external_editor(editor_path, staged_file.to_string_lossy().into_owned())?;
-        Ok::<_, String>(stamp)
+        let editor = open_external_editor(editor_path, staged_file.to_string_lossy().into_owned())?;
+        Ok::<_, String>((stamp, editor))
     }
     .await;
-    let stamp = match rendered {
-        Ok(stamp) => stamp,
+    let (stamp, editor) = match rendered {
+        Ok(rendered) => rendered,
         Err(error) => {
             let _ = fs::remove_dir_all(&staging_dir);
             return Err(error);
@@ -149,8 +165,8 @@ pub async fn start_editor_round_trip(
     };
 
     let session = EditorRoundTripRow {
-        id,
-        source_path,
+        id: id.clone(),
+        source_path: source_path.clone(),
         staging_dir: staging_dir.to_string_lossy().into_owned(),
         destination: None,
         saved_file: staged_file.to_string_lossy().into_owned(),
@@ -164,7 +180,45 @@ pub async fn start_editor_round_trip(
         log::warn!("External edit will not survive a restart: {error}");
     }
     SESSIONS.lock().unwrap().push(session);
+    watch_launch(editor, app_handle, source_path, move |app_handle| {
+        // Keep a session that already received a save.
+        let is_unsaved = SESSIONS
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|session| session.id == id && session.destination.is_none());
+        if is_unsaved {
+            end_session(app_handle, &id);
+        }
+        is_unsaved
+    });
     Ok(())
+}
+
+/// Waits for the started editor process in the background, so it never lingers
+/// as a zombie, and reports it when it fails within [`LAUNCH_WINDOW`] and
+/// `on_failure` confirms nothing was saved yet.
+fn watch_launch(
+    mut editor: Child,
+    app_handle: AppHandle,
+    source_path: String,
+    on_failure: impl FnOnce(&AppHandle) -> bool + Send + 'static,
+) {
+    let started = Instant::now();
+    thread::spawn(move || {
+        let Ok(status) = editor.wait() else { return };
+        if status.success() || started.elapsed() > LAUNCH_WINDOW || !on_failure(&app_handle) {
+            return;
+        }
+        log::warn!("External editor for {source_path} quit right after starting ({status})");
+        let _ = app_handle.emit(
+            FAILED_EVENT,
+            RoundTripFailed {
+                source_path,
+                message: format!("The external editor quit right after starting ({status})"),
+            },
+        );
+    });
 }
 
 /// Opens a file itself in the editor and refreshes its thumbnail whenever the
@@ -179,7 +233,7 @@ pub fn start_editing_original(
     let stamp =
         file_stamp(&physical).ok_or_else(|| format!("{} was not found", physical.display()))?;
     let physical = physical.to_string_lossy().into_owned();
-    open_external_editor(editor_path, physical.clone())?;
+    let editor = open_external_editor(editor_path, physical.clone())?;
 
     // A round trip saving into this file would overwrite the direct edits.
     let replaced: Vec<String> = SESSIONS
@@ -192,7 +246,11 @@ pub fn start_editing_original(
     for id in replaced {
         end_session(&app_handle, &id);
     }
-    ORIGINALS.lock().unwrap().insert(physical, stamp);
+    ORIGINALS.lock().unwrap().insert(physical.clone(), stamp);
+    watch_launch(editor, app_handle, path, move |_| {
+        ORIGINALS.lock().unwrap().remove(&physical);
+        true
+    });
     Ok(())
 }
 
@@ -451,21 +509,38 @@ fn file_stamp(path: &Path) -> Option<FileStamp> {
     })
 }
 
-/// The newest image the editor saved into the staging folder. Hidden files
-/// and files ThisIsRAW cannot open, such as editor temporaries and PSDs, are
-/// ignored.
-fn latest_saved_file(staging_dir: &Path) -> Option<(PathBuf, FileStamp)> {
-    fs::read_dir(staging_dir)
-        .ok()?
+fn is_hidden(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with('.'))
+}
+
+/// The visible entries of `dir`.
+fn visible_entries(dir: &Path) -> Vec<PathBuf> {
+    fs::read_dir(dir)
+        .into_iter()
+        .flatten()
         .filter_map(Result::ok)
         .map(|entry| entry.path())
-        .filter(|path| {
-            !path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .is_some_and(|name| name.starts_with('.'))
-                && is_supported_image_file(path)
-        })
+        .filter(|path| !is_hidden(path))
+        .collect()
+}
+
+/// The newest image the editor saved into the staging folder or one of its
+/// subfolders (editors that export into a folder of their own). Hidden files
+/// and folders and files ThisIsRAW cannot open, such as editor temporaries and
+/// PSDs, are ignored.
+fn latest_saved_file(staging_dir: &Path) -> Option<(PathBuf, FileStamp)> {
+    let entries = visible_entries(staging_dir);
+    let nested: Vec<PathBuf> = entries
+        .iter()
+        .filter(|path| path.is_dir())
+        .flat_map(|dir| visible_entries(dir))
+        .collect();
+    entries
+        .into_iter()
+        .chain(nested)
+        .filter(|path| is_supported_image_file(path))
         .filter_map(|path| file_stamp(&path).map(|stamp| (path, stamp)))
         .max_by_key(|(_, stamp)| stamp.modified)
 }
@@ -574,6 +649,31 @@ mod tests {
         let (latest, stamp) = latest_saved_file(staging.path()).unwrap();
         assert_eq!(latest, staged);
         assert_eq!(stamp.len, 6);
+    }
+
+    #[test]
+    fn latest_saved_file_finds_saves_in_subfolders_but_not_hidden_ones() {
+        let staging = tempfile::tempdir().unwrap();
+        let staged = staging.path().join("IMG_1-Edit.tif");
+        fs::write(&staged, b"render").unwrap();
+        let later = |path: &Path, seconds: u64| {
+            fs::write(path, b"saved").unwrap();
+            fs::File::options()
+                .write(true)
+                .open(path)
+                .unwrap()
+                .set_modified(SystemTime::now() + Duration::from_secs(seconds))
+                .unwrap();
+        };
+
+        fs::create_dir(staging.path().join(".cache")).unwrap();
+        later(&staging.path().join(".cache").join("IMG_1-Edit.jpg"), 60);
+        assert_eq!(latest_saved_file(staging.path()).unwrap().0, staged);
+
+        fs::create_dir(staging.path().join("Exports")).unwrap();
+        let exported = staging.path().join("Exports").join("IMG_1-Edit.jpg");
+        later(&exported, 30);
+        assert_eq!(latest_saved_file(staging.path()).unwrap().0, exported);
     }
 
     #[test]

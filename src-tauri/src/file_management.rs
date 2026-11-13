@@ -5814,8 +5814,12 @@ pub fn show_in_finder(path: String) -> Result<(), String> {
 
 /// Opens a user-configured external editor without using a shell. The editor
 /// path is deliberately passed as one argument, so spaces and file names are
-/// never interpreted as commands.
-pub(crate) fn open_external_editor(editor_path: String, image_path: String) -> Result<(), String> {
+/// never interpreted as commands. Returns the started process (on macOS the
+/// `open` launcher) so the caller can wait for it and notice an early failure.
+pub(crate) fn open_external_editor(
+    editor_path: String,
+    image_path: String,
+) -> Result<std::process::Child, String> {
     let editor = Path::new(&editor_path);
     let image = Path::new(&image_path);
     if !image.is_file() {
@@ -5879,12 +5883,12 @@ pub(crate) fn open_external_editor(editor_path: String, image_path: String) -> R
                 .arg(&app_bundle)
                 .arg(image)
                 .spawn()
-                .map_err(|error| format!("Failed to open external editor: {error}"))?;
+                .map_err(|error| format!("Failed to open external editor: {error}"))
         } else {
             Command::new(editor)
                 .arg(image)
                 .spawn()
-                .map_err(|error| format!("Failed to start external editor: {error}"))?;
+                .map_err(|error| format!("Failed to start external editor: {error}"))
         }
     }
 
@@ -5893,15 +5897,13 @@ pub(crate) fn open_external_editor(editor_path: String, image_path: String) -> R
         Command::new(editor)
             .arg(image)
             .spawn()
-            .map_err(|error| format!("Failed to start external editor: {error}"))?;
+            .map_err(|error| format!("Failed to start external editor: {error}"))
     }
 
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
-        return Err("External editors are not supported on mobile.".to_string());
+        Err("External editors are not supported on mobile.".to_string())
     }
-
-    Ok(())
 }
 
 #[tauri::command]
