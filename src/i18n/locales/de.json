@@ -274,6 +274,7 @@
     },
     "editor": {
       "autoAdjust": "Bild autom. anpassen",
+      "autoLensCorrection": "Autom. Objektivkorrektur",
       "cancel": "Abbrechen",
       "colorLabel": "Farbmarkierung",
       "confirmReset": "Zurücksetzen bestätigen",
@@ -339,6 +340,8 @@
       "addToAlbum": "Zu Album hinzufügen",
       "autoAdjust_one": "Bild autom. anpassen",
       "autoAdjust_other": "Bilder autom. anpassen",
+      "autoLensCorrection_one": "Autom. Objektivkorrektur",
+      "autoLensCorrection_other": "Autom. Objektivkorrektur",
       "collage_one": "Bild rahmen",
       "collage_other": "Collage erstellen",
       "confirmDelete": "Löschen bestätigen",
@@ -378,6 +381,7 @@
       "couldNotShowFolder": "Ordner konnte nicht angezeigt werden: {{err}}",
       "failedAddToAlbum": "Fehler beim Hinzufügen zum Album: {{err}}",
       "failedApplyAuto": "Fehler bei der autom. Anpassung: {{err}}",
+      "failedApplyAutoLensCorrection": "Fehler bei der autom. Objektivkorrektur: {{err}}",
       "failedChangeIcon": "Fehler beim Ändern des Symbols: {{err}}",
       "failedCopy": "Dateien kopieren fehlgeschlagen: {{err}}",
       "failedCreateVirtualCopy": "Virtuelle Kopie fehlgeschlagen: {{err}}",
@@ -548,6 +552,10 @@
         "armature": {
           "desc": "Harmonische Dreiecke",
           "name": "Dreiecke"
+        },
+        "center": {
+          "desc": "Mittellinien",
+          "name": "Mitte"
         },
         "diagonal": {
           "desc": "Diagonale Linien",

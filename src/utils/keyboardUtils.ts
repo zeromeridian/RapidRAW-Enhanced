@@ -414,7 +414,27 @@ export const isTextEntryTarget = (target: EventTarget | null) =>
   target instanceof HTMLTextAreaElement ||
   (target instanceof HTMLInputElement && !NON_TEXT_INPUT_TYPES.has(target.type));
 
+/** Whether Ctrl or Cmd is held, as tracked from key events by the editor canvas. */
+export const isCtrlKeyDown = () => (window as Window & { ctrlKeyDown?: boolean }).ctrlKeyDown === true;
+
+// Canonical identifiers keep stored shortcuts compatible while the symbol
+// comes from the active keyboard layout rather than a physical QWERTY key.
+const punctuationCodes: Record<string, string> = {
+  '[': 'BracketLeft',
+  ']': 'BracketRight',
+  '-': 'Minus',
+  '=': 'Equal',
+  ',': 'Comma',
+  '.': 'Period',
+  '/': 'Slash',
+  ';': 'Semicolon',
+  "'": 'Quote',
+  '`': 'Backquote',
+  '\\': 'Backslash',
+};
+
 export function normalizeCombo(event: KeyboardEvent, osPlatform?: string): string[] {
+  if (event.isComposing || event.key === 'Dead' || event.key === 'Process') return [];
   const isMacDelete = osPlatform === 'macos' && event.code === 'Backspace' && (event.ctrlKey || event.metaKey);
   const parts: string[] = [];
   if ((event.ctrlKey || event.metaKey) && !isMacDelete) parts.push('ctrl');
@@ -429,6 +449,14 @@ export function normalizeCombo(event: KeyboardEvent, osPlatform?: string): strin
     code = 'Equal';
   } else if (code === 'NumpadSubtract') {
     code = 'Minus';
+  } else if (
+    !code.startsWith('Numpad') &&
+    // Keep the physical number row for ratings on layouts (e.g. French AZERTY)
+    // whose unshifted digit keys type punctuation.
+    !(/^Digit[0-9]$/.test(code) && !event.ctrlKey && !event.metaKey && !event.altKey) &&
+    punctuationCodes[event.key]
+  ) {
+    code = punctuationCodes[event.key];
   }
   if (isValidShortcutKey(code)) {
     parts.push(code);

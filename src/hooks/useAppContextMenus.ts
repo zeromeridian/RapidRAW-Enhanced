@@ -16,6 +16,7 @@ import {
   Images,
   LayoutTemplate,
   Layers,
+  PencilSparkles,
   Redo,
   RefreshCw,
   RotateCcw,
@@ -70,9 +71,9 @@ import {
   LibraryViewMode,
 } from '../components/ui/AppProperties';
 import { Status } from '../components/ui/ExportImportProperties';
-import { Color, COLOR_LABELS, getInitialAdjustments, normalizeLoadedAdjustments } from '../utils/adjustments';
+import { Color, COLOR_LABELS, getInitialAdjustments } from '../utils/adjustments';
 import TaggingSubMenu from '../context/TaggingSubMenu';
-import { debouncedSave, useEditorActions } from './useEditorActions';
+import { applyBatchEditToPaths, debouncedSave, useEditorActions } from './useEditorActions';
 import {
   moveImageToStackTop,
   openCaptureTimeStackModal,
@@ -80,7 +81,6 @@ import {
   stackImages,
   useLibraryActions,
 } from './useLibraryActions';
-import { globalImageCache } from '../utils/ImageLRUCache';
 import { findImageStack, toggleImageStack, unstackImagePaths } from '../utils/imageStacks';
 import { autoStackCreatedImages } from '../utils/autoStacking';
 import { isCollectionView, isPathWithin } from '../utils/libraryViews';
@@ -106,6 +106,12 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
   const { handleAutoAdjustments, handleResetAdjustments, handleCopyAdjustments, handlePasteAdjustments } =
     useEditorActions();
+
+  const applyAutoLensCorrection = (paths: string[]) =>
+    applyBatchEditToPaths(Invokes.ApplyAutoLensCorrectionToPaths, paths).catch((err) => {
+      console.error('Failed to apply auto lens correction to paths:', err);
+      toast.error(t('contextMenus.toasts.failedApplyAutoLensCorrection', { err }));
+    });
   const { handleRate, handleSetColorLabel, handleTagsChanged } = useLibraryActions();
 
   const refreshFolders = useCallback(
@@ -346,8 +352,14 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             },
             {
               label: t('contextMenus.editor.autoAdjust'),
-              icon: Aperture,
+              icon: PencilSparkles,
               onClick: handleAutoAdjustments,
+              disabled: !selectedImage?.isReady,
+            },
+            {
+              label: t('contextMenus.editor.autoLensCorrection'),
+              icon: Aperture,
+              onClick: () => applyAutoLensCorrection([selectedImage.path]),
               disabled: !selectedImage?.isReady,
             },
             {
@@ -619,31 +631,10 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       };
 
       const handleApplyAutoAdjustmentsToSelection = () => {
-        if (finalSelection.length === 0) return;
-        finalSelection.forEach((p) => globalImageCache.delete(p));
-
-        invoke(Invokes.ApplyAutoAdjustmentsToPaths, { paths: finalSelection })
-          .then(async () => {
-            if (selectedImage && finalSelection.includes(selectedImage.path)) {
-              const metadata: any = await invoke(Invokes.LoadMetadata, { path: selectedImage.path });
-              if (metadata.adjustments && !metadata.adjustments.is_null) {
-                const normalized = normalizeLoadedAdjustments(metadata.adjustments);
-                setEditor({ adjustments: normalized });
-                useEditorStore.getState().resetHistory(normalized);
-              }
-            }
-            if (libraryActivePath && finalSelection.includes(libraryActivePath)) {
-              const metadata: any = await invoke(Invokes.LoadMetadata, { path: libraryActivePath });
-              if (metadata.adjustments && !metadata.adjustments.is_null) {
-                const normalized = normalizeLoadedAdjustments(metadata.adjustments);
-                setLibrary({ libraryActiveAdjustments: normalized });
-              }
-            }
-          })
-          .catch((err) => {
-            console.error('Failed to apply auto adjustments to paths:', err);
-            toast.error(t('contextMenus.toasts.failedApplyAuto', { err }));
-          });
+        applyBatchEditToPaths(Invokes.ApplyAutoAdjustmentsToPaths, finalSelection).catch((err) => {
+          console.error('Failed to apply auto adjustments to paths:', err);
+          toast.error(t('contextMenus.toasts.failedApplyAuto', { err }));
+        });
       };
 
       // Develop exports only the photo being edited, so several photos are exported from the Library.
@@ -751,7 +742,13 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               icon: SwatchBook,
               onClick: () => openPresetBatchForImages(finalSelection),
             },
-            { label: autoAdjustLabel, icon: Aperture, onClick: handleApplyAutoAdjustmentsToSelection },
+            { label: autoAdjustLabel, icon: PencilSparkles, onClick: handleApplyAutoAdjustmentsToSelection },
+            {
+              label: t('contextMenus.thumbnail.autoLensCorrection', { count: selectionCount }),
+              icon: Aperture,
+              disabled: finalSelection.length === 0,
+              onClick: () => applyAutoLensCorrection(finalSelection),
+            },
             {
               label: denoiseLabel,
               icon: Grip,

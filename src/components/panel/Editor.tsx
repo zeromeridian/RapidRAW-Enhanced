@@ -7,8 +7,16 @@ import { toast } from 'react-toastify';
 
 import { ImageDimensions, RenderSize, useImageRenderSize } from '../../hooks/useImageRenderSize';
 import { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
-import { calculateCenteredCrop, rotateCropCenter } from '../../utils/cropUtils';
+import {
+  calculateCenteredCrop,
+  fitCropTowards,
+  getOrientedDimensions,
+  moveCropInsideBounds,
+  rotateCropCenter,
+  zoomCrop,
+} from '../../utils/cropUtils';
 import { stripSentMaskData, stripSentSubMasks } from '../../utils/maskUtils';
+import { isCtrlKeyDown } from '../../utils/keyboardUtils';
 import EditorToolbar from './editor/EditorToolbar';
 import GuidedPerspectiveOverlay from './editor/GuidedPerspectiveOverlay';
 import ImageCanvas from './editor/ImageCanvas';
@@ -160,6 +168,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   const [crop, setCrop] = useState<Crop | null>(null);
   const prevCropParams = useRef<any>(null);
   const lastValidCropRef = useRef<PercentCrop | null>(null);
+  /** The crop when a Crop handle drag started; Ctrl/Cmd then resizes it from its centre. */
+  const cropResizeStartRef = useRef<PercentCrop | null>(null);
 
   const [isMaskHovered, setIsMaskHovered] = useState(false);
   const [isMaskTouchInteracting, setIsMaskTouchInteracting] = useState(false);
@@ -676,6 +686,100 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     isRelightPickerActive ||
     isTargetedAdjustmentActive;
 
+  /**
+   * Crop panel geometry for Ctrl/Cmd reframing: the oriented image size, rotation, current pixel crop,
+   * and the on-screen rectangle of the uncropped photo (the crop frame's coordinate space).
+   */
+  const getCropGeometry = useCallback(() => {
+    if (!selectedImage?.width || !selectedImage?.height) return null;
+    const orientationSteps = adjustments.orientationSteps || 0;
+    const { width, height } = getOrientedDimensions(selectedImage.width, selectedImage.height, orientationSteps);
+    const rotation = liveRotation ?? (adjustments.rotation || 0);
+    const crop =
+      adjustments.crop ??
+      calculateCenteredCrop(
+        selectedImage.width,
+        selectedImage.height,
+        orientationSteps,
+        adjustments.aspectRatio || width / height,
+        rotation,
+      );
+    const frame = imageContainerRef.current?.querySelector<HTMLElement>('.ReactCrop')?.getBoundingClientRect();
+    if (!crop || !frame?.width || !frame?.height) return null;
+    return { width, height, rotation, crop, frame };
+  }, [
+    selectedImage,
+    adjustments.orientationSteps,
+    adjustments.rotation,
+    adjustments.crop,
+    adjustments.aspectRatio,
+    liveRotation,
+  ]);
+
+  const setPixelCrop = useCallback(
+    (crop: Crop) =>
+      setAdjustments((prev: Adjustments) => ({
+        ...prev,
+        crop: {
+          unit: 'px',
+          x: Math.ceil(crop.x),
+          y: Math.ceil(crop.y),
+          width: Math.floor(crop.width),
+          height: Math.floor(crop.height),
+        },
+      })),
+    [setAdjustments],
+  );
+
+  // In Crop: remember where a handle drag starts (Ctrl/Cmd resizes from the centre), and let a
+  // Ctrl/Cmd drag on the photo outside the frame move the frame instead of drawing a new one.
+  const handleCropPointerDownCapture = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!isCropping || e.button !== 0) return;
+      const target = e.target as HTMLElement;
+      cropResizeStartRef.current = target.closest('[data-ord]') ? lastValidCropRef.current : null;
+
+      // On macOS Ctrl+click opens the context menu, so Cmd is the modifier there.
+      const isModifierDown = e.metaKey || (e.ctrlKey && osPlatform !== 'macos');
+      if (!isModifierDown || !target.closest('.ReactCrop') || target.closest('.ReactCrop__crop-selection')) return;
+      const geometry = getCropGeometry();
+      if (!geometry) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const { width, height, rotation, crop, frame } = geometry;
+      const { pointerId, clientX: startX, clientY: startY } = e;
+      const handleMove = (moveEvent: PointerEvent) => {
+        if (moveEvent.pointerId !== pointerId) return;
+        const dx = ((moveEvent.clientX - startX) / frame.width) * width;
+        const dy = ((moveEvent.clientY - startY) / frame.height) * height;
+        setPixelCrop(moveCropInsideBounds(crop, dx, dy, width, height, rotation));
+      };
+      const handleUp = (upEvent: PointerEvent) => {
+        if (upEvent.pointerId !== pointerId) return;
+        window.removeEventListener('pointermove', handleMove);
+        window.removeEventListener('pointerup', handleUp);
+        window.removeEventListener('pointercancel', handleUp);
+      };
+      window.addEventListener('pointermove', handleMove);
+      window.addEventListener('pointerup', handleUp);
+      window.addEventListener('pointercancel', handleUp);
+    },
+    [isCropping, osPlatform, getCropGeometry, setPixelCrop],
+  );
+
+  useEffect(() => {
+    const clearCropResizeStart = () => {
+      cropResizeStartRef.current = null;
+    };
+    window.addEventListener('pointerup', clearCropResizeStart);
+    window.addEventListener('pointercancel', clearCropResizeStart);
+    return () => {
+      window.removeEventListener('pointerup', clearCropResizeStart);
+      window.removeEventListener('pointercancel', clearCropResizeStart);
+    };
+  }, []);
+
   useEffect(() => {
     const container = imageContainerRef.current;
     if (!container) return;
@@ -684,6 +788,22 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
       e.preventDefault();
       if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
       if (physicsFrameId.current) cancelAnimationFrame(physicsFrameId.current);
+
+      // Ctrl/Cmd+scroll in Crop zooms the crop frame around the pointer. The key state comes from
+      // the key events, because a trackpad pinch also sends wheel events with ctrlKey set.
+      if (isCropping && isCtrlKeyDown()) {
+        const geometry = getCropGeometry();
+        if (geometry) {
+          const { width, height, rotation, crop, frame } = geometry;
+          const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+          const originX = ((e.clientX - frame.left) / frame.width) * width;
+          const originY = ((e.clientY - frame.top) / frame.height) * height;
+          setPixelCrop(
+            zoomCrop(crop, delta > 0 ? 1.05 : 0.95, width, height, rotation, adjustments.aspectRatio, originX, originY),
+          );
+        }
+        return;
+      }
 
       const isPinch = e.ctrlKey;
 
@@ -765,6 +885,10 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     startPhysicsLoop,
     appSettings?.canvasInputMode,
     appSettings?.zoomSpeedMultiplier,
+    isCropping,
+    getCropGeometry,
+    setPixelCrop,
+    adjustments.aspectRatio,
   ]);
 
   const handlePointerDown = useCallback(
@@ -1717,6 +1841,28 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
         height: (pc.height / 100) * H,
       });
 
+      // Ctrl/Cmd while dragging a handle resizes the crop symmetrically around its centre.
+      const resizeStart = cropResizeStartRef.current;
+      if (resizeStart && isCtrlKeyDown()) {
+        const width = 2 * percentCrop.width - resizeStart.width;
+        const height = 2 * percentCrop.height - resizeStart.height;
+        if (width < minPctW || height < minPctH) return;
+
+        const centered: PercentCrop = {
+          unit: '%',
+          x: resizeStart.x + resizeStart.width / 2 - width / 2,
+          y: resizeStart.y + resizeStart.height / 2 - height / 2,
+          width,
+          height,
+        };
+        const nextCrop = fitCropTowards(resizeStart, centered, (candidate) =>
+          checkCropValid(toPixel(candidate), W, H, rotation),
+        );
+        setCrop(nextCrop);
+        lastValidCropRef.current = nextCrop;
+        return;
+      }
+
       if (checkCropValid(toPixel(percentCrop), W, H, rotation)) {
         setCrop(percentCrop);
         lastValidCropRef.current = percentCrop;
@@ -2104,6 +2250,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
         onContextMenu={onContextMenu}
         ref={imageContainerRef}
         {...lightsOutClip}
+        onPointerDownCapture={handleCropPointerDownCapture}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}

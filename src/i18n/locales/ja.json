@@ -274,6 +274,7 @@
     },
     "editor": {
       "autoAdjust": "画像を自動補正",
+      "autoLensCorrection": "自動レンズ補正",
       "cancel": "キャンセル",
       "colorLabel": "カラーラベル",
       "confirmReset": "リセットを確認",
@@ -339,6 +340,8 @@
       "addToAlbum": "アルバムに追加",
       "autoAdjust_one": "画像を自動補正",
       "autoAdjust_other": "画像を自動補正",
+      "autoLensCorrection_one": "自動レンズ補正",
+      "autoLensCorrection_other": "自動レンズ補正",
       "collage_one": "画像にフレームを追加",
       "collage_other": "コラージュを作成",
       "confirmDelete": "削除を確認",
@@ -378,6 +381,7 @@
       "couldNotShowFolder": "フォルダを表示できませんでした: {{err}}",
       "failedAddToAlbum": "アルバムへの追加に失敗しました: {{err}}",
       "failedApplyAuto": "自動補正の適用に失敗しました: {{err}}",
+      "failedApplyAutoLensCorrection": "自動レンズ補正の適用に失敗しました: {{err}}",
       "failedChangeIcon": "アイコンの変更に失敗しました: {{err}}",
       "failedCopy": "ファイルのコピーに失敗しました: {{err}}",
       "failedCreateVirtualCopy": "仮想コピーの作成に失敗しました: {{err}}",
@@ -546,6 +550,10 @@
         "armature": {
           "desc": "アーマチュア",
           "name": "アーマチュア"
+        },
+        "center": {
+          "desc": "中央線",
+          "name": "中央"
         },
         "diagonal": {
           "desc": "対角線",

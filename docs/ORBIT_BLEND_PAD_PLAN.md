@@ -5,11 +5,14 @@ Status (2026-11-13): **not started.** `UPSTREAM_FEATURE_GAP.md` Plan item 27
 order; each must work and pass its tests before the next starts.
 
 **Open before Phase 1** (ask the owner when the item starts):
-- The Phase 1 reference `orbit-blend-pad.html` (owner, 2026-11-13) is at
-  the repository root, untracked: one self-contained page ("Orbit Blend Pad
-  · Phase 1", 473 lines, inline script, a Blend → Axis mode). Read it fully
-  before Phase 1; decide with the owner whether it moves next to the
-  prototype.
+- The Phase 1 reference `orbit-blend-pad.html` (owner, 2026-11-13) is in
+  `docs/`, tracked: one self-contained page ("Orbit Blend Pad · Phase 1",
+  473 lines, inline script, a Blend → Axis mode). Read it fully before
+  Phase 1; decide with the owner whether it moves next to the prototype.
+- `Orbit Blend Pad.md` (owner, 2026-11-13): the owner's feasibility and
+  concept note for the control inside TIR (up to 8 anchors, effort,
+  preview speed, storage). Background for porting the prototype later;
+  read it before Phase 1.
 - Where the prototype lives (for example `prototypes/orbit-blend-pad/` in
   this repository, or a separate folder) and whether it is committed.
 - "Run with `npx serve`" conflicts with the no-npm-registry rule for agents

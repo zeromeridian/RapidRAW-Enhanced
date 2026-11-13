@@ -5,6 +5,30 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.47.0-dev-quick-wins — 2026-11-13
+
+### Develop
+
+- **Auto Lens Correction** in the right-click Productivity menu turns on
+  automatic lens correction (profile, distortion, chromatic aberration and
+  vignetting) for the photo, or for every selected photo in the Library,
+  without touching their other adjustments. Auto Adjust now has its own
+  icon, so the two are easy to tell apart.
+- Fixed-lens cameras such as the Ricoh GR and Fujifilm X100 now get their
+  lens profile in Auto lens correction, also when the camera writes no lens
+  name. Such photos edited in Auto before may now show the correction.
+- **Crop**: hold Ctrl (Cmd on macOS) while dragging a handle to resize the
+  crop from its centre, scroll with Ctrl/Cmd to zoom the frame in or out
+  around the pointer, and Ctrl/Cmd+drag outside the frame to move it. A new
+  **Center** overlay marks the middle of the frame.
+
+### Interface
+
+- Double-click a panel divider to reset that panel to its default size.
+- Shortcuts on punctuation keys (such as `[`, `]` and `\`) follow the
+  symbol of your keyboard layout, and the number row still sets ratings on
+  layouts that type punctuation there.
+
 ## 1.46.1-fix-lensfun-db — 2026-11-13
 
 ### Develop

@@ -274,6 +274,7 @@
     },
     "editor": {
       "autoAdjust": "自动调整图像",
+      "autoLensCorrection": "自动镜头校正",
       "cancel": "取消",
       "colorLabel": "颜色标签",
       "confirmReset": "确认重置",
@@ -339,6 +340,8 @@
       "addToAlbum": "添加到相册",
       "autoAdjust_one": "自动调整图像",
       "autoAdjust_other": "自动调整图像",
+      "autoLensCorrection_one": "自动镜头校正",
+      "autoLensCorrection_other": "自动镜头校正",
       "collage_one": "装裱图像",
       "collage_other": "创建拼贴画",
       "confirmDelete": "确认删除",
@@ -378,6 +381,7 @@
       "couldNotShowFolder": "无法显示文件夹：{{err}}",
       "failedAddToAlbum": "添加到相册失败：{{err}}",
       "failedApplyAuto": "应用自动调整失败：{{err}}",
+      "failedApplyAutoLensCorrection": "应用自动镜头校正失败：{{err}}",
       "failedChangeIcon": "更换图标失败：{{err}}",
       "failedCopy": "复制文件失败：{{err}}",
       "failedCreateVirtualCopy": "创建虚拟副本失败：{{err}}",
@@ -546,6 +550,10 @@
         "armature": {
           "desc": "骨架",
           "name": "骨架"
+        },
+        "center": {
+          "desc": "中心线",
+          "name": "中心"
         },
         "diagonal": {
           "desc": "对角线",

@@ -65,7 +65,7 @@ pub const NATURAL_HEADROOM: f32 = 2.5;
 /// `NATURAL_HEADROOM` maps to 1. Fitted (sRGB-encoded least squares) to
 /// Adobe's default tone curve with the scene scaled by 1/1.6 (about -0.68 EV),
 /// which puts scene mid-grey 0.18 at sRGB 130/255. Provisional until the fit
-/// against Lightroom Classic reference exports (see HANDOFF.md).
+/// against Lightroom Classic reference exports (see docs/HANDOFF.md).
 pub const NATURAL_CURVE_B: f32 = 0.071_452_37;
 pub const NATURAL_CURVE_C: f32 = 6.436_48;
 pub const NATURAL_CURVE_D: f32 = 0.906_852_5;

@@ -3659,9 +3659,15 @@ pub fn resolve_lens_params_in_adjustments(
             if let Some(exif) = exif_data {
                 let exif_maker = exif.get("Make").map(|s| s.as_str()).unwrap_or("");
                 let exif_model = exif.get("LensModel").map(|s| s.as_str()).unwrap_or("");
+                let exif_camera_model = exif.get("Model").map(|s| s.as_str()).unwrap_or("");
                 if let Some(db) = lens_db {
                     if let Some((detected_maker, detected_model)) =
-                        crate::lens_correction::find_best_lens_match(db, exif_maker, exif_model)
+                        crate::lens_correction::find_best_lens_match(
+                            db,
+                            exif_maker,
+                            exif_model,
+                            exif_camera_model,
+                        )
                     {
                         map.insert(
                             "lensMaker".to_string(),
@@ -3743,7 +3749,7 @@ pub fn resolve_lens_params_in_adjustments(
 /// `auto_apply_lens_profile` is on. Images that already store a lens-correction
 /// choice or any edit are left unchanged, as are images without a matching
 /// profile, which therefore stay in manual mode. Deliberate fork deviation
-/// (upstream defaults to manual); see `UPSTREAM_FEATURE_GAP.md`.
+/// (upstream defaults to manual); see `docs/UPSTREAM_FEATURE_GAP.md`.
 pub fn apply_default_lens_profile(
     adjustments: &mut Value,
     sidecar_exif: &Option<HashMap<String, String>>,
@@ -4993,6 +4999,92 @@ pub async fn reset_adjustments_for_paths(
 
             if let Some((thumbnail_path, rating, is_edited)) = result {
                 emit_thumbnail_generated(&app_handle, path_str, &thumbnail_path, rating, is_edited);
+            }
+
+            increment_thumbnail_progress(&state, &app_handle);
+        });
+    });
+
+    Ok(())
+}
+
+/// Turns on automatic lens correction (profile from EXIF, distortion, TCA and
+/// vignetting) for every path, keeping their other adjustments.
+#[tauri::command]
+pub async fn apply_auto_lens_correction_to_paths(
+    paths: Vec<String>,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    let state = app_handle.state::<AppState>();
+    add_to_thumbnail_queue(&state, paths.len(), &app_handle);
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let settings = load_settings(app_handle.clone()).unwrap_or_default();
+        let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
+        let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
+
+        let state = app_handle.state::<AppState>();
+        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
+            Ok(dir) => dir,
+            Err(e) => {
+                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
+                for path in &paths {
+                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
+                }
+                for _ in 0..paths.len() {
+                    increment_thumbnail_progress(&state, &app_handle);
+                }
+                return;
+            }
+        };
+
+        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
+        let lens_db = state.lens_db.lock().unwrap().clone();
+
+        paths.par_iter().for_each(|path| {
+            let (source_path, sidecar_path) = parse_virtual_path(path);
+            let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+
+            if !existing_metadata.adjustments.is_object() {
+                existing_metadata.adjustments = serde_json::json!({});
+            }
+            if let Some(map) = existing_metadata.adjustments.as_object_mut() {
+                map.insert("lensCorrectionMode".to_string(), serde_json::json!("auto"));
+                map.insert("lensDistortionEnabled".to_string(), serde_json::json!(true));
+                map.insert("lensTcaEnabled".to_string(), serde_json::json!(true));
+                map.insert("lensVignetteEnabled".to_string(), serde_json::json!(true));
+            }
+            resolve_lens_params_in_adjustments(
+                &mut existing_metadata.adjustments,
+                &exif_processing::exif_for_lens_lookup(&existing_metadata.exif, &source_path),
+                lens_db.as_deref(),
+            );
+
+            match serde_json::to_string_pretty(&existing_metadata) {
+                Ok(json_string) => {
+                    if let Err(e) = write_metadata_file(&sidecar_path, &json_string) {
+                        log::error!("Failed to apply auto lens correction to {}: {}", path, e);
+                    }
+                }
+                Err(e) => log::error!("Failed to serialize metadata for {}: {}", path, e),
+            }
+
+            if enable_xmp_sync && !path.contains("?vc=") {
+                sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
+            }
+
+            let result = generate_single_thumbnail_and_cache(
+                path,
+                &thumb_cache_dir,
+                gpu_context.as_ref(),
+                None,
+                true,
+                &app_handle,
+                &settings,
+            );
+
+            if let Some((thumbnail_path, rating, is_edited)) = result {
+                emit_thumbnail_generated(&app_handle, path, &thumbnail_path, rating, is_edited);
             }
 
             increment_thumbnail_progress(&state, &app_handle);

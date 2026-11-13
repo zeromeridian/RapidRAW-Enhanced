@@ -78,7 +78,7 @@ pub const ESAM3_TEXT_SCORE_THRESHOLD: f32 = 0.3;
 /// contrast edge (a bright band under dark clouds) and score the parts
 /// differently. Deliberate deviation from upstream RapidRAW, which merges only
 /// queries above the threshold; see "Deliberate fork deviations" in
-/// UPSTREAM_FEATURE_GAP.md before changing it.
+/// docs/UPSTREAM_FEATURE_GAP.md before changing it.
 const ESAM3_SUPPORT_SCORE_THRESHOLD: f32 = 0.3;
 const ESAM3_MASK_LOW: f32 = 0.3;
 const ESAM3_MASK_HIGH: f32 = 0.7;
