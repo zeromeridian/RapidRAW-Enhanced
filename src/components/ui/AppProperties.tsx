@@ -88,6 +88,7 @@ export enum Invokes {
   GetOrCreateInternalLibraryRoot = 'get_or_create_internal_library_root',
   GetPinnedFolderTrees = 'get_pinned_folder_trees',
   GetSupportedFileTypes = 'get_supported_file_types',
+  GetBlendPadParameters = 'get_blend_pad_parameters',
   HandleExportPresetsToFile = 'handle_export_presets_to_file',
   HandleImportPresetsFromFile = 'handle_import_presets_from_file',
   HandleImportPresetsFromFiles = 'handle_import_presets_from_files',
@@ -190,6 +191,7 @@ export const DEFAULT_LIGHTS_OUT_BORDER_COLOR = LightsOutScreenColor.White;
 export enum Panel {
   Adjustments = 'adjustments',
   Ai = 'ai',
+  BlendPad = 'blendPad',
   Crop = 'crop',
   Export = 'export',
   Favorites = 'favorites',

@@ -11,6 +11,7 @@ import {
   Aperture,
   Tag,
   Star,
+  Orbit,
   type LucideIcon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -34,6 +35,7 @@ const editingPanelGroups: Array<Array<PanelOptions>> = [
   [
     { id: Panel.Adjustments, icon: SlidersHorizontal, title: 'editor.switcher.tooltips.adjust' },
     { id: Panel.Favorites, icon: Star, title: 'editor.switcher.tooltips.favorites' },
+    { id: Panel.BlendPad, icon: Orbit, title: 'editor.blendPad.title' },
     { id: Panel.Crop, icon: Crop, title: 'editor.switcher.tooltips.crop' },
     { id: Panel.Geometry, icon: Scan, title: 'editor.switcher.tooltips.geometry' },
     { id: Panel.LensCorrection, icon: Aperture, title: 'editor.crop.tooltips.lens' },

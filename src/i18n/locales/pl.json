@@ -444,6 +444,7 @@
       },
       "sections": {
         "basic": "Podstawowe",
+        "blendPad": "Blend Pad",
         "color": "Kolor",
         "curves": "Krzywe",
         "details": "Detale",
@@ -697,6 +698,19 @@
       "done": "Gotowe",
       "exporting": "Eksportowanie…",
       "savesTo": "Zewnętrzna edycja — zapisuje do"
+    },
+    "blendPad": {
+      "center": "Wyśrodkuj krążek",
+      "enabled": "Blend Pad włączony",
+      "hint": "Przeciągnij krążek, aby mieszać narzędzia. Shift – drobniejsze ruchy, strzałki – przesuwanie, dwukrotne kliknięcie krążka – wyśrodkowanie.",
+      "reset": "Resetuj pad",
+      "slots": {
+        "bottomLeft": "Na dole po lewej",
+        "bottomRight": "Na dole po prawej",
+        "top": "Na górze"
+      },
+      "target": "Cel",
+      "title": "Blend Pad"
     },
     "favorites": {
       "add": "Dodaj do ulubionych",

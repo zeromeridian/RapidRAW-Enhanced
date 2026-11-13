@@ -406,6 +406,7 @@
       },
       "sections": {
         "basic": "基本",
+        "blendPad": "ブレンドパッド",
         "color": "カラー",
         "curves": "トーンカーブ",
         "details": "ディテール",
@@ -647,6 +648,19 @@
       "done": "完了",
       "exporting": "書き出し中…",
       "savesTo": "外部編集 — 保存先"
+    },
+    "blendPad": {
+      "center": "パックを中央に戻す",
+      "enabled": "ブレンドパッドを有効化",
+      "hint": "パックをドラッグしてツールをブレンドします。Shift で細かく、矢印キーで微調整、パックをダブルクリックすると中央に戻ります。",
+      "reset": "パッドをリセット",
+      "slots": {
+        "bottomLeft": "左下",
+        "bottomRight": "右下",
+        "top": "上"
+      },
+      "target": "目標値",
+      "title": "ブレンドパッド"
     },
     "favorites": {
       "add": "お気に入りに追加",

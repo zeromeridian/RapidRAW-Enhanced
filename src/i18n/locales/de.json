@@ -406,6 +406,7 @@
       },
       "sections": {
         "basic": "Basis",
+        "blendPad": "Blend-Pad",
         "color": "Farbe",
         "curves": "Kurven",
         "details": "Details",
@@ -649,6 +650,19 @@
       "done": "Fertig",
       "exporting": "Exportieren…",
       "savesTo": "Externe Bearbeitung — speichert in"
+    },
+    "blendPad": {
+      "center": "Puck zentrieren",
+      "enabled": "Blend-Pad an",
+      "hint": "Den Puck ziehen, um die Werkzeuge zu mischen. Umschalt für feinere Bewegungen, Pfeiltasten zum Verschieben, Doppelklick auf den Puck zentriert ihn.",
+      "reset": "Pad zurücksetzen",
+      "slots": {
+        "bottomLeft": "Unten links",
+        "bottomRight": "Unten rechts",
+        "top": "Oben"
+      },
+      "target": "Ziel",
+      "title": "Blend-Pad"
     },
     "favorites": {
       "add": "Zu Favoriten hinzufügen",

@@ -432,6 +432,7 @@
       },
       "sections": {
         "basic": "Basic",
+        "blendPad": "Blend Pad",
         "color": "Color",
         "curves": "Curves",
         "details": "Details",
@@ -676,6 +677,19 @@
         "transform": "Manual perspective and keystone correction",
         "vertical": "Detect and correct converging vertical lines"
       }
+    },
+    "blendPad": {
+      "center": "Center the puck",
+      "enabled": "Blend Pad on",
+      "hint": "Drag the puck to blend the tools. Hold Shift for finer moves, use the arrow keys to nudge, and double-click the puck to center it.",
+      "reset": "Reset the pad",
+      "slots": {
+        "bottomLeft": "Bottom left",
+        "bottomRight": "Bottom right",
+        "top": "Top"
+      },
+      "target": "Target",
+      "title": "Blend Pad"
     },
     "favorites": {
       "add": "Add to Favorites",

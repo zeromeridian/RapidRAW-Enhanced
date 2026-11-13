@@ -425,6 +425,7 @@
       },
       "sections": {
         "basic": "Básico",
+        "blendPad": "Blend Pad",
         "color": "Cor",
         "curves": "Curvas",
         "details": "Detalhes",
@@ -673,6 +674,19 @@
       "done": "Concluído",
       "exporting": "Exportando…",
       "savesTo": "Edição externa — salva em"
+    },
+    "blendPad": {
+      "center": "Centralizar o disco",
+      "enabled": "Blend Pad ativado",
+      "hint": "Arraste o disco para misturar as ferramentas. Shift para movimentos mais finos, setas para deslocar e clique duplo no disco para centralizá-lo.",
+      "reset": "Redefinir o pad",
+      "slots": {
+        "bottomLeft": "Inferior esquerdo",
+        "bottomRight": "Inferior direito",
+        "top": "Superior"
+      },
+      "target": "Alvo",
+      "title": "Blend Pad"
     },
     "favorites": {
       "add": "Adicionar aos favoritos",

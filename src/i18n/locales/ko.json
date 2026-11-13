@@ -406,6 +406,7 @@
       },
       "sections": {
         "basic": "기본",
+        "blendPad": "블렌드 패드",
         "color": "색상",
         "curves": "커브",
         "details": "디테일",
@@ -647,6 +648,19 @@
       "done": "완료",
       "exporting": "내보내는 중…",
       "savesTo": "외부 편집 — 저장 위치:"
+    },
+    "blendPad": {
+      "center": "퍽을 가운데로",
+      "enabled": "블렌드 패드 켜기",
+      "hint": "퍽을 드래그하여 도구를 섞습니다. Shift로 더 세밀하게, 화살표 키로 미세 이동, 퍽을 더블클릭하면 가운데로 돌아갑니다.",
+      "reset": "패드 초기화",
+      "slots": {
+        "bottomLeft": "왼쪽 아래",
+        "bottomRight": "오른쪽 아래",
+        "top": "위"
+      },
+      "target": "목표값",
+      "title": "블렌드 패드"
     },
     "favorites": {
       "add": "즐겨찾기에 추가",
