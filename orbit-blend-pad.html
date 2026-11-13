@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Orbit Blend Pad · Phase 1</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg:#1b1b1d; --panel:#222225; --line:#3a3a3e; --text:#f4f1ed; --muted:#9a9690; --gold:#c7903d; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .app { display: grid; grid-template-columns: minmax(0,1fr) 380px; gap: 16px; height: 100%; padding: 16px; }
+  .stage { position: relative; background: #111; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; min-height: 300px; }
+  .stage.drag-over { outline: 2px dashed var(--gold); outline-offset: -8px; }
+  #gl { max-width: 100%; max-height: 100%; display: block; }
+  .fps { position: absolute; top: 10px; left: 10px; font: 11px ui-monospace, monospace; background: rgba(0,0,0,.6); padding: 2px 7px; border-radius: 4px; color: #ddd; }
+  .hint { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); color: var(--muted); font-size: 12px; background: rgba(0,0,0,.5); padding: 3px 10px; border-radius: 4px; pointer-events: none; }
+  .err { position: absolute; inset: auto 16px 16px 16px; color: #ff8a80; background: rgba(0,0,0,.75); padding: 8px 12px; border-radius: 6px; font: 12px ui-monospace, monospace; white-space: pre-wrap; display: none; }
+  .side { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+  #pad { width: 380px; height: 380px; display: block; border-radius: 8px; outline: none; touch-action: none; }
+  #pad:focus-visible { box-shadow: 0 0 0 1px var(--gold); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .card h3 { margin: 0 0 8px; font-size: 12px; font-weight: 500; color: var(--muted); }
+  .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .row label { color: var(--muted); min-width: 64px; }
+  .slot { display: grid; grid-template-columns: 74px 1fr; gap: 6px 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+  .slot:first-of-type { border-top: 0; }
+  .slot .pos { color: var(--muted); font-size: 11px; }
+  .slot .tgt { display: flex; gap: 8px; align-items: center; grid-column: 2; }
+  .out { min-width: 64px; text-align: right; font: 12px ui-monospace, monospace; }
+  input[type=range] { flex: 1; accent-color: var(--gold); }
+  select, button, input[type=file] { font: inherit; color: var(--text); background: #2c2c30; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+  button { cursor: pointer; } button:hover { border-color: #55555a; }
+  button.active { border-color: var(--gold); color: var(--gold); }
+  .vals { font: 11px ui-monospace, monospace; color: var(--muted); line-height: 1.7; }
+  .help { color: var(--muted); font-size: 12px; margin: 0; }
+  @media (max-width: 860px) { .app { grid-template-columns: 1fr; height: auto; } .stage { height: 55vh; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stage" id="stage">
+    <canvas id="gl"></canvas>
+    <span class="fps" id="fps">idle</span>
+    <span class="hint">Drop a JPEG or PNG here</span>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div class="side">
+    <canvas id="pad" tabindex="0" aria-label="Blend pad. Drag the puck; arrow keys nudge."></canvas>
+
+    <div class="card">
+      <h3>Tools (fixed slots)</h3>
+      <div id="slots"></div>
+    </div>
+
+    <div class="card">
+      <div class="row"><label>Blend</label><select id="mode" style="flex:1;min-width:0">
+        <option value="axis">Axis (centre = midpoint)</option>
+        <option value="reach">Reach (fades to neutral)</option>
+      </select></div>
+      <div class="row"><label>Amount</label><input type="range" id="amount" min="0" max="1" step="0.01" value="1"><span class="out" id="amountOut">1.00</span></div>
+      <div class="row">
+        <button id="hold">Hold for original</button>
+        <button id="centre">Centre puck</button>
+        <button id="reset">Reset</button>
+      </div>
+      <div class="row"><input type="file" id="file" accept="image/jpeg,image/png" style="flex:1"></div>
+    </div>
+
+    <div class="card">
+      <div class="vals" id="vals"></div>
+    </div>
+
+    <p class="help">Drag the puck to blend. Shift = 4x finer. Arrow keys nudge (Shift for fine). Double-click the puck to centre it. Hold the button or the \ key to see the original.</p>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+ * pad maths — pure, no DOM. Kept separate so it can be ported.
+ * Normalized space: circle radius 1 at (0,0), y up.
+ * ============================================================ */
+const Pad = (() => {
+  'use strict';
+  const TAU = Math.PI * 2, EPS = 1e-9;
+  const PARAMS = {
+    exposure:    { label: 'Exposure',    min: -2,   max: 2,   step: 0.01, def: 1,   unit: ' EV', dp: 2 },
+    contrast:    { label: 'Contrast',    min: -100, max: 100, step: 1, def: 60 },
+    shadows:     { label: 'Shadows',     min: -100, max: 100, step: 1, def: 50 },
+    highlights:  { label: 'Highlights',  min: -100, max: 100, step: 1, def: -50 },
+    saturation:  { label: 'Saturation',  min: -100, max: 100, step: 1, def: -60 },
+    temperature: { label: 'Temperature', min: -100, max: 100, step: 1, def: 50 },
+    fade:        { label: 'Fade',        min: 0,    max: 100, step: 1, def: 40 },
+    hueBlue:     { label: 'Blue hue',    min: -180, max: 180, step: 1, def: 60, unit: '°', wrap: true },
+  };
+  const FALLOFFS = { linear: x => x, smoothstep: x => x * x * (3 - 2 * x), 'ease-in': x => x * x };
+  const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+  const wrap = (v, a, b) => { const s = b - a; return ((((v - a) % s) + s) % s) + a; };
+  const tidy = v => (v === 0 ? 0 : v);
+  const anchorPoint = t => ({ x: Math.cos(TAU * t), y: Math.sin(TAU * t) });
+  const clampToDisk = p => { const r = Math.hypot(p.x, p.y); return r > 1 ? { x: p.x / r, y: p.y / r } : { x: p.x, y: p.y }; };
+
+  /* Two blend modes:
+   *  axis  — centre is the midpoint. Weight = projection of the puck onto the anchor's
+   *          direction: +1 at the anchor, 0 at the centre, -1 at the opposite edge.
+   *  reach — weight fades from 1 at the anchor to 0 at distance `reach`; never negative.
+   */
+  function anchorWeight(a, p, mode = 'axis') {
+    const q = anchorPoint(a.t);
+    if (mode === 'axis') {
+      const s = clamp(p.x * q.x + p.y * q.y, -1, 1);
+      const w = Math.abs(s) < EPS ? 0 : s;
+      return w;
+    }
+    const r = Math.hypot(q.x, q.y);                      // 1 on a circle; kept for later shapes
+    const d = Math.hypot(p.x - q.x, p.y - q.y);
+    let x = clamp(1 - d / ((a.reach || 1) * r), 0, 1);
+    if (x < EPS) x = 0;                                  // exact neutrality at the centre
+    return (FALLOFFS[a.falloff] || FALLOFFS.smoothstep)(x);
+  }
+  function resolveAnchors(pad) {
+    const p = clampToDisk(pad.puck), amount = clamp(pad.amount, 0, 1);
+    return pad.anchors.map(a => {
+      const w = PARAMS[a.param] ? anchorWeight(a, p, pad.mode) : 0;
+      return { param: a.param, weight: w, value: tidy(a.target * w * amount) };
+    });
+  }
+  function resolvePad(pad) {
+    const sums = {}; for (const k in PARAMS) sums[k] = 0;
+    for (const c of resolveAnchors(pad)) if (c.param in sums) sums[c.param] += c.value;
+    const out = {};
+    for (const k in PARAMS) { const d = PARAMS[k]; out[k] = tidy(d.wrap ? wrap(sums[k], d.min, d.max) : clamp(sums[k], d.min, d.max)); }
+    return out;
+  }
+  return { TAU, PARAMS, FALLOFFS, clamp, wrap, anchorPoint, clampToDisk, anchorWeight, resolveAnchors, resolvePad };
+})();
+
+/* ============================================================
+ * Self-test (runs once on load; results in the console)
+ * ============================================================ */
+(function selfTest() {
+  const P = Pad, fails = [];
+  const ok = (c, m) => { if (!c) fails.push(m); };
+  const A = (param, t, target) => ({ param, t, target, reach: 1, falloff: 'smoothstep' });
+  const base = { mode: 'axis', amount: 1, puck: { x: 0, y: 0 }, anchors: [A('contrast', .25, 60), A('temperature', 11/12, 50), A('saturation', 7/12, -60)] };
+  for (const m of ['axis', 'reach']) {
+    for (const a of base.anchors) ok(Math.abs(P.anchorWeight(a, P.anchorPoint(a.t), m) - 1) < 1e-12, m + ': w=1 on anchor ' + a.param);
+    for (const a of base.anchors) ok(P.anchorWeight(a, { x: 0, y: 0 }, m) === 0, m + ': w=0 at centre ' + a.param);
+  }
+  for (const a of base.anchors) { const q = P.anchorPoint(a.t); ok(Math.abs(P.anchorWeight(a, { x: -q.x, y: -q.y }, 'axis') + 1) < 1e-12, 'axis: w=-1 opposite ' + a.param); }
+  const v0 = P.resolvePad(base); ok(Object.values(v0).every(v => v === 0), 'centre neutral');
+  const st = P.resolvePad({ amount: 1, puck: { x: 0, y: 1 }, anchors: [A('contrast', .25, 40), A('contrast', .25, 30)] });
+  ok(st.contrast === 70, 'stacking adds');
+  const cl = P.resolvePad({ amount: 1, puck: { x: 0, y: 1 }, anchors: [A('contrast', .25, 80), A('contrast', .25, 80)] });
+  ok(cl.contrast === 100, 'clamps');
+  const hw = P.resolvePad({ amount: 1, puck: { x: 0, y: 1 }, anchors: [A('hueBlue', .25, 170), A('hueBlue', .25, 30)] });
+  ok(hw.hueBlue === -160, 'hue wraps');
+  const grid = () => { const r = []; for (let i = -10; i <= 10; i++) for (let j = -10; j <= 10; j++) r.push(JSON.stringify(P.resolvePad({ ...base, puck: { x: i / 10, y: j / 10 } }))); return r.join('|'); };
+  ok(grid() === grid(), 'deterministic grid');
+  if (fails.length) console.error('Pad self-test FAILED:', fails); else console.log('Pad self-test passed (' + 0 + ' failures)');
+})();
+
+/* ============================================================
+ * App
+ * ============================================================ */
+(() => {
+  'use strict';
+  const P = Pad, TAU = P.TAU;
+  const errBox = document.getElementById('err');
+  const showErr = m => { errBox.style.display = 'block'; errBox.textContent += m + '\n'; };
+  window.addEventListener('error', e => showErr(e.message));
+
+  // Three fixed slots, evenly spaced: top, bottom-right, bottom-left.
+  const SLOTS = [
+    { t: 0.25,      name: 'Top',          defParam: 'contrast',    defTarget: 60 },
+    { t: 11 / 12,   name: 'Bottom-right', defParam: 'temperature', defTarget: 50 },
+    { t: 7 / 12,    name: 'Bottom-left',  defParam: 'saturation',  defTarget: -60 },
+  ];
+  const fresh = () => ({ mode: blendMode, amount: 1, puck: { x: 0, y: 0 },
+    anchors: SLOTS.map(s => ({ param: s.defParam, t: s.t, target: s.defTarget, reach: 1, falloff: 'smoothstep' })) });
+  let blendMode = 'axis';
+  let pad = fresh();
+  let holding = false, drag = null;
+  let pending = false, frames = [];
+
+  const fmt = (k, v) => { const d = P.PARAMS[k]; const s = v > 0 ? '+' : v < 0 ? '−' : ''; return s + Math.abs(v).toFixed(d.dp || 0) + (d.unit || ''); };
+
+  /* ---------- WebGL ---------- */
+  const glc = document.getElementById('gl');
+  const gl = glc.getContext('webgl2', { antialias: false, premultipliedAlpha: false });
+  const U = {};
+  if (!gl) showErr('WebGL2 is not available in this browser.');
+  else {
+    const VS = `#version 300 es
+      out vec2 vUv;
+      void main() {
+        vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
+        vUv = p;
+        gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+      }`;
+    const FS = `#version 300 es
+      precision highp float;
+      in vec2 vUv; out vec4 outColor;
+      uniform sampler2D uTex;
+      uniform float uExp, uCon, uSh, uHi, uSat, uTemp, uFade, uHue;
+      vec3 toLin(vec3 c) { return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c)); }
+      vec3 toSrgb(vec3 c) { c = max(c, 0.0); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
+      float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+      float sCurve(float x, float k) {
+        x = clamp(x, 0.0, 1.0);
+        if (k >= 0.0) return mix(x, x * x * (3.0 - 2.0 * x), k);
+        return mix(x, 0.5 - sin(asin(1.0 - 2.0 * x) / 3.0), -k);
+      }
+      vec3 rgb2hsv(vec3 c) {
+        vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+        vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+        vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+        float d = q.x - min(q.w, q.y);
+        return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + 1e-10)), d / (q.x + 1e-10), q.x);
+      }
+      vec3 hsv2rgb(vec3 c) {
+        vec3 p = abs(fract(c.xxx + vec3(1.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);
+        return c.z * mix(vec3(1.0), clamp(p - 1.0, 0.0, 1.0), c.y);
+      }
+      void main() {
+        vec3 c = texture(uTex, vec2(vUv.x, 1.0 - vUv.y)).rgb;
+        c = toSrgb(toLin(c) * exp2(uExp));                                   // exposure in linear light
+        float l = luma(c);
+        float s = uSh / 100.0, h = uHi / 100.0;
+        c *= 1.0 + s * (1.0 - smoothstep(0.0, 0.42, l)) * (s > 0.0 ? 1.5 : 0.7); // shadows
+        c *= 1.0 + h * smoothstep(0.55, 1.0, l) * 0.5;                        // highlights
+        float t = uTemp / 100.0;
+        c *= vec3(1.0 + 0.10 * t, 1.0 + 0.015 * t, 1.0 - 0.10 * t);           // temperature
+        float k = uCon / 100.0;
+        c = vec3(sCurve(c.r, k), sCurve(c.g, k), sCurve(c.b, k));             // contrast
+        l = luma(c);
+        c = clamp(mix(vec3(l), c, 1.0 + uSat / 100.0), 0.0, 1.0);             // saturation
+        if (uHue != 0.0) {                                                    // blue hue band
+          vec3 v = rgb2hsv(c);
+          float dh = abs(fract(v.x - 215.0 / 360.0 + 0.5) - 0.5) * 360.0;
+          float w = (1.0 - smoothstep(25.0, 60.0, dh)) * smoothstep(0.05, 0.25, v.y);
+          v.x = fract(v.x + uHue / 360.0 * w);
+          c = hsv2rgb(v);
+        }
+        float f = uFade / 100.0 * 0.22;
+        c = mix(vec3(f), vec3(1.0 - f * 0.2), c);                             // fade
+        outColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+      }`;
+    const compile = (type, src) => {
+      const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) showErr('Shader error: ' + gl.getShaderInfoLog(s));
+      return s;
+    };
+    const prog = gl.createProgram();
+    gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) showErr('Link error: ' + gl.getProgramInfoLog(prog));
+    gl.useProgram(prog);
+    gl.bindVertexArray(gl.createVertexArray());
+    for (const n of ['uExp', 'uCon', 'uSh', 'uHi', 'uSat', 'uTemp', 'uFade', 'uHue']) U[n] = gl.getUniformLocation(prog, n);
+    gl.uniform1i(gl.getUniformLocation(prog, 'uTex'), 0);
+    const tex = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  }
+
+  function setSource(src, w, h) {
+    if (!gl) return;
+    const s = Math.min(1, 2048 / Math.max(w, h));
+    const W = Math.round(w * s), H = Math.round(h * s);
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, W, H);
+    glc.width = W; glc.height = H; gl.viewport(0, 0, W, H);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    schedule();
+  }
+
+  function testImage() {
+    const c = document.createElement('canvas'); c.width = 2048; c.height = 1366;
+    const x = c.getContext('2d');
+    let g = x.createLinearGradient(0, 0, 0, 820); g.addColorStop(0, '#2f5f9e'); g.addColorStop(1, '#c6d6e2');
+    x.fillStyle = g; x.fillRect(0, 0, 2048, 820);
+    g = x.createLinearGradient(0, 820, 0, 1366); g.addColorStop(0, '#6b6a3a'); g.addColorStop(1, '#1d1a14');
+    x.fillStyle = g; x.fillRect(0, 820, 2048, 546);
+    x.fillStyle = '#efdcb5'; x.beginPath(); x.arc(1500, 330, 110, 0, TAU); x.fill();
+    x.fillStyle = '#111'; x.fillRect(262, 560, 36, 300);
+    x.fillStyle = '#24331f'; x.beginPath(); x.arc(280, 540, 120, 0, TAU); x.fill();
+    ['#c0392b', '#e67e22', '#f1c40f', '#27ae60', '#16a085', '#2980b9', '#8e44ad', '#d35400']
+      .forEach((k, i) => { x.fillStyle = k; x.fillRect(120 + i * 140, 990, 110, 110); });
+    for (let i = 0; i < 16; i++) { const v = Math.round(i * 255 / 15); x.fillStyle = `rgb(${v},${v},${v})`; x.fillRect(120 + i * 112, 1170, 112, 100); }
+    return c;
+  }
+  setSource(testImage(), 2048, 1366);
+
+  async function loadFile(f) {
+    if (!f) return;
+    if (!/^image\/(jpeg|png)$/.test(f.type)) { showErr('Please use a JPEG or PNG.'); return; }
+    try {
+      const b = await createImageBitmap(f);
+      setSource(b, b.width, b.height); b.close();
+    } catch (e) { showErr('Could not read that image: ' + e.message); }
+  }
+  document.getElementById('file').addEventListener('change', e => loadFile(e.target.files[0]));
+  const stage = document.getElementById('stage');
+  ['dragenter', 'dragover'].forEach(ev => window.addEventListener(ev, e => { e.preventDefault(); stage.classList.add('drag-over'); }));
+  ['dragleave', 'drop'].forEach(ev => window.addEventListener(ev, e => { e.preventDefault(); stage.classList.remove('drag-over'); }));
+  window.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
+
+  /* ---------- Pad drawing ---------- */
+  const pc = document.getElementById('pad'), ctx = pc.getContext('2d');
+  const S = 380, dpr = window.devicePixelRatio || 1;
+  pc.width = S * dpr; pc.height = S * dpr; ctx.scale(dpr, dpr);
+  const cx = S / 2, cy = S / 2, R = S * 0.34;
+  const toS = p => ({ x: cx + p.x * R, y: cy - p.y * R });
+
+  function drawPad(contrib) {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = '#141414'; ctx.fillRect(0, 0, S, S);
+
+    // reach glows, clipped to the circle
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.clip();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const a of pad.anchors) {
+      const c = toS(P.anchorPoint(a.t));
+      if (pad.mode === 'axis') {
+        const o = toS({ x: -P.anchorPoint(a.t).x, y: -P.anchorPoint(a.t).y });
+        const pos = a.target >= 0 ? '199,144,61' : '80,140,134', neg = a.target >= 0 ? '80,140,134' : '199,144,61';
+        const g = ctx.createLinearGradient(c.x, c.y, o.x, o.y);
+        g.addColorStop(0, `rgba(${pos},0.13)`); g.addColorStop(0.5, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(${neg},0.07)`);
+        ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
+        continue;
+      }
+      const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, a.reach * R);
+      const col = a.target >= 0 ? '199,144,61' : '80,140,134';
+      g.addColorStop(0, `rgba(${col},0.16)`); g.addColorStop(1, `rgba(${col},0)`);
+      ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
+    }
+    ctx.restore();
+    ctx.globalCompositeOperation = 'source-over';
+
+    ctx.strokeStyle = 'rgba(244,241,237,.45)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = 'rgba(244,241,237,.35)';
+    ctx.beginPath(); ctx.moveTo(cx - 6, cy); ctx.lineTo(cx + 6, cy); ctx.moveTo(cx, cy - 6); ctx.lineTo(cx, cy + 6); ctx.stroke();
+
+    const live = drag !== null;
+    pad.anchors.forEach((a, i) => {
+      const q = P.anchorPoint(a.t), p = toS(q);
+      ctx.fillStyle = '#f4f1ed'; ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, TAU); ctx.fill();
+      const lp = Math.abs(q.y) > 0.3 && Math.abs(q.x) > 0.3
+        ? { x: p.x, y: p.y + (q.y > 0 ? -12 : 18) }
+        : { x: cx + q.x * (R + 18), y: cy - q.y * (R + 18) };
+      ctx.textAlign = Math.abs(q.y) > 0.3 ? 'center' : q.x > 0 ? 'left' : 'right';
+      ctx.textBaseline = 'middle';
+      const above = q.y > 0.3;
+      const y1 = above ? lp.y - 20 : lp.y, y2 = above ? lp.y - 6 : lp.y + 14;
+      ctx.font = '500 11px system-ui, sans-serif'; ctx.fillStyle = '#e8e6e3';
+      ctx.fillText(P.PARAMS[a.param].label.toUpperCase(), lp.x, y1);
+      ctx.font = '11px ui-monospace, monospace';
+      ctx.fillStyle = live ? '#c7903d' : '#8a8783';
+      ctx.fillText(live ? fmt(a.param, contrib[i].value) : '→ ' + fmt(a.param, a.target), lp.x, y2);
+    });
+
+    const pk = toS(P.clampToDisk(pad.puck));
+    ctx.strokeStyle = 'rgba(244,241,237,.25)';
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(pk.x, pk.y); ctx.stroke();
+    ctx.fillStyle = holding ? '#666' : '#f4f1ed'; ctx.strokeStyle = '#141414'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(pk.x, pk.y, 9, 0, TAU); ctx.fill(); ctx.stroke(); ctx.lineWidth = 1;
+  }
+
+  /* ---------- Frame loop (rAF-throttled) ---------- */
+  const valsEl = document.getElementById('vals'), fpsEl = document.getElementById('fps');
+  function schedule() { if (!pending) { pending = true; requestAnimationFrame(frame); } }
+  function frame(now) {
+    pending = false;
+    const v = P.resolvePad(pad), c = P.resolveAnchors(pad);
+    if (gl) {
+      const z = holding ? 0 : 1;
+      gl.uniform1f(U.uExp, z * v.exposure); gl.uniform1f(U.uCon, z * v.contrast);
+      gl.uniform1f(U.uSh, z * v.shadows);   gl.uniform1f(U.uHi, z * v.highlights);
+      gl.uniform1f(U.uSat, z * v.saturation); gl.uniform1f(U.uTemp, z * v.temperature);
+      gl.uniform1f(U.uFade, z * v.fade);    gl.uniform1f(U.uHue, z * v.hueBlue);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+    drawPad(c);
+    if (drag) frames.push(now);
+    valsEl.innerHTML = Object.keys(P.PARAMS).map(k => `${P.PARAMS[k].label.padEnd(12, ' ')}${fmt(k, v[k])}`).join('<br>');
+  }
+  setInterval(() => {
+    const t = performance.now(); frames = frames.filter(f => t - f < 1000);
+    fpsEl.textContent = frames.length > 1 ? frames.length + ' fps' : 'idle';
+  }, 300);
+
+  /* ---------- Pointer + keys ---------- */
+  const local = e => { const r = pc.getBoundingClientRect(); return { x: (e.clientX - r.left) * S / r.width, y: (e.clientY - r.top) * S / r.height }; };
+  const onPuck = s => { const pk = toS(P.clampToDisk(pad.puck)); return Math.hypot(pk.x - s.x, pk.y - s.y) <= 16; };
+
+  pc.addEventListener('pointerdown', e => {
+    pc.focus();
+    const s = local(e);
+    if (!onPuck(s)) return;                       // puck moves only when grabbed
+    pc.setPointerCapture(e.pointerId);
+    drag = { lx: s.x, ly: s.y, virt: { ...pad.puck } };
+    schedule();
+  });
+  pc.addEventListener('pointermove', e => {
+    const s = local(e);
+    if (!drag) { pc.style.cursor = onPuck(s) ? 'grab' : 'default'; return; }
+    pc.style.cursor = 'grabbing';
+    const f = e.shiftKey ? 0.25 : 1;
+    drag.virt.x += (s.x - drag.lx) / R * f;
+    drag.virt.y -= (s.y - drag.ly) / R * f;
+    drag.lx = s.x; drag.ly = s.y;
+    pad.puck = P.clampToDisk(drag.virt);
+    schedule();
+  });
+  const endDrag = () => { drag = null; schedule(); };
+  pc.addEventListener('pointerup', endDrag);
+  pc.addEventListener('pointercancel', endDrag);
+  pc.addEventListener('dblclick', e => { if (onPuck(local(e))) { pad.puck = { x: 0, y: 0 }; schedule(); } });
+  pc.addEventListener('keydown', e => {
+    const st = e.shiftKey ? 0.005 : 0.02;
+    const m = { ArrowLeft: [-st, 0], ArrowRight: [st, 0], ArrowUp: [0, st], ArrowDown: [0, -st] }[e.key];
+    if (m) { e.preventDefault(); pad.puck = P.clampToDisk({ x: pad.puck.x + m[0], y: pad.puck.y + m[1] }); schedule(); }
+  });
+
+  const setHold = v => { holding = v; document.getElementById('hold').classList.toggle('active', v); schedule(); };
+  const hb = document.getElementById('hold');
+  hb.addEventListener('pointerdown', () => setHold(true));
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => hb.addEventListener(ev, () => setHold(false)));
+  window.addEventListener('keydown', e => { if (e.key === '\\' && !e.repeat) setHold(true); });
+  window.addEventListener('keyup', e => { if (e.key === '\\') setHold(false); });
+
+  /* ---------- Slot controls ---------- */
+  const slotsEl = document.getElementById('slots');
+  function buildSlots() {
+    slotsEl.innerHTML = '';
+    SLOTS.forEach((slot, i) => {
+      const a = pad.anchors[i], d = P.PARAMS[a.param];
+      const el = document.createElement('div'); el.className = 'slot';
+      el.innerHTML = `<span class="pos">${slot.name}</span>
+        <select>${Object.keys(P.PARAMS).map(k => `<option value="${k}" ${k === a.param ? 'selected' : ''}>${P.PARAMS[k].label}</option>`).join('')}</select>
+        <div class="tgt"><input type="range" min="${d.min}" max="${d.max}" step="${d.step}" value="${a.target}"><span class="out"></span></div>`;
+      const sel = el.querySelector('select'), rng = el.querySelector('input'), out = el.querySelector('.out');
+      const sync = () => { out.textContent = fmt(a.param, a.target); };
+      sync();
+      sel.addEventListener('change', () => { a.param = sel.value; a.target = P.PARAMS[a.param].def; buildSlots(); schedule(); });
+      rng.addEventListener('input', () => { a.target = +rng.value; sync(); schedule(); });
+      slotsEl.appendChild(el);
+    });
+  }
+  buildSlots();
+
+  const modeSel = document.getElementById('mode');
+  modeSel.addEventListener('change', () => { blendMode = pad.mode = modeSel.value; schedule(); });
+  const am = document.getElementById('amount'), amOut = document.getElementById('amountOut');
+  am.addEventListener('input', () => { pad.amount = +am.value; amOut.textContent = pad.amount.toFixed(2); schedule(); });
+  document.getElementById('centre').addEventListener('click', () => { pad.puck = { x: 0, y: 0 }; schedule(); });
+  document.getElementById('reset').addEventListener('click', () => { pad = fresh(); am.value = 1; amOut.textContent = '1.00'; buildSlots(); schedule(); });
+
+  window.__padDebug = { get pad() { return pad; }, resolve: () => P.resolvePad(pad) };
+  schedule();
+})();
+</script>
+</body>
+</html>

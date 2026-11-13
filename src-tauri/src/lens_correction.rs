@@ -783,3 +783,33 @@ pub fn resolve_lens_params(
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::LensDatabase;
+    use std::path::Path;
+
+    #[test]
+    fn bundled_lensfun_db_files_all_parse() {
+        let db_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("lensfun_db");
+        let mut files = 0;
+        let mut lenses = 0;
+        let mut cameras = 0;
+
+        for entry in std::fs::read_dir(&db_dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().is_none_or(|ext| ext != "xml") {
+                continue;
+            }
+            let xml = std::fs::read_to_string(&path).unwrap();
+            let db: LensDatabase = quick_xml::de::from_str(&xml)
+                .unwrap_or_else(|e| panic!("{} does not parse: {e}", path.display()));
+            files += 1;
+            lenses += db.lenses.len();
+            cameras += db.cameras.len();
+        }
+
+        assert!(files > 0, "no Lensfun XML files in {}", db_dir.display());
+        assert!(lenses > 0 && cameras > 0);
+    }
+}
