@@ -676,17 +676,25 @@
       "savesTo": "Modification externe — s'enregistre dans"
     },
     "blendPad": {
+      "addTool": "Ajouter un outil",
+      "bake": "Appliquer aux curseurs",
+      "bakeTooltip": "Appliquer aux curseurs : écrit les valeurs du pad dans les curseurs et recentre le palet",
       "center": "Centrer le palet",
-      "enabled": "Blend Pad activé",
-      "hint": "Faites glisser le palet pour mélanger les outils. Maj pour des mouvements plus fins, flèches pour le déplacer, double-clic sur le palet pour le recentrer.",
-      "reset": "Réinitialiser le pad",
-      "slots": {
-        "bottomLeft": "En bas à gauche",
-        "bottomRight": "En bas à droite",
-        "top": "En haut"
+      "curve": "Courbe",
+      "curves": {
+        "easeIn": "Départ lent",
+        "linear": "Linéaire",
+        "soft": "Douce"
       },
+      "enabled": "Blend Pad activé",
+      "hint": "Faites glisser le palet pour mélanger les outils ; faites glisser une ancre le long du bord pour la déplacer. Maj pour des mouvements plus fins, flèches pour le déplacer, double-clic sur le palet pour le recentrer.",
+      "maxTools": "{{count}} outils au maximum",
+      "mute": "Désactiver",
+      "remove": "Retirer l'outil",
+      "reset": "Réinitialiser le pad",
       "target": "Cible",
-      "title": "Blend Pad"
+      "title": "Blend Pad",
+      "unmute": "Réactiver"
     },
     "favorites": {
       "add": "Ajouter aux favoris",

@@ -650,17 +650,25 @@
       "savesTo": "外部编辑 — 保存至"
     },
     "blendPad": {
+      "addTool": "添加工具",
+      "bake": "写入滑杆",
+      "bakeTooltip": "写入滑杆：将混合板的值写入滑杆，并将滑块居中",
       "center": "将滑块居中",
-      "enabled": "启用混合板",
-      "hint": "拖动滑块以混合各工具。按住 Shift 可微调，方向键可轻移，双击滑块可回到中心。",
-      "reset": "重置混合板",
-      "slots": {
-        "bottomLeft": "左下",
-        "bottomRight": "右下",
-        "top": "上"
+      "curve": "曲线",
+      "curves": {
+        "easeIn": "缓入",
+        "linear": "线性",
+        "soft": "柔和"
       },
+      "enabled": "启用混合板",
+      "hint": "拖动滑块以混合各工具；沿边缘拖动锚点可移动它。按住 Shift 可微调，方向键可轻移，双击滑块可回到中心。",
+      "maxTools": "最多 {{count}} 个工具",
+      "mute": "停用",
+      "remove": "移除工具",
+      "reset": "重置混合板",
       "target": "目标值",
-      "title": "混合板"
+      "title": "混合板",
+      "unmute": "重新启用"
     },
     "favorites": {
       "add": "添加到收藏",

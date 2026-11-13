@@ -132,7 +132,7 @@ struct GlobalAdjustments {
     flare_amount: f32,
     sharpness_threshold: f32,
 
-    _pad_motion_blur1: f32,
+    gaussian_blur_amount: f32,
     _pad_motion_blur2: f32,
     glow_hue: f32,
     glow_saturation: f32,
@@ -1891,16 +1891,21 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let clarity_blurred = textureLoad(clarity_blur_texture, absolute_coord, 0).rgb;
     let structure_blurred = textureLoad(structure_blur_texture, absolute_coord, 0).rgb;
 
+    // Gaussian Blur mixes toward the structure blur: first the whole photo's, then each mask's.
+    let structure_blurred_linear = select(
+        structure_blurred,
+        srgb_to_linear(structure_blurred),
+        is_raw == 0u
+    );
+    let global_blur_amount = adjustments.global.gaussian_blur_amount;
+    if (global_blur_amount > 0.001) {
+        initial_linear_rgb = mix(initial_linear_rgb, structure_blurred_linear, clamp(global_blur_amount, 0.0, 1.0));
+    }
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let influence = get_mask_influence(i, absolute_coord);
         let blur_amount = adjustments.mask_adjustments[i].gaussian_blur_amount * influence;
         if (blur_amount > 0.001) {
-            let blurred_linear = select(
-                structure_blurred,
-                srgb_to_linear(structure_blurred),
-                is_raw == 0u
-            );
-            initial_linear_rgb = mix(initial_linear_rgb, blurred_linear, clamp(blur_amount, 0.0, 1.0));
+            initial_linear_rgb = mix(initial_linear_rgb, structure_blurred_linear, clamp(blur_amount, 0.0, 1.0));
         }
     }
 

@@ -921,21 +921,9 @@ export default function EffectsPanel({
         </>
       )}
 
-      {isForMask && (
-        <AdjustmentTool id="gaussianBlur">
-          <Slider
-            label={t('adjustments.effects.amount')}
-            max={100}
-            min={0}
-            defaultValue={0}
-            onChange={(e: any) => handleAdjustmentChange(Effect.GaussianBlurAmount, e.target.value)}
-            step={1}
-            value={adjustments.gaussianBlurAmount ?? 0}
-            onDragStateChange={onDragStateChange}
-            fillOrigin="min"
-          />
-        </AdjustmentTool>
-      )}
+      <AdjustmentTool id="gaussianBlur">
+        <AdjustmentSlider control={Effect.GaussianBlurAmount} {...sliderProps} />
+      </AdjustmentTool>
 
       <AdjustmentTool id="motionBlur">
         <AdjustmentSlider control={Effect.MotionBlurAmount} {...sliderProps} />

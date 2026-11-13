@@ -5,6 +5,24 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.51.0-dev-orbit-blend-pad — 2026-11-13
+
+### Develop
+
+- **Orbit Blend Pad**: add up to 8 tools (they appear in the largest free
+  space on the circle), drag a tool's dot along the edge to move it, and
+  give each its own curve (Linear, Soft, Ease in), mute it or remove it.
+  A faint ring marks where each tool's reverse sits.
+- New tools on the pad: **Gaussian Blur, Glow, Light Flare and Grain**.
+  The pad's values combine with these sliders too, so the reverse side
+  can also reduce them.
+- **Bake into sliders** writes the pad's values into the sliders and
+  centres the puck, so the photo looks the same without the pad.
+- Sliders the pad moves show a small mark where the photo's value really
+  is.
+- **Gaussian Blur** is now available for the whole photo in Effects, as
+  it already was in masks.
+
 ## 1.50.0-dev-orbit-blend-pad — 2026-11-13
 
 ### Develop

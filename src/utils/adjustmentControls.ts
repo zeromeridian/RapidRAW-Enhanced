@@ -181,6 +181,13 @@ export const ADJUSTMENT_CONTROLS: Array<AdjustmentControl> = [
     qualify: true,
   },
   {
+    id: Effect.GaussianBlurAmount,
+    label: 'adjustments.effects.amount',
+    parent: 'gaussianBlur',
+    ...positive,
+    qualify: true,
+  },
+  {
     id: Effect.MotionBlurAmount,
     label: 'adjustments.effects.amount',
     parent: 'motionBlur',

@@ -290,6 +290,7 @@ export interface Adjustments {
   fogTemperature: number;
   fogTint: number;
   fogVariation: number;
+  gaussianBlurAmount: number;
   glowAmount: number;
   glowHue: number;
   glowSaturation: number;
@@ -836,6 +837,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   fogTemperature: 0,
   fogTint: 0,
   fogVariation: 25,
+  gaussianBlurAmount: 0,
   glowAmount: 0,
   glowHue: DEFAULT_GLOW_HUE,
   glowSaturation: 0,
@@ -1228,6 +1230,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
       keys: [Effect.VignetteAmount, Effect.VignetteFeather, Effect.VignetteMidpoint, Effect.VignetteRoundness],
     },
     { label: 'modals.copyPaste.groups.grain', keys: [Effect.GrainAmount, Effect.GrainRoughness, Effect.GrainSize] },
+    { label: 'adjustments.effects.gaussianBlur', keys: [Effect.GaussianBlurAmount] },
     {
       label: 'modals.copyPaste.groups.halationGlow',
       keys: [
@@ -1513,6 +1516,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     Effect.MotionBlurHighlights,
     Effect.MotionBlurDepthEnabled,
     Effect.MotionBlurDepth,
+    Effect.GaussianBlurAmount,
     Effect.GrainAmount,
     Effect.GrainRoughness,
     Effect.GrainSize,

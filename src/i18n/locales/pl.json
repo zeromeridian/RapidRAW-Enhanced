@@ -700,17 +700,25 @@
       "savesTo": "Zewnętrzna edycja — zapisuje do"
     },
     "blendPad": {
+      "addTool": "Dodaj narzędzie",
+      "bake": "Zapisz w suwakach",
+      "bakeTooltip": "Zapisz w suwakach: wpisuje wartości padu do suwaków i wyśrodkowuje krążek",
       "center": "Wyśrodkuj krążek",
-      "enabled": "Blend Pad włączony",
-      "hint": "Przeciągnij krążek, aby mieszać narzędzia. Shift – drobniejsze ruchy, strzałki – przesuwanie, dwukrotne kliknięcie krążka – wyśrodkowanie.",
-      "reset": "Resetuj pad",
-      "slots": {
-        "bottomLeft": "Na dole po lewej",
-        "bottomRight": "Na dole po prawej",
-        "top": "Na górze"
+      "curve": "Krzywa",
+      "curves": {
+        "easeIn": "Wolny start",
+        "linear": "Liniowa",
+        "soft": "Łagodna"
       },
+      "enabled": "Blend Pad włączony",
+      "hint": "Przeciągnij krążek, aby mieszać narzędzia; przeciągnij kotwicę wzdłuż krawędzi, aby ją przesunąć. Shift – drobniejsze ruchy, strzałki – przesuwanie, dwukrotne kliknięcie krążka – wyśrodkowanie.",
+      "maxTools": "Najwyżej {{count}} narzędzi",
+      "mute": "Wycisz",
+      "remove": "Usuń narzędzie",
+      "reset": "Resetuj pad",
       "target": "Cel",
-      "title": "Blend Pad"
+      "title": "Blend Pad",
+      "unmute": "Włącz ponownie"
     },
     "favorites": {
       "add": "Dodaj do ulubionych",

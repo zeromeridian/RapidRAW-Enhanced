@@ -67,6 +67,16 @@ const limit = (parameter: BlendPadParameter, value: number) => {
   return (rest < 0 ? rest + span : rest) + parameter.min;
 };
 
+/**
+ * Bounds the anchors' summed offset to the slider's whole span either way, so it can still
+ * lower a one-sided slider (`Parameter::limit_offset`); a hue wraps.
+ */
+const limitOffset = (parameter: BlendPadParameter, offset: number) => {
+  if (parameter.wraps) return limit(parameter, offset);
+  const span = parameter.max - parameter.min;
+  return Math.min(span, Math.max(-span, offset));
+};
+
 /** Rounds half away from zero, as Rust's `f64::round` (`Math.round(-0.5)` is −0). */
 const roundHalfAway = (value: number) => Math.sign(value) * Math.round(Math.abs(value));
 
@@ -84,27 +94,61 @@ export const resolveBlendPad = (
   }
   return Object.fromEntries(
     parameters.map((parameter) => {
-      const offset = roundHalfAway(limit(parameter, sums[parameter.id]) / parameter.step) * parameter.step;
+      const offset = roundHalfAway(limitOffset(parameter, sums[parameter.id]) / parameter.step) * parameter.step;
       return [parameter.id, offset === 0 ? 0 : offset];
     }),
   );
 };
 
-/** The three fixed anchor slots of the pad panel: top, bottom right, bottom left. */
-export const BLEND_PAD_SLOTS = [
+/** The slider's value with the pad's offset added, as the renderer uses it (`Offsets::apply`). */
+export const withBlendPadOffset = (parameter: BlendPadParameter, value: number, offset: number) =>
+  offset === 0 ? value : limit(parameter, value + offset);
+
+/** The value the pad moves the slider `id` to, or `undefined` when the pad does not move it. */
+export const blendPadValue = (
+  pad: BlendPad | null | undefined,
+  parameters: Array<BlendPadParameter>,
+  id: string,
+  value: number,
+): number | undefined => {
+  const parameter = parameters.find((candidate) => candidate.id === id);
+  if (!parameter || !pad?.enabled) return undefined;
+  const offset = resolveBlendPad(pad, [parameter])[id];
+  return offset === 0 ? undefined : withBlendPadOffset(parameter, value, offset);
+};
+
+/** Bake: the slider values with the pad's offsets written into them (only those it moves). */
+export const bakeBlendPad = (
+  values: Record<string, unknown>,
+  pad: BlendPad | null | undefined,
+  parameters: Array<BlendPadParameter>,
+): Record<string, number> => {
+  const offsets = resolveBlendPad(pad, parameters);
+  return Object.fromEntries(
+    parameters
+      .filter((parameter) => offsets[parameter.id] !== 0)
+      .map((parameter) => {
+        const value = typeof values[parameter.id] === 'number' ? (values[parameter.id] as number) : 0;
+        return [parameter.id, withBlendPadOffset(parameter, value, offsets[parameter.id])];
+      }),
+  );
+};
+
+/** The tools a new pad starts with: Contrast at the top, Temperature and Saturation below. */
+const DEFAULT_ANCHORS = [
   { id: 'top', t: 0.25, param: 'contrast', target: 60 },
   { id: 'bottomRight', t: 11 / 12, param: 'temperature', target: 50 },
   { id: 'bottomLeft', t: 7 / 12, param: 'saturation', target: -60 },
 ] as const;
 
-/** A new pad: the three slots with their default tools, the puck at the centre. */
+/** A new pad: the default tools, the puck at the centre. */
 export const createBlendPad = (): BlendPad => ({
   version: 1,
   enabled: true,
   shape: 'circle',
   amount: 1,
   puck: { x: 0, y: 0 },
-  anchors: BLEND_PAD_SLOTS.map(({ id, t, param, target }) => ({
+  anchors: DEFAULT_ANCHORS.map(({ id, t, param, target }) => ({
     id,
     param,
     t,
@@ -113,3 +157,32 @@ export const createBlendPad = (): BlendPad => ({
     muted: false,
   })),
 });
+
+/** Where a new anchor goes: the middle of the largest free stretch of edge (the top on an empty pad). */
+export const largestGapPosition = (anchors: Array<BlendPadAnchor>): number => {
+  const positions = anchors.map((anchor) => ((anchor.t % 1) + 1) % 1).sort((a, b) => a - b);
+  if (positions.length === 0) return 0.25;
+  let best = { start: positions[positions.length - 1], length: positions[0] + 1 - positions[positions.length - 1] };
+  for (let i = 1; i < positions.length; i += 1) {
+    const length = positions[i] - positions[i - 1];
+    if (length > best.length) best = { start: positions[i - 1], length };
+  }
+  return (best.start + best.length / 2) % 1;
+};
+
+/** The perimeter position of a point in pad space (0–1, from the right, anticlockwise). */
+export const positionOf = (point: Coord): number => {
+  const turns = Math.atan2(point.y, point.x) / TAU;
+  return turns < 0 ? turns + 1 : turns;
+};
+
+/** A target of the same share of the slider's reach (Contrast +60 becomes Exposure +3.00). */
+export const targetWithShare = (share: number, parameter: BlendPadParameter): number => {
+  const reach = Math.max(Math.abs(parameter.min), Math.abs(parameter.max));
+  const target = Math.round((share * reach) / parameter.step) * parameter.step;
+  return Math.min(parameter.max, Math.max(-parameter.max, target));
+};
+
+/** The share of the slider's reach a target is. */
+export const shareOf = (target: number, parameter: BlendPadParameter): number =>
+  target / Math.max(Math.abs(parameter.min), Math.abs(parameter.max));

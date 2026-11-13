@@ -652,17 +652,25 @@
       "savesTo": "Externe Bearbeitung — speichert in"
     },
     "blendPad": {
+      "addTool": "Werkzeug hinzufügen",
+      "bake": "In Regler übernehmen",
+      "bakeTooltip": "In Regler übernehmen: die Werte des Pads in die Regler schreiben und den Puck zentrieren",
       "center": "Puck zentrieren",
-      "enabled": "Blend-Pad an",
-      "hint": "Den Puck ziehen, um die Werkzeuge zu mischen. Umschalt für feinere Bewegungen, Pfeiltasten zum Verschieben, Doppelklick auf den Puck zentriert ihn.",
-      "reset": "Pad zurücksetzen",
-      "slots": {
-        "bottomLeft": "Unten links",
-        "bottomRight": "Unten rechts",
-        "top": "Oben"
+      "curve": "Kurve",
+      "curves": {
+        "easeIn": "Langsamer Start",
+        "linear": "Linear",
+        "soft": "Weich"
       },
+      "enabled": "Blend-Pad an",
+      "hint": "Den Puck ziehen, um die Werkzeuge zu mischen; einen Ankerpunkt am Rand entlang ziehen, um ihn zu verschieben. Umschalt für feinere Bewegungen, Pfeiltasten zum Verschieben, Doppelklick auf den Puck zentriert ihn.",
+      "maxTools": "Höchstens {{count}} Werkzeuge",
+      "mute": "Stummschalten",
+      "remove": "Werkzeug entfernen",
+      "reset": "Pad zurücksetzen",
       "target": "Ziel",
-      "title": "Blend-Pad"
+      "title": "Blend-Pad",
+      "unmute": "Wieder einschalten"
     },
     "favorites": {
       "add": "Zu Favoriten hinzufügen",
