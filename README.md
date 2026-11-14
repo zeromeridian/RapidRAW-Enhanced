@@ -38,6 +38,25 @@ Production builds created from `main` use the plain semantic version. Builds
 from any other branch automatically append a sanitized branch prerelease
 suffix, such as `1.0.3-develop` or `1.0.3-feature-masks`.
 
+## Installing on macOS
+
+The macOS release is not signed with an Apple Developer ID or notarized by
+Apple, so macOS blocks it the first time it is opened with a message that it
+"cannot verify" ThisIsRAW or that the app "is damaged". To open it anyway:
+
+1. Drag ThisIsRAW from the DMG into Applications and try to open it once.
+2. Open **System Settings → Privacy & Security**, scroll down, and click
+   **Open Anyway** next to the ThisIsRAW message. Confirm with your password.
+
+Alternatively, remove the download quarantine in Terminal:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/ThisIsRAW.app
+```
+
+This is needed once per installed version. After an update, macOS may also
+ask again for access to your photo folders.
+
 ## Inherited RapidRAW Foundation
 
 Because ThisIsRAW is built on RapidRAW 1.6, it retains core capabilities such
