@@ -78,7 +78,10 @@ details are in `RELEASE_NOTES.MD`.
   choose TIFF, JPEG, or ask-each-time per editor, then right-click one image
   in the Library or the image being edited in Develop (**Open in**) to open a
   16-bit TIFF or JPEG copy in that editor. The copy appears beside the original as `<name>-Edit` only
-  once it is saved in the editor, later saves update it in place, several
+  once it is saved in the editor, later saves update it in place. However
+  the editor saves (back into the copy, or Save As under another name or
+  format) and whether it opens a window or a tab, each saved image gets
+  its own copy beside the original under the name it was saved with. Several
   edits can run at once, and saves made while ThisIsRAW was closed are
   picked up on the next launch. A save into a subfolder of the editor's
   working folder counts too, and an editor that quits with an error right

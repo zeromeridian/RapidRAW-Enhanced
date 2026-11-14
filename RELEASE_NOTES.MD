@@ -5,6 +5,19 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.56.2-dev-editor-copies — 2026-11-14
+
+### External editors
+
+- **Open in** now handles every way an editor saves. A Save As under
+  another name or format (for example a JPEG next to the TIFF, or a second
+  TIFF version) appears beside the original under the name you chose,
+  and the first copy is kept too.
+- Each saved image keeps its own copy, and saving it again updates only
+  that copy. Switching between formats no longer creates extra
+  `-Edit-2` files.
+- Several saves made at the same moment are all picked up.
+
 ## 1.56.1-fix-constrain-crop-perspective — 2026-11-14
 
 ### Develop

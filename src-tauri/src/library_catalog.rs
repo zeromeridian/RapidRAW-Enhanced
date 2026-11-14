@@ -104,6 +104,14 @@ fn open_at(path: PathBuf) -> Result<Connection, String> {
                  saved_len INTEGER NOT NULL,
                  saved_modified INTEGER NOT NULL,
                  created_at INTEGER NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS editor_round_trip_files (
+                 session_id TEXT NOT NULL,
+                 staged_file TEXT NOT NULL,
+                 len INTEGER NOT NULL,
+                 modified INTEGER NOT NULL,
+                 destination TEXT,
+                 PRIMARY KEY (session_id, staged_file)
              );",
         )
         .map_err(|error| error.to_string())?;
@@ -581,18 +589,26 @@ fn keyword_image_paths_from_connection(
     Ok(rows.filter_map(Result::ok).collect())
 }
 
-/// One external-editor round trip (`editor_round_trip.rs`). `saved_*` describe
-/// the staged file that was last handled, so only a newer save is promoted.
+/// One external-editor round trip (`editor_round_trip.rs`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct EditorRoundTripRow {
     pub id: String,
     pub source_path: String,
     pub staging_dir: String,
-    pub destination: Option<String>,
-    pub saved_file: String,
-    pub saved_len: u64,
-    pub saved_modified: u64,
+    /// Every image in the staging folder that was handled, starting with the
+    /// render itself, so only a newer save is promoted.
+    pub files: Vec<StagedFileRow>,
     pub created_at: i64,
+}
+
+/// A handled file in a round trip's staging folder and the copy beside the
+/// source that its saves update (`None` until the editor saves it).
+#[derive(Clone, Debug, PartialEq)]
+pub struct StagedFileRow {
+    pub path: String,
+    pub len: u64,
+    pub modified: u64,
+    pub destination: Option<String>,
 }
 
 pub fn save_editor_round_trip(
@@ -607,7 +623,24 @@ fn save_editor_round_trip_to_connection(
     connection: &Connection,
     row: &EditorRoundTripRow,
 ) -> Result<(), String> {
-    connection
+    // The session's own `saved_*` and `destination` columns predate
+    // `editor_round_trip_files`; they keep the newest file so older versions
+    // still resume the session.
+    let newest = row
+        .files
+        .iter()
+        .max_by_key(|file| file.modified)
+        .ok_or("An external edit has no staged file")?;
+    let destination = row
+        .files
+        .iter()
+        .filter(|file| file.destination.is_some())
+        .max_by_key(|file| file.modified)
+        .and_then(|file| file.destination.as_deref());
+    let transaction = connection
+        .unchecked_transaction()
+        .map_err(|error| error.to_string())?;
+    transaction
         .execute(
             "INSERT INTO editor_round_trips
                  (id, source_path, staging_dir, destination, saved_file, saved_len, saved_modified, created_at)
@@ -621,15 +654,37 @@ fn save_editor_round_trip_to_connection(
                 row.id,
                 row.source_path,
                 row.staging_dir,
-                row.destination,
-                row.saved_file,
-                row.saved_len as i64,
-                row.saved_modified as i64,
+                destination,
+                newest.path,
+                newest.len as i64,
+                newest.modified as i64,
                 row.created_at,
             ],
         )
-        .map(|_| ())
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    transaction
+        .execute(
+            "DELETE FROM editor_round_trip_files WHERE session_id=?1",
+            params![row.id],
+        )
+        .map_err(|error| error.to_string())?;
+    for file in &row.files {
+        transaction
+            .execute(
+                "INSERT INTO editor_round_trip_files
+                     (session_id, staged_file, len, modified, destination)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    row.id,
+                    file.path,
+                    file.len as i64,
+                    file.modified as i64,
+                    file.destination,
+                ],
+            )
+            .map_err(|error| error.to_string())?;
+    }
+    transaction.commit().map_err(|error| error.to_string())
 }
 
 pub fn delete_editor_round_trip(app_handle: &AppHandle, id: &str) -> Result<(), String> {
@@ -641,10 +696,19 @@ fn delete_editor_round_trip_from_connection(
     connection: &Connection,
     id: &str,
 ) -> Result<(), String> {
-    connection
-        .execute("DELETE FROM editor_round_trips WHERE id=?1", params![id])
-        .map(|_| ())
-        .map_err(|error| error.to_string())
+    let transaction = connection
+        .unchecked_transaction()
+        .map_err(|error| error.to_string())?;
+    transaction
+        .execute(
+            "DELETE FROM editor_round_trip_files WHERE session_id=?1",
+            params![id],
+        )
+        .and_then(|_| {
+            transaction.execute("DELETE FROM editor_round_trips WHERE id=?1", params![id])
+        })
+        .map_err(|error| error.to_string())?;
+    transaction.commit().map_err(|error| error.to_string())
 }
 
 pub fn load_editor_round_trips(app_handle: &AppHandle) -> Result<Vec<EditorRoundTripRow>, String> {
@@ -661,21 +725,56 @@ fn load_editor_round_trips_from_connection(
              FROM editor_round_trips ORDER BY created_at",
         )
         .map_err(|error| error.to_string())?;
-    let rows = statement
+    let sessions: Vec<(EditorRoundTripRow, StagedFileRow)> = statement
         .query_map([], |row| {
-            Ok(EditorRoundTripRow {
-                id: row.get(0)?,
-                source_path: row.get(1)?,
-                staging_dir: row.get(2)?,
-                destination: row.get(3)?,
-                saved_file: row.get(4)?,
-                saved_len: row.get::<_, i64>(5)? as u64,
-                saved_modified: row.get::<_, i64>(6)? as u64,
-                created_at: row.get(7)?,
-            })
+            Ok((
+                EditorRoundTripRow {
+                    id: row.get(0)?,
+                    source_path: row.get(1)?,
+                    staging_dir: row.get(2)?,
+                    files: Vec::new(),
+                    created_at: row.get(7)?,
+                },
+                StagedFileRow {
+                    path: row.get(4)?,
+                    len: row.get::<_, i64>(5)? as u64,
+                    modified: row.get::<_, i64>(6)? as u64,
+                    destination: row.get(3)?,
+                },
+            ))
         })
+        .map_err(|error| error.to_string())?
+        .filter_map(Result::ok)
+        .collect();
+
+    let mut statement = connection
+        .prepare(
+            "SELECT staged_file, len, modified, destination
+             FROM editor_round_trip_files WHERE session_id=?1 ORDER BY modified",
+        )
         .map_err(|error| error.to_string())?;
-    Ok(rows.filter_map(Result::ok).collect())
+    sessions
+        .into_iter()
+        .map(|(mut session, newest)| {
+            session.files = statement
+                .query_map(params![session.id], |row| {
+                    Ok(StagedFileRow {
+                        path: row.get(0)?,
+                        len: row.get::<_, i64>(1)? as u64,
+                        modified: row.get::<_, i64>(2)? as u64,
+                        destination: row.get(3)?,
+                    })
+                })
+                .map_err(|error| error.to_string())?
+                .filter_map(Result::ok)
+                .collect();
+            // A session saved before `editor_round_trip_files` existed.
+            if session.files.is_empty() {
+                session.files.push(newest);
+            }
+            Ok(session)
+        })
+        .collect()
 }
 
 #[tauri::command]
@@ -820,31 +919,43 @@ mod tests {
     fn editor_round_trips_insert_update_and_delete() {
         let temporary = tempfile::tempdir().unwrap();
         let connection = open_at(temporary.path().join("catalog.sqlite3")).unwrap();
+        let render = StagedFileRow {
+            path: "/cache/external-edits/session/IMG_1-Edit.tif".to_owned(),
+            len: 10,
+            modified: 1_800_000_000_000_000_000,
+            destination: None,
+        };
         let mut row = EditorRoundTripRow {
             id: "session".to_owned(),
             source_path: "/photos/IMG_1.CR3?vc=2".to_owned(),
             staging_dir: "/cache/external-edits/session".to_owned(),
-            destination: None,
-            saved_file: "/cache/external-edits/session/IMG_1-Edit.tif".to_owned(),
-            saved_len: 10,
-            saved_modified: 1_800_000_000_000_000_000,
+            files: vec![render.clone()],
             created_at: 7,
         };
         save_editor_round_trip_to_connection(&connection, &row).unwrap();
 
         let saved = EditorRoundTripRow {
-            destination: Some("/photos/IMG_1-Edit.tif".to_owned()),
-            saved_len: 20,
-            saved_modified: row.saved_modified + 1,
+            files: vec![
+                StagedFileRow {
+                    len: 20,
+                    modified: render.modified + 1,
+                    destination: Some("/photos/IMG_1-Edit.tif".to_owned()),
+                    ..render.clone()
+                },
+                StagedFileRow {
+                    path: "/cache/external-edits/session/IMG_1-Edit.jpg".to_owned(),
+                    len: 5,
+                    modified: render.modified + 2,
+                    destination: Some("/photos/IMG_1-Edit.jpg".to_owned()),
+                },
+            ],
             // The source, staging folder, and creation time never change.
             created_at: 99,
             ..row.clone()
         };
         save_editor_round_trip_to_connection(&connection, &saved).unwrap();
 
-        row.destination = saved.destination.clone();
-        row.saved_len = saved.saved_len;
-        row.saved_modified = saved.saved_modified;
+        row.files = saved.files.clone();
         assert_eq!(
             load_editor_round_trips_from_connection(&connection).unwrap(),
             vec![row]
@@ -855,6 +966,36 @@ mod tests {
             load_editor_round_trips_from_connection(&connection)
                 .unwrap()
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn editor_round_trips_saved_before_per_file_tracking_still_load() {
+        let temporary = tempfile::tempdir().unwrap();
+        let connection = open_at(temporary.path().join("catalog.sqlite3")).unwrap();
+        connection
+            .execute(
+                "INSERT INTO editor_round_trips
+                     (id, source_path, staging_dir, destination, saved_file, saved_len, saved_modified, created_at)
+                 VALUES ('old', '/photos/IMG_1.CR3', '/cache/external-edits/old',
+                         '/photos/IMG_1-Edit.tif', '/cache/external-edits/old/IMG_1-Edit.tif', 20, 3, 7)",
+                [],
+            )
+            .unwrap();
+        assert_eq!(
+            load_editor_round_trips_from_connection(&connection).unwrap(),
+            vec![EditorRoundTripRow {
+                id: "old".to_owned(),
+                source_path: "/photos/IMG_1.CR3".to_owned(),
+                staging_dir: "/cache/external-edits/old".to_owned(),
+                files: vec![StagedFileRow {
+                    path: "/cache/external-edits/old/IMG_1-Edit.tif".to_owned(),
+                    len: 20,
+                    modified: 3,
+                    destination: Some("/photos/IMG_1-Edit.tif".to_owned()),
+                }],
+                created_at: 7,
+            }]
         );
     }
 

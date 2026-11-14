@@ -1,6 +1,6 @@
 # External Editor Round Trip and Photo Craft Integration Plan
 
-## Status (revised 2026-11-10)
+## Status (revised 2026-11-14)
 
 - **Steps 1–4 shipped** (`1.25.2`–`1.28.0`, plus **Open in** on the Develop
   canvas in `1.29.1`) and are in `develop`. None has been checked hands-on
@@ -13,10 +13,19 @@
   document and test the `--edit` exit codes.
 - **Linux Flatpak: deferred** by the owner (2026-11-02); see "Deferred:
   Linux Flatpak".
-- **Owner decisions:** all answered (2, 3 and 5 on 2026-11-10). The work
-  they lead to is `UPSTREAM_FEATURE_GAP.md` Plan item 15: a wide-gamut
-  option, and a round trip that works however the editor saves or opens
-  files.
+- **Every way of saving** (`1.56.2`, 2026-11-14, Plan item 15, on
+  `dev/editor-copies`, uncommitted): each image saved in the staging
+  folder (the render, a Save As to another name or format, a subfolder)
+  gets its own copy beside the source, named as it was saved (`-2`, … when
+  taken); saving it again replaces only that copy; several saves in one
+  poll are all promoted. Sessions now keep every handled file in the
+  catalog table `editor_round_trip_files`; sessions from older versions
+  load as one file. Decision 3 (window or tab) needed no change. Not yet
+  checked hands-on.
+- **Wide-gamut option (decision 5): moved to the GPU epic** by the owner
+  (2026-11-14), `UPSTREAM_FEATURE_GAP.md` item 19b. The render clamps to
+  sRGB right after tone mapping, so a ProPhoto TIFF today would hold only
+  sRGB colours.
 - **Known gap:** a copy that is open in Develop does not reload when the
   editor saves it again.
 
@@ -245,7 +254,8 @@ reads it, and a failed read is retried on the next poll.
    as they are.
 5. **Decided 2026-11-10: sRGB plus a wide-gamut option.** sRGB stays the
    default; each editor can choose a 16-bit ProPhoto RGB TIFF instead, as
-   Lightroom Classic offers.
+   Lightroom Classic offers. **2026-11-14 (owner): deferred to the GPU
+   epic** (item 19b), because the pipeline clips to sRGB before output.
 6. **Decided 2026-11-01: keep unsaved sessions for 7 days.**
 7. **Decided 2026-11-02: a preferred format per editor.** Each configured
    editor stores TIFF, JPEG, or "ask each time"; Photo Craft defaults to
