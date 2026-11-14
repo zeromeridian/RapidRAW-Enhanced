@@ -227,6 +227,17 @@
       "roundness": "둥글기",
       "size": "크기",
       "vignette": "비네트"
+    },
+    "zoneTint": {
+      "fill": "사이 채우기",
+      "fillHint": "선택한 첫 존과 마지막 존 사이를 한쪽 끝의 색, 강도, 휘도에서 다른 쪽 끝까지 커브를 따라 채웁니다.",
+      "hint": "존을 클릭하여 색을 입힙니다. Shift-클릭으로 범위를 선택하고, Cmd/Ctrl-클릭으로 존을 추가하거나 제거합니다.",
+      "protect": "보호",
+      "softness": "부드러움",
+      "tintedZones": "조정된 존",
+      "untint": "존 초기화",
+      "zone": "존 {{zone}}",
+      "zones": "존 {{zones}}"
     }
   },
   "contextMenus": {
@@ -410,7 +421,8 @@
         "color": "색상",
         "curves": "커브",
         "details": "디테일",
-        "effects": "효과"
+        "effects": "효과",
+        "zoneTint": "존 컬러 그레이딩"
       },
       "title": "조정",
       "tooltips": {
@@ -2197,6 +2209,7 @@
       "hue": "색조",
       "hueAbbreviation": "H:",
       "luminance": "휘도",
+      "luminanceAbbreviation": "L:",
       "reset": "초기화",
       "saturation": "채도",
       "saturationAbbreviation": "S:"

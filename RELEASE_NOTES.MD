@@ -5,6 +5,93 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.57.5-dev-zone-tint — 2026-11-14
+
+### Develop
+
+- **Zone Tint** is now called **Zone Color Grading**.
+- Each zone also has a **Luminance** slider, under the colour wheel, that
+  brightens or darkens that zone's tones by up to half a zone, with or
+  without a colour. Neighbouring zones blend smoothly and the tones always
+  keep their order, so a lifted zone never jumps above a lighter one.
+  Lifting Zone 0 gives faded blacks; the Protect slider only limits
+  colour, not luminance.
+- The scale shows each zone's grey after its luminance, and the list
+  below (now **Adjusted zones**) shows luminance too. **Fill between**
+  blends luminance along with colour, and **Amount** scales both.
+- Moving one setting on the wheel for several zones now changes only that
+  setting, so each zone keeps its own values for the others.
+
+## 1.57.4-dev-zone-tint — 2026-11-14
+
+### Develop
+
+- **Zone Tint** now works on colour photos too, as a colour grade by
+  tonal zone: each zone's colour shifts the colours already there, and
+  the brightness stays the same. On Black & White photos it tones as
+  before. A tint set in Black & White stays when you switch back to
+  colour.
+- A photo whose Zone Tint has no colour left no longer counts as edited.
+
+## 1.57.3-dev-zone-tint — 2026-11-14
+
+### Develop
+
+- **Zone Tint** has a new **Amount** slider that makes the whole tint
+  weaker or stronger, up to double, without changing the colours you set
+  for each zone. Edits made before keep their look.
+- **Fill between** blends a colour across a range of zones: colour the
+  first and last zone, Shift-click to select the range, pick a curve
+  (Linear, Soft or Ease in, as on the Orbit Blend Pad) and fill. The
+  zones in between move from one end's colour and strength to the
+  other's; opposite colours, like cool shadows and warm highlights, meet
+  in a soft neutral. Each filled zone can still be changed on its own.
+
+## 1.57.2-dev-zone-tint — 2026-11-14
+
+### Develop
+
+- **Zone Tint** zones now stand as an upright scale beside the colour
+  wheel, X at the top and 0 at the bottom, so every zone name stays
+  readable however narrow the sidebar is. Each zone's colour shows as a
+  band along the scale's edge.
+- A new **Tinted zones** list below the sliders shows every zone that has
+  a colour, with its hue and strength; neighbouring zones with the same
+  colour share one line, such as "Zones II–IV". Click a line to select
+  those zones, or its × to remove their tint.
+
+## 1.57.1-dev-zone-tint — 2026-11-14
+
+### Develop
+
+- **Zone Tint** has moved out of the Adjustments panel into its own
+  panel in the right toolbar, under the Orbit Blend Pad. On a colour
+  photo it offers a Black & White switch to get started; its eye and
+  reset buttons sit in the panel header.
+- The zones are now one continuous grey ramp from 0 to X: each zone's
+  colour shows as a band along the top, the selected zones are
+  underlined, and the zone numbers sit below the ramp where they are
+  easy to read. A selection of neighbouring zones is named as a range,
+  such as "Zones IV–VII".
+
+## 1.57.0-dev-zone-tint — 2026-11-14
+
+### Develop
+
+- New **Zone Tint** section for Black & White photos: give each of the
+  11 Zone System zones, from 0 (black) to X (white), its own colour
+  without changing the photo's tones. It shows up below the other
+  sections while Black & White is on.
+- Click a zone to colour it. Shift-click selects a range of zones and
+  Cmd/Ctrl-click adds or removes one, so one colour can go on several
+  zones at once; each zone can still be changed on its own later.
+- Pick the colour and its strength on a colour wheel. Neighbouring zones
+  blend smoothly, **Softness** sets how far each zone reaches, and
+  **Protect** keeps the deepest blacks and brightest whites neutral.
+- The tint stays even inside masks set to a blend mode. It is saved with
+  the edit, in XMP, copy/paste and presets; the section's eye turns it
+  off for a quick before and after.
+
 ## 1.56.2-dev-editor-copies — 2026-11-14
 
 ### External editors

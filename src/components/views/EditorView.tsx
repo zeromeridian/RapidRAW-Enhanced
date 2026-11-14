@@ -10,6 +10,7 @@ import Resizer from '../ui/Resizer';
 import Controls from '../panel/right/ControlsPanel';
 import FavoritesPanel from '../panel/right/FavoritesPanel';
 import BlendPadPanel from '../panel/right/BlendPadPanel';
+import ZoneTintPanel from '../panel/right/ZoneTintPanel';
 import MetadataPanel from '../panel/right/MetadataPanel';
 import CropPanel from '../panel/right/CropPanel';
 import GeometryPanel from '../panel/right/GeometryPanel';
@@ -248,6 +249,7 @@ export default function EditorView({
             {renderedRightPanel === Panel.Adjustments && <Controls />}
             {renderedRightPanel === Panel.Favorites && <FavoritesPanel />}
             {renderedRightPanel === Panel.BlendPad && <BlendPadPanel />}
+            {renderedRightPanel === Panel.ZoneTint && <ZoneTintPanel />}
             {renderedRightPanel === Panel.Metadata && <MetadataPanel />}
             {renderedRightPanel === Panel.Crop && <CropPanel />}
             {renderedRightPanel === Panel.Geometry && <GeometryPanel />}

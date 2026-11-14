@@ -327,6 +327,26 @@ details are in `RELEASE_NOTES.MD`.
   Variance, a hue–saturation field and luminance strip to refine the picked
   colour, before/after swatches, Hue/Saturation/Luminance range bars, and
   Visualize Range. Points travel with the edit (XMP, copy/paste, presets).
+- **Zone Color Grading** panel in the right toolbar (whole photo; formerly
+  Zone Tint): a colour and a luminance for each of the 11 Zone System
+  zones (0–X), toning a Black & White photo or grading a colour one by
+  tonal zone (the zone's colour shifts the colours there). The colour never
+  changes a tone; Luminance (−100 to 100) moves the zone's tones by up to
+  half a zone and always keeps them in order. The zones form an upright
+  grey scale (X at the top, each grey after its luminance) beside the
+  colour wheel, each zone's colour a band along its edge; an Adjusted
+  zones list below names every changed zone or range with its hue,
+  strength and luminance, selects it on click and resets it with ×. Pick a
+  zone, or a range with Shift-click (Cmd/Ctrl-click adds or removes one),
+  and set its colour, strength and luminance on the colour wheel (only the
+  value moved is written to every selected zone); neighbouring zones blend
+  smoothly, Softness sets how far a zone's colour reaches, and Protect
+  keeps black and white free of colour. Amount scales the whole effect
+  (0–200 %) without changing the zones' own settings. Fill between blends
+  the first and last selected zone's settings across the zones between
+  them along a Blend Pad curve (Linear, Soft, Ease in). Masks in a blend
+  mode keep the grade. The panel's eye switches it off and its reset
+  clears it. It travels with the edit (XMP, copy/paste, presets).
 - **Targeted adjustment pipettes**, as in Lightroom Classic: drag up or down
   on the photo to change what is under the cursor, double-click to reset it.
   The **Color Mixer** pipette (from RapidRAW) moves every colour band found

@@ -1121,6 +1121,48 @@ mod output_naming_tests {
     }
 
     #[test]
+    fn zone_tint_round_trips_through_xmp() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("portrait.orf");
+        fs::write(&image, []).unwrap();
+        fs::write(
+            image.with_extension("xmp"),
+            "<rdf:Description>\n</rdf:Description>",
+        )
+        .unwrap();
+
+        let zone_tint = serde_json::json!({
+            "version": 1, "softness": 0.05, "protect": 0.1, "amount": 1.5,
+            "zones": [
+                { "hue": 0, "strength": 0, "luminance": 40 },
+                { "hue": 30, "strength": 60, "luminance": -25 },
+            ],
+        });
+        let source = ImageMetadata {
+            adjustments: serde_json::json!({ "monochrome": true, "zoneTint": zone_tint }),
+            ..ImageMetadata::default()
+        };
+        let expected =
+            crate::image_processing::get_all_adjustments_from_json(&source.adjustments, true, None)
+                .global
+                .zone_tint;
+        sync_metadata_to_xmp(&image, &source, false);
+
+        let mut imported = ImageMetadata::default();
+        assert!(sync_metadata_from_xmp(&image, &mut imported, true));
+        assert_eq!(imported.adjustments["zoneTint"], zone_tint);
+        let rendered = crate::image_processing::get_all_adjustments_from_json(
+            &imported.adjustments,
+            true,
+            None,
+        )
+        .global
+        .zone_tint;
+        assert_eq!(rendered.enabled, 1);
+        assert_eq!(rendered, expected);
+    }
+
+    #[test]
     fn natural_tone_mapper_round_trips_through_xmp() {
         let folder = tempfile::tempdir().unwrap();
         let image = folder.path().join("sky.orf");

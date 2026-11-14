@@ -203,6 +203,7 @@ export enum Panel {
   Metadata = 'metadata',
   Presets = 'presets',
   Tagging = 'tagging',
+  ZoneTint = 'zoneTint',
 }
 
 export enum RawStatus {

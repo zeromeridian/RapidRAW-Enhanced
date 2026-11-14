@@ -227,6 +227,17 @@
       "roundness": "Zaokrąglenie",
       "size": "Rozmiar",
       "vignette": "Winieta"
+    },
+    "zoneTint": {
+      "fill": "Wypełnij pomiędzy",
+      "fillHint": "Wypełnia strefy między pierwszą a ostatnią zaznaczoną strefą wzdłuż krzywej, od koloru, siły i luminancji jednego końca do drugiego.",
+      "hint": "Kliknij strefę, aby ją zabarwić. Shift-klik zaznacza zakres, Cmd/Ctrl-klik dodaje lub usuwa strefę.",
+      "protect": "Ochrona",
+      "softness": "Miękkość",
+      "tintedZones": "Dostosowane strefy",
+      "untint": "Resetuj strefy",
+      "zone": "Strefa {{zone}}",
+      "zones": "Strefy {{zones}}"
     }
   },
   "contextMenus": {
@@ -448,7 +459,8 @@
         "color": "Kolor",
         "curves": "Krzywe",
         "details": "Detale",
-        "effects": "Efekty"
+        "effects": "Efekty",
+        "zoneTint": "Gradacja kolorów stref"
       },
       "title": "Ustawienia",
       "tooltips": {
@@ -2295,6 +2307,7 @@
       "hue": "Odcień",
       "hueAbbreviation": "H:",
       "luminance": "Luminancja",
+      "luminanceAbbreviation": "L:",
       "reset": "Resetuj",
       "saturation": "Nasycenie",
       "saturationAbbreviation": "S:"

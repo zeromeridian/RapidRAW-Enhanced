@@ -228,6 +228,17 @@
       "roundness": "Roundness",
       "size": "Size",
       "vignette": "Vignette"
+    },
+    "zoneTint": {
+      "fill": "Fill between",
+      "fillHint": "Fills the zones between the first and last selected zone along the curve, from one end's colour, strength and luminance to the other's.",
+      "hint": "Click a zone to color it. Shift-click selects a range, Cmd/Ctrl-click adds or removes a zone.",
+      "protect": "Protect",
+      "softness": "Softness",
+      "tintedZones": "Adjusted zones",
+      "untint": "Reset zones",
+      "zone": "Zone {{zone}}",
+      "zones": "Zones {{zones}}"
     }
   },
   "contextMenus": {
@@ -436,7 +447,8 @@
         "color": "Color",
         "curves": "Curves",
         "details": "Details",
-        "effects": "Effects"
+        "effects": "Effects",
+        "zoneTint": "Zone Color Grading"
       },
       "title": "Adjustments",
       "tooltips": {
@@ -2385,6 +2397,7 @@
       "hue": "Hue",
       "hueAbbreviation": "H:",
       "luminance": "Luminance",
+      "luminanceAbbreviation": "L:",
       "reset": "Reset",
       "saturation": "Saturation",
       "saturationAbbreviation": "S:"

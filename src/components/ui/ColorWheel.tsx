@@ -17,6 +17,8 @@ interface ColorWheelProps {
   value: HueSatLum;
   onDragStateChange?: (isDragging: boolean) => void;
   isExpanded?: boolean;
+  /** Off for tools that never change tones (Zone Tint), which then ignore `luminance`. */
+  showLuminance?: boolean;
 }
 
 const ColorWheel = ({
@@ -26,6 +28,7 @@ const ColorWheel = ({
   value,
   onDragStateChange,
   isExpanded = false,
+  showLuminance = true,
 }: ColorWheelProps) => {
   const { t } = useTranslation();
   const effectiveValue = { ...defaultValue, ...value };
@@ -301,19 +304,21 @@ const ColorWheel = ({
         )}
       </AnimatePresence>
 
-      <div className="w-full" style={lumWrapperStyle}>
-        <Slider
-          defaultValue={defaultValue.luminance}
-          label={isExpanded ? t('ui.colorWheel.luminance') : <Sun size={16} className="text-text-secondary" />}
-          max={100}
-          min={-100}
-          onChange={handleLumChange}
-          onDragStateChange={setIsSliderDragging}
-          step={1}
-          value={luminance}
-          trackClassName="cg-lum-gradient"
-        />
-      </div>
+      {showLuminance && (
+        <div className="w-full" style={lumWrapperStyle}>
+          <Slider
+            defaultValue={defaultValue.luminance}
+            label={isExpanded ? t('ui.colorWheel.luminance') : <Sun size={16} className="text-text-secondary" />}
+            max={100}
+            min={-100}
+            onChange={handleLumChange}
+            onDragStateChange={setIsSliderDragging}
+            step={1}
+            value={luminance}
+            trackClassName="cg-lum-gradient"
+          />
+        </div>
+      )}
     </div>
   );
 };

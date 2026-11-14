@@ -227,6 +227,17 @@
       "roundness": "圆度",
       "size": "大小",
       "vignette": "暗角"
+    },
+    "zoneTint": {
+      "fill": "填充中间",
+      "fillHint": "沿曲线填充所选首尾区域之间的区域，从一端的颜色、强度和亮度过渡到另一端。",
+      "hint": "点击一个区域为其着色。Shift 点击选择一个范围，Cmd/Ctrl 点击添加或移除区域。",
+      "protect": "保护",
+      "softness": "柔和度",
+      "tintedZones": "已调整区域",
+      "untint": "重置区域",
+      "zone": "区域 {{zone}}",
+      "zones": "区域 {{zones}}"
     }
   },
   "contextMenus": {
@@ -410,7 +421,8 @@
         "color": "颜色",
         "curves": "曲线",
         "details": "细节",
-        "effects": "效果"
+        "effects": "效果",
+        "zoneTint": "区域颜色分级"
       },
       "title": "调整",
       "tooltips": {
@@ -2197,6 +2209,7 @@
       "hue": "色相",
       "hueAbbreviation": "H:",
       "luminance": "亮度",
+      "luminanceAbbreviation": "L:",
       "reset": "重置",
       "saturation": "饱和度",
       "saturationAbbreviation": "S:"

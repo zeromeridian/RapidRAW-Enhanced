@@ -1,8 +1,17 @@
 # Zone Tint Plan
 
-Status (2026-11-13): **not started.** `UPSTREAM_FEATURE_GAP.md` Plan item 28
-(P0, owner 2026-11-13: after the remaining P1 items and after item 27, the
-Orbit Blend Pad). Four phases, each shippable and gated by its exit check.
+Status (2026-11-14): **Phases 1 and 2 done** on `dev/zone-tint` (from
+`develop` `492bfffe`, committed as `b23d9d3d`), built as `1.57.0`; Zone
+Tint then moved to its own right-toolbar panel (`1.57.1`) with an
+upright zone scale and a tinted zones list (`1.57.2`), then an overall
+Amount and Fill between along a curve (`1.57.3`), colour photos too
+(`1.57.4`), then per-zone luminance and the name Zone Color Grading
+(`1.57.5`, uncommitted); the GPU
+exit check and the hands-on check still have to run on the Mac. Next:
+Phase 3. `UPSTREAM_FEATURE_GAP.md` Plan item 28 (P0, owner
+2026-11-13: after item 27, the Orbit Blend Pad, whose steps 1–7 are done).
+Item 30 (import from card or camera) follows it. Four phases, each
+shippable and gated by its exit check.
 
 **Specification:** the owner's `BW Zone System Coloring.md` (2026-11-13)
 is the source of truth for the zone model, colour maths, UI, data model,
@@ -55,12 +64,196 @@ changes about it, the decisions still open, and progress.
 - **Curve Stamp** does not exist in TIR yet (ColrBent's); treat it as a
   separate later item.
 
-## Open decisions (ask the owner when the item starts)
+## Owner decisions (2026-11-14)
 
-- Hue control: full wheel per zone or hue slider with swatch (spec).
-- Blend-mode backdrop with Zone Tint (above).
+- **Ranges of zones:** Shift-click selects every zone between the
+  selected one and the clicked one, Cmd/Ctrl-click toggles single zones;
+  hue and strength are written into each selected zone, so each can still
+  be fine-tuned later (no separate "band" layer). This moves the spec's
+  multi-select from Phase 3 into Phase 2.
+- **Hue control:** a colour wheel (hue and strength in one control, like
+  Colour Grading's wheels), not a hue slider. The wheel's angle must be
+  the OKLab hue the Rust side uses (`zoneTint.zones[n].hue`, 0° = +a).
+- **Place in the GUI** (revised by the owner 2026-11-14, after `1.57.0`):
+  its own panel in the right toolbar (`Panel.ZoneTint`, `Blend` icon,
+  after the Orbit Blend Pad), no longer an Adjustments section; not
+  inside the Color section and not docked under the histogram. The
+  first version (`1.57.0`) was a collapsible Adjustments section shown
+  only while Black & White was on. Agent choice (Phase 2): the 11
+  swatches are equal width; placed by display value, Zones 0–II would
+  share the first ~9 % of the strip.
+- **Zone layout** (owner 2026-11-14, option A of four offered): an
+  upright scale beside the colour wheel, X at the top, names on the
+  left, an accent bar marking the selection, each zone's tint as a band
+  on the scale's right edge; readable at any sidebar width. It replaced
+  `1.57.1`'s horizontal ramp, which the owner found hard to read when
+  narrow. Rejected: two rows, three Zone System groups, Arabic numerals,
+  a zone list as the selector. The wheel's label joins neighbouring
+  zones into ranges ("Zones IV–VII").
+- **Tinted zones list** (owner 2026-11-14): below the sliders, every
+  tinted zone, neighbours with the same hue and strength on one line,
+  lightest first like the scale, with hue and strength; a click selects
+  the zones, × removes their tint (one history step).
+- **Overall Amount** (owner 2026-11-14; range agent choice): a stored
+  `zoneTint.amount` (0–2, default 1, absent = 1) that multiplies every
+  zone's strength in `zone_tint.rs`, the product capped at 100; the zones'
+  own values never change. Not in the owner's spec's data model (an
+  addition, version stays 1).
+- **Ramp across a range** (owner 2026-11-14, chosen over a strength
+  curve editor and a curve for Amount): "Fill between" writes the zones
+  strictly between the first and last selected zone (an unbroken range of
+  three or more) from the ends' tints along a Blend Pad curve
+  (`BLEND_PAD_CURVES`, `applyBlendPadCurve` in `utils/blendPad.ts`), as
+  ordinary per-zone values in one history step. Agent design: the ends
+  are the end zones themselves (no extra pickers); tints blend as
+  colour-wheel vectors (hue direction, strength length), like the
+  shader's sum, so opposite hues meet in a neutral middle instead of
+  sweeping through the hues between (a blue → amber hue blend went green).
+- **Colour photos** (owner 2026-11-14, answering the spec's open
+  question "out of scope for now"): Zone Tint works on colour photos too,
+  as a grade by tonal zone. No shader change: `apply_zone_tint` already
+  adds (a, b) at the pixel's L after the monochrome step, so on colour it
+  shifts the existing chroma, kept in gamut by the same search. The only
+  gate left is the panel's eye (`is_visible("zoneTint")`); the Color
+  section's eye no longer hides it, and switching Black & White off keeps
+  the tint. Overlaps Colour Grading's three wheels, which stay as they are.
+- **Per-zone luminance** (owner 2026-11-14, "if possible"; the numbers
+  are agent choices): each zone's `luminance` (−100 to 100, absent = 0)
+  shifts OKLab L by up to `MAX_LUMINANCE_SHIFT` = 0.05 (half a zone),
+  weighed like the colour but with σ never below 0.04
+  (`MIN_LUMINANCE_SOFTNESS`, passed as `luminance_weight_cap`). Those two
+  bounds keep the tone mapping increasing even for neighbours at +100 and
+  −100 at the narrowest softness (slope ≥ 1 − 0.1 × 7.8 ≈ 0.22), checked
+  on the GPU ramp. Protect does not apply to luminance (Zone 0 can be
+  lifted); Amount scales it. In gamut handling, the pixel's own chroma is
+  kept when it still fits at the new L, else reduced with the tint. This
+  breaks the spec's "L unchanged" rule only where the user sets a
+  luminance; with every luminance at 0 the acceptance test still holds.
+  The wheel now writes only the value that moved to the selected zones.
+- **Name** (owner 2026-11-14): the tool is shown as **Zone Color
+  Grading** (every locale, history label). Internal names stay
+  `zoneTint` / `zone_tint` / `Panel.ZoneTint` and this file's name, so
+  saved edits, XMP and presets keep working.
+
+- **Blend-mode backdrop:** carries the Zone Tint, so masks in a
+  non-Normal blend mode keep the zone colours. Done in `shader.wgsl`: the
+  monochrome-and-tinted backdrop is computed once per pixel, only where a
+  blend-mode mask covers it.
+- **Versioning:** no build for Phase 1; the first build is `1.57.0`
+  with Phase 2.
+
+## Remaining (2026-11-14)
+
+1. **Owner checks on the Mac:** Phase 1 GPU exit check (`cargo test --lib
+   zone_tint -- --nocapture` from `src-tauri`; must not print "No GPU
+   adapter"); Phase 2 hands-on exit check (tint, save, reopen, export
+   match the preview; steps in `HANDOFF.md`). Then commit `1.57.1`–`1.57.5`.
+2. **Phase 3** (spec): hover readout, Alt/Option mask preview, mask
+   smoothing (blur pass, `maskSmoothing` 0–4 px slider), the four starter
+   presets (Selenium, Sepia, Split, Platinum; multi-select is already
+   done). Exit check: smoothing 1–2 px removes colour speckle on a grainy
+   high-ISO file.
+3. **Phase 4** (spec): Advanced mode (move a zone's centre, its own width,
+   double-click resets; data and render exist, controls do not; re-check
+   the luminance order guarantee, which assumes evenly spaced centres) and
+   Zone Color Grading inside masks. Exit check: a sky gradient mask with a
+   Zone VIII colour colours only the sky's highlights.
+4. **Spec acceptance checks not yet covered by tests:** no banding on a
+   16-bit sky gradient, no clipping or hue shift at strength 100 on Zones I
+   and IX, no colour speckle at ISO 6400+ (after Phase 3), under 5 % more
+   preview frame time.
+5. **Decisions below**, plus whether the starter presets (specified for
+   B&W) change now that colour photos and luminance exist.
+6. **Later, separate:** Curve Stamp export (ColrBent).
+
+## Open decisions (ask the owner when the phase starts)
+
 - Lightroom 3-way grading import onto Zones II, V, VIII (spec).
-- Colour images and monoRAW: out of scope now (spec); confirm.
+- monoRAW: out of scope now (spec); confirm. (Colour images: decided,
+  see "Colour photos" above.)
 
-**Progress:** none yet. Record each finished phase here (version, date,
-exit check result).
+## Progress
+
+- **Phase 1, maths and shader** (2026-11-14, uncommitted, no version
+  yet: nothing writes `zoneTint`, so renders are unchanged).
+  `zone_tint.rs`: the `zoneTint` block (spec data model: version 1,
+  enabled, zones with hue, strength, centerOffset, width, softness,
+  protect; maskSmoothing is left for Phase 3) becomes
+  `ZoneTintSettings` (per zone a, b, centre, 1/(2σ²); Protect; enabled
+  only for a Black & White photo with its Color section visible and at
+  least one tinted zone, a newer version is ignored), the last field of
+  `GlobalAdjustments`. `shader.wgsl`: `linear_srgb_to_oklab`,
+  `oklab_to_linear_srgb`, `apply_zone_tint` (normalised Gaussian weights
+  offset by the nearest zone so narrow zones cannot underflow, Protect,
+  chroma reduced along the hue by a 12-step search when out of gamut),
+  called right after the global and mask monochrome steps, before
+  grain. Tests: `zone_tint::tests` (chroma vector, off cases, clamping),
+  `zone_tint_reaches_the_shader_only_for_a_visible_black_and_white_photo`,
+  the layout test, and the GPU exit check
+  `zone_tint_colours_its_zones_and_keeps_every_tone` (grey ramp, 16-bit
+  output: L within 0.001, Zone VII peak, Zone IV neutral, uniform tint,
+  clean ends), which **skips in the sandbox (no GPU adapter)**; run
+  `cargo test --lib zone_tint` from `src-tauri` on the Mac.
+- **Phase 2, panel and saving** (`1.57.0`, 2026-11-14, uncommitted).
+  A sixth Adjustments section `zoneTint` (`ADJUSTMENT_SECTIONS`,
+  `SectionVisibility`, `CollapsibleSectionsState`, open by default),
+  shown only while Black & White is on and never in masks
+  (`isAdjustmentSectionShown`, used by `ControlsPanel` and `MasksPanel`);
+  its eye switches the tint off (Rust checks `is_visible("zoneTint")`).
+  `components/adjustments/ZoneTint.tsx`: the swatch strip (zone grey,
+  tint dot, Shift-click range, Cmd/Ctrl-click toggle, never empty), the
+  shared `ColorWheel` (new `showLuminance` prop, off here) whose hue and
+  saturation become the selected zones' hue and strength, Softness and
+  Protect sliders (L ×100). `zoneTint` is `null` until edited
+  (`createZoneTint`); reset, copy/paste (own group), presets, history
+  label and XMP need nothing else. **Hue is the wheel's (HSV) hue**:
+  `zone_tint::oklab_hue` turns it into the OKLab direction of that
+  colour, so the photo turns the colour the wheel shows (test
+  `wheel_hues_tint_toward_the_colour_the_wheel_shows`). Tests added:
+  `zone_tint_round_trips_through_xmp`,
+  `a_zone_tint_counts_as_an_edit_only_on_a_black_and_white_photo`.
+  Strings in all 12 locales. Exit check (tint, save, reopen, export match
+  the preview): **not run in the app yet**.
+- **Own panel and new strip** (`1.57.1`, 2026-11-14, uncommitted):
+  `components/adjustments/ZoneTint.tsx` became
+  `components/panel/right/ZoneTintPanel.tsx` (header with eye and reset;
+  on a colour photo the hint plus a Black & White switch). `zoneTint` left
+  `ADJUSTMENT_SECTIONS`, `Sections`, `CollapsibleSectionsState` and
+  `ADJUSTMENT_SECTION_COMPONENTS`; `isAdjustmentSectionShown` is gone.
+  `sectionVisibility.zoneTint` stays (the panel's eye, Rust
+  `is_visible("zoneTint")`). The Adjustments reset no longer clears Zone
+  Tint; saved section orders or a `section:zoneTint` favourite drop it
+  silently. Strings reused (no locale changes).
+- **Upright scale and tinted zones list** (`1.57.2`, 2026-11-14,
+  uncommitted): `ZoneStrip` became `ZoneScale` beside the wheel;
+  `tintRuns` builds the list; `setZonesTint` is shared by the wheel and
+  ×. New strings `adjustments.zoneTint.tintedZones` and `.untint` in all
+  12 locales; the list's H/S labels reuse the wheel's.
+- **Amount and Fill between** (`1.57.3`, 2026-11-14, uncommitted):
+  `zone_tint.rs` reads `amount` (test
+  `the_amount_scales_every_zone_up_to_full_strength`); the panel gains the
+  Amount slider (reuses `adjustments.effects.amount`) and the curve
+  dropdown with Fill between (new strings `adjustments.zoneTint.fill`,
+  `.fillHint` in 12 locales; curve names reuse the Blend Pad's). The
+  Blend Pad's curve list moved from `BlendPadPanel.tsx` to
+  `utils/blendPad.ts` so both panels share it.
+- **Colour photos** (`1.57.4`, 2026-11-14, uncommitted):
+  `ZoneTintSettings::from_json` takes `visible` instead of `monochrome`;
+  a block without any colour now returns the default settings, so it no
+  longer counts as an edit (it did on B&W photos before: the zones'
+  centres and widths differed from the default). The panel lost its B&W
+  gate and the `needsBlackAndWhite` string (12 locales). Tests renamed
+  and updated: `zone_tint_reaches_the_shader_while_its_panel_is_visible`,
+  `a_zone_tint_counts_as_an_edit_on_colour_and_black_and_white_photos`,
+  `zone_tint_is_off_unless_a_visible_block_tints_a_zone`.
+- **Luminance and the new name** (`1.57.5`, 2026-11-14, uncommitted):
+  `ZoneTintSettings` gains `luminance_weight_cap`, `has_luminance` (the
+  former pads) and `luminance: [[f32; 4]; 3]` (240 bytes; the layout and
+  naga validation test passes); `apply_zone_tint` adds the luminance
+  pass and the gamut fallback. Tests: `a_zone_luminance_moves_its_tones_
+  without_needing_a_colour`, the GPU ramp extended (order kept, Zone V
+  lifted ≈ 0.044–0.05). Panel: wheel luminance on, `updateZones` writes
+  only changed values, scale greys follow luminance, `zoneRuns` lists
+  luminance-only zones. Strings: rename in 12 locales, `tintedZones` and
+  `untint` reworded (Adjusted zones, Reset zones), `fillHint` mentions
+  luminance, new `ui.colorWheel.luminanceAbbreviation`.
