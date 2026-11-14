@@ -7037,13 +7037,15 @@ fn replace_file_atomically(
     let parent = path
         .parent()
         .ok_or_else(|| format!("Could not determine the folder of {}", path.display()))?;
-    let mut builder = tempfile::Builder::new();
+    let builder = tempfile::Builder::new();
     // Temporary files default to owner-only access; the umask still applies.
     #[cfg(unix)]
-    {
+    let builder = {
         use std::os::unix::fs::PermissionsExt;
+        let mut builder = builder;
         builder.permissions(fs::Permissions::from_mode(0o666));
-    }
+        builder
+    };
     let mut temporary = builder.tempfile_in(parent).map_err(|error| {
         format!(
             "Could not create a temporary file in {}: {error}",
