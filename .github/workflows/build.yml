@@ -87,7 +87,8 @@ jobs:
       - name: Apply branch-qualified build version
         run: node scripts/prepare-build-version.mjs
 
-      - name: Configure Apple signing and notarization
+      - id: apple-signing
+        name: Configure Apple signing and notarization
         if: runner.os == 'macOS' && inputs.release-id != ''
         shell: bash
         env:
@@ -98,8 +99,16 @@ jobs:
           NOTARIZATION_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           NOTARIZATION_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          if [[ -z "$SIGNING_CERTIFICATE" && -z "$SIGNING_CERTIFICATE_PASSWORD" ]]; then
+            # No Developer ID configured: publish an ad-hoc signed release.
+            # Users must allow it once in Privacy & Security (see README.md).
+            echo "::warning::No Apple Developer ID secrets; the macOS release is ad-hoc signed and not notarized."
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+            echo "developer-id=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [[ -z "$SIGNING_CERTIFICATE" || -z "$SIGNING_CERTIFICATE_PASSWORD" ]]; then
-            echo "Release signing requires APPLE_CERTIFICATE and APPLE_CERTIFICATE_PASSWORD." >&2
+            echo "Release signing requires both APPLE_CERTIFICATE and APPLE_CERTIFICATE_PASSWORD." >&2
             exit 1
           fi
           if [[ -z "$NOTARIZATION_APPLE_ID" || -z "$NOTARIZATION_PASSWORD" || -z "$NOTARIZATION_TEAM_ID" ]]; then
@@ -115,6 +124,7 @@ jobs:
           echo "APPLE_ID=$NOTARIZATION_APPLE_ID" >> "$GITHUB_ENV"
           echo "APPLE_PASSWORD=$NOTARIZATION_PASSWORD" >> "$GITHUB_ENV"
           echo "APPLE_TEAM_ID=$NOTARIZATION_TEAM_ID" >> "$GITHUB_ENV"
+          echo "developer-id=true" >> "$GITHUB_OUTPUT"
 
       - id: tauri-build
         name: Build and package application
@@ -131,7 +141,7 @@ jobs:
       - name: Verify macOS application bundle
         if: runner.os == 'macOS'
         env:
-          REQUIRE_APPLE_SIGNATURE: ${{ inputs.release-id != '' }}
+          REQUIRE_APPLE_SIGNATURE: ${{ steps.apple-signing.outputs.developer-id == 'true' }}
           TAURI_ARTIFACT_PATHS: ${{ steps.tauri-build.outputs.artifactPaths }}
         run: |
           dmg_path=$(node -e '
