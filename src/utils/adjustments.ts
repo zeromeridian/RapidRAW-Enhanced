@@ -535,6 +535,11 @@ export interface BlendPadAnchor {
    * the tool fades to 0 at the centre and gives nothing beyond it.
    */
   reverse?: boolean;
+  /**
+   * The last value at the dot for each tool this anchor had, so switching back restores it
+   * (Exposure → Contrast → Exposure). Only the panel reads it; the renderer ignores it.
+   */
+  targets?: Record<string, number>;
 }
 
 /**

@@ -1,7 +1,7 @@
 # Orbit Blend Pad: How It Works
 
 This guide explains everything the Orbit Blend Pad does, in plain words
-with worked examples. It describes ThisIsRAW `1.54.1`. The pad is on the
+with worked examples. It describes ThisIsRAW `1.55.0`. The pad is on the
 **Orbit** tab of the Develop panel, below the Favorites star.
 
 ## The idea in one paragraph
@@ -59,7 +59,7 @@ Amount 100.
 
 ### Example 2: several tools at once
 
-A new pad has three tools, evenly spaced: Contrast +60 at the top,
+Take a pad with three tools, evenly spaced: Contrast +60 at the top,
 Temperature +50 at the bottom right, Saturation −60 at the bottom left.
 Drag the puck all the way to the top:
 
@@ -71,6 +71,12 @@ Drag the puck all the way to the top:
 
 Moving towards one tool always moves the others too, along their own
 lines. That is intended: the pad blends.
+
+**A new pad** starts with three tools, evenly spaced: **Exposure +0.50**
+at the top, **Whites +25** at the bottom right and **Blacks −25** at the
+bottom left. Towards Exposure the photo gets brighter, towards Whites the
+highlights open up, towards Blacks the shadows deepen; the far sides do
+the opposite.
 
 ### Example 3: why "Whites −80" can brighten the photo
 
@@ -88,14 +94,29 @@ tool to do the reverse, switch its **Reverse** off (see below).
 
 | Setting | What it does |
 |---|---|
-| **Tool** | Which slider the tool moves. Changing it keeps the same *share* of the slider's range: Contrast +60 (60 % of 100) becomes Exposure +3.00 (60 % of 5 EV). |
+| **Tool** | Which slider the tool moves. Each tool card **remembers the value at the dot for every tool it has had**: switching back restores it (see Example 4). A tool the card never had starts with the same *share* of the slider's range: Contrast +60 (60 % of 100) becomes Exposure +3.00 (60 % of 5 EV). |
 | **At the dot** | The value at the tool's dot. It can be negative (take away) or positive (add), up to the slider's full range either way. Double-click resets it to 40 % of the range. "now …" next to it shows what the tool gives right now. |
 | **Curve** | How fast the value grows along the line. The same on both sides of the centre. |
 | **Reverse on the opposite side** | On (default): the far side gives the opposite. Off: the tool fades to 0 at the centre and does nothing on the far side. |
 | **Eye (mute)** | Switches the tool off without removing it. Its dot and label turn faint. |
 | **Bin (remove)** | Removes the tool. A pad always keeps at least one tool. |
 
-### Example 4: the three curves
+### Example 4: switching a tool and back
+
+One tool card, Contrast +60.
+
+| You do | The card shows |
+|---|---|
+| Switch the tool to Exposure | Exposure **+3.00** (a tool the card never had: 60 % of the range, like Contrast +60) |
+| Set Exposure to +1.25 | Exposure +1.25 |
+| Switch back to Contrast | Contrast **+60** (remembered) |
+| Switch to Exposure again | Exposure **+1.25** (remembered) |
+
+The remembered values belong to that one card. A new tool card, or a new
+pad, starts fresh. Remembering is invisible otherwise: it never changes
+the photo and never marks a pad preset as modified.
+
+### Example 5: the three curves
 
 One tool, value at the dot +60. "Share of the way" means how far the puck
 is from the centre towards the dot (or towards the opposite ring, with the
@@ -113,7 +134,7 @@ value reversed).
   middle. Good for small, careful changes around the centre.
 - **Ease in:** very gentle at first, strong near the edge.
 
-### Example 5: Reverse off
+### Example 6: Reverse off
 
 Whites at the top, value −80, Linear, Reverse **off**.
 
@@ -144,7 +165,7 @@ The pad **adds to the sliders**. It never moves a slider itself.
   +70: the photo uses +100 (the slider's maximum), not +120. Past that
   point, moving the puck further changes nothing for that tool.
 - **Tools from 0 to 100 stop at 0.** Glow, Light Flare, Grain and Gaussian
-  Blur cannot go below 0, but the pad can still lower them. See Example 6.
+  Blur cannot go below 0, but the pad can still lower them. See Example 7.
 - **Hue wraps around** instead of stopping: Hue slider +170 with pad +30
   gives −160 (the same colour turn).
 - **Two tools on the same slider add up.** Contrast +40 at the top and
@@ -153,7 +174,7 @@ The pad **adds to the sliders**. It never moves a slider itself.
 - **Every value is rounded to the slider's step**: whole numbers for most
   tools, two decimals for Exposure and Brightness.
 
-### Example 6: a 0–100 tool
+### Example 7: a 0–100 tool
 
 Glow slider at 50; a Glow tool with +40 at its dot.
 
@@ -221,7 +242,7 @@ On every shape, each tool still gives its **full value at its dot** and its
 **full reverse at its opposite ring**, even when the two are at different
 distances from the centre. Each side of the centre is measured on its own.
 
-### Example 7: a triangle
+### Example 8: a triangle
 
 Contrast sits on the triangle's top corner with +60 at the dot. The top
 corner is twice as far from the centre as the bottom edge.

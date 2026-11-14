@@ -5,6 +5,17 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.55.0-dev-orbit-blend-pad — 2026-11-13
+
+### Develop
+
+- **Orbit Blend Pad**: each tool card now remembers its value for every
+  tool it has had. Switch Exposure to Contrast and back, and Exposure gets
+  its earlier value again instead of a converted one.
+- New pads now start with **Exposure +0.50** at the top, **Whites +25** at
+  the bottom right and **Blacks −25** at the bottom left. Existing pads and
+  presets are unchanged.
+
 ## 1.54.1-dev-orbit-blend-pad — 2026-11-13
 
 ### Develop

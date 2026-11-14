@@ -102,6 +102,27 @@ for (const shape of BLEND_PAD_SHAPES) {
   check(renamed[0]?.name === 'look 2', 'a clashing import name was not made unique');
 }
 
+// Switching an anchor's tool remembers each tool's value at the dot.
+{
+  const { switchAnchorTool, createBlendPad } = await import(resolve(repositoryRoot, 'src', 'utils', 'blendPad.ts'));
+  const check = (condition, message) => condition || failures.push(`tool switch: ${message}`);
+  const parameters = vectors.parameters;
+  const defaults = createBlendPad()
+    .anchors.map(({ param, target }) => `${param} ${target}`)
+    .join(', ');
+  check(defaults === 'exposure 0.5, whites 25, blacks -25', `new pads start with ${defaults}`);
+  const start = { id: 'a', param: 'contrast', t: 0.25, target: 60, curve: 'linear', muted: false, reverse: true };
+  const exposure = switchAnchorTool(start, 'exposure', parameters);
+  check(exposure.target === 3, `a new tool keeps the share (got ${exposure.target})`);
+  const tuned = { ...exposure, target: 1.25 };
+  const contrast = switchAnchorTool(tuned, 'contrast', parameters);
+  check(contrast.target === 60, `switching back restores Contrast +60 (got ${contrast.target})`);
+  const exposureAgain = switchAnchorTool(contrast, 'exposure', parameters);
+  check(exposureAgain.target === 1.25, `switching back restores Exposure +1.25 (got ${exposureAgain.target})`);
+  check(switchAnchorTool(start, 'fade', parameters) === start, 'an unknown tool changes the anchor');
+  check(switchAnchorTool(start, 'contrast', parameters) === start, 'the same tool changes the anchor');
+}
+
 if (failures.length > 0) {
   console.error(failures.join('\n'));
   process.exit(1);

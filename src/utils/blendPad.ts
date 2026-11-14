@@ -243,11 +243,11 @@ export const bakeBlendPad = (
   );
 };
 
-/** The tools a new pad starts with: Contrast at the top, Temperature and Saturation below. */
+/** The tools a new pad starts with (owner, 2026-11-13): Exposure at the top, Whites and Blacks below. */
 const DEFAULT_ANCHORS = [
-  { id: 'top', t: 0.25, param: 'contrast', target: 60 },
-  { id: 'bottomRight', t: 11 / 12, param: 'temperature', target: 50 },
-  { id: 'bottomLeft', t: 7 / 12, param: 'saturation', target: -60 },
+  { id: 'top', t: 0.25, param: 'exposure', target: 0.5 },
+  { id: 'bottomRight', t: 11 / 12, param: 'whites', target: 25 },
+  { id: 'bottomLeft', t: 7 / 12, param: 'blacks', target: -25 },
 ] as const;
 
 /** A new pad: the default tools, the puck at the centre. */
@@ -313,13 +313,55 @@ export const positionOf = (shape: BlendPadShape, point: Coord): number => {
 /** A target of the same share of the slider's reach (Contrast +60 becomes Exposure +3.00). */
 export const targetWithShare = (share: number, parameter: BlendPadParameter): number => {
   const reach = Math.max(Math.abs(parameter.min), Math.abs(parameter.max));
-  const target = Math.round((share * reach) / parameter.step) * parameter.step;
-  return Math.min(parameter.max, Math.max(-parameter.max, target));
+  return targetWithinReach(share * reach, parameter);
 };
 
 /** The share of the slider's reach a target is. */
-export const shareOf = (target: number, parameter: BlendPadParameter): number =>
+const shareOf = (target: number, parameter: BlendPadParameter): number =>
   target / Math.max(Math.abs(parameter.min), Math.abs(parameter.max));
+
+/** A target kept within the slider's reach either way and on its step. */
+const targetWithinReach = (target: number, parameter: BlendPadParameter) => {
+  const reach = Math.max(Math.abs(parameter.min), Math.abs(parameter.max));
+  return Math.min(reach, Math.max(-reach, Math.round(target / parameter.step) * parameter.step));
+};
+
+/**
+ * The anchor with another tool. It remembers the old tool's value at the dot and restores the
+ * new tool's remembered one; a tool it never had keeps the target's share of the range
+ * (Contrast +60 becomes Exposure +3.00).
+ */
+export const switchAnchorTool = (
+  anchor: BlendPadAnchor,
+  param: string,
+  parameters: Array<BlendPadParameter>,
+): BlendPadAnchor => {
+  const before = parameters.find((parameter) => parameter.id === anchor.param);
+  const after = parameters.find((parameter) => parameter.id === param);
+  if (!after || param === anchor.param) return anchor;
+  const targets = { ...anchor.targets, [anchor.param]: anchor.target };
+  const remembered = targets[param];
+  const target =
+    remembered !== undefined
+      ? targetWithinReach(remembered, after)
+      : targetWithShare(before ? shareOf(anchor.target, before) : 0, after);
+  return { ...anchor, param, target, targets };
+};
+
+/** Remembered targets from untrusted data: known tools only, within reach. */
+const sanitizeTargets = (
+  value: unknown,
+  parametersById: Map<string, BlendPadParameter>,
+): Record<string, number> | undefined => {
+  if (!isRecord(value)) return undefined;
+  const entries = Object.entries(value).flatMap(([id, target]) => {
+    const parameter = parametersById.get(id);
+    return parameter && typeof target === 'number' && Number.isFinite(target)
+      ? [[id, targetWithinReach(target, parameter)] as const]
+      : [];
+  });
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+};
 
 const CURVE_NAMES = Object.keys(CURVES) as Array<BlendPadCurve>;
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
@@ -341,8 +383,6 @@ export const sanitizeBlendPad = (value: unknown, parameters: Array<BlendPadParam
       if (!isRecord(candidate) || typeof candidate.param !== 'string') return [];
       const parameter = parametersById.get(candidate.param);
       if (!parameter || !Number.isFinite(candidate.t) || !Number.isFinite(candidate.target)) return [];
-      const reach = Math.max(Math.abs(parameter.min), Math.abs(parameter.max));
-      const target = Math.round((candidate.target as number) / parameter.step) * parameter.step;
       const id =
         typeof candidate.id === 'string' && candidate.id && !ids.has(candidate.id) ? candidate.id : crypto.randomUUID();
       ids.add(id);
@@ -351,10 +391,11 @@ export const sanitizeBlendPad = (value: unknown, parameters: Array<BlendPadParam
           id,
           param: parameter.id,
           t: wrapTurn(candidate.t as number),
-          target: Math.min(reach, Math.max(-reach, target)),
+          target: targetWithinReach(candidate.target as number, parameter),
           curve: CURVE_NAMES.includes(candidate.curve as BlendPadCurve) ? (candidate.curve as BlendPadCurve) : 'linear',
           muted: candidate.muted === true,
           reverse: candidate.reverse !== false,
+          targets: sanitizeTargets(candidate.targets, parametersById),
         },
       ];
     })

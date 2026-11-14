@@ -103,14 +103,11 @@ full at the start.
    centre and gives nothing beyond it. (3) changes the maths: Rust and
    the TS mirror, a shared vector, an optional anchor field (pad format
    stays version 1), presets carry it.
-6. **Remember each tool's target** (`1.55.0`, S). **Also (owner,
-   2026-11-13): a new pad's default tools become Exposure, Whites and
-   Blacks** (instead of Contrast, Temperature, Saturation), still at the
-   top, bottom right and bottom left. Their values at the dot are open;
-   ask the owner when the step starts (`createBlendPad` in
-   `utils/blendPad.ts`; the guide's Example 2 and the vectors' "defaults"
-   cases use the old tools and must be updated or kept as explicit pads).
-   Then: an anchor keeps the
+6. **Remember each tool's target** (`1.55.0`, S; done, see Progress).
+   **Also (owner, 2026-11-13): a new pad's default tools become
+   Exposure +0.50, Whites +25 and Blacks −25** (instead of Contrast,
+   Temperature, Saturation), at the top, bottom right and bottom left.
+   Original note: an anchor keeps the
    last target per tool, so switching Exposure → Contrast → Exposure
    restores the Exposure target instead of converting the share. Stored
    with the anchor (pad format stays version 1, the extra field is
@@ -216,7 +213,18 @@ more shapes (ellipse, custom outline). Restart: when the owner asks.
   the Node check round-trips every vector case through a preset and
   checks the cleaning (unknown tool, limit, bad values, newer version,
   clashing names).
-- Fix `1.54.1` (2026-11-13, uncommitted; owner report): the preset
+- Step 6 (`1.55.0`, 2026-11-13, uncommitted): `BlendPadAnchor.targets`
+  (optional map tool → last value at the dot; the renderer ignores it,
+  `sanitizeBlendPad` keeps known tools within reach, the "modified" check
+  leaves it out); `switchAnchorTool` restores a remembered target or
+  keeps the share for a new tool; `targetWithinReach` now shared by the
+  share rule and the cleaning. New pads default to **Exposure +0.50**
+  (top), **Whites +25** (bottom right), **Blacks −25** (bottom left)
+  (owner 2026-11-13, values chosen from the agent's options). Guide:
+  new Example 4 (switching back), defaults stated, examples renumbered.
+  Node check: defaults, share for a new tool, both restores, unknown and
+  same tool. No Rust change.
+- Fix `1.54.1` (2026-11-13, owner commit `3f5e3b10`; owner report): the preset
   picker forgot the loaded preset when the panel was switched (its
   selection was component state). The pad now records `presetId` (set on
   load and on "Save as new"; ignored by the renderer, stripped from
