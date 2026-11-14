@@ -16,12 +16,20 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useBlendPadParameters } from '../../../hooks/useBlendPadParameters';
 import { useControlLabel } from '../../../hooks/useControlLabel';
-import type { BlendPad, BlendPadAnchor, BlendPadCurve, BlendPadShape, Coord } from '../../../utils/adjustments';
+import type {
+  BlendPad,
+  BlendPadAnchor,
+  BlendPadCurve,
+  BlendPadMode,
+  BlendPadShape,
+  Coord,
+} from '../../../utils/adjustments';
 import {
+  BLEND_PAD_MODES,
   BLEND_PAD_SHAPES,
   MAX_BLEND_PAD_ANCHORS,
   anchorPoint,
-  anchorValue,
+  anchorValues,
   bakeBlendPad,
   clampToPad,
   createBlendPad,
@@ -112,6 +120,8 @@ function SelectedAxis({ anchor, shape, step }: { anchor: BlendPadAnchor; shape: 
 
 interface PadFieldProps {
   pad: BlendPad;
+  /** What each tool adds right now, by anchor id (`anchorValues`). */
+  currentValues: Record<string, number>;
   selectedId: string | null;
   getLabel(anchor: BlendPadAnchor): string;
   getStep(anchor: BlendPadAnchor): number;
@@ -124,6 +134,7 @@ interface PadFieldProps {
 /** The circle with its anchors and the puck: drag the puck to blend, an anchor to move it. */
 function PadField({
   pad,
+  currentValues,
   selectedId,
   getLabel,
   getStep,
@@ -140,6 +151,8 @@ function PadField({
   const frame = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
   const { shape } = pad;
+  // Only Axis has a reverse side: opposite rings, the selected line and Reverse belong to it.
+  const isAxis = (pad.mode ?? 'axis') === 'axis';
   const puck = clampToPad(shape, pad.puck);
   const corners = shapeCorners(shape);
   /** The pad's outline, for the clip and the stroke. */
@@ -277,7 +290,11 @@ function PadField({
             >
               <stop offset={0} stopColor={toward} stopOpacity={anchor.muted ? 0 : 0.2} />
               <stop offset={0.5} stopColor={toward} stopOpacity={0} />
-              <stop offset={1} stopColor={away} stopOpacity={anchor.muted || anchor.reverse === false ? 0 : 0.1} />
+              <stop
+                offset={1}
+                stopColor={away}
+                stopOpacity={anchor.muted || !isAxis || anchor.reverse === false ? 0 : 0.1}
+              />
             </linearGradient>
           );
         })}
@@ -297,24 +314,25 @@ function PadField({
       <path className="stroke-text-secondary" d="M -0.05 0 H 0.05 M 0 -0.05 V 0.05" strokeWidth={0.008} />
 
       {/* Where each anchor's reverse sits (faint when the tool has no reverse). */}
-      {pad.anchors.map((anchor) => {
-        const opposite = toView(oppositePoint(shape, anchor.t));
-        const isSelected = anchor.id === selectedId;
-        return (
-          <circle
-            className="fill-none stroke-text-secondary"
-            cx={opposite.x}
-            cy={opposite.y}
-            key={anchor.id}
-            r={0.025}
-            strokeOpacity={anchor.reverse === false ? 0.15 : isSelected ? 0.9 : 0.35}
-            strokeWidth={0.008}
-          />
-        );
-      })}
+      {isAxis &&
+        pad.anchors.map((anchor) => {
+          const opposite = toView(oppositePoint(shape, anchor.t));
+          const isSelected = anchor.id === selectedId;
+          return (
+            <circle
+              className="fill-none stroke-text-secondary"
+              cx={opposite.x}
+              cy={opposite.y}
+              key={anchor.id}
+              r={0.025}
+              strokeOpacity={anchor.reverse === false ? 0.15 : isSelected ? 0.9 : 0.35}
+              strokeWidth={0.008}
+            />
+          );
+        })}
 
       {/* The selected tool's line, with what it gives at both ends. */}
-      {selected && <SelectedAxis anchor={selected} shape={shape} step={getStep(selected)} />}
+      {isAxis && selected && <SelectedAxis anchor={selected} shape={shape} step={getStep(selected)} />}
 
       {pad.anchors.map((anchor) => {
         const point = anchorPoint(shape, anchor.t);
@@ -328,7 +346,7 @@ function PadField({
           : { x: at.x + direction.x * 0.18, y: at.y - direction.y * 0.18 };
         const textAnchor = isCorner || Math.abs(direction.x) <= 0.3 ? 'middle' : direction.x > 0 ? 'start' : 'end';
         const isAbove = direction.y > 0.3;
-        const current = formatSigned(anchorValue(shape, anchor, puck, pad.amount), getStep(anchor));
+        const current = formatSigned(currentValues[anchor.id] ?? 0, getStep(anchor));
         return (
           <g className="cursor-grab" key={anchor.id} opacity={anchor.muted ? 0.4 : 1}>
             {anchor.id === selectedId && (
@@ -413,6 +431,16 @@ export default function BlendPadPanel() {
     () => BLEND_PAD_SHAPES.map((shape) => ({ label: t(`editor.blendPad.shapes.${shape}`), value: shape })),
     [t],
   );
+  const modeOptions = useMemo(
+    () => BLEND_PAD_MODES.map((mode) => ({ label: t(`editor.blendPad.modes.${mode}`), value: mode })),
+    [t],
+  );
+  const isAxis = (pad.mode ?? 'axis') === 'axis';
+  /** What each tool adds right now, by anchor id, for the pad's labels and the tool cards. */
+  const currentValues = useMemo(() => {
+    const values = anchorValues(pad, parameters);
+    return Object.fromEntries(pad.anchors.map((anchor, index) => [anchor.id, values[index]]));
+  }, [pad, parameters]);
   const canBake = useMemo(
     () => Object.values(resolveBlendPad(pad, parameters)).some((offset) => offset !== 0),
     [pad, parameters],
@@ -545,6 +573,7 @@ export default function BlendPadPanel() {
         />
         <div className={clsx('transition-opacity', !pad.enabled && 'opacity-40')}>
           <PadField
+            currentValues={currentValues}
             getLabel={getLabel}
             getStep={getStep}
             onAnchorMove={handleAnchorMove}
@@ -577,6 +606,17 @@ export default function BlendPadPanel() {
               }
               options={shapeOptions}
               value={pad.shape}
+            />
+          </div>
+          <div className="flex items-center gap-2" data-tooltip={t(`editor.blendPad.modeHints.${pad.mode ?? 'axis'}`)}>
+            <Text variant={TextVariants.label} className="w-16 shrink-0 text-text-secondary">
+              {t('editor.blendPad.mode')}
+            </Text>
+            <Dropdown
+              className="grow min-w-0"
+              onChange={(mode: BlendPadMode) => updatePad((current) => ({ ...current, mode }))}
+              options={modeOptions}
+              value={pad.mode ?? 'axis'}
             />
           </div>
           <Slider
@@ -635,7 +675,7 @@ export default function BlendPadPanel() {
                 labelAddon={
                   <span className="text-xs font-mono text-accent">
                     {t('editor.blendPad.now', {
-                      value: formatSigned(anchorValue(pad.shape, anchor, pad.puck, pad.amount), parameter.step),
+                      value: formatSigned(currentValues[anchor.id] ?? 0, parameter.step),
                     })}
                   </span>
                 }
@@ -657,13 +697,15 @@ export default function BlendPadPanel() {
                   value={anchor.curve}
                 />
               </div>
-              <Switch
-                checked={anchor.reverse !== false}
-                id={`blend-pad-reverse-${anchor.id}`}
-                label={t('editor.blendPad.reverse')}
-                onChange={(reverse: boolean) => updateAnchor(anchor.id, { reverse })}
-                tooltip={t('editor.blendPad.reverseHint')}
-              />
+              {isAxis && (
+                <Switch
+                  checked={anchor.reverse !== false}
+                  id={`blend-pad-reverse-${anchor.id}`}
+                  label={t('editor.blendPad.reverse')}
+                  onChange={(reverse: boolean) => updateAnchor(anchor.id, { reverse })}
+                  tooltip={t('editor.blendPad.reverseHint')}
+                />
+              )}
             </div>
           );
         })}

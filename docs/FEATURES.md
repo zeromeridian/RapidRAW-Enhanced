@@ -222,6 +222,9 @@ details are in `RELEASE_NOTES.MD`.
   position; load, update, rename, delete, export and import JSON.
   Saved with the edit and in XMP, copy/paste and regular presets;
   previews, exports and thumbnails apply it. For the photo only.
+  Three blend modes: Axis (two-sided lines through the centre), Normalized
+  (a crossfade by closeness, never neutral) and Polar (direction mixes
+  two neighbouring tools, distance sets the strength).
   Each tool's label shows its current value and its value at the dot;
   a per-tool Reverse switch; the selected tool's line shows both ends.
   Full behaviour with examples: `docs/ORBIT_BLEND_PAD_GUIDE.md`.

@@ -5,6 +5,21 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.56.0-dev-orbit-blend-pad — 2026-11-13
+
+### Develop
+
+- **Orbit Blend Pad blend modes**: a new Mode setting next to Shape.
+  - **Axis** works as before: each tool along its own line, full at its
+    dot, nothing at the centre, its reverse on the far side.
+  - **Normalized** crossfades between the tools by closeness. The shares
+    always add up to the whole, so the pad is never neutral; on a tool's
+    dot only that tool counts.
+  - **Polar**: the direction from the centre mixes the two neighbouring
+    tools, and the distance from the centre sets the strength. The centre
+    is neutral.
+- Pad presets keep the mode. Existing pads stay in Axis mode.
+
 ## 1.55.0-dev-orbit-blend-pad — 2026-11-13
 
 ### Develop

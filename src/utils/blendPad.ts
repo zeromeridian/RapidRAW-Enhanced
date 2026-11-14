@@ -3,7 +3,7 @@
  * stays the source of truth for every render. Both are checked against `blendPad.vectors.json`
  * (`node scripts/check-blend-pad.mjs` and `cargo test`). Type imports only, so Node can run it.
  */
-import type { BlendPad, BlendPadAnchor, BlendPadCurve, BlendPadShape, Coord } from './adjustments';
+import type { BlendPad, BlendPadAnchor, BlendPadCurve, BlendPadMode, BlendPadShape, Coord } from './adjustments';
 
 /** A slider the pad can drive, as `blend_pad::Parameter` (read with `get_blend_pad_parameters`). */
 export interface BlendPadParameter {
@@ -159,13 +159,101 @@ export const axisWeight = (shape: BlendPadShape, t: number, puck: Coord): number
   return Math.min(1, Math.max(-1, weight));
 };
 
-/** What one anchor adds at the puck before stacking, limiting and rounding. */
-export const anchorValue = (shape: BlendPadShape, anchor: BlendPadAnchor, puck: Coord, amount: number): number => {
-  if (anchor.muted) return 0;
-  const weight = axisWeight(shape, anchor.t, clampToPad(shape, puck));
-  if (weight < 0 && anchor.reverse === false) return 0;
-  const value = anchor.target * CURVES[anchor.curve](Math.abs(weight)) * Math.sign(weight) * amount;
-  return value === 0 ? 0 : value;
+/** Every blend mode, in the order the panel offers them (`blend_pad::Mode`). */
+export const BLEND_PAD_MODES: Array<BlendPadMode> = ['axis', 'normalized', 'polar'];
+
+/** A point's direction as an angle in [0, 2π) (`turn_of`). */
+const turnOf = (point: Coord) => {
+  const angle = Math.atan2(point.y, point.x);
+  return angle < 0 ? angle + TAU : angle;
+};
+
+/** `f64::rem_euclid(TAU)`. */
+const wrapAngle = (angle: number) => {
+  const rest = angle % TAU;
+  return rest < 0 ? rest + TAU : rest;
+};
+
+/**
+ * Each taking-part tool's factor (its share, shaped by its curve), in order; the offset is
+ * target × factor × amount (`Mode::factors`).
+ */
+const modeFactors = (
+  mode: BlendPadMode,
+  shape: BlendPadShape,
+  anchors: Array<BlendPadAnchor>,
+  puck: Coord,
+): Array<number> => {
+  if (mode === 'axis') {
+    return anchors.map((anchor) => {
+      const weight = axisWeight(shape, anchor.t, puck);
+      if (weight < 0 && anchor.reverse === false) return 0;
+      return CURVES[anchor.curve](Math.abs(weight)) * (weight < 0 || Object.is(weight, -0) ? -1 : 1);
+    });
+  }
+  if (mode === 'normalized') {
+    const distances = anchors.map((anchor) => lengthOf(sub(puck, anchorPoint(shape, anchor.t))));
+    const onDot = distances.findIndex((distance) => distance < EPSILON);
+    if (onDot >= 0) return anchors.map((_, index) => (index === onDot ? 1 : 0));
+    const closeness = distances.map((distance) => 1 / (distance * distance));
+    const total = closeness.reduce((sum, value) => sum + value, 0);
+    return anchors.map((anchor, index) => CURVES[anchor.curve](closeness[index] / total));
+  }
+  const radius = lengthOf(puck);
+  const shares = anchors.map(() => 0);
+  if (radius < EPSILON || anchors.length === 0) return shares;
+  const direction = scale(puck, 1 / radius);
+  const strength = Math.min(1, radius / edgeDistance(shape, direction));
+  const puckTurn = turnOf(puck);
+  const turns = anchors.map((anchor) => turnOf(anchorPoint(shape, anchor.t)));
+  // The tools on either side of the puck's direction (the first on ties), wrapping past 0.
+  let before = -1;
+  let after = -1;
+  let lowest = 0;
+  let highest = 0;
+  turns.forEach((turn, index) => {
+    if (turn <= puckTurn && (before < 0 || turn > turns[before])) before = index;
+    if (turn > puckTurn && (after < 0 || turn < turns[after])) after = index;
+    if (turn < turns[lowest]) lowest = index;
+    if (turn > turns[highest]) highest = index;
+  });
+  if (before < 0) before = highest;
+  if (after < 0) after = lowest;
+  if (before === after) {
+    shares[before] = 1;
+  } else {
+    const gap = wrapAngle(turns[after] - turns[before]);
+    const along = wrapAngle(puckTurn - turns[before]);
+    const mix = gap < EPSILON ? 0 : Math.min(1, Math.max(0, along / gap));
+    shares[before] += 1 - mix;
+    shares[after] += mix;
+  }
+  return anchors.map((anchor, index) => shares[index] * CURVES[anchor.curve](strength));
+};
+
+/**
+ * What each tool adds right now, before stacking, limiting and rounding, in pad order: 0 for
+ * a muted tool or one the pad does not know. In Normalized mode a tool's share depends on the
+ * others, so they are worked out together.
+ */
+export const anchorValues = (pad: BlendPad, parameters: Array<BlendPadParameter>): Array<number> => {
+  const known = new Set(parameters.map((parameter) => parameter.id));
+  const anchors = pad.anchors.slice(0, MAX_BLEND_PAD_ANCHORS);
+  const taking = anchors.flatMap((anchor, index) => (!anchor.muted && known.has(anchor.param) ? [index] : []));
+  const puck = clampToPad(pad.shape, pad.puck);
+  const amount = Math.min(1, Math.max(0, pad.amount));
+  const factors = modeFactors(
+    pad.mode ?? 'axis',
+    pad.shape,
+    taking.map((index) => anchors[index]),
+    puck,
+  );
+  const values = pad.anchors.map(() => 0);
+  taking.forEach((index, position) => {
+    const value = anchors[index].target * factors[position] * amount;
+    values[index] = value === 0 ? 0 : value;
+  });
+  return values;
 };
 
 /** Brings a value into the slider's range, wrapping a hue (`f64::rem_euclid`). */
@@ -195,11 +283,11 @@ export const resolveBlendPad = (
   parameters: Array<BlendPadParameter>,
 ): Record<string, number> => {
   const sums: Record<string, number> = Object.fromEntries(parameters.map((parameter) => [parameter.id, 0]));
-  if (pad?.enabled && pad.version === 1) {
-    const amount = Math.min(1, Math.max(0, pad.amount));
-    for (const anchor of pad.anchors.slice(0, MAX_BLEND_PAD_ANCHORS)) {
-      if (anchor.param in sums) sums[anchor.param] += anchorValue(pad.shape, anchor, pad.puck, amount);
-    }
+  if (pad?.enabled && pad.version === 1 && BLEND_PAD_MODES.includes(pad.mode ?? 'axis')) {
+    const values = anchorValues(pad, parameters);
+    pad.anchors.slice(0, MAX_BLEND_PAD_ANCHORS).forEach((anchor, index) => {
+      if (anchor.param in sums) sums[anchor.param] += values[index];
+    });
   }
   return Object.fromEntries(
     parameters.map((parameter) => {
@@ -255,6 +343,7 @@ export const createBlendPad = (): BlendPad => ({
   version: 1,
   enabled: true,
   shape: 'circle',
+  mode: 'axis',
   amount: 1,
   puck: { x: 0, y: 0 },
   anchors: DEFAULT_ANCHORS.map(({ id, t, param, target }) => ({
@@ -406,6 +495,7 @@ export const sanitizeBlendPad = (value: unknown, parameters: Array<BlendPadParam
     version: 1,
     enabled: value.enabled !== false,
     shape,
+    mode: BLEND_PAD_MODES.includes(value.mode as BlendPadMode) ? (value.mode as BlendPadMode) : 'axis',
     amount: Math.min(1, Math.max(0, finiteOr(value.amount, 1))),
     puck: clampToPad(shape, puck),
     anchors,
@@ -465,7 +555,8 @@ export const isBlendPadPresetDirty = (preset: BlendPadPreset, pad: BlendPad) => 
       muted,
       reverse: reverse !== false,
     }));
-    return JSON.stringify({ ...rest, puck, anchors: anchorData });
+    // A missing mode (older pads) is Axis.
+    return JSON.stringify({ ...rest, mode: rest.mode ?? 'axis', puck, anchors: anchorData });
   };
   return comparable(preset.pad) !== comparable(pad);
 };

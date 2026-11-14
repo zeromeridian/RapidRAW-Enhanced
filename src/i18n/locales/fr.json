@@ -690,6 +690,17 @@
       "enabled": "Blend Pad activé",
       "hint": "Faites glisser le palet pour mélanger les outils ; faites glisser une ancre le long du bord pour la déplacer. Maj pour des mouvements plus fins, flèches pour le déplacer, double-clic sur le palet pour le recentrer.",
       "maxTools": "{{count}} outils au maximum",
+      "mode": "Mode",
+      "modeHints": {
+        "axis": "Chaque outil agit le long de sa propre ligne passant par le centre : valeur complète sur son point, rien au centre, l'inverse du côté opposé.",
+        "normalized": "Les outils se partagent l'effet selon la proximité, toujours pour un total complet : un fondu. Jamais neutre ; sur un point, seul cet outil compte.",
+        "polar": "La direction mélange les deux outils voisins ; la distance au centre règle l'intensité. Le centre est neutre."
+      },
+      "modes": {
+        "axis": "Axe",
+        "normalized": "Normalisé",
+        "polar": "Polaire"
+      },
       "mute": "Désactiver",
       "now": "actuel {{value}}",
       "presets": {

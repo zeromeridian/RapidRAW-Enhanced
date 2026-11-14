@@ -1,7 +1,7 @@
 # Orbit Blend Pad: How It Works
 
 This guide explains everything the Orbit Blend Pad does, in plain words
-with worked examples. It describes ThisIsRAW `1.55.0`. The pad is on the
+with worked examples. It describes ThisIsRAW `1.56.0`. The pad is on the
 **Orbit** tab of the Develop panel, below the Favorites star.
 
 ## The idea in one paragraph
@@ -148,6 +148,71 @@ Whites at the top, value −80, Linear, Reverse **off**.
 
 With Reverse on, the last two rows would be +40 and +80.
 
+## Blend modes
+
+"Mode" (under Shape) decides how the puck's position turns into each
+tool's share. Everything above describes **Axis**, the default. Hover the
+Mode picker for a short reminder. Values at the dot, curves, Amount,
+muting, the sliders, Bake and presets work the same in every mode.
+
+| Mode | In one sentence | Centre | On a tool's dot |
+|---|---|---|---|
+| **Axis** | Each tool along its own line: full at its dot, nothing at the centre, its reverse on the far side. | nothing | that tool in full, the others partly (and possibly reversed) |
+| **Normalized** | The tools share the effect by closeness, always adding up to the whole: a crossfade between tools. | every tool a share | that tool in full, the others nothing |
+| **Polar** | The direction picks a mix of the two neighbouring tools; the distance from the centre sets the strength. | nothing | that tool in full, the others nothing |
+
+Only **Axis** has a far side. In the other two modes nothing is ever
+reversed, so the opposite rings, the selected tool's dashed line and the
+**Reverse** switch are hidden, and each tool's glow fades towards the
+centre instead.
+
+### Normalized: a crossfade
+
+Each tool's share is worked out from how close the puck is to its dot:
+closer means a much bigger share (1 ÷ distance²). The shares always add
+up to 100 %, then each tool's curve shapes its share.
+
+- It is **never neutral**: even at the centre every tool gives
+  something. Use Amount or the on/off switch to get back to the plain
+  sliders.
+- A **muted** tool takes no share; the others split it.
+
+### Example 9: Normalized
+
+Contrast +60 at the top, Temperature +50 at the bottom right, Saturation
+−60 at the bottom left, Linear, on a circle.
+
+| Where the puck is | Contrast | Temperature | Saturation |
+|---|---|---|---|
+| Centre (all three equally close: a third each) | +20 | +17 | −20 |
+| On the Contrast dot | +60 | 0 | 0 |
+| Centre, Saturation muted (half each) | +30 | +25 | 0 |
+
+### Polar: direction and distance
+
+Look from the centre towards the puck. The two tools on either side of
+that direction (going round the edge) are mixed: pointing straight at a
+tool gives only that tool; pointing halfway between two tools gives half
+of each. How far the puck is from the centre sets the strength: 0 at the
+centre, full on the edge, shaped by each tool's curve.
+
+- The **centre is neutral**.
+- With **one tool**, only the distance matters.
+- The mix wraps round past the right-hand side, so the last and the first
+  tool around the edge are neighbours too.
+
+### Example 10: Polar
+
+The same three tools: Contrast at the top, Temperature at the bottom
+right, Saturation at the bottom left (Linear).
+
+| Where the puck is | Contrast | Temperature | Saturation |
+|---|---|---|---|
+| Centre | 0 | 0 | 0 |
+| Straight up, halfway to the edge | +30 | 0 | 0 |
+| On the edge, halfway between Contrast and Saturation | +30 | 0 | −30 |
+| To the right, 80 % out (a quarter of the way from Temperature towards Contrast) | +12 | +30 | 0 |
+
 ## Amount and the on/off switch
 
 - **Amount** (0–100) scales every tool at once. At 50, everything the pad
@@ -267,7 +332,7 @@ centre until it is on the edge.
 ## Pad presets
 
 The bar at the top of the pad saves pad setups under a name. Pad presets
-hold **only the pad**: shape, tools and their settings, Amount, on/off
+hold **only the pad**: shape, mode, tools and their settings, Amount, on/off
 and, optionally, the puck. Regular presets (the Presets panel) are
 separate and still include the pad as part of a whole look.
 
@@ -326,7 +391,12 @@ off for that tool.
 **A tool seems to do nothing.** The puck may be at the centre or on the
 line's middle, the tool may be muted, the pad may be off, Amount may be 0,
 the slider may already be at its limit, or the tool's section may be
-hidden in Adjustments.
+hidden in Adjustments. In Polar mode, a tool far from the puck's direction
+gets nothing; in Normalized mode, a far tool gets only a small share.
+
+**The photo changes even with the puck in the centre.** The pad is in
+Normalized mode, which is never neutral. Switch to Axis or Polar, or turn
+the pad off.
 
 **I want to keep the result and stop using the pad.** Use Bake.
 

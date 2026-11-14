@@ -714,6 +714,17 @@
       "enabled": "Blend Pad włączony",
       "hint": "Przeciągnij krążek, aby mieszać narzędzia; przeciągnij kotwicę wzdłuż krawędzi, aby ją przesunąć. Shift – drobniejsze ruchy, strzałki – przesuwanie, dwukrotne kliknięcie krążka – wyśrodkowanie.",
       "maxTools": "Najwyżej {{count}} narzędzi",
+      "mode": "Tryb",
+      "modeHints": {
+        "axis": "Każde narzędzie działa wzdłuż własnej linii przez środek: pełna wartość w swoim punkcie, nic w środku, odwrotnie po przeciwnej stronie.",
+        "normalized": "Narzędzia dzielą efekt według bliskości, zawsze łącznie w całości: przenikanie. Nigdy neutralne; w punkcie liczy się tylko to narzędzie.",
+        "polar": "Kierunek miesza dwa sąsiednie narzędzia; odległość od środka ustala siłę. Środek jest neutralny."
+      },
+      "modes": {
+        "axis": "Oś",
+        "normalized": "Znormalizowany",
+        "polar": "Biegunowy"
+      },
       "mute": "Wycisz",
       "now": "teraz {{value}}",
       "presets": {

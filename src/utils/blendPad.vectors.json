@@ -241,6 +241,123 @@
       "offsets": { "contrast": -30 }
     },
     {
+      "name": "normalized: at the centre every tool takes a third",
+      "pad": {
+        "version": 1,
+        "enabled": true,
+        "shape": "circle",
+        "mode": "normalized",
+        "amount": 1,
+        "puck": { "x": 0, "y": 0 },
+        "anchors": [
+          { "id": "a", "param": "contrast", "t": 0.25, "target": 60, "curve": "linear", "muted": false },
+          {
+            "id": "b",
+            "param": "temperature",
+            "t": 0.9166666666666666,
+            "target": 50,
+            "curve": "linear",
+            "muted": false
+          },
+          {
+            "id": "c",
+            "param": "saturation",
+            "t": 0.5833333333333334,
+            "target": -60,
+            "curve": "linear",
+            "muted": false
+          }
+        ]
+      },
+      "offsets": { "contrast": 20, "temperature": 17, "saturation": -20 }
+    },
+    {
+      "name": "normalized: a muted tool takes no share",
+      "pad": {
+        "version": 1,
+        "enabled": true,
+        "shape": "circle",
+        "mode": "normalized",
+        "amount": 1,
+        "puck": { "x": 0, "y": 0 },
+        "anchors": [
+          { "id": "a", "param": "contrast", "t": 0.25, "target": 60, "curve": "linear", "muted": false },
+          {
+            "id": "b",
+            "param": "temperature",
+            "t": 0.9166666666666666,
+            "target": 50,
+            "curve": "linear",
+            "muted": false
+          },
+          { "id": "c", "param": "saturation", "t": 0.5833333333333334, "target": -60, "curve": "linear", "muted": true }
+        ]
+      },
+      "offsets": { "contrast": 30, "temperature": 25 }
+    },
+    {
+      "name": "polar: on the edge between two tools",
+      "pad": {
+        "version": 1,
+        "enabled": true,
+        "shape": "circle",
+        "mode": "polar",
+        "amount": 1,
+        "puck": { "x": -0.8660254037844387, "y": 0.49999999999999994 },
+        "anchors": [
+          { "id": "a", "param": "contrast", "t": 0.25, "target": 60, "curve": "linear", "muted": false },
+          {
+            "id": "b",
+            "param": "temperature",
+            "t": 0.9166666666666666,
+            "target": 50,
+            "curve": "linear",
+            "muted": false
+          },
+          {
+            "id": "c",
+            "param": "saturation",
+            "t": 0.5833333333333334,
+            "target": -60,
+            "curve": "linear",
+            "muted": false
+          }
+        ]
+      },
+      "offsets": { "contrast": 30, "saturation": -30 }
+    },
+    {
+      "name": "polar: wrapping past the right, 0.8 out",
+      "pad": {
+        "version": 1,
+        "enabled": true,
+        "shape": "circle",
+        "mode": "polar",
+        "amount": 1,
+        "puck": { "x": 0.8, "y": 0 },
+        "anchors": [
+          { "id": "a", "param": "contrast", "t": 0.25, "target": 60, "curve": "linear", "muted": false },
+          {
+            "id": "b",
+            "param": "temperature",
+            "t": 0.9166666666666666,
+            "target": 50,
+            "curve": "linear",
+            "muted": false
+          },
+          {
+            "id": "c",
+            "param": "saturation",
+            "t": 0.5833333333333334,
+            "target": -60,
+            "curve": "linear",
+            "muted": false
+          }
+        ]
+      },
+      "offsets": { "temperature": 30, "contrast": 12 }
+    },
+    {
       "name": "hue wraps",
       "pad": {
         "version": 1,

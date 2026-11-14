@@ -516,6 +516,9 @@ export const createPointColor = (hue: number, saturation: number, luminance: num
 /** How an anchor's offset grows along its axis, the same on both sides of the centre. */
 export type BlendPadCurve = 'linear' | 'soft' | 'easeIn';
 
+/** How the puck's position becomes each tool's share (`blend_pad::Mode`). */
+export type BlendPadMode = 'axis' | 'normalized' | 'polar';
+
 /** The pad's outline (`blend_pad::Shape`); every shape fits the unit circle. */
 export type BlendPadShape = 'circle' | 'triangle' | 'square' | 'rectangle' | 'pentagon' | 'hexagon';
 
@@ -551,6 +554,8 @@ export interface BlendPad {
   version: 1;
   enabled: boolean;
   shape: BlendPadShape;
+  /** Axis when absent (pads saved before modes existed). */
+  mode?: BlendPadMode;
   /** Master strength, 0–1. */
   amount: number;
   puck: Coord;

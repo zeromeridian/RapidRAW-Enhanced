@@ -690,6 +690,17 @@
       "enabled": "Blend Pad ativado",
       "hint": "Arraste o disco para misturar as ferramentas; arraste uma âncora pela borda para movê-la. Shift para movimentos mais finos, setas para deslocar e clique duplo no disco para centralizá-lo.",
       "maxTools": "No máximo {{count}} ferramentas",
+      "mode": "Modo",
+      "modeHints": {
+        "axis": "Cada ferramenta age ao longo da própria linha pelo centro: valor total no seu ponto, nada no centro, o inverso no lado oposto.",
+        "normalized": "As ferramentas dividem o efeito pela proximidade, sempre somando o todo: uma transição. Nunca neutro; sobre um ponto só essa ferramenta conta.",
+        "polar": "A direção mistura as duas ferramentas vizinhas; a distância ao centro define a intensidade. O centro é neutro."
+      },
+      "modes": {
+        "axis": "Eixo",
+        "normalized": "Normalizado",
+        "polar": "Polar"
+      },
       "mute": "Silenciar",
       "now": "agora {{value}}",
       "presets": {
