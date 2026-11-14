@@ -233,6 +233,8 @@
       "needsBlackAndWhite": "Schalten Sie Schwarzweiß ein, um die Zonentönung zu verwenden.",
       "protect": "Schutz",
       "softness": "Weichheit",
+      "tintedZones": "Getönte Zonen",
+      "untint": "Tönung entfernen",
       "zone": "Zone {{zone}}",
       "zones": "Zonen {{zones}}"
     }

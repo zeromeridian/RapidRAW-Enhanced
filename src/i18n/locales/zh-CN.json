@@ -233,6 +233,8 @@
       "needsBlackAndWhite": "打开黑白以使用区域着色。",
       "protect": "保护",
       "softness": "柔和度",
+      "tintedZones": "已着色区域",
+      "untint": "移除着色",
       "zone": "区域 {{zone}}",
       "zones": "区域 {{zones}}"
     }

@@ -1,5 +1,5 @@
 import { MouseEvent, useCallback, useState } from 'react';
-import { Eye, EyeOff, RotateCcw } from 'lucide-react';
+import { Eye, EyeOff, RotateCcw, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
@@ -65,18 +65,44 @@ const formatZones = (zones: number[]) => {
     .join(', ');
 };
 
-interface ZoneStripProps {
+const zoneRange = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, index) => from + index);
+
+/** Neighbouring zones that share one tint. */
+interface TintRun {
+  from: number;
+  to: number;
+  hue: number;
+  strength: number;
+}
+
+/** The tinted zones, neighbours with the same colour and strength joined, lightest first like the scale. */
+const tintRuns = (zoneTint: ZoneTint): TintRun[] => {
+  const runs: TintRun[] = [];
+  for (let zone = 0; zone < ZONE_TINT_ZONE_COUNT; zone += 1) {
+    const { hue, strength } = zoneTint.zones[zone] ?? NEUTRAL_ZONE;
+    if (strength <= 0) continue;
+    const last = runs[runs.length - 1];
+    if (last && last.to === zone - 1 && last.hue === hue && last.strength === strength) last.to = zone;
+    else runs.push({ from: zone, to: zone, hue, strength });
+  }
+  return runs.reverse();
+};
+
+interface ZoneScaleProps {
   onZoneClick(zone: number, event: MouseEvent): void;
   selected: number[];
   zoneTint: ZoneTint;
 }
 
-/** The eleven zones as one grey ramp: a tint band on top, the selection marked beneath. */
-function ZoneStrip({ onZoneClick, selected, zoneTint }: ZoneStripProps) {
+/**
+ * The eleven zones as an upright grey scale, X at the top: names on the left, the selection
+ * marked beside them, each zone's tint as a band on the scale's right edge.
+ */
+function ZoneScale({ onZoneClick, selected, zoneTint }: ZoneScaleProps) {
   const { t } = useTranslation();
 
   return (
-    <div className="flex">
+    <div className="flex flex-col-reverse shrink-0">
       {ZONE_NAMES.map((name, zone) => {
         const { hue, strength } = zoneTint.zones[zone] ?? NEUTRAL_ZONE;
         const isSelected = selected.includes(zone);
@@ -84,31 +110,34 @@ function ZoneStrip({ onZoneClick, selected, zoneTint }: ZoneStripProps) {
           <button
             aria-label={t('adjustments.zoneTint.zone', { zone: name })}
             aria-pressed={isSelected}
-            className="group flex-1 min-w-0 flex flex-col items-stretch gap-1 focus:outline-none"
+            className="group flex items-stretch gap-1.5 h-5 compact:h-[18px] focus:outline-none"
             key={name}
             onClick={(event) => onZoneClick(zone, event)}
           >
             <span
               className={clsx(
-                'relative h-8 compact:h-7 overflow-hidden',
-                zone === 0 && 'rounded-l-md',
-                zone === ZONE_NAMES.length - 1 && 'rounded-r-md',
-                zone > 0 && 'border-l border-white/5',
-              )}
-              style={{ backgroundColor: zoneGrey(zone) }}
-            >
-              {strength > 0 && (
-                <span className="absolute inset-x-0 top-0 h-2" style={{ backgroundColor: tintColor(hue, strength) }} />
-              )}
-            </span>
-            <span className={clsx('h-0.5 transition-colors', isSelected ? 'bg-accent' : 'bg-transparent')} />
-            <span
-              className={clsx(
-                'text-[10px] leading-none text-center select-none transition-colors tabular-nums',
+                'w-8 self-center text-right text-[11px] leading-none select-none transition-colors',
                 isSelected ? 'text-text-primary font-semibold' : 'text-text-secondary group-hover:text-text-primary',
               )}
             >
               {name}
+            </span>
+            <span className={clsx('w-0.5 transition-colors', isSelected ? 'bg-accent' : 'bg-transparent')} />
+            <span
+              className={clsx(
+                'relative w-10 overflow-hidden',
+                zone === 0 && 'rounded-b-md',
+                zone === ZONE_NAMES.length - 1 && 'rounded-t-md',
+                zone > 0 && 'border-b border-white/5',
+              )}
+              style={{ backgroundColor: zoneGrey(zone) }}
+            >
+              {strength > 0 && (
+                <span
+                  className="absolute inset-y-0 right-0 w-2.5"
+                  style={{ backgroundColor: tintColor(hue, strength) }}
+                />
+              )}
             </span>
           </button>
         );
@@ -137,38 +166,53 @@ export default function ZoneTintPanel() {
   const zoneTint = storedZoneTint ?? createZoneTint();
   const shown = zoneTint.zones[anchor] ?? NEUTRAL_ZONE;
 
-  const updateZoneTint = (update: (current: ZoneTint) => ZoneTint) =>
-    setAdjustments((prev) => ({ ...prev, zoneTint: update(prev.zoneTint ?? createZoneTint()) }));
+  const updateZoneTint = (update: (current: ZoneTint) => ZoneTint, historyLabel?: string) =>
+    setAdjustments((prev) => ({ ...prev, zoneTint: update(prev.zoneTint ?? createZoneTint()) }), historyLabel);
+
+  /** Writes a tint into the given zones, keeping their other settings. */
+  const setZonesTint = (zones: number[], hue: number, strength: number, historyLabel?: string) =>
+    updateZoneTint(
+      (current) => ({
+        ...current,
+        zones: Array.from({ length: ZONE_TINT_ZONE_COUNT }, (_, zone) => {
+          const existing = current.zones[zone] ?? NEUTRAL_ZONE;
+          return zones.includes(zone) ? { ...existing, hue, strength } : existing;
+        }),
+      }),
+      historyLabel,
+    );
 
   const handleDragStateChange = useCallback(
     (isDragging: boolean) => setEditor({ isSliderDragging: isDragging }),
     [setEditor],
   );
 
-  const handleColorChange = ({ hue, saturation }: HueSatLum) =>
-    updateZoneTint((current) => ({
-      ...current,
-      zones: Array.from({ length: ZONE_TINT_ZONE_COUNT }, (_, zone) => {
-        const existing = current.zones[zone] ?? NEUTRAL_ZONE;
-        return selected.includes(zone) ? { ...existing, hue, strength: saturation } : existing;
-      }),
-    }));
+  const handleColorChange = ({ hue, saturation }: HueSatLum) => setZonesTint(selected, hue, saturation);
 
   const handleZoneClick = (zone: number, event: MouseEvent) => {
     setSelected(nextSelection(selected, anchor, zone, event));
     if (!event.shiftKey) setAnchor(zone);
   };
 
+  const selectRun = ({ from, to }: TintRun) => {
+    setSelected(zoneRange(from, to));
+    setAnchor(from);
+  };
+
+  const zonesLabel = (zones: number[]) =>
+    zones.length === 1
+      ? t('adjustments.zoneTint.zone', { zone: ZONE_NAMES[zones[0]] })
+      : t('adjustments.zoneTint.zones', { zones: formatZones(zones) });
+
+  const runs = tintRuns(zoneTint);
+  const isSelectedRun = ({ from, to }: TintRun) =>
+    selected.length === to - from + 1 && selected[0] === from && selected[selected.length - 1] === to;
+
   const handleToggleVisibility = () =>
     setAdjustments((prev) => {
       const visibility = prev.sectionVisibility ?? INITIAL_ADJUSTMENTS.sectionVisibility;
       return { ...prev, sectionVisibility: { ...visibility, zoneTint: !visibility.zoneTint } };
     });
-
-  const label =
-    selected.length === 1
-      ? t('adjustments.zoneTint.zone', { zone: ZONE_NAMES[selected[0]] })
-      : t('adjustments.zoneTint.zones', { zones: formatZones(selected) });
 
   return (
     <div className="flex flex-col h-full">
@@ -215,23 +259,22 @@ export default function ZoneTintPanel() {
           </>
         ) : (
           <div className={clsx('flex flex-col gap-4 compact:gap-3 transition-opacity', !isVisible && 'opacity-40')}>
-            <div className="flex flex-col gap-2">
-              <ZoneStrip onZoneClick={handleZoneClick} selected={selected} zoneTint={zoneTint} />
-              <Text variant={TextVariants.small} color={TextColors.secondary} className="block">
-                {t('adjustments.zoneTint.hint')}
-              </Text>
+            <div className="flex items-center gap-3">
+              <ZoneScale onZoneClick={handleZoneClick} selected={selected} zoneTint={zoneTint} />
+              <div className="grow min-w-0 max-w-60">
+                <ColorWheel
+                  defaultValue={NEUTRAL}
+                  label={zonesLabel(selected)}
+                  onChange={handleColorChange}
+                  onDragStateChange={handleDragStateChange}
+                  showLuminance={false}
+                  value={{ hue: shown.hue, saturation: shown.strength, luminance: 0 }}
+                />
+              </div>
             </div>
-
-            <div className="w-full max-w-60 self-center">
-              <ColorWheel
-                defaultValue={NEUTRAL}
-                label={label}
-                onChange={handleColorChange}
-                onDragStateChange={handleDragStateChange}
-                showLuminance={false}
-                value={{ hue: shown.hue, saturation: shown.strength, luminance: 0 }}
-              />
-            </div>
+            <Text variant={TextVariants.small} color={TextColors.secondary} className="block">
+              {t('adjustments.zoneTint.hint')}
+            </Text>
 
             <div className="flex flex-col gap-2">
               <Slider
@@ -259,6 +302,57 @@ export default function ZoneTintPanel() {
                 value={zoneTint.protect * SLIDER_SCALE}
               />
             </div>
+
+            {runs.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <Text variant={TextVariants.label} color={TextColors.secondary}>
+                  {t('adjustments.zoneTint.tintedZones')}
+                </Text>
+                {runs.map((run) => (
+                  <div
+                    className={clsx(
+                      'flex items-center gap-1 rounded-md transition-colors',
+                      isSelectedRun(run) ? 'bg-surface' : 'hover:bg-surface',
+                    )}
+                    key={run.from}
+                  >
+                    <button
+                      className="grow min-w-0 flex items-center gap-2 px-2 py-1.5 text-left"
+                      onClick={() => selectRun(run)}
+                    >
+                      <span
+                        className="w-3 h-3 shrink-0 rounded-full border border-white/20"
+                        style={{ backgroundColor: tintColor(run.hue, run.strength) }}
+                      />
+                      <Text variant={TextVariants.small} className="grow truncate">
+                        {zonesLabel(zoneRange(run.from, run.to))}
+                      </Text>
+                      <Text
+                        variant={TextVariants.small}
+                        color={TextColors.secondary}
+                        className="flex items-center gap-2 tabular-nums"
+                      >
+                        <span>
+                          <span className="font-bold">{t('ui.colorWheel.hueAbbreviation')}</span> {Math.round(run.hue)}
+                          &deg;
+                        </span>
+                        <span>
+                          <span className="font-bold">{t('ui.colorWheel.saturationAbbreviation')}</span>{' '}
+                          {Math.round(run.strength)}
+                        </span>
+                      </Text>
+                    </button>
+                    <button
+                      className="p-1.5 mr-0.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-bg-primary transition-colors"
+                      data-tooltip={t('adjustments.zoneTint.untint')}
+                      onClick={() => setZonesTint(zoneRange(run.from, run.to), 0, 0, t('adjustments.zoneTint.untint'))}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

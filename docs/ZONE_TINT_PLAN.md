@@ -2,8 +2,8 @@
 
 Status (2026-11-14): **Phases 1 and 2 done** on `dev/zone-tint` (from
 `develop` `492bfffe`, committed as `b23d9d3d`), built as `1.57.0`; Zone
-Tint then moved to its own right-toolbar panel with a new zone strip
-(`1.57.1`, uncommitted); the GPU
+Tint then moved to its own right-toolbar panel (`1.57.1`) with an
+upright zone scale and a tinted zones list (`1.57.2`, uncommitted); the GPU
 exit check and the hands-on check still have to run on the Mac. Next:
 Phase 3. `UPSTREAM_FEATURE_GAP.md` Plan item 28 (P0, owner
 2026-11-13: after item 27, the Orbit Blend Pad, whose steps 1–7 are done).
@@ -79,11 +79,18 @@ changes about it, the decisions still open, and progress.
   only while Black & White was on. Agent choice (Phase 2): the 11
   swatches are equal width; placed by display value, Zones 0–II would
   share the first ~9 % of the strip.
-- **Zone strip layout** (owner 2026-11-14: "more streamlined and easier
-  to read"; agent design): one continuous grey ramp without gaps, each
-  zone's tint as a band along its top, an accent underline under the
-  selected zones, and the zone numbers in a row below the ramp; the
-  wheel's label joins neighbouring zones into ranges ("Zones IV–VII").
+- **Zone layout** (owner 2026-11-14, option A of four offered): an
+  upright scale beside the colour wheel, X at the top, names on the
+  left, an accent bar marking the selection, each zone's tint as a band
+  on the scale's right edge; readable at any sidebar width. It replaced
+  `1.57.1`'s horizontal ramp, which the owner found hard to read when
+  narrow. Rejected: two rows, three Zone System groups, Arabic numerals,
+  a zone list as the selector. The wheel's label joins neighbouring
+  zones into ranges ("Zones IV–VII").
+- **Tinted zones list** (owner 2026-11-14): below the sliders, every
+  tinted zone, neighbours with the same hue and strength on one line,
+  lightest first like the scale, with hue and strength; a click selects
+  the zones, × removes their tint (one history step).
 
 - **Blend-mode backdrop:** carries the Zone Tint, so masks in a
   non-Normal blend mode keep the zone colours. Done in `shader.wgsl`: the
@@ -149,3 +156,8 @@ changes about it, the decisions still open, and progress.
   `is_visible("zoneTint")`). The Adjustments reset no longer clears Zone
   Tint; saved section orders or a `section:zoneTint` favourite drop it
   silently. Strings reused (no locale changes).
+- **Upright scale and tinted zones list** (`1.57.2`, 2026-11-14,
+  uncommitted): `ZoneStrip` became `ZoneScale` beside the wheel;
+  `tintRuns` builds the list; `setZonesTint` is shared by the wheel and
+  ×. New strings `adjustments.zoneTint.tintedZones` and `.untint` in all
+  12 locales; the list's H/S labels reuse the wheel's.

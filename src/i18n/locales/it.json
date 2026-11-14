@@ -233,6 +233,8 @@
       "needsBlackAndWhite": "Attiva Bianco e nero per usare la tinta per zone.",
       "protect": "Protezione",
       "softness": "Morbidezza",
+      "tintedZones": "Zone tinte",
+      "untint": "Rimuovi tinta",
       "zone": "Zona {{zone}}",
       "zones": "Zone {{zones}}"
     }

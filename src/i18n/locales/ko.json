@@ -233,6 +233,8 @@
       "needsBlackAndWhite": "존 틴트를 사용하려면 흑백을 켜세요.",
       "protect": "보호",
       "softness": "부드러움",
+      "tintedZones": "틴트된 존",
+      "untint": "틴트 제거",
       "zone": "존 {{zone}}",
       "zones": "존 {{zones}}"
     }

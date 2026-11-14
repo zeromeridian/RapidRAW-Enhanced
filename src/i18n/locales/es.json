@@ -233,6 +233,8 @@
       "needsBlackAndWhite": "Activa Blanco y negro para usar el tono por zonas.",
       "protect": "Proteger",
       "softness": "Suavidad",
+      "tintedZones": "Zonas con tono",
+      "untint": "Quitar tono",
       "zone": "Zona {{zone}}",
       "zones": "Zonas {{zones}}"
     }
