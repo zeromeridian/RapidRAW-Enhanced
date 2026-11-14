@@ -228,6 +228,14 @@
       "roundness": "Roundness",
       "size": "Size",
       "vignette": "Vignette"
+    },
+    "zoneTint": {
+      "hint": "Click a zone to color it. Shift-click selects a range, Cmd/Ctrl-click adds or removes a zone.",
+      "needsBlackAndWhite": "Turn on Black & White to use Zone Tint.",
+      "protect": "Protect",
+      "softness": "Softness",
+      "zone": "Zone {{zone}}",
+      "zones": "Zones {{zones}}"
     }
   },
   "contextMenus": {
@@ -436,7 +444,8 @@
         "color": "Color",
         "curves": "Curves",
         "details": "Details",
-        "effects": "Effects"
+        "effects": "Effects",
+        "zoneTint": "Zone Tint"
       },
       "title": "Adjustments",
       "tooltips": {

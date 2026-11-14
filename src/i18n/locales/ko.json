@@ -227,6 +227,14 @@
       "roundness": "둥글기",
       "size": "크기",
       "vignette": "비네트"
+    },
+    "zoneTint": {
+      "hint": "존을 클릭하여 색을 입힙니다. Shift-클릭으로 범위를 선택하고, Cmd/Ctrl-클릭으로 존을 추가하거나 제거합니다.",
+      "needsBlackAndWhite": "존 틴트를 사용하려면 흑백을 켜세요.",
+      "protect": "보호",
+      "softness": "부드러움",
+      "zone": "존 {{zone}}",
+      "zones": "존 {{zones}}"
     }
   },
   "contextMenus": {
@@ -410,7 +418,8 @@
         "color": "색상",
         "curves": "커브",
         "details": "디테일",
-        "effects": "효과"
+        "effects": "효과",
+        "zoneTint": "존 틴트"
       },
       "title": "조정",
       "tooltips": {

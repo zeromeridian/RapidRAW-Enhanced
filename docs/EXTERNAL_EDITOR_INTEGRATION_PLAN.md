@@ -13,8 +13,8 @@
   document and test the `--edit` exit codes.
 - **Linux Flatpak: deferred** by the owner (2026-11-02); see "Deferred:
   Linux Flatpak".
-- **Every way of saving** (`1.56.2`, 2026-11-14, Plan item 15, on
-  `dev/editor-copies`, uncommitted): each image saved in the staging
+- **Every way of saving** (`1.56.2`, 2026-11-14, Plan item 15, owner
+  commit `2a6c03ea`, in `develop` and `main`): each image saved in the staging
   folder (the render, a Save As to another name or format, a subfolder)
   gets its own copy beside the source, named as it was saved (`-2`, … when
   taken); saving it again replaces only that copy; several saves in one

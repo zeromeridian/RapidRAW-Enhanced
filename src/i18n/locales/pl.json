@@ -227,6 +227,14 @@
       "roundness": "Zaokrąglenie",
       "size": "Rozmiar",
       "vignette": "Winieta"
+    },
+    "zoneTint": {
+      "hint": "Kliknij strefę, aby ją zabarwić. Shift-klik zaznacza zakres, Cmd/Ctrl-klik dodaje lub usuwa strefę.",
+      "needsBlackAndWhite": "Włącz tryb czarno-biały, aby użyć tonowania stref.",
+      "protect": "Ochrona",
+      "softness": "Miękkość",
+      "zone": "Strefa {{zone}}",
+      "zones": "Strefy {{zones}}"
     }
   },
   "contextMenus": {
@@ -448,7 +456,8 @@
         "color": "Kolor",
         "curves": "Krzywe",
         "details": "Detale",
-        "effects": "Efekty"
+        "effects": "Efekty",
+        "zoneTint": "Tonowanie stref"
       },
       "title": "Ustawienia",
       "tooltips": {

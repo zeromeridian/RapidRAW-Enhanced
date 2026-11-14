@@ -1,8 +1,10 @@
 # Lightroom-style Rename Plan
 
-Status (2026-11-13): **not started.** `UPSTREAM_FEATURE_GAP.md` Plan item 29
+Status (2026-11-14): **not started.** `UPSTREAM_FEATURE_GAP.md` Plan item 29
 (P0, owner 2026-11-13: the whole feature, its bug fixes included, after
-item 28, Zone Tint). Five phases, each with its own version.
+item 28, Zone Tint; owner 2026-11-14: after item 30, import from card or
+camera, which was meant to reuse this item's naming engine; see item 30's
+open decision). Five phases, each with its own version.
 
 **Specification:** the owner's `LRC_based_rename.md` (2026-11-13) holds the
 phases, token syntax and dialog design. This file records what the code

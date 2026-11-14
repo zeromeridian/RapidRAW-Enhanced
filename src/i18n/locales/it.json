@@ -227,6 +227,14 @@
       "roundness": "Rotondità",
       "size": "Dimensione",
       "vignette": "Vignettatura"
+    },
+    "zoneTint": {
+      "hint": "Fai clic su una zona per colorarla. Maiusc-clic seleziona un intervallo, Cmd/Ctrl-clic aggiunge o rimuove una zona.",
+      "needsBlackAndWhite": "Attiva Bianco e nero per usare la tinta per zone.",
+      "protect": "Protezione",
+      "softness": "Morbidezza",
+      "zone": "Zona {{zone}}",
+      "zones": "Zone {{zones}}"
     }
   },
   "contextMenus": {
@@ -429,7 +437,8 @@
         "color": "Colore",
         "curves": "Curve",
         "details": "Dettagli",
-        "effects": "Effetti"
+        "effects": "Effetti",
+        "zoneTint": "Tinta per zone"
       },
       "title": "Regolazioni",
       "tooltips": {

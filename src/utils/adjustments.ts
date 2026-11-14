@@ -387,6 +387,7 @@ export interface Adjustments {
   vignetteMidpoint: number;
   vignetteRoundness: number;
   whites: number;
+  zoneTint: ZoneTint | null;
 }
 
 export type GuideOrientation = 'vertical' | 'horizontal';
@@ -564,6 +565,45 @@ export interface BlendPad {
   presetId?: string;
 }
 
+/** Zones 0 to X; mirrors `zone_tint::ZONE_COUNT`. */
+export const ZONE_TINT_ZONE_COUNT = 11;
+
+/** Zone Tint defaults and ranges; mirror the constants in `zone_tint.rs`. */
+export const ZONE_TINT_SOFTNESS = { default: 0.04, min: 0.02, max: 0.08 } as const;
+export const ZONE_TINT_PROTECT = { default: 0.08, min: 0, max: 0.2 } as const;
+
+/** One Zone System zone's colour: the colour wheel's hue (degrees) and strength (0–100, 0 neutral). */
+export interface ZoneTintZone {
+  hue: number;
+  strength: number;
+  /** Advanced mode (Phase 4): the centre's offset in OKLab L and the zone's own width. */
+  centerOffset?: number;
+  width?: number | null;
+}
+
+/**
+ * Zone Tint, rendered by `zone_tint.rs` on Black & White photos only: a colour per zone 0–X of
+ * OKLab lightness, added without changing any tone. Absent (`null`) means off.
+ */
+export interface ZoneTint {
+  /** `zone_tint::VERSION`. */
+  version: 1;
+  enabled: boolean;
+  zones: ZoneTintZone[];
+  /** Zone softness, σ in OKLab L. */
+  softness: number;
+  /** How far from black and white the colour fades out, in OKLab L. */
+  protect: number;
+}
+
+export const createZoneTint = (): ZoneTint => ({
+  version: 1,
+  enabled: true,
+  zones: Array.from({ length: ZONE_TINT_ZONE_COUNT }, () => ({ hue: 0, strength: 0 })),
+  softness: ZONE_TINT_SOFTNESS.default,
+  protect: ZONE_TINT_PROTECT.default,
+});
+
 interface Hsl {
   [index: string]: HueSatLum;
   aquas: HueSatLum;
@@ -672,6 +712,7 @@ export interface Sections {
   color: Array<string>;
   details: Array<string>;
   effects: Array<string>;
+  zoneTint: Array<string>;
 }
 
 export interface SectionVisibility {
@@ -681,6 +722,7 @@ export interface SectionVisibility {
   color: boolean;
   details: boolean;
   effects: boolean;
+  zoneTint: boolean;
 }
 
 export const COLOR_LABELS: Array<Color> = [
@@ -794,6 +836,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
     color: true,
     details: true,
     effects: true,
+    zoneTint: true,
   },
   shadows: 0,
   sharpness: 0,
@@ -927,6 +970,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
     color: true,
     details: true,
     effects: true,
+    zoneTint: true,
   },
   shadows: 0,
   sharpness: 0,
@@ -953,6 +997,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   vignetteMidpoint: 50,
   vignetteRoundness: 0,
   whites: 0,
+  zoneTint: null,
 };
 
 const deepCloneCurves = (curves: any): Curves => ({
@@ -1153,6 +1198,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     hsl: { ...INITIAL_ADJUSTMENTS.hsl, ...(loadedAdjustments.hsl || {}) },
     pointColors: loadedAdjustments.pointColors ?? INITIAL_ADJUSTMENTS.pointColors,
     blendPad: loadedAdjustments.blendPad ?? INITIAL_ADJUSTMENTS.blendPad,
+    zoneTint: loadedAdjustments.zoneTint ?? INITIAL_ADJUSTMENTS.zoneTint,
     curves: loadedAdjustments.curves ? deepCloneCurves(loadedAdjustments.curves) : getDefaultCurves(),
     pointCurves: loadedAdjustments.pointCurves ? deepCloneCurves(loadedAdjustments.pointCurves) : getDefaultCurves(),
     parametricCurve: loadedAdjustments.parametricCurve
@@ -1321,6 +1367,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
   ],
   masks: [{ label: 'modals.copyPaste.groups.masks', keys: ['masks'] }],
   blendPad: [{ label: 'editor.blendPad.title', keys: ['blendPad'] }],
+  zoneTint: [{ label: 'editor.adjustments.sections.zoneTint', keys: ['zoneTint'] }],
 };
 
 export const SPEED_EDIT_ROTATION = 'rotation';
@@ -1574,7 +1621,18 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     Effect.FogTemperature,
     Effect.FogTint,
   ],
+  zoneTint: ['zoneTint'],
 };
+
+/**
+ * Whether a section shows in a panel: Zone Tint only on a Black & White photo, and not in
+ * masks yet (`ZONE_TINT_PLAN.md` Phase 4).
+ */
+export const isAdjustmentSectionShown = (
+  section: string,
+  adjustments: Partial<Adjustments>,
+  isForMask: boolean,
+): boolean => section !== 'zoneTint' || (!isForMask && !!adjustments.monochrome);
 
 const reconcileOrder = (defaultOrder: string[], order: string[] = []): string[] => {
   const savedOrder = order.filter((id, index) => defaultOrder.includes(id) && order.indexOf(id) === index);

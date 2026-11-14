@@ -227,6 +227,14 @@
       "roundness": "Arrondi",
       "size": "Taille",
       "vignette": "Vignettage"
+    },
+    "zoneTint": {
+      "hint": "Cliquez sur une zone pour la colorer. Maj-clic sélectionne une plage, Cmd/Ctrl-clic ajoute ou retire une zone.",
+      "needsBlackAndWhite": "Activez Noir et blanc pour utiliser la teinte par zones.",
+      "protect": "Protection",
+      "softness": "Douceur",
+      "zone": "Zone {{zone}}",
+      "zones": "Zones {{zones}}"
     }
   },
   "contextMenus": {
@@ -429,7 +437,8 @@
         "color": "Couleur",
         "curves": "Courbes",
         "details": "Détails",
-        "effects": "Effets"
+        "effects": "Effets",
+        "zoneTint": "Teinte par zones"
       },
       "title": "Ajustements",
       "tooltips": {

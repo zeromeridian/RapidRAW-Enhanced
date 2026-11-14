@@ -227,6 +227,14 @@
       "roundness": "Rundheit",
       "size": "Größe",
       "vignette": "Vignettierung"
+    },
+    "zoneTint": {
+      "hint": "Klicken Sie auf eine Zone, um sie einzufärben. Umschalt-Klick wählt einen Bereich, Cmd/Strg-Klick fügt eine Zone hinzu oder entfernt sie.",
+      "needsBlackAndWhite": "Schalten Sie Schwarzweiß ein, um die Zonentönung zu verwenden.",
+      "protect": "Schutz",
+      "softness": "Weichheit",
+      "zone": "Zone {{zone}}",
+      "zones": "Zonen {{zones}}"
     }
   },
   "contextMenus": {
@@ -410,7 +418,8 @@
         "color": "Farbe",
         "curves": "Kurven",
         "details": "Details",
-        "effects": "Effekte"
+        "effects": "Effekte",
+        "zoneTint": "Zonentönung"
       },
       "title": "Anpassungen",
       "tooltips": {
