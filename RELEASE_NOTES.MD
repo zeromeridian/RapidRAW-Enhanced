@@ -5,6 +5,19 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.57.2-dev-zone-tint — 2026-11-14
+
+### Develop
+
+- **Zone Tint** zones now stand as an upright scale beside the colour
+  wheel, X at the top and 0 at the bottom, so every zone name stays
+  readable however narrow the sidebar is. Each zone's colour shows as a
+  band along the scale's edge.
+- A new **Tinted zones** list below the sliders shows every zone that has
+  a colour, with its hue and strength; neighbouring zones with the same
+  colour share one line, such as "Zones II–IV". Click a line to select
+  those zones, or its × to remove their tint.
+
 ## 1.57.1-dev-zone-tint — 2026-11-14
 
 ### Develop

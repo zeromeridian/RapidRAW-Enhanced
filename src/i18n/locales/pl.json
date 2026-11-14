@@ -233,6 +233,8 @@
       "needsBlackAndWhite": "Włącz tryb czarno-biały, aby użyć tonowania stref.",
       "protect": "Ochrona",
       "softness": "Miękkość",
+      "tintedZones": "Zabarwione strefy",
+      "untint": "Usuń tonowanie",
       "zone": "Strefa {{zone}}",
       "zones": "Strefy {{zones}}"
     }

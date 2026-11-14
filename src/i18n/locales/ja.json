@@ -233,6 +233,8 @@
       "needsBlackAndWhite": "ゾーンティントを使うには白黒をオンにしてください。",
       "protect": "保護",
       "softness": "柔らかさ",
+      "tintedZones": "着色済みのゾーン",
+      "untint": "着色を解除",
       "zone": "ゾーン {{zone}}",
       "zones": "ゾーン {{zones}}"
     }

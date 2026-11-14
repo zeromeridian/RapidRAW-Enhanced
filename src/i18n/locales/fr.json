@@ -233,6 +233,8 @@
       "needsBlackAndWhite": "Activez Noir et blanc pour utiliser la teinte par zones.",
       "protect": "Protection",
       "softness": "Douceur",
+      "tintedZones": "Zones teintées",
+      "untint": "Retirer la teinte",
       "zone": "Zone {{zone}}",
       "zones": "Zones {{zones}}"
     }

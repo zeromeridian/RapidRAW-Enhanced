@@ -329,8 +329,11 @@ details are in `RELEASE_NOTES.MD`.
   Visualize Range. Points travel with the edit (XMP, copy/paste, presets).
 - **Zone Tint** panel in the right toolbar for Black & White photos (whole
   photo): a colour for each of the 11 Zone System zones (0–X) without
-  changing any tone. The zones form one grey ramp with each zone's tint
-  as a band on top. Pick a zone, or a range with Shift-click (Cmd/Ctrl-click
+  changing any tone. The zones form an upright grey scale (X at the top)
+  beside the colour wheel, each zone's tint a band along its edge; a
+  Tinted zones list below names every coloured zone or range with its hue
+  and strength, selects it on click and removes its tint with ×. Pick a
+  zone, or a range with Shift-click (Cmd/Ctrl-click
   adds or removes one), and set its colour and strength on a colour wheel;
   neighbouring zones blend smoothly, Softness sets how far a zone reaches,
   and Protect keeps black and white neutral. Masks in a blend mode keep the

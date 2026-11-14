@@ -234,6 +234,8 @@
       "needsBlackAndWhite": "Turn on Black & White to use Zone Tint.",
       "protect": "Protect",
       "softness": "Softness",
+      "tintedZones": "Tinted zones",
+      "untint": "Remove tint",
       "zone": "Zone {{zone}}",
       "zones": "Zones {{zones}}"
     }
