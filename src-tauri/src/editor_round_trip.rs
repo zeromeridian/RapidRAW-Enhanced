@@ -3,7 +3,10 @@
 //! A rendered copy is staged in the app cache and opened in the editor. Only
 //! when the editor saves into that staging folder is the result copied beside
 //! the source (`<stem>-Edit.<ext>`) and added to the Library, so abandoned
-//! edits leave nothing behind. Later saves replace the same copy. Sessions are
+//! edits leave nothing behind. However the editor saves (back into the render,
+//! or Save As under another name or format), each image file it writes there
+//! gets its own copy, and later saves of that file replace the same copy.
+//! Whether the editor opens it in a new window or a tab does not matter. Sessions are
 //! kept in the catalog, so a save made while ThisIsRAW was closed is picked up
 //! on the next launch, and end once they have seen no new save for
 //! [`RETENTION`]. Ending a session deletes only its staging folder.
@@ -35,7 +38,7 @@ use crate::file_management::{
     copy_file_atomically, modified_nanos, open_external_editor, parse_virtual_path,
 };
 use crate::formats::is_supported_image_file;
-use crate::library_catalog::{self, EditorRoundTripRow};
+use crate::library_catalog::{self, EditorRoundTripRow, StagedFileRow};
 
 const STAGING_FOLDER: &str = "external-edits";
 const EDIT_SUFFIX: &str = "-Edit";
@@ -168,10 +171,12 @@ pub async fn start_editor_round_trip(
         id: id.clone(),
         source_path: source_path.clone(),
         staging_dir: staging_dir.to_string_lossy().into_owned(),
-        destination: None,
-        saved_file: staged_file.to_string_lossy().into_owned(),
-        saved_len: stamp.len,
-        saved_modified: stamp.modified,
+        files: vec![StagedFileRow {
+            path: staged_file.to_string_lossy().into_owned(),
+            len: stamp.len,
+            modified: stamp.modified,
+            destination: None,
+        }],
         created_at: SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_or(0, |duration| duration.as_secs() as i64),
@@ -186,7 +191,7 @@ pub async fn start_editor_round_trip(
             .lock()
             .unwrap()
             .iter()
-            .any(|session| session.id == id && session.destination.is_none());
+            .any(|session| session.id == id && !has_copy(session, |_| true));
         if is_unsaved {
             end_session(app_handle, &id);
         }
@@ -240,7 +245,7 @@ pub fn start_editing_original(
         .lock()
         .unwrap()
         .iter()
-        .filter(|session| session.destination.as_deref() == Some(physical.as_str()))
+        .filter(|session| has_copy(session, |destination| destination == physical))
         .map(|session| session.id.clone())
         .collect();
     for id in replaced {
@@ -356,35 +361,35 @@ pub fn start_watcher(app_handle: AppHandle) {
             remove_orphaned_staging(&root, SystemTime::now());
         }
 
-        let mut unsettled: HashMap<String, (PathBuf, FileStamp)> = HashMap::new();
+        // Files with an unhandled change, keyed by path, and the stamp the
+        // previous poll saw.
+        let mut unsettled: HashMap<String, FileStamp> = HashMap::new();
         loop {
             let now = SystemTime::now();
             let sessions = SESSIONS.lock().unwrap().clone();
             let originals = ORIGINALS.lock().unwrap().clone();
-            unsettled.retain(|key, _| {
-                originals.contains_key(key) || sessions.iter().any(|session| &session.id == key)
-            });
-            for session in sessions {
+            let mut changed: HashMap<String, FileStamp> = HashMap::new();
+            for mut session in sessions {
                 let staging_dir = Path::new(&session.staging_dir);
-                match latest_saved_file(staging_dir) {
-                    Some(latest) if !is_handled(&session, &latest) => {
-                        if is_settled(&mut unsettled, &session.id, latest.clone()) {
-                            // A failure (for example a file the editor still
-                            // has locked on Windows) retries next poll.
-                            let id = session.id.clone();
-                            match promote(&app_handle, session, &latest) {
-                                Ok(()) => {
-                                    unsettled.remove(&id);
-                                }
-                                Err(error) => log::warn!("Could not save external edit: {error}"),
-                            }
-                        }
+                let saves: Vec<_> = saved_files(staging_dir)
+                    .into_iter()
+                    .filter(|save| !is_handled(&session, save))
+                    .collect();
+                if saves.is_empty() {
+                    if !staging_dir.is_dir() || is_expired(&session, now) {
+                        end_session(&app_handle, &session.id);
                     }
-                    _ => {
-                        unsettled.remove(&session.id);
-                        if !staging_dir.is_dir() || is_expired(&session, now) {
-                            end_session(&app_handle, &session.id);
-                        }
+                    continue;
+                }
+                for save in saves {
+                    let key = save.0.to_string_lossy().into_owned();
+                    if !is_settled(&unsettled, &key, save.1) {
+                        changed.insert(key, save.1);
+                    } else if let Err(error) = promote(&app_handle, &mut session, &save) {
+                        // For example a file the editor still has locked on
+                        // Windows; the next poll retries.
+                        log::warn!("Could not save external edit: {error}");
+                        changed.insert(key, save.1);
                     }
                 }
             }
@@ -394,9 +399,11 @@ pub fn start_watcher(app_handle: AppHandle) {
                     continue;
                 };
                 if stamp == handled {
-                    unsettled.remove(&path);
-                } else if is_settled(&mut unsettled, &path, (PathBuf::from(&path), stamp)) {
-                    unsettled.remove(&path);
+                    continue;
+                }
+                if !is_settled(&unsettled, &path, stamp) {
+                    changed.insert(path, stamp);
+                } else {
                     ORIGINALS.lock().unwrap().insert(path.clone(), stamp);
                     let _ = app_handle.emit(
                         SAVED_EVENT,
@@ -408,6 +415,7 @@ pub fn start_watcher(app_handle: AppHandle) {
                     );
                 }
             }
+            unsettled = changed;
             thread::sleep(POLL_INTERVAL);
         }
     });
@@ -484,21 +492,28 @@ fn folder_size(path: &Path) -> u64 {
 /// No save has been handled for [`RETENTION`]. The last handled file is the
 /// render itself until the editor saves.
 fn is_expired(session: &EditorRoundTripRow, now: SystemTime) -> bool {
-    now.duration_since(UNIX_EPOCH + Duration::from_nanos(session.saved_modified))
+    let last_handled = session
+        .files
+        .iter()
+        .map(|file| file.modified)
+        .max()
+        .unwrap_or_default();
+    now.duration_since(UNIX_EPOCH + Duration::from_nanos(last_handled))
         .is_ok_and(|age| age > RETENTION)
 }
 
-/// Records `latest` and reports whether the previous poll saw the same file.
-fn is_settled(
-    unsettled: &mut HashMap<String, (PathBuf, FileStamp)>,
-    key: &str,
-    latest: (PathBuf, FileStamp),
-) -> bool {
-    if unsettled.get(key) == Some(&latest) {
-        return true;
-    }
-    unsettled.insert(key.to_owned(), latest);
-    false
+/// Whether the previous poll saw the file at `key` with the same stamp.
+fn is_settled(unsettled: &HashMap<String, FileStamp>, key: &str, stamp: FileStamp) -> bool {
+    unsettled.get(key) == Some(&stamp)
+}
+
+/// Whether one of the session's copies beside the source matches `filter`.
+fn has_copy(session: &EditorRoundTripRow, filter: impl Fn(&str) -> bool) -> bool {
+    session
+        .files
+        .iter()
+        .filter_map(|file| file.destination.as_deref())
+        .any(filter)
 }
 
 fn file_stamp(path: &Path) -> Option<FileStamp> {
@@ -526,11 +541,11 @@ fn visible_entries(dir: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-/// The newest image the editor saved into the staging folder or one of its
-/// subfolders (editors that export into a folder of their own). Hidden files
-/// and folders and files ThisIsRAW cannot open, such as editor temporaries and
-/// PSDs, are ignored.
-fn latest_saved_file(staging_dir: &Path) -> Option<(PathBuf, FileStamp)> {
+/// The images in the staging folder and its subfolders (editors that export
+/// into a folder of their own): the render and everything the editor saved.
+/// Hidden files and folders and files ThisIsRAW cannot open, such as editor
+/// temporaries and PSDs, are ignored.
+fn saved_files(staging_dir: &Path) -> Vec<(PathBuf, FileStamp)> {
     let entries = visible_entries(staging_dir);
     let nested: Vec<PathBuf> = entries
         .iter()
@@ -542,20 +557,24 @@ fn latest_saved_file(staging_dir: &Path) -> Option<(PathBuf, FileStamp)> {
         .chain(nested)
         .filter(|path| is_supported_image_file(path))
         .filter_map(|path| file_stamp(&path).map(|stamp| (path, stamp)))
-        .max_by_key(|(_, stamp)| stamp.modified)
+        .collect()
 }
 
 fn is_handled(session: &EditorRoundTripRow, (file, stamp): &(PathBuf, FileStamp)) -> bool {
-    Path::new(&session.saved_file) == file
-        && session.saved_len == stamp.len
-        && session.saved_modified == stamp.modified
+    session.files.iter().any(|handled| {
+        Path::new(&handled.path) == file
+            && handled.len == stamp.len
+            && handled.modified == stamp.modified
+    })
 }
 
-/// `<stem>-Edit.<ext>` beside the source, or `-Edit-2`, `-Edit-3`, … when taken.
-fn free_destination(source_path: &str, extension: &str) -> PathBuf {
+/// The saved file's name beside the source (`<stem>-Edit.<ext>` for the
+/// render, the chosen name after a Save As), with `-2`, `-3`, … when taken.
+fn free_destination(source_path: &str, saved_file: &Path) -> PathBuf {
     let (source, _) = parse_virtual_path(source_path);
     let folder = source.parent().unwrap_or(Path::new(""));
-    let stem = source.file_stem().unwrap_or_default().to_string_lossy();
+    let stem = saved_file.file_stem().unwrap_or_default().to_string_lossy();
+    let extension = saved_file.extension().unwrap_or_default().to_string_lossy();
     (1u32..)
         .map(|number| {
             let counter = if number == 1 {
@@ -563,43 +582,21 @@ fn free_destination(source_path: &str, extension: &str) -> PathBuf {
             } else {
                 format!("-{number}")
             };
-            folder.join(format!("{stem}{EDIT_SUFFIX}{counter}.{extension}"))
+            folder.join(format!("{stem}{counter}.{extension}"))
         })
         .find(|candidate| !candidate.exists())
         .expect("an unused file name exists")
 }
 
-/// Copies a settled save beside the source, replacing this session's earlier
-/// copy unless the editor changed the file type.
+/// Copies a settled save beside the source, records it in the session and the
+/// catalog, and tells the Library.
 fn promote(
     app_handle: &AppHandle,
-    mut session: EditorRoundTripRow,
-    (file, stamp): &(PathBuf, FileStamp),
+    session: &mut EditorRoundTripRow,
+    save: &(PathBuf, FileStamp),
 ) -> Result<(), String> {
-    let extension = file
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .unwrap_or_default();
-    let previous = session
-        .destination
-        .as_deref()
-        .map(PathBuf::from)
-        .filter(|destination| {
-            destination
-                .extension()
-                .and_then(|extension| extension.to_str())
-                == Some(extension)
-        });
-    let is_new = previous.is_none();
-    let destination = previous.unwrap_or_else(|| free_destination(&session.source_path, extension));
-    copy_file_atomically(file, &destination)?;
-
-    let output_path = destination.to_string_lossy().into_owned();
-    session.destination = Some(output_path.clone());
-    session.saved_file = file.to_string_lossy().into_owned();
-    session.saved_len = stamp.len;
-    session.saved_modified = stamp.modified;
-    if let Err(error) = library_catalog::save_editor_round_trip(app_handle, &session) {
+    let (output_path, is_new) = copy_save(session, save)?;
+    if let Err(error) = library_catalog::save_editor_round_trip(app_handle, session) {
         log::warn!("Could not record external edit: {error}");
     }
     if let Some(entry) = SESSIONS
@@ -613,12 +610,49 @@ fn promote(
     let _ = app_handle.emit(
         SAVED_EVENT,
         RoundTripSaved {
-            source_path: session.source_path,
+            source_path: session.source_path.clone(),
             output_path,
             is_new,
         },
     );
     Ok(())
+}
+
+/// Copies a save beside the source, replacing the copy an earlier save of the
+/// same file made, and marks it handled. Returns the copy's path and whether
+/// it is new.
+fn copy_save(
+    session: &mut EditorRoundTripRow,
+    (file, stamp): &(PathBuf, FileStamp),
+) -> Result<(String, bool), String> {
+    let path = file.to_string_lossy().into_owned();
+    let previous = session
+        .files
+        .iter()
+        .find(|handled| handled.path == path)
+        .and_then(|handled| handled.destination.clone());
+    let is_new = previous.is_none();
+    let destination = previous
+        .map(PathBuf::from)
+        .unwrap_or_else(|| free_destination(&session.source_path, file));
+    copy_file_atomically(file, &destination)?;
+
+    let output_path = destination.to_string_lossy().into_owned();
+    let handled = StagedFileRow {
+        path,
+        len: stamp.len,
+        modified: stamp.modified,
+        destination: Some(output_path.clone()),
+    };
+    match session
+        .files
+        .iter_mut()
+        .find(|entry| entry.path == handled.path)
+    {
+        Some(entry) => *entry = handled,
+        None => session.files.push(handled),
+    }
+    Ok((output_path, is_new))
 }
 
 #[cfg(test)]
@@ -630,50 +664,54 @@ mod tests {
             id: "session".to_owned(),
             source_path: "/photos/IMG_1.CR3".to_owned(),
             staging_dir: staged_file.parent().unwrap().to_string_lossy().into_owned(),
-            destination: None,
-            saved_file: staged_file.to_string_lossy().into_owned(),
-            saved_len: stamp.len,
-            saved_modified: stamp.modified,
+            files: vec![StagedFileRow {
+                path: staged_file.to_string_lossy().into_owned(),
+                len: stamp.len,
+                modified: stamp.modified,
+                destination: None,
+            }],
             created_at: 0,
         }
     }
 
+    fn unhandled(session: &EditorRoundTripRow) -> Vec<(PathBuf, FileStamp)> {
+        saved_files(Path::new(&session.staging_dir))
+            .into_iter()
+            .filter(|save| !is_handled(session, save))
+            .collect()
+    }
+
     #[test]
-    fn latest_saved_file_ignores_hidden_and_unreadable_files() {
+    fn saved_files_ignore_hidden_and_unreadable_files() {
         let staging = tempfile::tempdir().unwrap();
         let staged = staging.path().join("IMG_1-Edit.tif");
         fs::write(&staged, b"render").unwrap();
         fs::write(staging.path().join(".IMG_1-Edit.tif.tmp"), b"partial").unwrap();
         fs::write(staging.path().join("IMG_1-Edit.psd"), b"layers").unwrap();
 
-        let (latest, stamp) = latest_saved_file(staging.path()).unwrap();
-        assert_eq!(latest, staged);
-        assert_eq!(stamp.len, 6);
+        let files = saved_files(staging.path());
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].0, staged);
+        assert_eq!(files[0].1.len, 6);
     }
 
     #[test]
-    fn latest_saved_file_finds_saves_in_subfolders_but_not_hidden_ones() {
+    fn saved_files_include_subfolders_but_not_hidden_ones() {
         let staging = tempfile::tempdir().unwrap();
         let staged = staging.path().join("IMG_1-Edit.tif");
         fs::write(&staged, b"render").unwrap();
-        let later = |path: &Path, seconds: u64| {
-            fs::write(path, b"saved").unwrap();
-            fs::File::options()
-                .write(true)
-                .open(path)
-                .unwrap()
-                .set_modified(SystemTime::now() + Duration::from_secs(seconds))
-                .unwrap();
-        };
-
         fs::create_dir(staging.path().join(".cache")).unwrap();
-        later(&staging.path().join(".cache").join("IMG_1-Edit.jpg"), 60);
-        assert_eq!(latest_saved_file(staging.path()).unwrap().0, staged);
-
+        fs::write(staging.path().join(".cache").join("IMG_1-Edit.jpg"), b"x").unwrap();
         fs::create_dir(staging.path().join("Exports")).unwrap();
         let exported = staging.path().join("Exports").join("IMG_1-Edit.jpg");
-        later(&exported, 30);
-        assert_eq!(latest_saved_file(staging.path()).unwrap().0, exported);
+        fs::write(&exported, b"saved").unwrap();
+
+        let mut files: Vec<PathBuf> = saved_files(staging.path())
+            .into_iter()
+            .map(|(path, _)| path)
+            .collect();
+        files.sort();
+        assert_eq!(files, vec![exported, staged]);
     }
 
     #[test]
@@ -681,29 +719,61 @@ mod tests {
         let staging = tempfile::tempdir().unwrap();
         let staged = staging.path().join("IMG_1-Edit.tif");
         fs::write(&staged, b"render").unwrap();
-        let rendered = latest_saved_file(staging.path()).unwrap();
-        let session = session_for(&staged, rendered.1);
-        assert!(is_handled(&session, &rendered));
+        let session = session_for(&staged, file_stamp(&staged).unwrap());
+        assert!(unhandled(&session).is_empty());
 
         fs::write(&staged, b"saved by the editor").unwrap();
-        assert!(!is_handled(
-            &session,
-            &latest_saved_file(staging.path()).unwrap()
-        ));
+        assert_eq!(unhandled(&session).len(), 1);
+    }
+
+    #[test]
+    fn each_saved_file_gets_its_own_copy_that_later_saves_replace() {
+        let photos = tempfile::tempdir().unwrap();
+        let staging = tempfile::tempdir().unwrap();
+        let staged = staging.path().join("IMG_1-Edit.tif");
+        fs::write(&staged, b"render").unwrap();
+        let mut session = session_for(&staged, file_stamp(&staged).unwrap());
+        session.source_path = photos.path().join("IMG_1.CR3").to_string_lossy().into();
+        let copy_all = |session: &mut EditorRoundTripRow| {
+            let mut copies: Vec<(String, bool)> = unhandled(session)
+                .iter()
+                .map(|save| copy_save(session, save).unwrap())
+                .collect();
+            copies.sort();
+            copies
+        };
+        let copy = |name: &str| photos.path().join(name).to_string_lossy().into_owned();
+
+        // Save, then Save As to JPEG and to a second TIFF name in one poll.
+        fs::write(&staged, b"saved").unwrap();
+        fs::write(staging.path().join("IMG_1-Edit.jpg"), b"jpeg").unwrap();
+        fs::write(staging.path().join("IMG_1-Edit-bw.tif"), b"bw").unwrap();
+        assert_eq!(
+            copy_all(&mut session),
+            vec![
+                (copy("IMG_1-Edit-bw.tif"), true),
+                (copy("IMG_1-Edit.jpg"), true),
+                (copy("IMG_1-Edit.tif"), true),
+            ]
+        );
+        assert!(unhandled(&session).is_empty());
+
+        // Saving the first TIFF again replaces only its own copy.
+        fs::write(&staged, b"saved again").unwrap();
+        let replaced = copy_all(&mut session);
+        assert_eq!(replaced.len(), 1);
+        assert!(!replaced[0].1);
+        assert_eq!(fs::read(&replaced[0].0).unwrap(), b"saved again");
+        assert_eq!(fs::read_dir(photos.path()).unwrap().count(), 3);
     }
 
     #[test]
     fn a_save_settles_once_two_polls_agree() {
-        let mut unsettled = HashMap::new();
-        let reading = |len| {
-            (
-                PathBuf::from("IMG_1-Edit.tif"),
-                FileStamp { len, modified: 1 },
-            )
-        };
-        assert!(!is_settled(&mut unsettled, "session", reading(1)));
-        assert!(!is_settled(&mut unsettled, "session", reading(2)));
-        assert!(is_settled(&mut unsettled, "session", reading(2)));
+        let stamp = |len| FileStamp { len, modified: 1 };
+        let polls = HashMap::from([("IMG_1-Edit.tif".to_owned(), stamp(1))]);
+        assert!(!is_settled(&polls, "IMG_1-Edit.tif", stamp(2)));
+        assert!(!is_settled(&polls, "IMG_1-Edit-bw.tif", stamp(1)));
+        assert!(is_settled(&polls, "IMG_1-Edit.tif", stamp(1)));
     }
 
     #[test]
@@ -773,20 +843,25 @@ mod tests {
         let folder = tempfile::tempdir().unwrap();
         let source = folder.path().join("IMG_1.CR3");
         let source_path = format!("{}?vc=2", source.display());
+        let staged = |name: &str| Path::new("/cache/external-edits/session").join(name);
         assert_eq!(
-            free_destination(&source_path, "tif"),
+            free_destination(&source_path, &staged("IMG_1-Edit.tif")),
             folder.path().join("IMG_1-Edit.tif")
         );
 
         fs::write(folder.path().join("IMG_1-Edit.tif"), b"").unwrap();
         fs::write(folder.path().join("IMG_1-Edit-2.tif"), b"").unwrap();
         assert_eq!(
-            free_destination(&source_path, "tif"),
+            free_destination(&source_path, &staged("IMG_1-Edit.tif")),
             folder.path().join("IMG_1-Edit-3.tif")
         );
         assert_eq!(
-            free_destination(&source_path, "jpg"),
+            free_destination(&source_path, &staged("IMG_1-Edit.jpg")),
             folder.path().join("IMG_1-Edit.jpg")
+        );
+        assert_eq!(
+            free_destination(&source_path, &staged("Sunset.tif")),
+            folder.path().join("Sunset.tif")
         );
     }
 }
