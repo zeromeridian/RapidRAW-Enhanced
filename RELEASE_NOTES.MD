@@ -5,6 +5,25 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.56.1-fix-constrain-crop-perspective — 2026-11-14
+
+### Develop
+
+- **Constrain Crop** no longer changes how strongly a perspective
+  correction straightens. It now only zooms the corrected photo enough to
+  hide the empty borders, so turning it on or off keeps vertical lines
+  exactly as straight as before.
+- Auto and Vertical now give the same correction with Constrain Crop on
+  or off.
+- **Note for existing edits** with a perspective correction and Constrain
+  Crop turned on: they now look different.
+  - A Manual Transform Vertical or Horizontal correction now straightens
+    exactly as set on the sliders; before, the zoom made it stronger.
+  - An Auto or Vertical result saved with Constrain Crop on may now look
+    under-corrected; click Auto or Vertical again to redo it.
+  - Their Library thumbnails update when the photo is edited again or the
+    thumbnail cache is cleared.
+
 ## 1.56.0-dev-orbit-blend-pad — 2026-11-13
 
 ### Develop

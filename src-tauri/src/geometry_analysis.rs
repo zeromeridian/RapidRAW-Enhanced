@@ -21,8 +21,8 @@ use serde::{Deserialize, Serialize};
 use crate::AppState;
 use crate::guided_perspective::GuidedPerspective;
 use crate::image_processing::{
-    GeometryParams, build_transform_matrix, compute_transform_constrain_scale, downscale_f32_image,
-    get_geometry_params_from_json, is_geometry_identity, warp_image_geometry,
+    GeometryParams, build_transform_matrix, downscale_f32_image, get_geometry_params_from_json,
+    is_geometry_identity, warp_image_geometry,
 };
 
 type Point = (f32, f32);
@@ -216,16 +216,16 @@ fn project(matrix: &Matrix3<f32>, point: Point) -> Option<Point> {
 }
 
 /// Length-weighted mean squared sine of each segment's angle to its target
-/// axis after the correction.
+/// axis after the correction. Constrain Crop's zoom scales the result about
+/// its centre, which keeps every angle, so the cost leaves it out.
 fn alignment_cost(
     segments: &[AxisSegment],
     base: &GeometryParams,
     width: f32,
     height: f32,
-    extra_scale: f32,
     correction: Correction,
 ) -> f32 {
-    let matrix = build_transform_matrix(&correction.apply_to(base), width, height, extra_scale);
+    let matrix = build_transform_matrix(&correction.apply_to(base), width, height, 1.0);
     let mut weighted_sum = 0.0;
     let mut total_weight = 0.0;
     for axis_segment in segments {
@@ -269,29 +269,14 @@ struct AlignmentProblem<'a> {
 }
 
 impl AlignmentProblem<'_> {
-    fn cost(&self, correction: Correction, extra_scale: f32) -> f32 {
+    fn cost(&self, correction: Correction) -> f32 {
         alignment_cost(
             self.segments,
             self.base,
             self.width,
             self.height,
-            extra_scale,
             correction,
         )
-    }
-
-    /// The cost with the zoom Constrain Crop applies for this correction.
-    fn settled_cost(&self, correction: Correction) -> f32 {
-        let extra_scale = if self.base.constrain_crop {
-            compute_transform_constrain_scale(
-                &correction.apply_to(self.base),
-                self.width,
-                self.height,
-            )
-        } else {
-            1.0
-        };
-        self.cost(correction, extra_scale)
     }
 
     fn coarse_search(&self) -> (Correction, f32) {
@@ -305,7 +290,7 @@ impl AlignmentProblem<'_> {
                         vertical: vertical_step as f32 * 5.0,
                         horizontal: horizontal_step as f32 * 5.0,
                     };
-                    let cost = self.cost(correction, 1.0);
+                    let cost = self.cost(correction);
                     if cost < best.1 {
                         best = (correction, cost);
                     }
@@ -316,8 +301,8 @@ impl AlignmentProblem<'_> {
     }
 
     /// Pattern search around `start`, halving the step after each round.
-    fn refine(&self, start: Correction, extra_scale: f32) -> (Correction, f32) {
-        let mut best = (start, self.cost(start, extra_scale));
+    fn refine(&self, start: Correction) -> (Correction, f32) {
+        let mut best = (start, self.cost(start));
         let mut rotate_step = 1.5;
         let mut perspective_step = 2.5;
         let deltas = |free: bool, step: f32| if free { [-step, 0.0, step] } else { [0.0; 3] };
@@ -332,7 +317,7 @@ impl AlignmentProblem<'_> {
                             horizontal: center.horizontal + horizontal_delta,
                         }
                         .clamped();
-                        let cost = self.cost(correction, extra_scale);
+                        let cost = self.cost(correction);
                         if cost < best.1 {
                             best = (correction, cost);
                         }
@@ -347,25 +332,7 @@ impl AlignmentProblem<'_> {
 
     fn solve(&self) -> Option<(Correction, f32)> {
         let (coarse, _) = self.coarse_search();
-        let mut best = self.refine(coarse, 1.0);
-        if self.base.constrain_crop {
-            // Constrain Crop scales the image before the perspective, so the
-            // scale and the correction depend on each other; iterate to their
-            // fixed point.
-            let mut extra_scale = 1.0;
-            for _ in 0..12 {
-                let next_scale = compute_transform_constrain_scale(
-                    &best.0.apply_to(self.base),
-                    self.width,
-                    self.height,
-                );
-                if (next_scale - extra_scale).abs() < 1e-4 {
-                    break;
-                }
-                extra_scale = next_scale;
-                best = self.refine(best.0, extra_scale);
-            }
-        }
+        let best = self.refine(coarse);
         // `alignment_cost` reports f32::MAX for no segments or an invalid warp.
         (best.1 < f32::MAX).then_some(best)
     }
@@ -806,8 +773,8 @@ fn analyze_segments(
                     free: vertical_free,
                 };
                 let keeps_verticals = |candidate: &Solution| {
-                    verticals_problem.settled_cost(candidate.correction)
-                        <= verticals_problem.settled_cost(vertical_only.correction)
+                    verticals_problem.cost(candidate.correction)
+                        <= verticals_problem.cost(vertical_only.correction)
                             + KEYSTONE_VERTICAL_TOLERANCE
                 };
                 (
@@ -1285,56 +1252,23 @@ mod tests {
             horizontal: 0.0,
         };
         let gray = scene_needing(truth, &FACADE_XS, &[]);
-        let base = GeometryParams {
-            constrain_crop: true,
-            ..GeometryParams::default()
+        let analyze_with = |constrain_crop: bool| {
+            let base = GeometryParams {
+                constrain_crop,
+                ..GeometryParams::default()
+            };
+            analyze_geometry_pixels(&gray, AutoGeometryMode::Vertical, 0, &base).unwrap()
         };
-        let result = analyze_geometry_pixels(&gray, AutoGeometryMode::Vertical, 0, &base).unwrap();
-        // The drawn lines need the correction without the zoom, so the
-        // solver must still straighten them once the zoom is applied.
-        let applied = Correction {
-            rotate: result.rotate,
-            vertical: result.vertical.unwrap(),
-            horizontal: 0.0,
-        };
-        let extra_scale = compute_transform_constrain_scale(
-            &applied.apply_to(&base),
-            WIDTH as f32,
-            HEIGHT as f32,
+        // Constrain Crop's zoom comes after the perspective, so the same
+        // lines need the same correction with it on or off.
+        let free = analyze_with(false);
+        let constrained = analyze_with(true);
+        assert_eq!(constrained.rotate, free.rotate, "{constrained:?}");
+        assert_eq!(constrained.vertical, free.vertical, "{constrained:?}");
+        assert!(
+            (free.vertical.unwrap() - truth.vertical).abs() < 2.0,
+            "{free:?}"
         );
-        assert!(extra_scale > 1.0);
-        let segments = FACADE_XS
-            .iter()
-            .map(|&x| {
-                let inverse = build_transform_matrix(
-                    &truth.apply_to(&GeometryParams::default()),
-                    WIDTH as f32,
-                    HEIGHT as f32,
-                    1.0,
-                )
-                .try_inverse()
-                .unwrap();
-                let source =
-                    |y: f32| project(&inverse, (x * WIDTH as f32, y * HEIGHT as f32)).unwrap();
-                AxisSegment {
-                    segment: LineSegment {
-                        start: source(0.12),
-                        end: source(0.88),
-                    },
-                    axis: Axis::Vertical,
-                    weight: 1.0,
-                }
-            })
-            .collect::<Vec<_>>();
-        let cost = alignment_cost(
-            &segments,
-            &base,
-            WIDTH as f32,
-            HEIGHT as f32,
-            extra_scale,
-            applied,
-        );
-        assert!(cost < 1e-5, "cost {cost}, {result:?}");
     }
 
     #[test]
