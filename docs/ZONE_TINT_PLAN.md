@@ -4,8 +4,9 @@ Status (2026-11-14): **Phases 1 and 2 done** on `dev/zone-tint` (from
 `develop` `492bfffe`, committed as `b23d9d3d`), built as `1.57.0`; Zone
 Tint then moved to its own right-toolbar panel (`1.57.1`) with an
 upright zone scale and a tinted zones list (`1.57.2`), then an overall
-Amount and Fill between along a curve (`1.57.3`), then colour photos too
-(`1.57.4`, uncommitted); the GPU
+Amount and Fill between along a curve (`1.57.3`), colour photos too
+(`1.57.4`), then per-zone luminance and the name Zone Color Grading
+(`1.57.5`, uncommitted); the GPU
 exit check and the hands-on check still have to run on the Mac. Next:
 Phase 3. `UPSTREAM_FEATURE_GAP.md` Plan item 28 (P0, owner
 2026-11-13: after item 27, the Orbit Blend Pad, whose steps 1–7 are done).
@@ -116,6 +117,23 @@ changes about it, the decisions still open, and progress.
   gate left is the panel's eye (`is_visible("zoneTint")`); the Color
   section's eye no longer hides it, and switching Black & White off keeps
   the tint. Overlaps Colour Grading's three wheels, which stay as they are.
+- **Per-zone luminance** (owner 2026-11-14, "if possible"; the numbers
+  are agent choices): each zone's `luminance` (−100 to 100, absent = 0)
+  shifts OKLab L by up to `MAX_LUMINANCE_SHIFT` = 0.05 (half a zone),
+  weighed like the colour but with σ never below 0.04
+  (`MIN_LUMINANCE_SOFTNESS`, passed as `luminance_weight_cap`). Those two
+  bounds keep the tone mapping increasing even for neighbours at +100 and
+  −100 at the narrowest softness (slope ≥ 1 − 0.1 × 7.8 ≈ 0.22), checked
+  on the GPU ramp. Protect does not apply to luminance (Zone 0 can be
+  lifted); Amount scales it. In gamut handling, the pixel's own chroma is
+  kept when it still fits at the new L, else reduced with the tint. This
+  breaks the spec's "L unchanged" rule only where the user sets a
+  luminance; with every luminance at 0 the acceptance test still holds.
+  The wheel now writes only the value that moved to the selected zones.
+- **Name** (owner 2026-11-14): the tool is shown as **Zone Color
+  Grading** (every locale, history label). Internal names stay
+  `zoneTint` / `zone_tint` / `Panel.ZoneTint` and this file's name, so
+  saved edits, XMP and presets keep working.
 
 - **Blend-mode backdrop:** carries the Zone Tint, so masks in a
   non-Normal blend mode keep the zone colours. Done in `shader.wgsl`: the
@@ -204,3 +222,14 @@ changes about it, the decisions still open, and progress.
   and updated: `zone_tint_reaches_the_shader_while_its_panel_is_visible`,
   `a_zone_tint_counts_as_an_edit_on_colour_and_black_and_white_photos`,
   `zone_tint_is_off_unless_a_visible_block_tints_a_zone`.
+- **Luminance and the new name** (`1.57.5`, 2026-11-14, uncommitted):
+  `ZoneTintSettings` gains `luminance_weight_cap`, `has_luminance` (the
+  former pads) and `luminance: [[f32; 4]; 3]` (240 bytes; the layout and
+  naga validation test passes); `apply_zone_tint` adds the luminance
+  pass and the gamut fallback. Tests: `a_zone_luminance_moves_its_tones_
+  without_needing_a_colour`, the GPU ramp extended (order kept, Zone V
+  lifted ≈ 0.044–0.05). Panel: wheel luminance on, `updateZones` writes
+  only changed values, scale greys follow luminance, `zoneRuns` lists
+  luminance-only zones. Strings: rename in 12 locales, `tintedZones` and
+  `untint` reworded (Adjusted zones, Reset zones), `fillHint` mentions
+  luminance, new `ui.colorWheel.luminanceAbbreviation`.

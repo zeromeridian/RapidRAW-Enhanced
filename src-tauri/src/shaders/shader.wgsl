@@ -29,13 +29,14 @@ struct PointColor {
 }
 
 // Zone Tint (`zone_tint::ZoneTintSettings`). Per zone: OKLab a and b at full weight, the
-// centre in OKLab L and 1 / (2σ²).
+// centre in OKLab L and 1 / (2σ²); then each zone's shift in L, four zones to a vector.
 struct ZoneTint {
     zones: array<vec4<f32>, 11>,
     enabled: u32,
     protect: f32,
-    _pad1: f32,
-    _pad2: f32,
+    luminance_weight_cap: f32,
+    has_luminance: u32,
+    luminance: array<vec4<f32>, 3>,
 }
 
 struct ColorGradeSettings {
@@ -369,26 +370,54 @@ fn apply_zone_tint(srgb: vec3<f32>, tint: ZoneTint) -> vec3<f32> {
         protection = smoothstep(0.0, tint.protect, l) * (1.0 - smoothstep(1.0 - tint.protect, 1.0, l));
     }
     chroma *= protection / weight_sum;
-    if (all(chroma == vec2<f32>(0.0))) {
+
+    // Luminance: the zones' shifts in L, weighed like the colours but never narrower than
+    // the cap allows, so the tones keep their order. Protect does not hold it back.
+    var new_l = l;
+    if (tint.has_luminance == 1u) {
+        var nearest_l = 1e30;
+        for (var n = 0u; n < 11u; n = n + 1u) {
+            let d = l - tint.zones[n].z;
+            nearest_l = min(nearest_l, d * d * min(tint.zones[n].w, tint.luminance_weight_cap));
+        }
+        var luminance_weight_sum = 0.0;
+        var shift = 0.0;
+        for (var n = 0u; n < 11u; n = n + 1u) {
+            let d = l - tint.zones[n].z;
+            let weight = exp(nearest_l - d * d * min(tint.zones[n].w, tint.luminance_weight_cap));
+            luminance_weight_sum += weight;
+            shift += weight * tint.luminance[n / 4u][n % 4u];
+        }
+        new_l = clamp(l + shift / luminance_weight_sum, 0.0, 1.0);
+    }
+    if (all(chroma == vec2<f32>(0.0)) && new_l == l) {
         return srgb;
     }
 
-    let full = oklab_to_linear_srgb(vec3<f32>(l, lab.yz + chroma));
+    let full = oklab_to_linear_srgb(vec3<f32>(new_l, lab.yz + chroma));
     if (in_unit_gamut(full)) {
         return linear_to_srgb(full);
     }
-    // The untinted pixel is in gamut, so search the largest share of the chroma that fits.
+    // Search the largest share of the added chroma that fits. The pixel's own chroma is in
+    // gamut at its own L; at a moved L it may not be, and then it is reduced with the tint
+    // (a grey at any L in 0–1 always fits).
+    var kept = lab.yz;
+    var added = chroma;
+    if (!in_unit_gamut(oklab_to_linear_srgb(vec3<f32>(new_l, lab.yz)))) {
+        kept = vec2<f32>(0.0);
+        added = lab.yz + chroma;
+    }
     var inside = 0.0;
     var outside = 1.0;
     for (var i = 0u; i < 12u; i = i + 1u) {
         let share = 0.5 * (inside + outside);
-        if (in_unit_gamut(oklab_to_linear_srgb(vec3<f32>(l, lab.yz + chroma * share)))) {
+        if (in_unit_gamut(oklab_to_linear_srgb(vec3<f32>(new_l, kept + added * share)))) {
             inside = share;
         } else {
             outside = share;
         }
     }
-    return linear_to_srgb(oklab_to_linear_srgb(vec3<f32>(l, lab.yz + chroma * inside)));
+    return linear_to_srgb(oklab_to_linear_srgb(vec3<f32>(new_l, kept + added * inside)));
 }
 
 fn rgb_to_hsv(c: vec3<f32>) -> vec3<f32> {

@@ -5,6 +5,23 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.57.5-dev-zone-tint — 2026-11-14
+
+### Develop
+
+- **Zone Tint** is now called **Zone Color Grading**.
+- Each zone also has a **Luminance** slider, under the colour wheel, that
+  brightens or darkens that zone's tones by up to half a zone, with or
+  without a colour. Neighbouring zones blend smoothly and the tones always
+  keep their order, so a lifted zone never jumps above a lighter one.
+  Lifting Zone 0 gives faded blacks; the Protect slider only limits
+  colour, not luminance.
+- The scale shows each zone's grey after its luminance, and the list
+  below (now **Adjusted zones**) shows luminance too. **Fill between**
+  blends luminance along with colour, and **Amount** scales both.
+- Moving one setting on the wheel for several zones now changes only that
+  setting, so each zone keeps its own values for the others.
+
 ## 1.57.4-dev-zone-tint — 2026-11-14
 
 ### Develop

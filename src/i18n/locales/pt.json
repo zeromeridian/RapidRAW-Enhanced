@@ -230,12 +230,12 @@
     },
     "zoneTint": {
       "fill": "Preencher entre",
-      "fillHint": "Preenche as zonas entre a primeira e a última zona selecionada ao longo da curva, da cor e intensidade de uma ponta às da outra.",
+      "fillHint": "Preenche as zonas entre a primeira e a última zona selecionada ao longo da curva, da cor, intensidade e luminância de uma ponta às da outra.",
       "hint": "Clique numa zona para a colorir. Shift-clique seleciona um intervalo, Cmd/Ctrl-clique adiciona ou remove uma zona.",
       "protect": "Proteção",
       "softness": "Suavidade",
-      "tintedZones": "Zonas tonalizadas",
-      "untint": "Remover tonalidade",
+      "tintedZones": "Zonas ajustadas",
+      "untint": "Redefinir zonas",
       "zone": "Zona {{zone}}",
       "zones": "Zonas {{zones}}"
     }
@@ -441,7 +441,7 @@
         "curves": "Curvas",
         "details": "Detalhes",
         "effects": "Efeitos",
-        "zoneTint": "Tonalidade por zonas"
+        "zoneTint": "Gradação de Cores por Zonas"
       },
       "title": "Ajustes",
       "tooltips": {
@@ -2259,6 +2259,7 @@
       "hue": "Matiz",
       "hueAbbreviation": "M:",
       "luminance": "Luminância",
+      "luminanceAbbreviation": "L:",
       "reset": "Redefinir",
       "saturation": "Saturação",
       "saturationAbbreviation": "S:"

@@ -19,8 +19,15 @@ const VERSION: u32 = 1;
 /// OKLab chroma of a zone at strength 100.
 const MAX_CHROMA: f32 = 0.10;
 const MAX_STRENGTH: f32 = 100.0;
-/// The overall Amount scales every zone's strength, up to double; the product still stops at
-/// `MAX_STRENGTH`.
+/// A zone's Luminance runs −100 to 100; at ±100 it moves the zone's tones by half a zone.
+const MAX_LUMINANCE: f32 = 100.0;
+const MAX_LUMINANCE_SHIFT: f32 = 0.05;
+/// Luminance spreads at least this wide (σ in L), whatever the softness. Together with
+/// `MAX_LUMINANCE_SHIFT` this keeps the tones in order: neighbouring zones at +100 and −100
+/// still map darker tones below lighter ones.
+const MIN_LUMINANCE_SOFTNESS: f32 = DEFAULT_SOFTNESS;
+/// The overall Amount scales every zone's strength and luminance, up to double; the product
+/// still stops at `MAX_STRENGTH` and `MAX_LUMINANCE`.
 const DEFAULT_AMOUNT: f32 = 1.0;
 const MAX_AMOUNT: f32 = 2.0;
 /// Zone softness (σ in L) and its range, also the range of a zone's own width.
@@ -39,11 +46,15 @@ const MAX_CENTER_OFFSET: f32 = 0.05;
 pub struct ZoneTintSettings {
     /// Per zone: OKLab a and b at full weight, the centre in L, and 1 / (2σ²).
     pub zones: [[f32; 4]; ZONE_COUNT],
-    /// 1 when the panel is visible and at least one zone has a colour.
+    /// 1 when the panel is visible and at least one zone has a colour or a luminance shift.
     pub enabled: u32,
     pub protect: f32,
-    _pad1: f32,
-    _pad2: f32,
+    /// The largest 1 / (2σ²) luminance weighs zones with (`MIN_LUMINANCE_SOFTNESS`).
+    pub luminance_weight_cap: f32,
+    /// 1 when at least one zone moves its tones.
+    pub has_luminance: u32,
+    /// Per zone, four to a vector: the shift in OKLab L at full weight.
+    pub luminance: [[f32; 4]; 3],
 }
 
 /// The edit's `zoneTint` block.
@@ -80,6 +91,8 @@ struct Zone {
     hue: f32,
     /// 0–100; 0 leaves the zone neutral.
     strength: f32,
+    /// −100 to 100; 0 keeps the zone's tones.
+    luminance: f32,
     center_offset: f32,
     /// The zone's own σ; `None` uses the block's softness.
     width: Option<f32>,
@@ -105,7 +118,9 @@ impl ZoneTintSettings {
             ..Self::default()
         };
         let mut tinted = false;
-        for (index, slot) in settings.zones.iter_mut().enumerate() {
+        let mut moves = false;
+        let mut zones = settings.zones;
+        for (index, slot) in zones.iter_mut().enumerate() {
             let zone = tint.zones.get(index);
             let chroma = zone.map_or(0.0, |zone| {
                 (zone.strength.max(0.0) * amount).min(MAX_STRENGTH) / MAX_STRENGTH * MAX_CHROMA
@@ -118,7 +133,15 @@ impl ZoneTintSettings {
             let sigma = zone
                 .and_then(|zone| zone.width)
                 .map_or(softness, |width| width.clamp(MIN_SOFTNESS, MAX_SOFTNESS));
+            let shift = zone.map_or(0.0, |zone| {
+                (zone.luminance.clamp(-MAX_LUMINANCE, MAX_LUMINANCE) * amount)
+                    .clamp(-MAX_LUMINANCE, MAX_LUMINANCE)
+                    / MAX_LUMINANCE
+                    * MAX_LUMINANCE_SHIFT
+            });
+            settings.luminance[index / 4][index % 4] = shift;
             tinted |= chroma > 0.0;
+            moves |= shift != 0.0;
             *slot = [
                 chroma * hue.cos(),
                 chroma * hue.sin(),
@@ -126,12 +149,16 @@ impl ZoneTintSettings {
                 1.0 / (2.0 * sigma * sigma),
             ];
         }
-        // Without a colour the block is off exactly like a missing one, so an edit whose
-        // zones are all neutral (or whose Amount is 0) does not count as an edit.
-        if !tinted {
+        // Without a colour or a luminance shift the block is off exactly like a missing one,
+        // so an edit whose zones are all neutral (or whose Amount is 0) is not an edit.
+        if !tinted && !moves {
             return Self::default();
         }
+        settings.zones = zones;
         settings.enabled = 1;
+        settings.has_luminance = u32::from(moves);
+        settings.luminance_weight_cap =
+            1.0 / (2.0 * MIN_LUMINANCE_SOFTNESS * MIN_LUMINANCE_SOFTNESS);
         settings
     }
 }
@@ -246,6 +273,34 @@ mod tests {
         assert!((inverse_two_sigma_sq - 1.0 / (2.0 * MAX_SOFTNESS * MAX_SOFTNESS)).abs() < 1e-2);
         // Zones without an entry keep the block's softness.
         assert!((tint.zones[5][3] - 1.0 / (2.0 * MAX_SOFTNESS * MAX_SOFTNESS)).abs() < 1e-2);
+    }
+
+    #[test]
+    fn a_zone_luminance_moves_its_tones_without_needing_a_colour() {
+        let mut zones = vec![json!({}); ZONE_COUNT];
+        zones[5] = json!({ "luminance": 100 });
+        zones[6] = json!({ "luminance": -50 });
+        zones[10] = json!({ "luminance": 400 });
+        let tint = settings(json!({ "zones": zones }));
+
+        assert_eq!(tint.enabled, 1);
+        assert_eq!(tint.has_luminance, 1);
+        let shift = |zone: usize| tint.luminance[zone / 4][zone % 4];
+        assert!((shift(5) - MAX_LUMINANCE_SHIFT).abs() < 1e-6);
+        assert!((shift(6) + MAX_LUMINANCE_SHIFT / 2.0).abs() < 1e-6);
+        // Out of range, a zone's luminance is clamped to ±100.
+        assert!((shift(10) - MAX_LUMINANCE_SHIFT).abs() < 1e-6);
+        assert_eq!(shift(0), 0.0);
+        // Luminance alone tints nothing and spreads at least as wide as the default softness.
+        assert!(tint.zones.iter().all(|zone| zone[..2] == [0.0, 0.0]));
+        assert!((tint.luminance_weight_cap - 312.5).abs() < 1e-3);
+
+        // The Amount scales the shift too; a colour alone moves no tone.
+        let halved = settings(json!({ "amount": 0.5, "zones": [{ "luminance": 100 }] }));
+        assert!((halved.luminance[0][0] - MAX_LUMINANCE_SHIFT / 2.0).abs() < 1e-6);
+        let colour_only = settings(json!({ "zones": [{ "hue": 30, "strength": 40 }] }));
+        assert_eq!(colour_only.has_luminance, 0);
+        assert_eq!(colour_only.luminance, [[0.0; 4]; 3]);
     }
 
     #[test]
