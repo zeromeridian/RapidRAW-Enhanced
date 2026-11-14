@@ -541,6 +541,7 @@ export default function BlendPadPanel() {
             updatePad(() => loadBlendPadPreset(preset), preset.name);
             setSelectedId(null);
           }}
+          onSaved={(preset) => updatePad((current) => ({ ...current, presetId: preset.id }))}
           pad={pad}
           parameters={parameters}
         />

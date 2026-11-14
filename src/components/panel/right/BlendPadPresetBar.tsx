@@ -31,6 +31,8 @@ interface BlendPadPresetBarProps {
   pad: BlendPad;
   parameters: Array<BlendPadParameter>;
   onLoad(preset: BlendPadPreset): void;
+  /** The current pad was saved as this new preset: it now belongs to it. */
+  onSaved(preset: BlendPadPreset): void;
 }
 
 type NameModal = { kind: 'save' } | { kind: 'rename'; preset: BlendPadPreset } | null;
@@ -39,12 +41,11 @@ type NameModal = { kind: 'save' } | { kind: 'rename'; preset: BlendPadPreset } |
  * Named pad setups, kept in the app settings (only the pad; full looks stay in Presets): pick
  * one to load it, save the current pad, update, rename, delete, export and import JSON.
  */
-export default function BlendPadPresetBar({ pad, parameters, onLoad }: BlendPadPresetBarProps) {
+export default function BlendPadPresetBar({ pad, parameters, onLoad, onSaved }: BlendPadPresetBarProps) {
   const { t } = useTranslation();
   const { showContextMenu } = useContextMenu();
   const appSettings = useSettingsStore((state) => state.appSettings);
   const handleSettingsChange = useSettingsStore((state) => state.handleSettingsChange);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [nameModal, setNameModal] = useState<NameModal>(null);
   const [includesPuck, setIncludesPuck] = useState(true);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -55,7 +56,8 @@ export default function BlendPadPresetBar({ pad, parameters, onLoad }: BlendPadP
     () => (isReady ? sanitizeBlendPadPresets(appSettings?.blendPadPresets, parameters) : []),
     [appSettings?.blendPadPresets, isReady, parameters],
   );
-  const selected = presets.find((preset) => preset.id === selectedId) ?? null;
+  // The pad remembers its preset, so the name stays when the panel is reopened or the photo reloaded.
+  const selected = presets.find((preset) => preset.id === pad.presetId) ?? null;
   const isDirty = !!selected && isBlendPadPresetDirty(selected, pad);
   const options = useMemo(() => presets.map((preset) => ({ label: preset.name, value: preset.id })), [presets]);
 
@@ -65,15 +67,13 @@ export default function BlendPadPresetBar({ pad, parameters, onLoad }: BlendPadP
 
   const handleLoad = (id: string) => {
     const preset = presets.find((candidate) => candidate.id === id);
-    if (!preset) return;
-    setSelectedId(id);
-    onLoad(preset);
+    if (preset) onLoad(preset);
   };
 
   const handleSaveNew = (name: string) => {
     const preset = createBlendPadPreset(name, pad, includesPuck);
     savePresets([...presets, preset]);
-    setSelectedId(preset.id);
+    onSaved(preset);
   };
 
   const handleUpdate = () => {
@@ -86,8 +86,8 @@ export default function BlendPadPresetBar({ pad, parameters, onLoad }: BlendPadP
 
   const handleDelete = () => {
     if (!selected) return;
+    // The pad keeps a stale `presetId`, which simply matches nothing any more.
     savePresets(presets.filter((preset) => preset.id !== selected.id));
-    setSelectedId(null);
   };
 
   const handleExport = async (toExport: Array<BlendPadPreset>) => {
