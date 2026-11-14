@@ -107,7 +107,11 @@ jobs:
             # The hardened runtime only serves notarization. With an ad-hoc
             # signature its library validation would refuse the bundled ONNX
             # Runtime, which has no Team ID, when the AI features load it.
-            echo 'TAURI_CONFIG={"bundle":{"macOS":{"hardenedRuntime":false}}}' >> "$GITHUB_ENV"
+            # Tauri 2 reads extra configuration only from --config, not from
+            # the TAURI_CONFIG environment variable.
+            adhoc_config="$RUNNER_TEMP/tauri-adhoc.conf.json"
+            echo '{"bundle":{"macOS":{"hardenedRuntime":false}}}' > "$adhoc_config"
+            echo "tauri-args=--config $adhoc_config" >> "$GITHUB_OUTPUT"
             echo "developer-id=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -137,7 +141,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NO_STRIP: ${{ runner.os == 'Linux' }}
         with:
-          args: --verbose ${{ inputs.build-args }} --target ${{ inputs.target }}
+          args: --verbose ${{ inputs.build-args }} ${{ steps.apple-signing.outputs.tauri-args }} --target ${{ inputs.target }}
           assetNamePattern: '[name]_v[version]_${{ inputs.asset-platform }}_[arch][ext]'
           releaseId: ${{ inputs.release-id }}
           retryAttempts: 3
