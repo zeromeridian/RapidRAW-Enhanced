@@ -72,7 +72,6 @@ import {
   MaskBlendMode,
   ADJUSTMENT_SECTIONS,
   getAdjustmentSectionOrder,
-  isAdjustmentSectionShown,
   AI_DEPTH_MASK_RANGE_DEFAULTS,
   LUMINANCE_MASK_RANGE_DEFAULTS,
 } from '../../../utils/adjustments';
@@ -2020,32 +2019,30 @@ function SettingsPanel({
         onMouseLeave={() => setIsMaskControlHovered(false)}
         className="flex flex-col gap-2"
       >
-        {getAdjustmentSectionOrder(appSettings?.adjustmentLayout?.sectionOrder)
-          .filter((sectionName) => isAdjustmentSectionShown(sectionName, displayContainer.adjustments, true))
-          .map((sectionName) => {
-            const SectionComponent = ADJUSTMENT_SECTION_COMPONENTS[sectionName];
-            const title = sectionName.charAt(0).toUpperCase() + sectionName.slice(1);
-            return (
-              <CollapsibleSection
-                key={sectionName}
-                title={title}
-                isOpen={collapsibleState[sectionName]}
-                isContentVisible={sectionVisibility[sectionName]}
-                onToggle={() => handleToggleSection(sectionName)}
-                onToggleVisibility={() => handleToggleVisibility(sectionName)}
-                onContextMenu={(e: any) => handleSectionContextMenu(e, sectionName)}
-              >
-                <SectionComponent
-                  adjustments={displayContainer.adjustments}
-                  setAdjustments={setMaskContainerAdjustments}
-                  histogram={histogram}
-                  isForMask={true}
-                  appSettings={appSettings}
-                  onDragStateChange={onDragStateChange}
-                />
-              </CollapsibleSection>
-            );
-          })}
+        {getAdjustmentSectionOrder(appSettings?.adjustmentLayout?.sectionOrder).map((sectionName) => {
+          const SectionComponent = ADJUSTMENT_SECTION_COMPONENTS[sectionName];
+          const title = sectionName.charAt(0).toUpperCase() + sectionName.slice(1);
+          return (
+            <CollapsibleSection
+              key={sectionName}
+              title={title}
+              isOpen={collapsibleState[sectionName]}
+              isContentVisible={sectionVisibility[sectionName]}
+              onToggle={() => handleToggleSection(sectionName)}
+              onToggleVisibility={() => handleToggleVisibility(sectionName)}
+              onContextMenu={(e: any) => handleSectionContextMenu(e, sectionName)}
+            >
+              <SectionComponent
+                adjustments={displayContainer.adjustments}
+                setAdjustments={setMaskContainerAdjustments}
+                histogram={histogram}
+                isForMask={true}
+                appSettings={appSettings}
+                onDragStateChange={onDragStateChange}
+              />
+            </CollapsibleSection>
+          );
+        })}
       </div>
     </div>
   );

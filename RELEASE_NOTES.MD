@@ -5,6 +5,20 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.57.1-dev-zone-tint — 2026-11-14
+
+### Develop
+
+- **Zone Tint** has moved out of the Adjustments panel into its own
+  panel in the right toolbar, under the Orbit Blend Pad. On a colour
+  photo it offers a Black & White switch to get started; its eye and
+  reset buttons sit in the panel header.
+- The zones are now one continuous grey ramp from 0 to X: each zone's
+  colour shows as a band along the top, the selected zones are
+  underlined, and the zone numbers sit below the ramp where they are
+  easy to read. A selection of neighbouring zones is named as a range,
+  such as "Zones IV–VII".
+
 ## 1.57.0-dev-zone-tint — 2026-11-14
 
 ### Develop
