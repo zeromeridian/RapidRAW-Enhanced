@@ -690,6 +690,17 @@
       "enabled": "Blend Pad activado",
       "hint": "Arrastra el disco para mezclar las herramientas; arrastra un ancla por el borde para moverla. Mayús para movimientos más finos, flechas para desplazarlo y doble clic en el disco para centrarlo.",
       "maxTools": "Hasta {{count}} herramientas",
+      "mode": "Modo",
+      "modeHints": {
+        "axis": "Cada herramienta actúa a lo largo de su propia línea por el centro: valor completo en su punto, nada en el centro y el inverso en el lado opuesto.",
+        "normalized": "Las herramientas se reparten el efecto según la cercanía y siempre suman el total: un fundido. Nunca es neutro; sobre un punto solo cuenta esa herramienta.",
+        "polar": "La dirección mezcla las dos herramientas vecinas; la distancia al centro marca la intensidad. El centro es neutro."
+      },
+      "modes": {
+        "axis": "Eje",
+        "normalized": "Normalizado",
+        "polar": "Polar"
+      },
       "mute": "Silenciar",
       "now": "ahora {{value}}",
       "presets": {

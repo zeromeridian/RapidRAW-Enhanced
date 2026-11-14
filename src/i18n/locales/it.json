@@ -690,6 +690,17 @@
       "enabled": "Blend Pad attivo",
       "hint": "Trascina il disco per miscelare gli strumenti; trascina un'ancora lungo il bordo per spostarla. Maiusc per movimenti più fini, frecce per spostarlo, doppio clic sul disco per centrarlo.",
       "maxTools": "Al massimo {{count}} strumenti",
+      "mode": "Modalità",
+      "modeHints": {
+        "axis": "Ogni strumento agisce lungo la propria linea attraverso il centro: valore pieno sul suo punto, nulla al centro, l'inverso sul lato opposto.",
+        "normalized": "Gli strumenti si dividono l'effetto in base alla vicinanza, sempre per il totale: una dissolvenza. Mai neutro; su un punto conta solo quello strumento.",
+        "polar": "La direzione miscela i due strumenti vicini; la distanza dal centro regola l'intensità. Il centro è neutro."
+      },
+      "modes": {
+        "axis": "Asse",
+        "normalized": "Normalizzato",
+        "polar": "Polare"
+      },
       "mute": "Disattiva",
       "now": "ora {{value}}",
       "presets": {

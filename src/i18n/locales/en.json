@@ -693,6 +693,17 @@
       "enabled": "Blend Pad on",
       "hint": "Drag the puck to blend the tools; drag an anchor along the edge to move it. Hold Shift for finer moves, use the arrow keys to nudge, and double-click the puck to center it.",
       "maxTools": "Up to {{count}} tools",
+      "mode": "Mode",
+      "modeHints": {
+        "axis": "Each tool works along its own line through the center: its full value at its dot, nothing at the center, its reverse on the far side.",
+        "normalized": "The tools share the effect by closeness, always adding up to the whole: a crossfade. Never neutral; on a dot only that tool counts.",
+        "polar": "The direction mixes the two neighboring tools; the distance from the center sets the strength. The center is neutral."
+      },
+      "modes": {
+        "axis": "Axis",
+        "normalized": "Normalized",
+        "polar": "Polar"
+      },
       "mute": "Mute",
       "now": "now {{value}}",
       "presets": {

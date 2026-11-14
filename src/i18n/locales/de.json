@@ -666,6 +666,17 @@
       "enabled": "Blend-Pad an",
       "hint": "Den Puck ziehen, um die Werkzeuge zu mischen; einen Ankerpunkt am Rand entlang ziehen, um ihn zu verschieben. Umschalt für feinere Bewegungen, Pfeiltasten zum Verschieben, Doppelklick auf den Puck zentriert ihn.",
       "maxTools": "Höchstens {{count}} Werkzeuge",
+      "mode": "Modus",
+      "modeHints": {
+        "axis": "Jedes Werkzeug wirkt entlang seiner eigenen Linie durch die Mitte: voller Wert am Punkt, nichts in der Mitte, das Gegenteil auf der Gegenseite.",
+        "normalized": "Die Werkzeuge teilen sich die Wirkung nach Nähe, zusammen immer das Ganze: eine Überblendung. Nie neutral; auf einem Punkt zählt nur dieses Werkzeug.",
+        "polar": "Die Richtung mischt die zwei benachbarten Werkzeuge; der Abstand zur Mitte bestimmt die Stärke. Die Mitte ist neutral."
+      },
+      "modes": {
+        "axis": "Achse",
+        "normalized": "Normalisiert",
+        "polar": "Polar"
+      },
       "mute": "Stummschalten",
       "now": "jetzt {{value}}",
       "presets": {

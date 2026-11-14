@@ -395,6 +395,121 @@ impl Curve {
     }
 }
 
+/// How the puck's position becomes each tool's share of its value at the dot.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Mode {
+    /// Each tool along its own line through the centre: its full value at its dot, nothing at
+    /// the centre, its reverse at the opposite edge point (unless Reverse is off).
+    #[default]
+    Axis,
+    /// Shares by closeness (1 / distance²) that always add up to 1: a crossfade between the
+    /// tools, never neutral; on a dot only that tool counts.
+    Normalized,
+    /// The puck's direction mixes the two neighbouring tools around the edge; its distance
+    /// from the centre (0 there, 1 on the edge) sets the strength.
+    Polar,
+}
+
+/// A point's direction as an angle in [0, 2π).
+fn turn_of(point: Point) -> f64 {
+    let angle = point.y.atan2(point.x);
+    if angle < 0.0 { angle + TAU } else { angle }
+}
+
+impl Mode {
+    /// Each tool's factor (its share, shaped by its curve); the offset is target × factor ×
+    /// amount. `anchors` are the tools that take part, in pad order.
+    fn factors(self, shape: Shape, anchors: &[&Anchor], puck: Point) -> Vec<f64> {
+        match self {
+            Mode::Axis => anchors
+                .iter()
+                .map(|anchor| {
+                    let weight = shape.axis_weight(anchor.t, puck);
+                    if weight < 0.0 && !anchor.reverse {
+                        0.0
+                    } else {
+                        anchor.curve.apply(weight.abs()) * weight.signum()
+                    }
+                })
+                .collect(),
+            Mode::Normalized => {
+                let distances: Vec<f64> = anchors
+                    .iter()
+                    .map(|anchor| puck.sub(shape.point_at(anchor.t)).length())
+                    .collect();
+                if let Some(on_dot) = distances.iter().position(|distance| *distance < EPSILON) {
+                    return (0..anchors.len())
+                        .map(|index| if index == on_dot { 1.0 } else { 0.0 })
+                        .collect();
+                }
+                let closeness: Vec<f64> = distances
+                    .iter()
+                    .map(|distance| 1.0 / (distance * distance))
+                    .collect();
+                let total: f64 = closeness.iter().sum();
+                anchors
+                    .iter()
+                    .zip(closeness)
+                    .map(|(anchor, share)| anchor.curve.apply(share / total))
+                    .collect()
+            }
+            Mode::Polar => {
+                let radius = puck.length();
+                let mut shares = vec![0.0; anchors.len()];
+                if radius < EPSILON || anchors.is_empty() {
+                    return shares;
+                }
+                let direction = puck.scale(1.0 / radius);
+                let strength = (radius / shape.edge_distance(direction)).min(1.0);
+                let puck_turn = turn_of(puck);
+                let turns: Vec<f64> = anchors
+                    .iter()
+                    .map(|anchor| turn_of(shape.point_at(anchor.t)))
+                    .collect();
+                // The tools on either side of the puck's direction (the first on ties),
+                // wrapping round past 0.
+                let (mut before, mut after) = (None::<usize>, None::<usize>);
+                let (mut lowest, mut highest) = (0, 0);
+                for (index, turn) in turns.iter().enumerate() {
+                    if *turn <= puck_turn && before.is_none_or(|b| *turn > turns[b]) {
+                        before = Some(index);
+                    }
+                    if *turn > puck_turn && after.is_none_or(|a| *turn < turns[a]) {
+                        after = Some(index);
+                    }
+                    if *turn < turns[lowest] {
+                        lowest = index;
+                    }
+                    if *turn > turns[highest] {
+                        highest = index;
+                    }
+                }
+                let before = before.unwrap_or(highest);
+                let after = after.unwrap_or(lowest);
+                if before == after {
+                    shares[before] = 1.0;
+                } else {
+                    let gap = (turns[after] - turns[before]).rem_euclid(TAU);
+                    let along = (puck_turn - turns[before]).rem_euclid(TAU);
+                    let mix = if gap < EPSILON {
+                        0.0
+                    } else {
+                        (along / gap).clamp(0.0, 1.0)
+                    };
+                    shares[before] += 1.0 - mix;
+                    shares[after] += mix;
+                }
+                anchors
+                    .iter()
+                    .zip(shares)
+                    .map(|(anchor, share)| share * anchor.curve.apply(strength))
+                    .collect()
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Anchor {
@@ -427,6 +542,8 @@ struct BlendPad {
     enabled: bool,
     #[serde(default)]
     shape: Shape,
+    #[serde(default)]
+    mode: Mode,
     #[serde(default = "full_amount")]
     amount: f64,
     #[serde(default)]
@@ -454,21 +571,19 @@ impl Offsets {
         let puck = pad.shape.clamp(pad.puck);
         let amount = pad.amount.clamp(0.0, 1.0);
         let mut sums = [0.0; PARAMETERS.len()];
-        let anchors = pad
+        // The tools that take part: valid, not muted, driving a known slider.
+        let active: Vec<(usize, Anchor)> = pad
             .anchors
             .iter()
             .take(MAX_ANCHORS)
-            .filter_map(|anchor| Anchor::deserialize(anchor).ok());
-        for anchor in anchors.filter(|anchor| !anchor.muted) {
-            let Some(index) = parameter_index(&anchor.param) else {
-                continue;
-            };
-            let weight = pad.shape.axis_weight(anchor.t, puck);
-            if weight < 0.0 && !anchor.reverse {
-                continue;
-            }
-            sums[index] +=
-                anchor.target * anchor.curve.apply(weight.abs()) * weight.signum() * amount;
+            .filter_map(|anchor| Anchor::deserialize(anchor).ok())
+            .filter(|anchor| !anchor.muted)
+            .filter_map(|anchor| parameter_index(&anchor.param).map(|index| (index, anchor)))
+            .collect();
+        let anchors: Vec<&Anchor> = active.iter().map(|(_, anchor)| anchor).collect();
+        let factors = pad.mode.factors(pad.shape, &anchors, puck);
+        for ((index, anchor), factor) in active.iter().zip(factors) {
+            sums[*index] += anchor.target * factor * amount;
         }
         let mut offsets = [0.0; PARAMETERS.len()];
         for ((offset, sum), parameter) in offsets.iter_mut().zip(sums).zip(&PARAMETERS) {
@@ -714,6 +829,65 @@ mod tests {
         assert_eq!(resolved.offset("hue"), -160.0);
         let single = offsets((0.0, 1.0), vec![anchor("hue", TOP, 150.0)]);
         assert_eq!(single.apply("hue", 100.0), -110.0);
+    }
+
+    fn offsets_in(mode: &str, puck: (f64, f64), anchors: Vec<Value>) -> Offsets {
+        let mut adjustments = pad(puck, anchors);
+        adjustments["blendPad"]["mode"] = json!(mode);
+        Offsets::from_adjustments(&adjustments)
+    }
+
+    #[test]
+    fn normalized_shares_add_up_to_one_and_a_dot_takes_all() {
+        // At the centre of a circle every tool is as close: a third each.
+        let centre = offsets_in("normalized", (0.0, 0.0), defaults());
+        assert_eq!(centre.offset("contrast"), 20.0);
+        assert_eq!(centre.offset("temperature"), 17.0);
+        assert_eq!(centre.offset("saturation"), -20.0);
+        let on_dot = offsets_in("normalized", (0.0, 1.0), defaults());
+        assert_eq!(on_dot.offset("contrast"), 60.0);
+        assert_eq!(on_dot.offset("temperature"), 0.0);
+        assert_eq!(on_dot.offset("saturation"), 0.0);
+        // A muted tool takes no share: the other two split it.
+        let mut anchors = defaults();
+        anchors[2]["muted"] = json!(true);
+        let muted = offsets_in("normalized", (0.0, 0.0), anchors);
+        assert_eq!(muted.offset("contrast"), 30.0);
+        assert_eq!(muted.offset("temperature"), 25.0);
+        assert_eq!(muted.offset("saturation"), 0.0);
+    }
+
+    #[test]
+    fn polar_mixes_the_two_neighbours_and_the_centre_is_neutral() {
+        assert_eq!(
+            offsets_in("polar", (0.0, 0.0), defaults()),
+            Offsets::default()
+        );
+        // Straight towards Contrast, halfway out: Contrast only, at half strength.
+        let up = offsets_in("polar", (0.0, 0.5), defaults());
+        assert_eq!(up.offset("contrast"), 30.0);
+        assert_eq!(up.offset("saturation"), 0.0);
+        // On the edge halfway between Contrast (90°) and Saturation (210°).
+        let angle = 150f64.to_radians();
+        let between = offsets_in("polar", (angle.cos(), angle.sin()), defaults());
+        assert_eq!(between.offset("contrast"), 30.0);
+        assert_eq!(between.offset("saturation"), -30.0);
+        assert_eq!(between.offset("temperature"), 0.0);
+        // Right (0°), 0.8 out: a quarter of the way from Temperature (330°) to Contrast (90°).
+        let right = offsets_in("polar", (0.8, 0.0), defaults());
+        assert_eq!(right.offset("temperature"), 30.0);
+        assert_eq!(right.offset("contrast"), 12.0);
+        // One tool: the direction does not matter, only the distance.
+        let single = offsets_in("polar", (-0.5, 0.0), vec![anchor("contrast", TOP, 60.0)]);
+        assert_eq!(single.offset("contrast"), 30.0);
+    }
+
+    #[test]
+    fn an_unknown_mode_changes_nothing() {
+        assert_eq!(
+            offsets_in("spiral", (0.0, 1.0), defaults()),
+            Offsets::default()
+        );
     }
 
     #[test]

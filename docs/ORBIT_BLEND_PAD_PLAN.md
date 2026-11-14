@@ -213,7 +213,24 @@ more shapes (ellipse, custom outline). Restart: when the owner asks.
   the Node check round-trips every vector case through a preset and
   checks the cleaning (unknown tool, limit, bad values, newer version,
   clashing names).
-- Step 6 (`1.55.0`, 2026-11-13, uncommitted): `BlendPadAnchor.targets`
+- Step 7 (`1.56.0`, 2026-11-13, uncommitted): `blend_pad::Mode`
+  (Axis default, Normalized, Polar; `mode` on the pad, absent = Axis; an
+  unknown mode makes Rust ignore the pad, TS cleaning maps it to Axis).
+  `from_pad` now collects the taking-part tools (valid, not muted, known
+  slider) and asks `Mode::factors` for each tool's factor; Axis keeps the
+  exact old arithmetic (all earlier tests and vectors unchanged).
+  Normalized: shares 1/d² normalised to 1, a dot takes all, curve on the
+  share. Polar: the neighbours around the puck's direction (first on
+  ties, wrapping past 0) mixed by angle, strength = distance / edge
+  distance, curve on the strength; one tool = distance only. TS:
+  `modeFactors` + `anchorValues` (all tools' current values together,
+  used by the labels, cards and `resolveBlendPad`). Panel: Mode picker
+  with a hint; opposite rings, the selected line, Reverse and the far
+  glow only in Axis. Vectors 23 (4 mode cases); Rust tests for both
+  modes and an unknown mode. Guide: "Blend modes" with Examples 9–10.
+  Agent definitions (from the concept note): Normalized exponent 2;
+  Polar mixes linearly by angle.
+- Step 6 (`1.55.0`, 2026-11-13, owner commit `69b62d6f`): `BlendPadAnchor.targets`
   (optional map tool → last value at the dot; the renderer ignores it,
   `sanitizeBlendPad` keeps known tools within reach, the "modified" check
   leaves it out); `switchAnchorTool` restores a remembered target or
