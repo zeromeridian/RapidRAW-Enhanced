@@ -47,7 +47,7 @@ const KEY_NAMES: Record<string, string> = {
   colorCalibration: 'Color Calibration',
   pointColors: 'Point Color',
   blendPad: 'Blend Pad',
-  zoneTint: 'Zone Tint',
+  zoneTint: 'Zone Color Grading',
   toneMapper: 'Tone Mapper',
   showClipping: 'Show Clipping',
   sectionVisibility: 'Section Visibility',

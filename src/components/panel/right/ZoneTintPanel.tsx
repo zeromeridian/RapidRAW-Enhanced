@@ -31,11 +31,19 @@ const MIDDLE_GREY_ZONE = 5;
 /** Softness and Protect are OKLab L values, Amount a factor; the sliders show them ×100. */
 const SLIDER_SCALE = 100;
 const NEUTRAL: HueSatLum = { hue: 0, saturation: 0, luminance: 0 };
-const NEUTRAL_ZONE = { hue: 0, strength: 0 };
+const NEUTRAL_ZONE: ZoneTintZone = { hue: 0, strength: 0, luminance: 0 };
+/** `zone_tint::MAX_LUMINANCE_SHIFT`: luminance ±100 moves a zone's tones by half a zone. */
+const MAX_LUMINANCE_SHIFT = 0.05;
 
-/** The display grey of a zone's centre: OKLab L = n / 10 is linear luminance L³. */
-const zoneGrey = (zone: number) => {
-  const linear = (zone / (ZONE_TINT_ZONE_COUNT - 1)) ** 3;
+const luminanceOf = (zone: ZoneTintZone) => zone.luminance ?? 0;
+
+/**
+ * The display grey of a zone's centre after its luminance: OKLab L = n / 10 (plus the shift) is
+ * linear luminance L³.
+ */
+const zoneGrey = (zone: number, luminance: number) => {
+  const l = Math.min(Math.max(zone / (ZONE_TINT_ZONE_COUNT - 1) + (luminance / 100) * MAX_LUMINANCE_SHIFT, 0), 1);
+  const linear = l ** 3;
   const display = linear <= 0.0031308 ? linear * 12.92 : 1.055 * linear ** (1 / 2.4) - 0.055;
   const level = Math.round(display * 255);
   return `rgb(${level}, ${level}, ${level})`;
@@ -87,13 +95,16 @@ const tintVector = ({ hue, strength }: ZoneTintZone) => {
 
 /**
  * Fills the zones strictly between `from` and `to` along the curve, blending one end's tint
- * into the other's on the colour wheel, as the shader sums the zones' colours. Opposite hues
- * (cool shadows, warm highlights) meet in a soft neutral instead of sweeping through the hues
- * between them, and an untinted end fades the other end's colour out without changing its hue.
+ * into the other's on the colour wheel, as the shader sums the zones' colours, and its
+ * luminance into the other's. Opposite hues (cool shadows, warm highlights) meet in a soft
+ * neutral instead of sweeping through the hues between them, and an untinted end fades the
+ * other end's colour out without changing its hue.
  */
 const fillZones = (zones: ZoneTintZone[], from: number, to: number, curve: BlendPadCurve): ZoneTintZone[] => {
-  const [startX, startY] = tintVector(zones[from] ?? NEUTRAL_ZONE);
-  const [endX, endY] = tintVector(zones[to] ?? NEUTRAL_ZONE);
+  const start = zones[from] ?? NEUTRAL_ZONE;
+  const end = zones[to] ?? NEUTRAL_ZONE;
+  const [startX, startY] = tintVector(start);
+  const [endX, endY] = tintVector(end);
   return Array.from({ length: ZONE_TINT_ZONE_COUNT }, (_, zone) => {
     const existing = zones[zone] ?? NEUTRAL_ZONE;
     if (zone <= from || zone >= to) return existing;
@@ -102,27 +113,40 @@ const fillZones = (zones: ZoneTintZone[], from: number, to: number, curve: Blend
     const y = startY + (endY - startY) * share;
     const strength = Math.hypot(x, y);
     const hue = strength > 1e-6 ? ((((Math.atan2(y, x) * 180) / Math.PI) % 360) + 360) % 360 : existing.hue;
-    return { ...existing, hue, strength };
+    const luminance = luminanceOf(start) + (luminanceOf(end) - luminanceOf(start)) * share;
+    return { ...existing, hue, strength, luminance };
   });
 };
 
-/** Neighbouring zones that share one tint. */
-interface TintRun {
+/** Neighbouring zones that share one setting. */
+interface ZoneRun {
   from: number;
   to: number;
   hue: number;
   strength: number;
+  luminance: number;
 }
 
-/** The tinted zones, neighbours with the same colour and strength joined, lightest first like the scale. */
-const tintRuns = (zoneTint: ZoneTint): TintRun[] => {
-  const runs: TintRun[] = [];
+/**
+ * The zones with a colour or a luminance shift, neighbours with the same settings joined,
+ * lightest first like the scale.
+ */
+const zoneRuns = (zoneTint: ZoneTint): ZoneRun[] => {
+  const runs: ZoneRun[] = [];
   for (let zone = 0; zone < ZONE_TINT_ZONE_COUNT; zone += 1) {
-    const { hue, strength } = zoneTint.zones[zone] ?? NEUTRAL_ZONE;
-    if (strength <= 0) continue;
+    const settings = zoneTint.zones[zone] ?? NEUTRAL_ZONE;
+    const { hue, strength } = settings;
+    const luminance = luminanceOf(settings);
+    if (strength <= 0 && luminance === 0) continue;
     const last = runs[runs.length - 1];
-    if (last && last.to === zone - 1 && last.hue === hue && last.strength === strength) last.to = zone;
-    else runs.push({ from: zone, to: zone, hue, strength });
+    const isSame =
+      last &&
+      last.to === zone - 1 &&
+      last.strength === strength &&
+      last.luminance === luminance &&
+      (strength <= 0 || last.hue === hue);
+    if (isSame) last.to = zone;
+    else runs.push({ from: zone, to: zone, hue, strength, luminance });
   }
   return runs.reverse();
 };
@@ -143,7 +167,8 @@ function ZoneScale({ onZoneClick, selected, zoneTint }: ZoneScaleProps) {
   return (
     <div className="flex flex-col-reverse shrink-0">
       {ZONE_NAMES.map((name, zone) => {
-        const { hue, strength } = zoneTint.zones[zone] ?? NEUTRAL_ZONE;
+        const settings = zoneTint.zones[zone] ?? NEUTRAL_ZONE;
+        const { hue, strength } = settings;
         const isSelected = selected.includes(zone);
         return (
           <button
@@ -169,7 +194,7 @@ function ZoneScale({ onZoneClick, selected, zoneTint }: ZoneScaleProps) {
                 zone === ZONE_NAMES.length - 1 && 'rounded-t-md',
                 zone > 0 && 'border-b border-white/5',
               )}
-              style={{ backgroundColor: zoneGrey(zone) }}
+              style={{ backgroundColor: zoneGrey(zone, luminanceOf(settings)) }}
             >
               {strength > 0 && (
                 <span
@@ -211,14 +236,14 @@ export default function ZoneTintPanel() {
   const updateZoneTint = (update: (current: ZoneTint) => ZoneTint, historyLabel?: string) =>
     setAdjustments((prev) => ({ ...prev, zoneTint: update(prev.zoneTint ?? createZoneTint()) }), historyLabel);
 
-  /** Writes a tint into the given zones, keeping their other settings. */
-  const setZonesTint = (zones: number[], hue: number, strength: number, historyLabel?: string) =>
+  /** Writes the given settings into the given zones, keeping their others. */
+  const updateZones = (zones: number[], change: Partial<ZoneTintZone>, historyLabel?: string) =>
     updateZoneTint(
       (current) => ({
         ...current,
         zones: Array.from({ length: ZONE_TINT_ZONE_COUNT }, (_, zone) => {
           const existing = current.zones[zone] ?? NEUTRAL_ZONE;
-          return zones.includes(zone) ? { ...existing, hue, strength } : existing;
+          return zones.includes(zone) ? { ...existing, ...change } : existing;
         }),
       }),
       historyLabel,
@@ -229,14 +254,24 @@ export default function ZoneTintPanel() {
     [setEditor],
   );
 
-  const handleColorChange = ({ hue, saturation }: HueSatLum) => setZonesTint(selected, hue, saturation);
+  /**
+   * Writes only what the wheel changed, so moving the hue of a range keeps each zone's own
+   * strength and luminance (and the other way round).
+   */
+  const handleColorChange = ({ hue, saturation, luminance }: HueSatLum) => {
+    const change: Partial<ZoneTintZone> = {};
+    if (hue !== shown.hue) change.hue = hue;
+    if (saturation !== shown.strength) change.strength = saturation;
+    if (luminance !== luminanceOf(shown)) change.luminance = luminance;
+    if (Object.keys(change).length > 0) updateZones(selected, change);
+  };
 
   const handleZoneClick = (zone: number, event: MouseEvent) => {
     setSelected(nextSelection(selected, anchor, zone, event));
     if (!event.shiftKey) setAnchor(zone);
   };
 
-  const selectRun = ({ from, to }: TintRun) => {
+  const selectRun = ({ from, to }: ZoneRun) => {
     setSelected(zoneRange(from, to));
     setAnchor(from);
   };
@@ -256,8 +291,8 @@ export default function ZoneTintPanel() {
     );
   };
 
-  const runs = tintRuns(zoneTint);
-  const isSelectedRun = ({ from, to }: TintRun) =>
+  const runs = zoneRuns(zoneTint);
+  const isSelectedRun = ({ from, to }: ZoneRun) =>
     selected.length === to - from + 1 && selected[0] === from && selected[selected.length - 1] === to;
 
   const handleToggleVisibility = () =>
@@ -307,8 +342,7 @@ export default function ZoneTintPanel() {
                 label={zonesLabel(selected)}
                 onChange={handleColorChange}
                 onDragStateChange={handleDragStateChange}
-                showLuminance={false}
-                value={{ hue: shown.hue, saturation: shown.strength, luminance: 0 }}
+                value={{ hue: shown.hue, saturation: shown.strength, luminance: luminanceOf(shown) }}
               />
             </div>
           </div>
@@ -387,7 +421,10 @@ export default function ZoneTintPanel() {
                   >
                     <span
                       className="w-3 h-3 shrink-0 rounded-full border border-white/20"
-                      style={{ backgroundColor: tintColor(run.hue, run.strength) }}
+                      style={{
+                        backgroundColor:
+                          run.strength > 0 ? tintColor(run.hue, run.strength) : zoneGrey(run.from, run.luminance),
+                      }}
                     />
                     <Text variant={TextVariants.small} className="grow truncate">
                       {zonesLabel(zoneRange(run.from, run.to))}
@@ -397,20 +434,37 @@ export default function ZoneTintPanel() {
                       color={TextColors.secondary}
                       className="flex items-center gap-2 tabular-nums"
                     >
-                      <span>
-                        <span className="font-bold">{t('ui.colorWheel.hueAbbreviation')}</span> {Math.round(run.hue)}
-                        &deg;
-                      </span>
-                      <span>
-                        <span className="font-bold">{t('ui.colorWheel.saturationAbbreviation')}</span>{' '}
-                        {Math.round(run.strength)}
-                      </span>
+                      {run.strength > 0 && (
+                        <>
+                          <span>
+                            <span className="font-bold">{t('ui.colorWheel.hueAbbreviation')}</span>{' '}
+                            {Math.round(run.hue)}&deg;
+                          </span>
+                          <span>
+                            <span className="font-bold">{t('ui.colorWheel.saturationAbbreviation')}</span>{' '}
+                            {Math.round(run.strength)}
+                          </span>
+                        </>
+                      )}
+                      {run.luminance !== 0 && (
+                        <span>
+                          <span className="font-bold">{t('ui.colorWheel.luminanceAbbreviation')}</span>{' '}
+                          {run.luminance > 0 ? '+' : ''}
+                          {Math.round(run.luminance)}
+                        </span>
+                      )}
                     </Text>
                   </button>
                   <button
                     className="p-1.5 mr-0.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-bg-primary transition-colors"
                     data-tooltip={t('adjustments.zoneTint.untint')}
-                    onClick={() => setZonesTint(zoneRange(run.from, run.to), 0, 0, t('adjustments.zoneTint.untint'))}
+                    onClick={() =>
+                      updateZones(
+                        zoneRange(run.from, run.to),
+                        { hue: 0, strength: 0, luminance: 0 },
+                        t('adjustments.zoneTint.untint'),
+                      )
+                    }
                   >
                     <X size={14} />
                   </button>

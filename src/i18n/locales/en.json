@@ -231,12 +231,12 @@
     },
     "zoneTint": {
       "fill": "Fill between",
-      "fillHint": "Fills the zones between the first and last selected zone along the curve, from one end's colour and strength to the other's.",
+      "fillHint": "Fills the zones between the first and last selected zone along the curve, from one end's colour, strength and luminance to the other's.",
       "hint": "Click a zone to color it. Shift-click selects a range, Cmd/Ctrl-click adds or removes a zone.",
       "protect": "Protect",
       "softness": "Softness",
-      "tintedZones": "Tinted zones",
-      "untint": "Remove tint",
+      "tintedZones": "Adjusted zones",
+      "untint": "Reset zones",
       "zone": "Zone {{zone}}",
       "zones": "Zones {{zones}}"
     }
@@ -448,7 +448,7 @@
         "curves": "Curves",
         "details": "Details",
         "effects": "Effects",
-        "zoneTint": "Zone Tint"
+        "zoneTint": "Zone Color Grading"
       },
       "title": "Adjustments",
       "tooltips": {
@@ -2397,6 +2397,7 @@
       "hue": "Hue",
       "hueAbbreviation": "H:",
       "luminance": "Luminance",
+      "luminanceAbbreviation": "L:",
       "reset": "Reset",
       "saturation": "Saturation",
       "saturationAbbreviation": "S:"

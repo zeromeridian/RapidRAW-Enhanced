@@ -574,10 +574,15 @@ export const ZONE_TINT_PROTECT = { default: 0.08, min: 0, max: 0.2 } as const;
 /** `zone_tint::MAX_AMOUNT`: the overall Amount scales every zone's strength, up to double. */
 export const ZONE_TINT_AMOUNT = { default: 1, min: 0, max: 2 } as const;
 
-/** One Zone System zone's colour: the colour wheel's hue (degrees) and strength (0–100, 0 neutral). */
+/**
+ * One Zone System zone's colour: the colour wheel's hue (degrees) and strength (0–100, 0
+ * neutral), and its luminance (−100 to 100, absent in older edits: 0), which moves its tones
+ * by up to half a zone.
+ */
 export interface ZoneTintZone {
   hue: number;
   strength: number;
+  luminance?: number;
   /** Advanced mode (Phase 4): the centre's offset in OKLab L and the zone's own width. */
   centerOffset?: number;
   width?: number | null;

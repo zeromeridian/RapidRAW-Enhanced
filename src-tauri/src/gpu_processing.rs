@@ -2756,6 +2756,33 @@ mod tests {
             }
         }
         assert!(checked_peak > 0, "the ramp crosses Zone VII");
+
+        // Luminance: Zone V up and Zone VI down by the most, at the narrowest softness, still
+        // keeps every tone in order, and lifts Zone V's centre by about half a zone.
+        let mut zones = vec![serde_json::json!({}); 11];
+        zones[5] = serde_json::json!({ "luminance": 100 });
+        zones[6] = serde_json::json!({ "luminance": -100 });
+        let moved = render(serde_json::json!({ "softness": 0.02, "zones": zones }));
+        for pair in moved.windows(2) {
+            assert!(
+                pair[1][0] >= pair[0][0] - 2e-3,
+                "tones keep their order at L {}",
+                pair[0][0]
+            );
+        }
+        let mut checked_centre = 0;
+        for (plain, moved) in plain.iter().zip(&moved) {
+            let l = plain[0];
+            assert!(
+                chroma(moved) < 2e-3,
+                "luminance alone stays neutral at L {l}"
+            );
+            if (l - 0.5).abs() < 0.005 {
+                assert!((moved[0] - l - 0.05).abs() < 0.01, "Zone V lifted at L {l}");
+                checked_centre += 1;
+            }
+        }
+        assert!(checked_centre > 0, "the ramp crosses Zone V");
     }
 
     #[test]
