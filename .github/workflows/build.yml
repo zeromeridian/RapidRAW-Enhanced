@@ -104,6 +104,10 @@ jobs:
             # Users must allow it once in Privacy & Security (see README.md).
             echo "::warning::No Apple Developer ID secrets; the macOS release is ad-hoc signed and not notarized."
             echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+            # The hardened runtime only serves notarization. With an ad-hoc
+            # signature its library validation would refuse the bundled ONNX
+            # Runtime, which has no Team ID, when the AI features load it.
+            echo 'TAURI_CONFIG={"bundle":{"macOS":{"hardenedRuntime":false}}}' >> "$GITHUB_ENV"
             echo "developer-id=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -142,6 +146,7 @@ jobs:
         if: runner.os == 'macOS'
         env:
           REQUIRE_APPLE_SIGNATURE: ${{ steps.apple-signing.outputs.developer-id == 'true' }}
+          REQUIRE_ADHOC_SIGNATURE: ${{ steps.apple-signing.outputs.developer-id == 'false' }}
           TAURI_ARTIFACT_PATHS: ${{ steps.tauri-build.outputs.artifactPaths }}
         run: |
           dmg_path=$(node -e '
