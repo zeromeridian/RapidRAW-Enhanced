@@ -205,12 +205,13 @@ details are in `RELEASE_NOTES.MD`.
   They edit the photo's own values, with the same history, XMP and Speed
   Edit. For the photo only; masks keep their full panels.
 - **Orbit Blend Pad** tab in the Develop tool strip: up to 8 tools sit on
-  a circle (new pads start with Contrast, Temperature, Saturation), each
+  a circle (new pads start with Exposure, Whites, Blacks), each
   with a target; dragging one puck adds their values on top of the
   sliders (they combine or cancel), full target at a tool's anchor and
   its reverse on the opposite side, nothing at the centre. Add tools (21
   global sliders, including Gaussian Blur, Glow, Light Flare and Grain),
-  drag them along the edge, set target, curve, mute or remove; Amount,
+  drag them along the edge, set target, curve, mute or remove (switching
+  a card's tool back restores its earlier target); Amount,
   on/off, Shift for finer drags, arrow keys, double-click to centre.
   Bake writes the values into the sliders; sliders show a mark and the
   combined value in brackets where the pad moves them. Six shapes

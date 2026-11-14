@@ -31,7 +31,7 @@ import {
   positionOf,
   resolveBlendPad,
   shapeCorners,
-  shareOf,
+  switchAnchorTool,
   targetWithShare,
 } from '../../../utils/blendPad';
 
@@ -446,12 +446,10 @@ export default function BlendPadPanel() {
     [updateAnchor],
   );
 
-  /** A new tool keeps the target's share of its range, so the anchor stays as strong. */
+  /** Switching back to a tool restores its value at the dot; a new one keeps the share of its range. */
   const handleToolChange = (anchor: BlendPadAnchor, param: string) => {
-    const before = parametersById[anchor.param];
-    const after = parametersById[param];
-    if (!after) return;
-    updateAnchor(anchor.id, { param, target: targetWithShare(before ? shareOf(anchor.target, before) : 0, after) });
+    const switched = switchAnchorTool(anchor, param, parameters);
+    if (switched !== anchor) updateAnchor(anchor.id, switched);
   };
 
   const handleAddTool = (param: string) => {
