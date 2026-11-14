@@ -142,6 +142,30 @@ changes about it, the decisions still open, and progress.
 - **Versioning:** no build for Phase 1; the first build is `1.57.0`
   with Phase 2.
 
+## Remaining (2026-11-14)
+
+1. **Owner checks on the Mac:** Phase 1 GPU exit check (`cargo test --lib
+   zone_tint -- --nocapture` from `src-tauri`; must not print "No GPU
+   adapter"); Phase 2 hands-on exit check (tint, save, reopen, export
+   match the preview; steps in `HANDOFF.md`). Then commit `1.57.1`–`1.57.5`.
+2. **Phase 3** (spec): hover readout, Alt/Option mask preview, mask
+   smoothing (blur pass, `maskSmoothing` 0–4 px slider), the four starter
+   presets (Selenium, Sepia, Split, Platinum; multi-select is already
+   done). Exit check: smoothing 1–2 px removes colour speckle on a grainy
+   high-ISO file.
+3. **Phase 4** (spec): Advanced mode (move a zone's centre, its own width,
+   double-click resets; data and render exist, controls do not; re-check
+   the luminance order guarantee, which assumes evenly spaced centres) and
+   Zone Color Grading inside masks. Exit check: a sky gradient mask with a
+   Zone VIII colour colours only the sky's highlights.
+4. **Spec acceptance checks not yet covered by tests:** no banding on a
+   16-bit sky gradient, no clipping or hue shift at strength 100 on Zones I
+   and IX, no colour speckle at ISO 6400+ (after Phase 3), under 5 % more
+   preview frame time.
+5. **Decisions below**, plus whether the starter presets (specified for
+   B&W) change now that colour photos and luminance exist.
+6. **Later, separate:** Curve Stamp export (ColrBent).
+
 ## Open decisions (ask the owner when the phase starts)
 
 - Lightroom 3-way grading import onto Zones II, V, VIII (spec).
