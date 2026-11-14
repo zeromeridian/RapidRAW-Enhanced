@@ -5,6 +5,29 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.59.0-dev-zone-color-pickers — 2026-11-14
+
+### Develop
+
+- **Zone Color Grading** now works in **grades**: select one or more
+  zones (on the scale, with the pipette or with a rectangle), move the
+  wheel, and that selection becomes a grade with its own colour,
+  strength and luminance. Make another selection and colour it: it
+  becomes a second grade, even when it shares zones with the first.
+- Grades that share zones **add up** there: two similar colours
+  strengthen each other, opposite colours soften towards neutral, and
+  luminance shifts add. Each grade keeps its own settings.
+- Overlaps are marked: the scale shows each grade's colour side by side
+  with a layers icon on shared zones, and the **Grades** list shows
+  "Overlaps …" under every grade that shares zones.
+- Click a grade in the list to select it and edit it on the wheel; ×
+  removes it.
+- **Fill between** now creates one gradient grade on the zones between
+  the two ends, replacing other grades there, so the ramp looks exactly
+  as before.
+- Edits made with earlier versions open unchanged: each run of zones with
+  the same settings becomes a grade.
+
 ## 1.58.0-dev-zone-color-pickers — 2026-11-14
 
 ### Develop

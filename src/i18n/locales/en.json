@@ -231,14 +231,17 @@
     },
     "zoneTint": {
       "fill": "Fill between",
-      "fillHint": "Fills the zones between the first and last selected zone along the curve, from one end's colour, strength and luminance to the other's.",
-      "hint": "Click a zone to color it. Shift-click selects a range, Cmd/Ctrl-click adds or removes a zone.",
+      "fillHint": "Fills the zones between the first and last selected zone along the curve, from one end's colour, strength and luminance to the other's, as one gradient grade that replaces other grades there.",
+      "gradient": "Gradient",
+      "grades": "Grades",
+      "hint": "Select zones and move the wheel: each coloured selection becomes its own grade. Grades that share zones add up there and are marked. Shift-click selects a range, Cmd/Ctrl-click adds or removes a zone; click a grade to edit it.",
+      "overlapCount": "{{count}} grades overlap here",
+      "overlaps": "Overlaps {{zones}}",
       "pickArea": "Pick zones by dragging a rectangle on the photo (Shift or Cmd/Ctrl adds to the selection)",
       "pickPoint": "Pick a zone by clicking the photo (Shift selects a range, Cmd/Ctrl adds or removes)",
       "protect": "Protect",
       "softness": "Softness",
-      "tintedZones": "Adjusted zones",
-      "untint": "Reset zones",
+      "removeGrade": "Remove grade",
       "zone": "Zone {{zone}}",
       "zones": "Zones {{zones}}"
     }

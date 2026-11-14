@@ -230,14 +230,17 @@
     },
     "zoneTint": {
       "fill": "Preencher entre",
-      "fillHint": "Preenche as zonas entre a primeira e a última zona selecionada ao longo da curva, da cor, intensidade e luminância de uma ponta às da outra.",
-      "hint": "Clique numa zona para a colorir. Shift-clique seleciona um intervalo, Cmd/Ctrl-clique adiciona ou remove uma zona.",
+      "fillHint": "Preenche as zonas entre a primeira e a última zona selecionada ao longo da curva, da cor, intensidade e luminância de uma ponta às da outra, como uma gradação em degradê que substitui as outras aí.",
+      "gradient": "Degradê",
+      "grades": "Gradações",
+      "hint": "Selecione zonas e mova a roda: cada seleção colorida torna-se uma gradação própria. Gradações que partilham zonas somam-se aí e ficam assinaladas. Shift-clique seleciona um intervalo, Cmd/Ctrl-clique adiciona ou remove uma zona; clique numa gradação para a editar.",
+      "overlapCount": "{{count}} gradações sobrepõem-se aqui",
+      "overlaps": "Sobrepõe-se em {{zones}}",
       "pickArea": "Escolher zonas arrastando um retângulo na foto (Shift ou Cmd/Ctrl adiciona à seleção)",
       "pickPoint": "Escolher uma zona clicando na foto (Shift seleciona um intervalo, Cmd/Ctrl adiciona ou remove)",
       "protect": "Proteção",
       "softness": "Suavidade",
-      "tintedZones": "Zonas ajustadas",
-      "untint": "Redefinir zonas",
+      "removeGrade": "Remover gradação",
       "zone": "Zona {{zone}}",
       "zones": "Zonas {{zones}}"
     }

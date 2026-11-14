@@ -230,14 +230,17 @@
     },
     "zoneTint": {
       "fill": "填滿中間",
-      "fillHint": "沿曲線填滿所選首尾區域之間的區域，從一端的顏色、強度與亮度過渡到另一端。",
-      "hint": "點擊一個區域為其著色。Shift 點擊選取一個範圍，Cmd/Ctrl 點擊新增或移除區域。",
+      "fillHint": "沿曲線填滿所選首尾區域之間的區域，從一端的顏色、強度與亮度過渡到另一端，作為一個漸層分級，取代該處的其他分級。",
+      "gradient": "漸層",
+      "grades": "分級",
+      "hint": "選取區域並轉動色輪：每個著色的選取都會成為一個獨立的分級。共用區域的分級會在該處疊加並有標記。Shift 點擊選取範圍，Cmd/Ctrl 點擊新增或移除區域；點擊分級即可編輯。",
+      "overlapCount": "此處有 {{count}} 個分級重疊",
+      "overlaps": "在 {{zones}} 重疊",
       "pickArea": "在相片上拖曳矩形以選取區域（Shift 或 Cmd/Ctrl 加入選取）",
       "pickPoint": "點按相片以選取區域（Shift 選取範圍，Cmd/Ctrl 加入或移除）",
       "protect": "保護",
       "softness": "柔和度",
-      "tintedZones": "已調整區域",
-      "untint": "重置區域",
+      "removeGrade": "移除分級",
       "zone": "區域 {{zone}}",
       "zones": "區域 {{zones}}"
     }

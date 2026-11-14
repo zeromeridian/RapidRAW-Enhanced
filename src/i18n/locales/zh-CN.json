@@ -230,14 +230,17 @@
     },
     "zoneTint": {
       "fill": "填充中间",
-      "fillHint": "沿曲线填充所选首尾区域之间的区域，从一端的颜色、强度和亮度过渡到另一端。",
-      "hint": "点击一个区域为其着色。Shift 点击选择一个范围，Cmd/Ctrl 点击添加或移除区域。",
+      "fillHint": "沿曲线填充所选首尾区域之间的区域，从一端的颜色、强度和亮度过渡到另一端，作为一个渐变分级，替换该处的其他分级。",
+      "gradient": "渐变",
+      "grades": "分级",
+      "hint": "选择区域并转动色轮：每个着色的选择都会成为一个独立的分级。共享区域的分级会在那里叠加并有标记。Shift 点击选择范围，Cmd/Ctrl 点击添加或移除区域；点击分级即可编辑。",
+      "overlapCount": "此处有 {{count}} 个分级重叠",
+      "overlaps": "在 {{zones}} 重叠",
       "pickArea": "在照片上拖动矩形以选择区域（Shift 或 Cmd/Ctrl 添加到选择）",
       "pickPoint": "单击照片以选择区域（Shift 选择范围，Cmd/Ctrl 添加或移除）",
       "protect": "保护",
       "softness": "柔和度",
-      "tintedZones": "已调整区域",
-      "untint": "重置区域",
+      "removeGrade": "移除分级",
       "zone": "区域 {{zone}}",
       "zones": "区域 {{zones}}"
     }

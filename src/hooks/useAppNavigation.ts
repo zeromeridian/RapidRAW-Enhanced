@@ -269,6 +269,8 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
         ...canvasToolState(),
         activeRelightLightId: null,
         transformedOriginalUrl: null,
+        // The zones stay selected, but a grade belongs to the photo it was selected on.
+        zoneTintSelection: { ...useEditorStore.getState().zoneTintSelection, gradeId: null },
       });
 
       setUI({

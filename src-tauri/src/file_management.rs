@@ -1137,6 +1137,11 @@ mod output_naming_tests {
                 { "hue": 0, "strength": 0, "luminance": 40 },
                 { "hue": 30, "strength": 60, "luminance": -25 },
             ],
+            // The editable grades (TS only); `zones` above is their sum, which Rust renders.
+            "grades": [
+                { "id": "a", "zones": [{ "hue": 0, "strength": 0, "luminance": 40 }, null] },
+                { "id": "b", "zones": [null, { "hue": 30, "strength": 60, "luminance": -25 }] },
+            ],
         });
         let source = ImageMetadata {
             adjustments: serde_json::json!({ "monochrome": true, "zoneTint": zone_tint }),

@@ -230,14 +230,17 @@
     },
     "zoneTint": {
       "fill": "Remplir entre",
-      "fillHint": "Remplit les zones entre la première et la dernière zone sélectionnée selon la courbe, de la couleur, de l'intensité et de la luminance d'une extrémité à celles de l'autre.",
-      "hint": "Cliquez sur une zone pour la colorer. Maj-clic sélectionne une plage, Cmd/Ctrl-clic ajoute ou retire une zone.",
+      "fillHint": "Remplit les zones entre la première et la dernière zone sélectionnée selon la courbe, de la couleur, de l'intensité et de la luminance d'une extrémité à celles de l'autre, en un étalonnage dégradé qui remplace les autres à cet endroit.",
+      "gradient": "Dégradé",
+      "grades": "Étalonnages",
+      "hint": "Sélectionnez des zones et tournez la roue : chaque sélection colorée devient un étalonnage à part. Les étalonnages qui partagent des zones s'y additionnent et sont signalés. Maj-clic sélectionne une plage, Cmd/Ctrl-clic ajoute ou retire une zone ; cliquez sur un étalonnage pour le modifier.",
+      "overlapCount": "{{count}} étalonnages se chevauchent ici",
+      "overlaps": "Chevauche {{zones}}",
       "pickArea": "Choisir des zones en traçant un rectangle sur la photo (Maj ou Cmd/Ctrl ajoute à la sélection)",
       "pickPoint": "Choisir une zone en cliquant sur la photo (Maj sélectionne une plage, Cmd/Ctrl ajoute ou retire)",
       "protect": "Protection",
       "softness": "Douceur",
-      "tintedZones": "Zones ajustées",
-      "untint": "Réinitialiser les zones",
+      "removeGrade": "Supprimer l'étalonnage",
       "zone": "Zone {{zone}}",
       "zones": "Zones {{zones}}"
     }

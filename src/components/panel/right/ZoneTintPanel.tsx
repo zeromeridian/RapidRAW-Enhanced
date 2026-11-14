@@ -1,5 +1,6 @@
 import { MouseEvent, useCallback, useState } from 'react';
-import { Eye, EyeOff, Pipette, RotateCcw, SquareDashedMousePointer, X } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
+import { Eye, EyeOff, Layers, Pipette, RotateCcw, SquareDashedMousePointer, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
@@ -21,21 +22,32 @@ import {
   ZONE_TINT_SOFTNESS,
   ZONE_TINT_ZONE_COUNT,
   ZoneTint,
+  ZoneTintGrade,
   ZoneTintZone,
   createZoneTint,
 } from '../../../utils/adjustments';
-import { BLEND_PAD_CURVES, applyBlendPadCurve } from '../../../utils/blendPad';
-import { ZoneSelection, nextZoneSelection } from '../../../utils/zoneTint';
+import { BLEND_PAD_CURVES } from '../../../utils/blendPad';
+import {
+  NEUTRAL_ZONE,
+  ZoneSelection,
+  fillGrades,
+  gradeSelection,
+  gradeZones,
+  isUniformGrade,
+  luminanceOf,
+  nextZoneSelection,
+  overlappingZones,
+  updateGrade,
+  withZoneTintGrades,
+  zoneTintGrades,
+} from '../../../utils/zoneTint';
 
 const ZONE_NAMES = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 /** Softness and Protect are OKLab L values, Amount a factor; the sliders show them ×100. */
 const SLIDER_SCALE = 100;
 const NEUTRAL: HueSatLum = { hue: 0, saturation: 0, luminance: 0 };
-const NEUTRAL_ZONE: ZoneTintZone = { hue: 0, strength: 0, luminance: 0 };
 /** `zone_tint::MAX_LUMINANCE_SHIFT`: luminance ±100 moves a zone's tones by half a zone. */
 const MAX_LUMINANCE_SHIFT = 0.05;
-
-const luminanceOf = (zone: ZoneTintZone) => zone.luminance ?? 0;
 
 /**
  * The display grey of a zone's centre after its luminance: OKLab L = n / 10 (plus the shift) is
@@ -52,6 +64,10 @@ const zoneGrey = (zone: number, luminance: number) => {
 /** The wheel colour of a zone's tint, fainter for a weaker tint. */
 const tintColor = (hue: number, strength: number) => `hsl(${hue} 100% 50% / ${0.35 + (0.65 * strength) / 100})`;
 
+/** A grade's colour in one zone: its tint, or for a luminance-only grade the zone's grey. */
+const gradeZoneColor = (settings: ZoneTintZone, zone: number) =>
+  settings.strength > 0 ? tintColor(settings.hue, settings.strength) : zoneGrey(zone, luminanceOf(settings));
+
 /** Sorted zones as their names, with neighbouring zones joined into ranges: "II, IV–VII". */
 const formatZones = (zones: number[]) => {
   const runs: Array<[number, number]> = [];
@@ -65,8 +81,6 @@ const formatZones = (zones: number[]) => {
     .join(', ');
 };
 
-const zoneRange = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, index) => from + index);
-
 /** The selection as its first and last zone when it is one unbroken range with zones between them. */
 const fillableRange = (selected: number[]): [number, number] | null => {
   const from = selected[0];
@@ -74,71 +88,12 @@ const fillableRange = (selected: number[]): [number, number] | null => {
   return selected.length >= 3 && to - from === selected.length - 1 ? [from, to] : null;
 };
 
-/** A zone's tint as a point on the colour wheel: the hue's direction, the strength's length. */
-const tintVector = ({ hue, strength }: ZoneTintZone) => {
-  const angle = (hue * Math.PI) / 180;
-  return [strength * Math.cos(angle), strength * Math.sin(angle)];
-};
-
-/**
- * Fills the zones strictly between `from` and `to` along the curve, blending one end's tint
- * into the other's on the colour wheel, as the shader sums the zones' colours, and its
- * luminance into the other's. Opposite hues (cool shadows, warm highlights) meet in a soft
- * neutral instead of sweeping through the hues between them, and an untinted end fades the
- * other end's colour out without changing its hue.
- */
-const fillZones = (zones: ZoneTintZone[], from: number, to: number, curve: BlendPadCurve): ZoneTintZone[] => {
-  const start = zones[from] ?? NEUTRAL_ZONE;
-  const end = zones[to] ?? NEUTRAL_ZONE;
-  const [startX, startY] = tintVector(start);
-  const [endX, endY] = tintVector(end);
-  return Array.from({ length: ZONE_TINT_ZONE_COUNT }, (_, zone) => {
-    const existing = zones[zone] ?? NEUTRAL_ZONE;
-    if (zone <= from || zone >= to) return existing;
-    const share = applyBlendPadCurve(curve, (zone - from) / (to - from));
-    const x = startX + (endX - startX) * share;
-    const y = startY + (endY - startY) * share;
-    const strength = Math.hypot(x, y);
-    const hue = strength > 1e-6 ? ((((Math.atan2(y, x) * 180) / Math.PI) % 360) + 360) % 360 : existing.hue;
-    const luminance = luminanceOf(start) + (luminanceOf(end) - luminanceOf(start)) * share;
-    return { ...existing, hue, strength, luminance };
-  });
-};
-
-/** Neighbouring zones that share one setting. */
-interface ZoneRun {
-  from: number;
-  to: number;
-  hue: number;
-  strength: number;
-  luminance: number;
-}
-
-/**
- * The zones with a colour or a luminance shift, neighbours with the same settings joined,
- * lightest first like the scale.
- */
-const zoneRuns = (zoneTint: ZoneTint): ZoneRun[] => {
-  const runs: ZoneRun[] = [];
-  for (let zone = 0; zone < ZONE_TINT_ZONE_COUNT; zone += 1) {
-    const settings = zoneTint.zones[zone] ?? NEUTRAL_ZONE;
-    const { hue, strength } = settings;
-    const luminance = luminanceOf(settings);
-    if (strength <= 0 && luminance === 0) continue;
-    const last = runs[runs.length - 1];
-    const isSame =
-      last &&
-      last.to === zone - 1 &&
-      last.strength === strength &&
-      last.luminance === luminance &&
-      (strength <= 0 || last.hue === hue);
-    if (isSame) last.to = zone;
-    else runs.push({ from: zone, to: zone, hue, strength, luminance });
-  }
-  return runs.reverse();
-};
+/** The grades, lightest first like the scale. */
+const byLightestZone = (grades: ZoneTintGrade[]) =>
+  [...grades].sort((a, b) => Math.max(...gradeZones(b)) - Math.max(...gradeZones(a)));
 
 interface ZoneScaleProps {
+  grades: ZoneTintGrade[];
   onZoneClick(zone: number, event: MouseEvent): void;
   selected: number[];
   zoneTint: ZoneTint;
@@ -146,22 +101,30 @@ interface ZoneScaleProps {
 
 /**
  * The eleven zones as an upright grey scale, X at the top: names on the left, the selection
- * marked beside them, each zone's tint as a band on the scale's right edge.
+ * marked beside them, each zone's grades as bands on the scale's right edge, side by side (and
+ * flagged) where grades overlap.
  */
-function ZoneScale({ onZoneClick, selected, zoneTint }: ZoneScaleProps) {
+function ZoneScale({ grades, onZoneClick, selected, zoneTint }: ZoneScaleProps) {
   const { t } = useTranslation();
 
   return (
     <div className="flex flex-col-reverse shrink-0">
       {ZONE_NAMES.map((name, zone) => {
-        const settings = zoneTint.zones[zone] ?? NEUTRAL_ZONE;
-        const { hue, strength } = settings;
+        const combined = zoneTint.zones[zone] ?? NEUTRAL_ZONE;
+        const bands = grades.flatMap((grade) => {
+          const settings = grade.zones[zone];
+          return settings && (settings.strength > 0 || luminanceOf(settings) !== 0)
+            ? [{ id: grade.id, color: gradeZoneColor(settings, zone) }]
+            : [];
+        });
+        const isOverlap = bands.length > 1;
         const isSelected = selected.includes(zone);
         return (
           <button
             aria-label={t('adjustments.zoneTint.zone', { zone: name })}
             aria-pressed={isSelected}
             className="group flex items-stretch gap-1.5 h-5 compact:h-[18px] focus:outline-none"
+            data-tooltip={isOverlap ? t('adjustments.zoneTint.overlapCount', { count: bands.length }) : undefined}
             key={name}
             onClick={(event) => onZoneClick(zone, event)}
           >
@@ -181,12 +144,23 @@ function ZoneScale({ onZoneClick, selected, zoneTint }: ZoneScaleProps) {
                 zone === ZONE_NAMES.length - 1 && 'rounded-t-md',
                 zone > 0 && 'border-b border-white/5',
               )}
-              style={{ backgroundColor: zoneGrey(zone, luminanceOf(settings)) }}
+              style={{ backgroundColor: zoneGrey(zone, luminanceOf(combined)) }}
             >
-              {strength > 0 && (
-                <span
-                  className="absolute inset-y-0 right-0 w-2.5"
-                  style={{ backgroundColor: tintColor(hue, strength) }}
+              {bands.length > 0 && (
+                <span className="absolute inset-y-0 right-0 flex">
+                  {bands.map((band) => (
+                    <span
+                      className={clsx(isOverlap ? 'w-1.5' : 'w-2.5')}
+                      key={band.id}
+                      style={{ backgroundColor: band.color }}
+                    />
+                  ))}
+                </span>
+              )}
+              {isOverlap && (
+                <Layers
+                  className="absolute left-0.5 top-1/2 -translate-y-1/2 text-white drop-shadow-[0_0_1px_rgba(0,0,0,0.9)]"
+                  size={10}
                 />
               )}
             </span>
@@ -197,9 +171,39 @@ function ZoneScale({ onZoneClick, selected, zoneTint }: ZoneScaleProps) {
   );
 }
 
+/** A grade's settings in the list: hue, strength and luminance, or "Gradient" for a Fill between ramp. */
+function GradeValues({ grade }: { grade: ZoneTintGrade }) {
+  const { t } = useTranslation();
+  if (!isUniformGrade(grade)) return <span>{t('adjustments.zoneTint.gradient')}</span>;
+  const settings = grade.zones[gradeZones(grade)[0]] ?? NEUTRAL_ZONE;
+  const luminance = luminanceOf(settings);
+  return (
+    <>
+      {settings.strength > 0 && (
+        <>
+          <span>
+            <span className="font-bold">{t('ui.colorWheel.hueAbbreviation')}</span> {Math.round(settings.hue)}&deg;
+          </span>
+          <span>
+            <span className="font-bold">{t('ui.colorWheel.saturationAbbreviation')}</span>{' '}
+            {Math.round(settings.strength)}
+          </span>
+        </>
+      )}
+      {luminance !== 0 && (
+        <span>
+          <span className="font-bold">{t('ui.colorWheel.luminanceAbbreviation')}</span> {luminance > 0 ? '+' : ''}
+          {Math.round(luminance)}
+        </span>
+      )}
+    </>
+  );
+}
+
 /**
- * Zone Tint: a colour per Zone System zone (`zone_tint.rs`), toning a Black & White photo or
- * grading a colour one by tonal zone.
+ * Zone Color Grading (internally Zone Tint): colours by Zone System zone (`zone_tint.rs`),
+ * toning a Black & White photo or grading a colour one. Each coloured selection is a grade;
+ * grades that share zones add up there.
  */
 export default function ZoneTintPanel() {
   const { t } = useTranslation();
@@ -220,23 +224,16 @@ export default function ZoneTintPanel() {
   const title = t('editor.adjustments.sections.zoneTint');
   const isVisible = sectionVisibility.zoneTint;
   const zoneTint = storedZoneTint ?? createZoneTint();
-  const shown = zoneTint.zones[anchor] ?? NEUTRAL_ZONE;
+  const grades = zoneTintGrades(zoneTint);
+  const activeGrade = grades.find((grade) => grade.id === selection.gradeId) ?? null;
+  // A selection that is not a grade yet shows neutral: moving the wheel creates its grade.
+  const shown = activeGrade?.zones[anchor] ?? NEUTRAL_ZONE;
 
   const updateZoneTint = (update: (current: ZoneTint) => ZoneTint, historyLabel?: string) =>
     setAdjustments((prev) => ({ ...prev, zoneTint: update(prev.zoneTint ?? createZoneTint()) }), historyLabel);
 
-  /** Writes the given settings into the given zones, keeping their others. */
-  const updateZones = (zones: number[], change: Partial<ZoneTintZone>, historyLabel?: string) =>
-    updateZoneTint(
-      (current) => ({
-        ...current,
-        zones: Array.from({ length: ZONE_TINT_ZONE_COUNT }, (_, zone) => {
-          const existing = current.zones[zone] ?? NEUTRAL_ZONE;
-          return zones.includes(zone) ? { ...existing, ...change } : existing;
-        }),
-      }),
-      historyLabel,
-    );
+  const updateGrades = (update: (current: ZoneTint) => ZoneTintGrade[], historyLabel?: string) =>
+    updateZoneTint((current) => withZoneTintGrades(current, update(current)), historyLabel);
 
   const handleDragStateChange = useCallback(
     (isDragging: boolean) => setEditor({ isSliderDragging: isDragging }),
@@ -244,20 +241,32 @@ export default function ZoneTintPanel() {
   );
 
   /**
-   * Writes only what the wheel changed, so moving the hue of a range keeps each zone's own
-   * strength and luminance (and the other way round).
+   * Writes only what the wheel changed into the selected grade, so moving the hue keeps each
+   * zone's own strength and luminance (and the other way round). A selection that is not a
+   * grade yet becomes one.
    */
   const handleColorChange = ({ hue, saturation, luminance }: HueSatLum) => {
     const change: Partial<ZoneTintZone> = {};
     if (hue !== shown.hue) change.hue = hue;
     if (saturation !== shown.strength) change.strength = saturation;
     if (luminance !== luminanceOf(shown)) change.luminance = luminance;
-    if (Object.keys(change).length > 0) updateZones(selected, change);
+    if (Object.keys(change).length === 0) return;
+    // The store, not this render's copy, so every event of one drag edits the same new grade.
+    const current = useEditorStore.getState().zoneTintSelection;
+    const gradeId = current.gradeId ?? uuidv4();
+    if (!current.gradeId) setSelection({ ...current, gradeId });
+    updateGrades((zoneTintNow) => updateGrade(zoneTintGrades(zoneTintNow), gradeId, current.zones, change));
   };
 
   const handleZoneClick = (zone: number, event: MouseEvent) => setSelection(nextZoneSelection(selection, zone, event));
 
-  const selectRun = ({ from, to }: ZoneRun) => setSelection({ zones: zoneRange(from, to), anchor: from });
+  const removeGrade = (grade: ZoneTintGrade) => {
+    if (selection.gradeId === grade.id) setSelection({ ...selection, gradeId: null });
+    updateGrades(
+      (current) => zoneTintGrades(current).filter((g) => g.id !== grade.id),
+      t('adjustments.zoneTint.removeGrade'),
+    );
+  };
 
   /** Turns a picker on the photo on (`area`: the rectangle), or off when it is already on. */
   const togglePicker = (area: boolean) =>
@@ -274,15 +283,9 @@ export default function ZoneTintPanel() {
   const curveOptions = BLEND_PAD_CURVES.map((curve) => ({ label: t(`editor.blendPad.curves.${curve}`), value: curve }));
   const handleFill = () => {
     if (!fillRange) return;
-    updateZoneTint(
-      (current) => ({ ...current, zones: fillZones(current.zones, ...fillRange, fillCurve) }),
-      t('adjustments.zoneTint.fill'),
-    );
+    setSelection({ ...selection, gradeId: null });
+    updateGrades((current) => fillGrades(current, ...fillRange, fillCurve), t('adjustments.zoneTint.fill'));
   };
-
-  const runs = zoneRuns(zoneTint);
-  const isSelectedRun = ({ from, to }: ZoneRun) =>
-    selected.length === to - from + 1 && selected[0] === from && selected[selected.length - 1] === to;
 
   const handleToggleVisibility = () =>
     setAdjustments((prev) => {
@@ -325,12 +328,13 @@ export default function ZoneTintPanel() {
               className="p-2 rounded-full hover:bg-surface transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
               data-tooltip={t('editor.adjustments.actions.resetSectionSettings', { section: title })}
               disabled={!storedZoneTint}
-              onClick={() =>
+              onClick={() => {
+                setSelection({ ...selection, gradeId: null });
                 setAdjustments(
                   (prev) => ({ ...prev, zoneTint: null }),
                   t('editor.adjustments.actions.resetSectionSettings', { section: title }),
-                )
-              }
+                );
+              }}
             >
               <RotateCcw size={18} />
             </button>
@@ -340,7 +344,7 @@ export default function ZoneTintPanel() {
       <div className="grow overflow-y-auto p-4 compact:p-3 flex flex-col gap-4 compact:gap-3">
         <div className={clsx('flex flex-col gap-4 compact:gap-3 transition-opacity', !isVisible && 'opacity-40')}>
           <div className="flex items-center gap-3">
-            <ZoneScale onZoneClick={handleZoneClick} selected={selected} zoneTint={zoneTint} />
+            <ZoneScale grades={grades} onZoneClick={handleZoneClick} selected={selected} zoneTint={zoneTint} />
             <div className="grow min-w-0 max-w-60">
               <ColorWheel
                 defaultValue={NEUTRAL}
@@ -407,74 +411,67 @@ export default function ZoneTintPanel() {
             />
           </div>
 
-          {runs.length > 0 && (
+          {grades.length > 0 && (
             <div className="flex flex-col gap-1">
               <Text variant={TextVariants.label} color={TextColors.secondary}>
-                {t('adjustments.zoneTint.tintedZones')}
+                {t('adjustments.zoneTint.grades')}
               </Text>
-              {runs.map((run) => (
-                <div
-                  className={clsx(
-                    'flex items-center gap-1 rounded-md transition-colors',
-                    isSelectedRun(run) ? 'bg-surface' : 'hover:bg-surface',
-                  )}
-                  key={run.from}
-                >
-                  <button
-                    className="grow min-w-0 flex items-center gap-2 px-2 py-1.5 text-left"
-                    onClick={() => selectRun(run)}
+              {byLightestZone(grades).map((grade) => {
+                const zones = gradeZones(grade);
+                const overlap = overlappingZones(grade, grades);
+                const first = grade.zones[zones[0]] ?? NEUTRAL_ZONE;
+                const last = grade.zones[zones[zones.length - 1]] ?? NEUTRAL_ZONE;
+                return (
+                  <div
+                    className={clsx(
+                      'flex items-center gap-1 rounded-md transition-colors',
+                      grade.id === activeGrade?.id ? 'bg-surface' : 'hover:bg-surface',
+                    )}
+                    key={grade.id}
                   >
-                    <span
-                      className="w-3 h-3 shrink-0 rounded-full border border-white/20"
-                      style={{
-                        backgroundColor:
-                          run.strength > 0 ? tintColor(run.hue, run.strength) : zoneGrey(run.from, run.luminance),
-                      }}
-                    />
-                    <Text variant={TextVariants.small} className="grow truncate">
-                      {zonesLabel(zoneRange(run.from, run.to))}
-                    </Text>
-                    <Text
-                      variant={TextVariants.small}
-                      color={TextColors.secondary}
-                      className="flex items-center gap-2 tabular-nums"
+                    <button
+                      className="grow min-w-0 flex items-center gap-2 px-2 py-1.5 text-left"
+                      onClick={() => setSelection(gradeSelection(grade))}
                     >
-                      {run.strength > 0 && (
-                        <>
-                          <span>
-                            <span className="font-bold">{t('ui.colorWheel.hueAbbreviation')}</span>{' '}
-                            {Math.round(run.hue)}&deg;
-                          </span>
-                          <span>
-                            <span className="font-bold">{t('ui.colorWheel.saturationAbbreviation')}</span>{' '}
-                            {Math.round(run.strength)}
-                          </span>
-                        </>
-                      )}
-                      {run.luminance !== 0 && (
-                        <span>
-                          <span className="font-bold">{t('ui.colorWheel.luminanceAbbreviation')}</span>{' '}
-                          {run.luminance > 0 ? '+' : ''}
-                          {Math.round(run.luminance)}
-                        </span>
-                      )}
-                    </Text>
-                  </button>
-                  <button
-                    className="p-1.5 mr-0.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-bg-primary transition-colors"
-                    data-tooltip={t('adjustments.zoneTint.untint')}
-                    onClick={() =>
-                      updateZones(
-                        zoneRange(run.from, run.to),
-                        { hue: 0, strength: 0, luminance: 0 },
-                        t('adjustments.zoneTint.untint'),
-                      )
-                    }
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
+                      <span
+                        className="w-3 h-3 shrink-0 rounded-full border border-white/20"
+                        style={{
+                          background: `linear-gradient(to top, ${gradeZoneColor(first, zones[0])}, ${gradeZoneColor(last, zones[zones.length - 1])})`,
+                        }}
+                      />
+                      <span className="grow min-w-0 flex flex-col">
+                        <Text variant={TextVariants.small} className="truncate">
+                          {zonesLabel(zones)}
+                        </Text>
+                        {overlap.length > 0 && (
+                          <Text
+                            variant={TextVariants.small}
+                            color={TextColors.secondary}
+                            className="flex items-center gap-1 truncate"
+                          >
+                            <Layers className="shrink-0" size={11} />
+                            {t('adjustments.zoneTint.overlaps', { zones: formatZones(overlap) })}
+                          </Text>
+                        )}
+                      </span>
+                      <Text
+                        variant={TextVariants.small}
+                        color={TextColors.secondary}
+                        className="flex items-center gap-2 tabular-nums"
+                      >
+                        <GradeValues grade={grade} />
+                      </Text>
+                    </button>
+                    <button
+                      className="p-1.5 mr-0.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-bg-primary transition-colors"
+                      data-tooltip={t('adjustments.zoneTint.removeGrade')}
+                      onClick={() => removeGrade(grade)}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

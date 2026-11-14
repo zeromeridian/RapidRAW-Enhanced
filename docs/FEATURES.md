@@ -332,25 +332,29 @@ details are in `RELEASE_NOTES.MD`.
   zones (0–X), toning a Black & White photo or grading a colour one by
   tonal zone (the zone's colour shifts the colours there). The colour never
   changes a tone; Luminance (−100 to 100) moves the zone's tones by up to
-  half a zone and always keeps them in order. The zones form an upright
-  grey scale (X at the top, each grey after its luminance) beside the
-  colour wheel, each zone's colour a band along its edge; an Adjusted
-  zones list below names every changed zone or range with its hue,
-  strength and luminance, selects it on click and resets it with ×. Pick a
-  zone, or a range with Shift-click (Cmd/Ctrl-click adds or removes one),
-  on the scale or from the photo: a pipette selects the zone under a click
-  (same modifiers), a rectangle picker selects every zone holding a fair
-  share of the dragged area (Shift or Cmd/Ctrl adds them); both read the
-  tones before the grading. Then set its colour, strength and luminance
-  on the colour wheel (only the value moved is written to every selected
-  zone); neighbouring zones blend
+  half a zone and always keeps them in order. Select a zone, or a range
+  with Shift-click (Cmd/Ctrl-click adds or removes one), on an upright
+  grey scale (X at the top) or from the photo: a pipette selects the zone
+  under a click (same modifiers), a rectangle picker selects every zone
+  holding a fair share of the dragged area (Shift or Cmd/Ctrl adds them);
+  both read the tones before the grading. Moving the colour wheel turns
+  the selection into a **grade** with its own colour, strength and
+  luminance; each further coloured selection is another grade, and
+  grades that share zones add up there (colours as colour-wheel vectors,
+  so opposites soften towards neutral; luminance summed). The scale shows
+  each grade's colour as a band, side by side with a layers mark where
+  grades overlap; the Grades list shows every grade with its values and
+  an "Overlaps …" line, selects it for editing on click (only the moved
+  value is written) and removes it with ×. Neighbouring zones blend
   smoothly, Softness sets how far a zone's colour reaches, and Protect
   keeps black and white free of colour. Amount scales the whole effect
-  (0–200 %) without changing the zones' own settings. Fill between blends
-  the first and last selected zone's settings across the zones between
-  them along a Blend Pad curve (Linear, Soft, Ease in). Masks in a blend
-  mode keep the grade. The panel's eye switches it off and its reset
-  clears it. It travels with the edit (XMP, copy/paste, presets).
+  (0–200 %) without changing the stored settings. Fill between makes one
+  gradient grade on the zones between the first and last selected zone,
+  from one end's colour to the other's along a Blend Pad curve (Linear,
+  Soft, Ease in), replacing other grades there. Masks in a blend mode
+  keep the grade. The panel's eye switches it off and its reset clears
+  it. It travels with the edit (XMP, copy/paste, presets); older edits
+  open as grades. Guide: `ZONE_COLOR_GRADING_GUIDE.md`.
 - **Targeted adjustment pipettes**, as in Lightroom Classic: drag up or down
   on the photo to change what is under the cursor, double-click to reset it.
   The **Color Mixer** pipette (from RapidRAW) moves every colour band found

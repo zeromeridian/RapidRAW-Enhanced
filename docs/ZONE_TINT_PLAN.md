@@ -8,7 +8,9 @@ Amount and Fill between along a curve (`1.57.3`), colour photos too
 (`1.57.5`). All of it was committed by the owner on `dev/zone-tint`
 (up to `bc3d2b40`) and merged into `develop` and `main` (`7d5093a4`).
 Zone pickers on the photo (`1.58.0`, branch `dev/zone-color-pickers`
-from `7d5093a4`). The GPU exit check and the hands-on
+from `7d5093a4`, committed by the owner as `3392b413`), then
+overlapping grades (`1.59.0`, uncommitted on the same branch). How the
+tool behaves: `ZONE_COLOR_GRADING_GUIDE.md`. The GPU exit check and the hands-on
 check still have to run on the Mac. Next: the rest of Phase 3. `UPSTREAM_FEATURE_GAP.md` Plan item 28 (P0, owner
 2026-11-13: after item 27, the Orbit Blend Pad, whose steps 1–7 are done).
 Item 30 (import from card or camera) follows it. Four phases, each
@@ -70,8 +72,42 @@ changes about it, the decisions still open, and progress.
 - **Ranges of zones:** Shift-click selects every zone between the
   selected one and the clicked one, Cmd/Ctrl-click toggles single zones;
   hue and strength are written into each selected zone, so each can still
-  be fine-tuned later (no separate "band" layer). This moves the spec's
-  multi-select from Phase 3 into Phase 2.
+  be fine-tuned later. This moves the spec's multi-select from Phase 3
+  into Phase 2. The original "no separate band layer" part was reversed
+  by the owner the same day: see "Grades".
+- **Grades, overlapping adjustments** (`1.59.0`; owner 2026-11-14,
+  reversing "no separate band layer"):
+  - Owner: each coloured selection is its own grade with its own
+    settings; a later selection that shares zones (partly or fully) is
+    another grade; the settings combine; overlapping grades are flagged.
+  - Owner: Fill between replaces: its gradient grade takes the zones
+    strictly between the ends out of other grades (a grade left empty is
+    removed); the ends keep their grades.
+  - Agent design: a grade (`ZoneTintGrade`) is an id plus a value or
+    `null` per zone (equal values for a selection, varying for a ramp).
+    A new selection is not a grade (`zoneTintSelection.gradeId` null,
+    the wheel shows neutral); the first wheel move creates it and later
+    moves edit it until the selection changes. Clicking a grade in the
+    list selects it. Moving the wheel writes only the moved value into
+    every zone of the grade (this flattens that value across a ramp;
+    flagged to the owner). Opening another photo clears the active grade.
+  - Agent design: per zone the grades' colours add as colour-wheel vectors
+    (opposite hues soften towards neutral) and their luminances add;
+    capped at strength 100 and luminance ±100. Softness, Protect and the
+    overall Amount stay global; no per-grade name, mute or Amount (not
+    asked for).
+  - Flag: the scale shows each grade's colour as a band, side by side with
+    a layers icon on shared zones (tooltip: how many); the list shows
+    "Overlaps …" under each grade that shares zones.
+  - Saving: `zoneTint.grades` is the editable state and `zoneTint.zones`
+    their sum (`withZoneTintGrades`), so Rust, the shader and older builds
+    render it unchanged; the one summing implementation is in TS. A block
+    without `grades`, or whose grades no longer add up to its `zones` (an
+    older build edited it), loads its zones as grades: one per run of
+    equal neighbouring zones, with fixed ids. Flag: an old Fill between
+    ramp therefore opens as one-zone grades; an older build's edit
+    replaces the grades.
+  - Advanced mode's per-zone `centerOffset`/`width` stay on `zones`.
 - **Hue control:** a colour wheel (hue and strength in one control, like
   Colour Grading's wheels), not a hue slider. The wheel's angle must be
   the OKLab hue the Rust side uses (`zoneTint.zones[n].hue`, 0° = +a).
@@ -188,6 +224,7 @@ changes about it, the decisions still open, and progress.
 
 ## Open decisions (ask the owner when the phase starts)
 
+
 - Lightroom 3-way grading import onto Zones II, V, VIII (spec).
 - monoRAW: out of scope now (spec); confirm. (Colour images: decided,
   see "Colour photos" above.)
@@ -266,8 +303,21 @@ changes about it, the decisions still open, and progress.
   and updated: `zone_tint_reaches_the_shader_while_its_panel_is_visible`,
   `a_zone_tint_counts_as_an_edit_on_colour_and_black_and_white_photos`,
   `zone_tint_is_off_unless_a_visible_block_tints_a_zone`.
-- **Zone pickers** (`1.58.0`, 2026-11-14, uncommitted, branch
-  `dev/zone-color-pickers`): `SAMPLE_PROBE_ZONE_TINT` and
+- **Grades** (`1.59.0`, 2026-11-14, uncommitted, branch
+  `dev/zone-color-pickers` on top of `3392b413`): `ZoneTintGrade`,
+  `createZoneTintGrade` and `ZoneTint.grades` in `utils/adjustments.ts`;
+  `utils/zoneTint.ts` gains the grade maths (`zoneTintGrades`,
+  `withZoneTintGrades`, `updateGrade`, `fillGrades` (moved from the
+  panel), `overlappingZones`, `gradeSelection`, `isUniformGrade`) and
+  `ZoneSelection.gradeId`; `ZoneTintPanel.tsx` shows the Grades list,
+  the side-by-side bands and the overlap marks;
+  `useAppNavigation.ts` clears the active grade on a photo switch. The
+  XMP round-trip test carries `grades`. Strings: `grades`, `gradient`,
+  `overlaps`, `overlapCount`, `removeGrade` added, `hint` and `fillHint`
+  reworded, `tintedZones` and `untint` removed (12 locales). New guide
+  `ZONE_COLOR_GRADING_GUIDE.md`.
+- **Zone pickers** (`1.58.0`, 2026-11-14, committed by the owner as
+  `3392b413`): `SAMPLE_PROBE_ZONE_TINT` and
   `zone_tint_oklab` in `shader.wgsl`, `SampleProbe::ZoneTint` in
   `gpu_processing.rs`; `sample_adjustment_probe` takes `radius_x` and
   `radius_y` (was one square `radius`). New `src/utils/zoneTint.ts`

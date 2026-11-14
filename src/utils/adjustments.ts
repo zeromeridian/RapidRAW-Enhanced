@@ -589,6 +589,15 @@ export interface ZoneTintZone {
 }
 
 /**
+ * One grade of Zone Color Grading: the zones a selection coloured, each with its settings (equal
+ * for a plain grade, changing across a Fill between). `null` marks a zone outside the grade.
+ */
+export interface ZoneTintGrade {
+  id: string;
+  zones: Array<ZoneTintZone | null>;
+}
+
+/**
  * Zone Tint, rendered by `zone_tint.rs` on colour and Black & White photos: a colour per zone 0–X of
  * OKLab lightness, added without changing any tone. Absent (`null`) means off.
  */
@@ -596,7 +605,13 @@ export interface ZoneTint {
   /** `zone_tint::VERSION`. */
   version: 1;
   enabled: boolean;
+  /**
+   * What Rust renders: the sum of `grades` (`withZoneTintGrades` in `utils/zoneTint.ts`), so older
+   * builds render the same. Advanced mode's `centerOffset` and `width` live only here.
+   */
   zones: ZoneTintZone[];
+  /** The editable grades, which overlap and add up; absent in older edits (see `zoneTintGrades`). */
+  grades?: ZoneTintGrade[];
   /** Zone softness, σ in OKLab L. */
   softness: number;
   /** How far from black and white the colour fades out, in OKLab L. */
@@ -605,10 +620,16 @@ export interface ZoneTint {
   amount?: number;
 }
 
+export const createZoneTintGrade = (zones: Array<ZoneTintZone | null>, id: string = uuidv4()): ZoneTintGrade => ({
+  id,
+  zones,
+});
+
 export const createZoneTint = (): ZoneTint => ({
   version: 1,
   enabled: true,
   zones: Array.from({ length: ZONE_TINT_ZONE_COUNT }, () => ({ hue: 0, strength: 0 })),
+  grades: [],
   softness: ZONE_TINT_SOFTNESS.default,
   protect: ZONE_TINT_PROTECT.default,
   amount: ZONE_TINT_AMOUNT.default,
