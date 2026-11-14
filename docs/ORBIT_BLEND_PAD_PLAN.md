@@ -103,7 +103,14 @@ full at the start.
    centre and gives nothing beyond it. (3) changes the maths: Rust and
    the TS mirror, a shared vector, an optional anchor field (pad format
    stays version 1), presets carry it.
-6. **Remember each tool's target** (`1.55.0`, S): an anchor keeps the
+6. **Remember each tool's target** (`1.55.0`, S). **Also (owner,
+   2026-11-13): a new pad's default tools become Exposure, Whites and
+   Blacks** (instead of Contrast, Temperature, Saturation), still at the
+   top, bottom right and bottom left. Their values at the dot are open;
+   ask the owner when the step starts (`createBlendPad` in
+   `utils/blendPad.ts`; the guide's Example 2 and the vectors' "defaults"
+   cases use the old tools and must be updated or kept as explicit pads).
+   Then: an anchor keeps the
    last target per tool, so switching Exposure → Contrast → Exposure
    restores the Exposure target instead of converting the share. Stored
    with the anchor (pad format stays version 1, the extra field is
@@ -209,8 +216,14 @@ more shapes (ellipse, custom outline). Restart: when the owner asks.
   the Node check round-trips every vector case through a preset and
   checks the cleaning (unknown tool, limit, bad values, newer version,
   clashing names).
-- Step 5a (`1.54.0`, 2026-11-13, uncommitted; step 5 committed by the
-  owner): pad labels always show "now X" (accent) and "→ target" (grey,
+- Fix `1.54.1` (2026-11-13, uncommitted; owner report): the preset
+  picker forgot the loaded preset when the panel was switched (its
+  selection was component state). The pad now records `presetId` (set on
+  load and on "Save as new"; ignored by the renderer, stripped from
+  presets, excluded from the "modified" check), so the name survives
+  panel switches, reloads and copy/paste; a deleted preset simply
+  matches nothing.
+- Step 5a (`1.54.0`, 2026-11-13, owner commit `40de3841`): pad labels always show "now X" (accent) and "→ target" (grey,
   `tspan`s); tool cards: "At the dot" with "now X" as the slider's label
   addon; selected tool: dashed line dot → opposite point with the far
   value (`SelectedAxis`); per-tool **Reverse** (`Anchor.reverse` in Rust,

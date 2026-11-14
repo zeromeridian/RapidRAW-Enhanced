@@ -386,10 +386,11 @@ const normalizePresetName = (name: string) => name.trim().toLowerCase();
 const CENTRE: Coord = { x: 0, y: 0 };
 
 /** The preset's pad as it is saved: the puck kept only when the preset includes it. */
-const presetPad = (pad: BlendPad, includesPuck: boolean): BlendPad => ({
-  ...pad,
-  puck: includesPuck ? pad.puck : CENTRE,
-});
+const presetPad = (pad: BlendPad, includesPuck: boolean): BlendPad => {
+  // A preset never records which preset a pad came from.
+  const { presetId: _presetId, ...rest } = pad;
+  return { ...rest, puck: includesPuck ? pad.puck : CENTRE };
+};
 
 export const createBlendPadPreset = (name: string, pad: BlendPad, includesPuck: boolean): BlendPadPreset => ({
   id: crypto.randomUUID(),
@@ -399,7 +400,10 @@ export const createBlendPadPreset = (name: string, pad: BlendPad, includesPuck: 
 });
 
 /** The pad a preset loads. */
-export const loadBlendPadPreset = (preset: BlendPadPreset): BlendPad => presetPad(preset.pad, preset.includesPuck);
+export const loadBlendPadPreset = (preset: BlendPadPreset): BlendPad => ({
+  ...presetPad(preset.pad, preset.includesPuck),
+  presetId: preset.id,
+});
 
 /** Overwrites a preset with the current pad, keeping its name and whether it includes the puck. */
 export const updateBlendPadPreset = (preset: BlendPadPreset, pad: BlendPad): BlendPadPreset => ({

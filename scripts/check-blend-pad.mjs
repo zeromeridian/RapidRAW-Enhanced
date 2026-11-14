@@ -56,6 +56,11 @@ for (const shape of BLEND_PAD_SHAPES) {
     !isBlendPadPresetDirty(tools, { ...pad, puck: { x: -0.3, y: 0.1 } }),
     'a preset without the puck counts a moved puck as a change',
   );
+  const remembered = createBlendPadPreset('Remembered', pad, true);
+  const loaded = loadBlendPadPreset(remembered);
+  check(loaded.presetId === remembered.id, 'a loaded pad does not remember its preset');
+  check(!isBlendPadPresetDirty(remembered, loaded), 'the remembered preset id makes the pad look modified');
+  check(createBlendPadPreset('Again', loaded, true).pad.presetId === undefined, 'a preset stores a preset id');
   const older = { ...pad, anchors: pad.anchors.map(({ reverse: _reverse, ...anchor }) => anchor) };
   check(
     !isBlendPadPresetDirty(createBlendPadPreset('Older', pad, true), older),

@@ -550,6 +550,8 @@ export interface BlendPad {
   amount: number;
   puck: Coord;
   anchors: BlendPadAnchor[];
+  /** The pad preset it was loaded from or saved as, so the pad panel shows its name; the renderer ignores it. */
+  presetId?: string;
 }
 
 interface Hsl {

@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.54.1-dev-orbit-blend-pad — 2026-11-13
+
+### Develop
+
+- **Orbit Blend Pad presets**: the preset picker no longer forgets the
+  loaded preset's name when you switch to another panel and back. The
+  name now also stays after reopening the photo or restarting, and comes
+  along when you copy the pad to another photo.
+
 ## 1.54.0-dev-orbit-blend-pad — 2026-11-13
 
 ### Develop

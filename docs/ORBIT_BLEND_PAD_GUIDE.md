@@ -1,7 +1,7 @@
 # Orbit Blend Pad: How It Works
 
 This guide explains everything the Orbit Blend Pad does, in plain words
-with worked examples. It describes ThisIsRAW `1.54.0`. The pad is on the
+with worked examples. It describes ThisIsRAW `1.54.1`. The pad is on the
 **Orbit** tab of the Develop panel, below the Favorites star.
 
 ## The idea in one paragraph
@@ -256,6 +256,11 @@ separate and still include the pad as part of a whole look.
     to explore.
 - **Load:** pick a preset from the list. It replaces the photo's pad (one
   undo step).
+- **The picker remembers.** The pad notes which preset it came from (or
+  was saved as), so the picker keeps showing that name when you switch to
+  another panel and back, reopen the photo, or restart. Copying the pad to
+  another photo carries the name along. If the preset is deleted, the
+  picker goes back to "Pad preset"; the pad itself stays as it is.
 - **Changed since loading:** the list shows a red "*" and the Save button
   becomes **Update**, which overwrites the preset. A preset without the
   puck ignores where the puck is.
