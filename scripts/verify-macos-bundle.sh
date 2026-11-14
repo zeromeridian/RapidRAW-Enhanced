@@ -87,6 +87,14 @@ if echo "$signature_details" | grep -q '^Authority='; then
 elif [[ "${REQUIRE_APPLE_SIGNATURE:-false}" == "true" ]]; then
   echo "release bundle is not signed with an Apple Developer ID" >&2
   exit 1
+elif [[ "${REQUIRE_ADHOC_SIGNATURE:-false}" == "true" ]]; then
+  # An ad-hoc release cannot pass Gatekeeper, but its signature must still be
+  # intact, and without a Team ID the hardened runtime would block ONNX Runtime.
+  codesign --verify --deep --strict --verbose=2 "$app_path"
+  if echo "$signature_details" | grep -q 'flags=.*runtime'; then
+    echo "ad-hoc signed bundle must not use the hardened runtime" >&2
+    exit 1
+  fi
 fi
 
 echo "macOS bundle verification passed: $input_path"
