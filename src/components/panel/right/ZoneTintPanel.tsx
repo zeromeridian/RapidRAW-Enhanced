@@ -1,5 +1,5 @@
 import { MouseEvent, useCallback, useState } from 'react';
-import { Eye, EyeOff, RotateCcw, X } from 'lucide-react';
+import { Eye, EyeOff, Pipette, RotateCcw, SquareDashedMousePointer, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
@@ -10,7 +10,7 @@ import Dropdown from '../../ui/Dropdown';
 import Slider from '../../ui/Slider';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants } from '../../../types/typography';
-import { useEditorStore } from '../../../store/useEditorStore';
+import { canvasToolState, useEditorStore } from '../../../store/useEditorStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import {
   BlendPadCurve,
@@ -25,9 +25,9 @@ import {
   createZoneTint,
 } from '../../../utils/adjustments';
 import { BLEND_PAD_CURVES, applyBlendPadCurve } from '../../../utils/blendPad';
+import { ZoneSelection, nextZoneSelection } from '../../../utils/zoneTint';
 
 const ZONE_NAMES = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
-const MIDDLE_GREY_ZONE = 5;
 /** Softness and Protect are OKLab L values, Amount a factor; the sliders show them ×100. */
 const SLIDER_SCALE = 100;
 const NEUTRAL: HueSatLum = { hue: 0, saturation: 0, luminance: 0 };
@@ -51,19 +51,6 @@ const zoneGrey = (zone: number, luminance: number) => {
 
 /** The wheel colour of a zone's tint, fainter for a weaker tint. */
 const tintColor = (hue: number, strength: number) => `hsl(${hue} 100% 50% / ${0.35 + (0.65 * strength) / 100})`;
-
-/** The zones a click selects: Shift adds the range from the anchor, Cmd/Ctrl toggles one zone. */
-const nextSelection = (selected: number[], anchor: number, zone: number, event: MouseEvent) => {
-  if (event.shiftKey) {
-    const [from, to] = anchor <= zone ? [anchor, zone] : [zone, anchor];
-    return Array.from({ length: to - from + 1 }, (_, index) => from + index);
-  }
-  if (event.metaKey || event.ctrlKey) {
-    const toggled = selected.includes(zone) ? selected.filter((z) => z !== zone) : [...selected, zone];
-    return toggled.length > 0 ? toggled.sort((a, b) => a - b) : selected;
-  }
-  return [zone];
-};
 
 /** Sorted zones as their names, with neighbouring zones joined into ranges: "II, IV–VII". */
 const formatZones = (zones: number[]) => {
@@ -217,15 +204,17 @@ function ZoneScale({ onZoneClick, selected, zoneTint }: ZoneScaleProps) {
 export default function ZoneTintPanel() {
   const { t } = useTranslation();
   const { setAdjustments } = useEditorActions();
-  const { storedZoneTint, sectionVisibility, setEditor } = useEditorStore(
+  const { storedZoneTint, sectionVisibility, selection, picker, setEditor } = useEditorStore(
     useShallow((state) => ({
       storedZoneTint: state.adjustments.zoneTint,
       sectionVisibility: state.adjustments.sectionVisibility ?? INITIAL_ADJUSTMENTS.sectionVisibility,
+      selection: state.zoneTintSelection,
+      picker: state.targetedAdjustment?.tool === 'zoneTint' ? state.targetedAdjustment : null,
       setEditor: state.setEditor,
     })),
   );
-  const [selected, setSelected] = useState<number[]>([MIDDLE_GREY_ZONE]);
-  const [anchor, setAnchor] = useState(MIDDLE_GREY_ZONE);
+  const { zones: selected, anchor } = selection;
+  const setSelection = (zoneTintSelection: ZoneSelection) => setEditor({ zoneTintSelection });
   const [fillCurve, setFillCurve] = useState<BlendPadCurve>('linear');
 
   const title = t('editor.adjustments.sections.zoneTint');
@@ -266,15 +255,15 @@ export default function ZoneTintPanel() {
     if (Object.keys(change).length > 0) updateZones(selected, change);
   };
 
-  const handleZoneClick = (zone: number, event: MouseEvent) => {
-    setSelected(nextSelection(selected, anchor, zone, event));
-    if (!event.shiftKey) setAnchor(zone);
-  };
+  const handleZoneClick = (zone: number, event: MouseEvent) => setSelection(nextZoneSelection(selection, zone, event));
 
-  const selectRun = ({ from, to }: ZoneRun) => {
-    setSelected(zoneRange(from, to));
-    setAnchor(from);
-  };
+  const selectRun = ({ from, to }: ZoneRun) => setSelection({ zones: zoneRange(from, to), anchor: from });
+
+  /** Turns a picker on the photo on (`area`: the rectangle), or off when it is already on. */
+  const togglePicker = (area: boolean) =>
+    setEditor(canvasToolState(picker?.area === area ? {} : { targetedAdjustment: { tool: 'zoneTint', area } }));
+  const pickerClassName = (isActive: boolean) =>
+    clsx('p-2 rounded-full transition-colors', isActive ? 'bg-accent text-button-text' : 'hover:bg-surface');
 
   const zonesLabel = (zones: number[]) =>
     zones.length === 1
@@ -307,6 +296,22 @@ export default function ZoneTintPanel() {
         title={title}
         actions={
           <>
+            <button
+              aria-pressed={picker?.area === false}
+              className={pickerClassName(picker?.area === false)}
+              data-tooltip={t('adjustments.zoneTint.pickPoint')}
+              onClick={() => togglePicker(false)}
+            >
+              <Pipette size={18} />
+            </button>
+            <button
+              aria-pressed={picker?.area === true}
+              className={pickerClassName(picker?.area === true)}
+              data-tooltip={t('adjustments.zoneTint.pickArea')}
+              onClick={() => togglePicker(true)}
+            >
+              <SquareDashedMousePointer size={18} />
+            </button>
             <button
               className="p-2 rounded-full hover:bg-surface transition-colors"
               data-tooltip={

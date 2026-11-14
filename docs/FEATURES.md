@@ -338,8 +338,12 @@ details are in `RELEASE_NOTES.MD`.
   zones list below names every changed zone or range with its hue,
   strength and luminance, selects it on click and resets it with ×. Pick a
   zone, or a range with Shift-click (Cmd/Ctrl-click adds or removes one),
-  and set its colour, strength and luminance on the colour wheel (only the
-  value moved is written to every selected zone); neighbouring zones blend
+  on the scale or from the photo: a pipette selects the zone under a click
+  (same modifiers), a rectangle picker selects every zone holding a fair
+  share of the dragged area (Shift or Cmd/Ctrl adds them); both read the
+  tones before the grading. Then set its colour, strength and luminance
+  on the colour wheel (only the value moved is written to every selected
+  zone); neighbouring zones blend
   smoothly, Softness sets how far a zone's colour reaches, and Protect
   keeps black and white free of colour. Amount scales the whole effect
   (0–200 %) without changing the zones' own settings. Fill between blends

@@ -1,14 +1,15 @@
 # Zone Tint Plan
 
-Status (2026-11-14): **Phases 1 and 2 done** on `dev/zone-tint` (from
-`develop` `492bfffe`, committed as `b23d9d3d`), built as `1.57.0`; Zone
+Status (2026-11-14): **Phases 1 and 2 done**, built as `1.57.0`; Zone
 Tint then moved to its own right-toolbar panel (`1.57.1`) with an
 upright zone scale and a tinted zones list (`1.57.2`), then an overall
 Amount and Fill between along a curve (`1.57.3`), colour photos too
 (`1.57.4`), then per-zone luminance and the name Zone Color Grading
-(`1.57.5`, uncommitted); the GPU
-exit check and the hands-on check still have to run on the Mac. Next:
-Phase 3. `UPSTREAM_FEATURE_GAP.md` Plan item 28 (P0, owner
+(`1.57.5`). All of it was committed by the owner on `dev/zone-tint`
+(up to `bc3d2b40`) and merged into `develop` and `main` (`7d5093a4`).
+Zone pickers on the photo (`1.58.0`, branch `dev/zone-color-pickers`
+from `7d5093a4`). The GPU exit check and the hands-on
+check still have to run on the Mac. Next: the rest of Phase 3. `UPSTREAM_FEATURE_GAP.md` Plan item 28 (P0, owner
 2026-11-13: after item 27, the Orbit Blend Pad, whose steps 1–7 are done).
 Item 30 (import from card or camera) follows it. Four phases, each
 shippable and gated by its exit check.
@@ -135,6 +136,23 @@ changes about it, the decisions still open, and progress.
   `zoneTint` / `zone_tint` / `Panel.ZoneTint` and this file's name, so
   saved edits, XMP and presets keep working.
 
+- **Vignette order** (owner 2026-11-14, answering the spec's open
+  question): the vignette stays **before** Zone Color Grading, so the
+  zones follow the vignetted tones (a darkened corner takes the darker
+  zones' colour, as a toner acts on a burnt-in print). The agent offered
+  "after" (the vignette darkens the tint) as an option or a setting; the
+  owner chose to keep "before" with no setting.
+- **Zone pickers** (owner 2026-11-14): a point picker and a dragged
+  rectangle that selects the zones it samples. Agent design: both are
+  `targetedAdjustment` tools (`{ tool: 'zoneTint', area }`) reading the
+  new `zoneTint` probe (OKLab L right before `apply_zone_tint`, so an
+  already graded photo picks the same zones); a point pick takes the
+  zone of the 16-px square's mean L with the scale's modifiers; a
+  rectangle keeps every zone holding at least 3 % of its pixels
+  (`MIN_AREA_SHARE`), the anchor on the fullest, and Shift or Cmd/Ctrl
+  joins the current selection; a drag under 4 screen px is a point pick.
+  The selection moved into the editor store (`zoneTintSelection`), so
+  the panel and the canvas share it.
 - **Blend-mode backdrop:** carries the Zone Tint, so masks in a
   non-Normal blend mode keep the zone colours. Done in `shader.wgsl`: the
   monochrome-and-tinted backdrop is computed once per pixel, only where a
@@ -147,9 +165,11 @@ changes about it, the decisions still open, and progress.
 1. **Owner checks on the Mac:** Phase 1 GPU exit check (`cargo test --lib
    zone_tint -- --nocapture` from `src-tauri`; must not print "No GPU
    adapter"); Phase 2 hands-on exit check (tint, save, reopen, export
-   match the preview; steps in `HANDOFF.md`). Then commit `1.57.1`–`1.57.5`.
+   match the preview; steps in `HANDOFF.md`); the `1.58.0` pickers.
 2. **Phase 3** (spec): hover readout, Alt/Option mask preview, mask
-   smoothing (blur pass, `maskSmoothing` 0–4 px slider), the four starter
+   smoothing (blur pass, `maskSmoothing` 0–4 px slider; the pickers'
+   `zoneTint` probe reads L before it, so they would not follow the
+   smoothing), the four starter
    presets (Selenium, Sepia, Split, Platinum; multi-select is already
    done). Exit check: smoothing 1–2 px removes colour speckle on a grainy
    high-ISO file.
@@ -174,8 +194,8 @@ changes about it, the decisions still open, and progress.
 
 ## Progress
 
-- **Phase 1, maths and shader** (2026-11-14, uncommitted, no version
-  yet: nothing writes `zoneTint`, so renders are unchanged).
+- **Phase 1, maths and shader** (2026-11-14, `b23d9d3d`, no version
+  of its own: nothing wrote `zoneTint` yet).
   `zone_tint.rs`: the `zoneTint` block (spec data model: version 1,
   enabled, zones with hue, strength, centerOffset, width, softness,
   protect; maskSmoothing is left for Phase 3) becomes
@@ -194,7 +214,7 @@ changes about it, the decisions still open, and progress.
   output: L within 0.001, Zone VII peak, Zone IV neutral, uniform tint,
   clean ends), which **skips in the sandbox (no GPU adapter)**; run
   `cargo test --lib zone_tint` from `src-tauri` on the Mac.
-- **Phase 2, panel and saving** (`1.57.0`, 2026-11-14, uncommitted).
+- **Phase 2, panel and saving** (`1.57.0`, 2026-11-14).
   A sixth Adjustments section `zoneTint` (`ADJUSTMENT_SECTIONS`,
   `SectionVisibility`, `CollapsibleSectionsState`, open by default),
   shown only while Black & White is on and never in masks
@@ -214,7 +234,7 @@ changes about it, the decisions still open, and progress.
   `a_zone_tint_counts_as_an_edit_only_on_a_black_and_white_photo`.
   Strings in all 12 locales. Exit check (tint, save, reopen, export match
   the preview): **not run in the app yet**.
-- **Own panel and new strip** (`1.57.1`, 2026-11-14, uncommitted):
+- **Own panel and new strip** (`1.57.1`, 2026-11-14):
   `components/adjustments/ZoneTint.tsx` became
   `components/panel/right/ZoneTintPanel.tsx` (header with eye and reset;
   on a colour photo the hint plus a Black & White switch). `zoneTint` left
@@ -229,7 +249,7 @@ changes about it, the decisions still open, and progress.
   `tintRuns` builds the list; `setZonesTint` is shared by the wheel and
   ×. New strings `adjustments.zoneTint.tintedZones` and `.untint` in all
   12 locales; the list's H/S labels reuse the wheel's.
-- **Amount and Fill between** (`1.57.3`, 2026-11-14, uncommitted):
+- **Amount and Fill between** (`1.57.3`, 2026-11-14):
   `zone_tint.rs` reads `amount` (test
   `the_amount_scales_every_zone_up_to_full_strength`); the panel gains the
   Amount slider (reuses `adjustments.effects.amount`) and the curve
@@ -237,7 +257,7 @@ changes about it, the decisions still open, and progress.
   `.fillHint` in 12 locales; curve names reuse the Blend Pad's). The
   Blend Pad's curve list moved from `BlendPadPanel.tsx` to
   `utils/blendPad.ts` so both panels share it.
-- **Colour photos** (`1.57.4`, 2026-11-14, uncommitted):
+- **Colour photos** (`1.57.4`, 2026-11-14):
   `ZoneTintSettings::from_json` takes `visible` instead of `monochrome`;
   a block without any colour now returns the default settings, so it no
   longer counts as an edit (it did on B&W photos before: the zones'
@@ -246,7 +266,17 @@ changes about it, the decisions still open, and progress.
   and updated: `zone_tint_reaches_the_shader_while_its_panel_is_visible`,
   `a_zone_tint_counts_as_an_edit_on_colour_and_black_and_white_photos`,
   `zone_tint_is_off_unless_a_visible_block_tints_a_zone`.
-- **Luminance and the new name** (`1.57.5`, 2026-11-14, uncommitted):
+- **Zone pickers** (`1.58.0`, 2026-11-14, uncommitted, branch
+  `dev/zone-color-pickers`): `SAMPLE_PROBE_ZONE_TINT` and
+  `zone_tint_oklab` in `shader.wgsl`, `SampleProbe::ZoneTint` in
+  `gpu_processing.rs`; `sample_adjustment_probe` takes `radius_x` and
+  `radius_y` (was one square `radius`). New `src/utils/zoneTint.ts`
+  (selection, point and area zone reads; `nextSelection` moved there from
+  the panel); `useTargetedAdjustment` gains `pickZone`, `startZoneArea`
+  and the `pickArea` rectangle that `ImageCanvas` draws; the panel header
+  gains the two picker toggles. Strings `adjustments.zoneTint.pickPoint`
+  and `.pickArea` in 12 locales.
+- **Luminance and the new name** (`1.57.5`, 2026-11-14, committed by the owner):
   `ZoneTintSettings` gains `luminance_weight_cap`, `has_luminance` (the
   former pads) and `luminance: [[f32; 4]; 3]` (240 bytes; the layout and
   naga validation test passes); `apply_zone_tint` adds the luminance

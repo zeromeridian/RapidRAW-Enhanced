@@ -232,6 +232,8 @@
       "fill": "填滿中間",
       "fillHint": "沿曲線填滿所選首尾區域之間的區域，從一端的顏色、強度與亮度過渡到另一端。",
       "hint": "點擊一個區域為其著色。Shift 點擊選取一個範圍，Cmd/Ctrl 點擊新增或移除區域。",
+      "pickArea": "在相片上拖曳矩形以選取區域（Shift 或 Cmd/Ctrl 加入選取）",
+      "pickPoint": "點按相片以選取區域（Shift 選取範圍，Cmd/Ctrl 加入或移除）",
       "protect": "保護",
       "softness": "柔和度",
       "tintedZones": "已調整區域",

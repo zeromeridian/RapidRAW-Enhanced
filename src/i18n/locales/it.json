@@ -232,6 +232,8 @@
       "fill": "Riempi tra",
       "fillHint": "Riempie le zone tra la prima e l'ultima zona selezionata lungo la curva, dal colore, dall'intensità e dalla luminanza di un estremo a quelli dell'altro.",
       "hint": "Fai clic su una zona per colorarla. Maiusc-clic seleziona un intervallo, Cmd/Ctrl-clic aggiunge o rimuove una zona.",
+      "pickArea": "Scegli le zone trascinando un rettangolo sulla foto (Maiusc o Cmd/Ctrl aggiunge alla selezione)",
+      "pickPoint": "Scegli una zona facendo clic sulla foto (Maiusc seleziona un intervallo, Cmd/Ctrl aggiunge o rimuove)",
       "protect": "Protezione",
       "softness": "Morbidezza",
       "tintedZones": "Zone regolate",

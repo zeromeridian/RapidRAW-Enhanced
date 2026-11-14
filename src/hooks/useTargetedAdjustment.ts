@@ -3,8 +3,9 @@ import { invoke } from '@tauri-apps/api/core';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { useEditorStore } from '../store/useEditorStore';
-import { Adjustments, MAX_POINT_COLORS, createPointColor } from '../utils/adjustments';
+import { Adjustments, MAX_POINT_COLORS, createPointColor, createZoneTint } from '../utils/adjustments';
 import { samplePickedColor } from '../utils/pointColor';
+import { ZoneSelectionModifiers, nextZoneSelection, sampleAreaZones, samplePickedZone } from '../utils/zoneTint';
 import { stripSentMaskData } from '../utils/maskUtils';
 import {
   TargetedAdjustment,
@@ -19,6 +20,8 @@ import { FINE_ADJUSTMENT_MULTIPLIER, hasFineAdjustmentModifier } from '../compon
 
 /** The side of the sampled square, in screen pixels at any zoom. */
 export const TARGETED_SAMPLE_SCREEN_SIZE = 16;
+/** A rectangle pick narrower or lower than this, in screen pixels, counts as a click. */
+const MIN_PICK_AREA_SCREEN_SIZE = 4;
 /** Value units per pixel dragged (right or up raises). */
 const DRAG_GAIN = 0.5;
 
@@ -34,9 +37,18 @@ interface ActiveDrag {
   edit: TargetedDrag | null;
 }
 
+/** A rectangle on the photo, in the canvas's render pixels. */
+export interface PickArea {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 interface Pick {
   target: TargetedAdjustment;
   maskId: string | null;
+  point: Coord;
   sample(): Promise<Uint8Array>;
 }
 
@@ -57,7 +69,19 @@ const getClientPoint = (e: MouseEvent | TouchEvent): Coord | undefined => {
 const clampOffset = ({ edit }: ActiveDrag, offset: number) =>
   edit ? Math.max(edit.range[0], Math.min(edit.range[1], offset)) : offset;
 
-/** Runs the colour mixer, tone curve and Point Color pipettes (`targetedAdjustment` in the editor store) on the canvas. */
+const areaBetween = (a: Coord, b: Coord): PickArea => ({
+  x: Math.min(a.x, b.x),
+  y: Math.min(a.y, b.y),
+  width: Math.abs(b.x - a.x),
+  height: Math.abs(b.y - a.y),
+});
+
+const currentZoneTint = () => useEditorStore.getState().adjustments.zoneTint ?? createZoneTint();
+
+/**
+ * Runs the colour mixer, tone curve, Point Color and Zone Color Grading pipettes
+ * (`targetedAdjustment` in the editor store) on the canvas.
+ */
 export function useTargetedAdjustment({
   activeMaskContainerId,
   getCanvasPointer,
@@ -69,8 +93,27 @@ export function useTargetedAdjustment({
   const target = useEditorStore((state) => state.targetedAdjustment);
   const setEditor = useEditorStore((state) => state.setEditor);
   const [isDragging, setIsDragging] = useState(false);
+  const [pickArea, setPickArea] = useState<PickArea | null>(null);
   const dragRef = useRef<ActiveDrag | null>(null);
   const detachRef = useRef<(() => void) | null>(null);
+
+  /** The preview's pixels in `area` as `target` reads them. */
+  const sampleArea = useCallback(
+    async (target: TargetedAdjustment, maskId: string | null, area: PickArea) => {
+      const { width, height } = imageRenderSize;
+      const { adjustments, patchesSentToBackend } = useEditorStore.getState();
+      const pixels = await invoke<ArrayBuffer>(Invokes.SampleAdjustmentProbe, {
+        jsAdjustments: stripSentMaskData(adjustments, patchesSentToBackend),
+        x: (area.x + area.width / 2) / width,
+        y: (area.y + area.height / 2) / height,
+        radiusX: area.width / 2 / width,
+        radiusY: area.height / 2 / height,
+        probe: getSampleProbe(target, maskId),
+      });
+      return new Uint8Array(pixels);
+    },
+    [imageRenderSize],
+  );
 
   const getPick = useCallback(
     (e: KonvaEventObject<MouseEvent | TouchEvent>): Pick | null => {
@@ -80,25 +123,11 @@ export function useTargetedAdjustment({
       if (!target || !pos || (isMasking && !maskId)) return null;
       const { width, height } = imageRenderSize;
       if (pos.x < 0 || pos.y < 0 || pos.x > width || pos.y > height) return null;
-      const radius = TARGETED_SAMPLE_SCREEN_SIZE / 2 / zoomScale / width;
-      const probe = getSampleProbe(target, maskId);
-      return {
-        target,
-        maskId,
-        sample: async () => {
-          const { adjustments, patchesSentToBackend } = useEditorStore.getState();
-          const pixels = await invoke<ArrayBuffer>(Invokes.SampleAdjustmentProbe, {
-            jsAdjustments: stripSentMaskData(adjustments, patchesSentToBackend),
-            x: pos.x / width,
-            y: pos.y / height,
-            radius,
-            probe,
-          });
-          return new Uint8Array(pixels);
-        },
-      };
+      const size = TARGETED_SAMPLE_SCREEN_SIZE / zoomScale;
+      const square = { x: pos.x - size / 2, y: pos.y - size / 2, width: size, height: size };
+      return { target, maskId, point: pos, sample: () => sampleArea(target, maskId, square) };
     },
-    [target, isMasking, activeMaskContainerId, imageRenderSize, zoomScale, getCanvasPointer],
+    [target, isMasking, activeMaskContainerId, imageRenderSize, zoomScale, getCanvasPointer, sampleArea],
   );
 
   const applyDrag = useCallback(
@@ -116,6 +145,7 @@ export function useTargetedAdjustment({
   const end = useCallback(() => {
     detachRef.current?.();
     detachRef.current = null;
+    setPickArea(null);
     if (!dragRef.current) return;
     dragRef.current = null;
     setIsDragging(false);
@@ -139,6 +169,76 @@ export function useTargetedAdjustment({
     [setAdjustments, setEditor],
   );
 
+  /** Zone Color Grading: a click selects the zone under the cursor (Shift and Cmd/Ctrl as on its scale). */
+  const pickZone = useCallback(
+    (pick: Pick, modifiers: ZoneSelectionModifiers) => {
+      pick
+        .sample()
+        .then((pixels) => {
+          const zone = samplePickedZone(pixels, currentZoneTint());
+          if (zone === null) return;
+          setEditor((state) => ({ zoneTintSelection: nextZoneSelection(state.zoneTintSelection, zone, modifiers) }));
+        })
+        .catch((err) => console.error('Failed to sample the preview for Zone Color Grading:', err));
+    },
+    [setEditor],
+  );
+
+  /**
+   * Zone Color Grading's rectangle: a drag selects the zones inside it on release (Shift or
+   * Cmd/Ctrl adds them to the selection); a click without a drag picks one zone.
+   */
+  const startZoneArea = useCallback(
+    (stage: Konva.Stage, pick: Pick, modifiers: ZoneSelectionModifiers) => {
+      end();
+      const { width, height } = imageRenderSize;
+      const origin = pick.point;
+      let area = areaBetween(origin, origin);
+
+      const onMove = (ev: MouseEvent | TouchEvent) => {
+        if (ev.cancelable) ev.preventDefault();
+        stage.setPointersPositions(ev);
+        const pos = getCanvasPointer(stage);
+        if (!pos) return;
+        area = areaBetween(origin, {
+          x: Math.max(0, Math.min(width, pos.x)),
+          y: Math.max(0, Math.min(height, pos.y)),
+        });
+        setPickArea(area);
+      };
+      const onUp = () => {
+        end();
+        const minSize = MIN_PICK_AREA_SCREEN_SIZE / zoomScale;
+        if (area.width < minSize || area.height < minSize) {
+          pickZone(pick, modifiers);
+          return;
+        }
+        sampleArea(pick.target, pick.maskId, area)
+          .then((pixels) =>
+            setEditor((state) => ({
+              zoneTintSelection:
+                sampleAreaZones(pixels, currentZoneTint(), state.zoneTintSelection, modifiers) ??
+                state.zoneTintSelection,
+            })),
+          )
+          .catch((err) => console.error('Failed to sample the preview for Zone Color Grading:', err));
+      };
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('touchmove', onMove, { passive: false });
+      window.addEventListener('mouseup', onUp);
+      window.addEventListener('touchend', onUp);
+      window.addEventListener('touchcancel', end);
+      detachRef.current = () => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('touchmove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        window.removeEventListener('touchend', onUp);
+        window.removeEventListener('touchcancel', end);
+      };
+    },
+    [end, imageRenderSize, getCanvasPointer, zoomScale, pickZone, sampleArea, setEditor],
+  );
+
   const start = useCallback(
     (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
       const pick = getPick(e);
@@ -146,6 +246,13 @@ export function useTargetedAdjustment({
       if (!pick || !clientPoint) return;
       if (pick.target.tool === 'pointColor') {
         if (!pick.maskId) addPointColor(pick);
+        return;
+      }
+      if (pick.target.tool === 'zoneTint') {
+        const stage = e.target.getStage();
+        if (pick.maskId || !stage) return;
+        if (pick.target.area) startZoneArea(stage, pick, e.evt);
+        else pickZone(pick, e.evt);
         return;
       }
 
@@ -189,7 +296,7 @@ export function useTargetedAdjustment({
         })
         .catch((err) => console.error('Failed to sample the preview for a targeted adjustment:', err));
     },
-    [getPick, setEditor, applyDrag, end, addPointColor],
+    [getPick, setEditor, applyDrag, end, addPointColor, pickZone, startZoneArea],
   );
 
   const reset = useCallback(
@@ -212,5 +319,5 @@ export function useTargetedAdjustment({
 
   useEffect(() => end, [end]);
 
-  return { isActive: target !== null, isDragging, start, reset };
+  return { isActive: target !== null, isDragging, pickArea, start, reset };
 }

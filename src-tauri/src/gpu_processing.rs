@@ -41,10 +41,12 @@ pub enum SampleProbe {
     MaskCurve,
     /// The perceptual hue, saturation and luma Point Color selects by, after the colour mixer.
     PointColor,
+    /// The OKLab lightness Zone Tint picks its zones by, in red.
+    ZoneTint,
 }
 
 impl SampleProbe {
-    const COUNT: usize = 4;
+    const COUNT: usize = 5;
 
     fn index(self) -> usize {
         self as usize
@@ -2508,6 +2510,7 @@ mod tests {
             (SampleProbe::Curve, "SAMPLE_PROBE_CURVE"),
             (SampleProbe::MaskCurve, "SAMPLE_PROBE_MASK_CURVE"),
             (SampleProbe::PointColor, "SAMPLE_PROBE_POINT_COLOR"),
+            (SampleProbe::ZoneTint, "SAMPLE_PROBE_ZONE_TINT"),
         ] {
             let constant = format!("const {name}: u32 = {}u;", probe.shader_value());
             assert!(source.contains(&constant), "missing `{constant}`");

@@ -1565,10 +1565,14 @@ const ImageCanvas = memo(
       : 0;
 
     const effectiveZoomScale = transformState.scale > 0 ? transformState.scale : 1;
-    const isPointColorPicking = useEditorStore((state) => state.targetedAdjustment?.tool === 'pointColor');
+    // Point Color and Zone Color Grading pick on a click or a rectangle; the other pipettes drag.
+    const isClickPicking = useEditorStore(
+      (state) => state.targetedAdjustment?.tool === 'pointColor' || state.targetedAdjustment?.tool === 'zoneTint',
+    );
 
     const {
       isActive: isTargetedAdjustmentActive,
+      pickArea,
       start: startTargetedAdjustment,
       reset: resetTargetedAdjustment,
     } = useTargetedAdjustment({
@@ -2978,8 +2982,7 @@ const ImageCanvas = memo(
     };
 
     const effectiveCursor = useMemo(() => {
-      // Point Color picks on a click; the other pipettes drag up and down.
-      if (isTargetedAdjustmentActive) return isPointColorPicking ? 'crosshair' : TARGETED_ADJUSTMENT_CURSOR;
+      if (isTargetedAdjustmentActive) return isClickPicking ? 'crosshair' : TARGETED_ADJUSTMENT_CURSOR;
       if (isWbPickerActive || showRelightLights) return 'crosshair';
       if (isParametricActive) return 'crosshair';
       if (isInitialDrawing) return 'crosshair';
@@ -3006,7 +3009,7 @@ const ImageCanvas = memo(
       return cursorStyle;
     }, [
       isTargetedAdjustmentActive,
-      isPointColorPicking,
+      isClickPicking,
       isWbPickerActive,
       showRelightLights,
       isInitialDrawing,
@@ -3358,6 +3361,18 @@ const ImageCanvas = memo(
                           stroke="#0ea5e9"
                           strokeWidth={2}
                           dash={[4, 4]}
+                          listening={false}
+                        />
+                      )}
+                      {pickArea && (
+                        <Rect
+                          {...pickArea}
+                          stroke="#ffffff"
+                          strokeWidth={1.5}
+                          dash={[4, 4]}
+                          shadowColor="black"
+                          shadowBlur={2}
+                          shadowOpacity={0.8}
                           listening={false}
                         />
                       )}

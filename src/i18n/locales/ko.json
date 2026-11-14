@@ -232,6 +232,8 @@
       "fill": "사이 채우기",
       "fillHint": "선택한 첫 존과 마지막 존 사이를 한쪽 끝의 색, 강도, 휘도에서 다른 쪽 끝까지 커브를 따라 채웁니다.",
       "hint": "존을 클릭하여 색을 입힙니다. Shift-클릭으로 범위를 선택하고, Cmd/Ctrl-클릭으로 존을 추가하거나 제거합니다.",
+      "pickArea": "사진에서 사각형을 드래그해 존 선택 (Shift 또는 Cmd/Ctrl로 선택에 추가)",
+      "pickPoint": "사진을 클릭해 존 선택 (Shift로 범위 선택, Cmd/Ctrl로 추가 또는 제거)",
       "protect": "보호",
       "softness": "부드러움",
       "tintedZones": "조정된 존",

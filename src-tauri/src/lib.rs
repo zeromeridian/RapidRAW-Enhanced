@@ -540,14 +540,16 @@ impl EditorRender {
     }
 }
 
-/// The pixels around a point of the Develop preview (`x`, `y` and `radius` as fractions
-/// of its width and height) as a targeted adjustment reads them at `probe`'s stage, RGBA8.
+/// The pixels in a rectangle of the Develop preview as a targeted adjustment reads them at
+/// `probe`'s stage, RGBA8: centred on `x`, `y`, reaching `radius_x` and `radius_y` to each
+/// side (`x` and `radius_x` as fractions of its width, `y` and `radius_y` of its height).
 #[tauri::command]
 async fn sample_adjustment_probe(
     js_adjustments: serde_json::Value,
     x: f32,
     y: f32,
-    radius: f32,
+    radius_x: f32,
+    radius_y: f32,
     probe: crate::gpu_processing::SampleProbe,
     app_handle: tauri::AppHandle,
 ) -> Result<Response, String> {
@@ -580,11 +582,12 @@ async fn sample_adjustment_probe(
             .ok_or("The Develop preview is not ready")?;
 
         let (width, height) = image.dimensions();
-        let half = (radius * width as f32).max(1.0);
-        let x0 = (x * width as f32 - half).clamp(0.0, width as f32 - 1.0) as u32;
-        let y0 = (y * height as f32 - half).clamp(0.0, height as f32 - 1.0) as u32;
-        let x1 = ((x * width as f32 + half).ceil() as u32).clamp(x0 + 1, width);
-        let y1 = ((y * height as f32 + half).ceil() as u32).clamp(y0 + 1, height);
+        let half_x = (radius_x * width as f32).max(1.0);
+        let half_y = (radius_y * height as f32).max(1.0);
+        let x0 = (x * width as f32 - half_x).clamp(0.0, width as f32 - 1.0) as u32;
+        let y0 = (y * height as f32 - half_y).clamp(0.0, height as f32 - 1.0) as u32;
+        let x1 = ((x * width as f32 + half_x).ceil() as u32).clamp(x0 + 1, width);
+        let y1 = ((y * height as f32 + half_y).ceil() as u32).clamp(y0 + 1, height);
 
         let editor_render = EditorRender::prepare(
             &app_handle,

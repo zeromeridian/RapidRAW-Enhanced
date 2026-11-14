@@ -273,6 +273,7 @@ const SAMPLE_PROBE_HSL: u32 = 1u;
 const SAMPLE_PROBE_CURVE: u32 = 2u;
 const SAMPLE_PROBE_MASK_CURVE: u32 = 3u;
 const SAMPLE_PROBE_POINT_COLOR: u32 = 4u;
+const SAMPLE_PROBE_ZONE_TINT: u32 = 5u;
 
 const LUMA_COEFF = vec3<f32>(0.2126, 0.7152, 0.0722);
 
@@ -343,10 +344,15 @@ fn in_unit_gamut(c: vec3<f32>) -> bool {
     return all(c >= vec3<f32>(0.0)) && all(c <= vec3<f32>(1.0));
 }
 
+// The OKLab colour of display sRGB that Zone Tint reads its zones from.
+fn zone_tint_oklab(srgb: vec3<f32>) -> vec3<f32> {
+    return linear_srgb_to_oklab(srgb_to_linear(clamp(srgb, vec3<f32>(0.0), vec3<f32>(1.0))));
+}
+
 // Zone Tint on display sRGB: adds the zones' chroma at the pixel's OKLab L, never changing L.
 // Chroma that would leave sRGB is reduced along the same hue instead of clipped.
 fn apply_zone_tint(srgb: vec3<f32>, tint: ZoneTint) -> vec3<f32> {
-    let lab = linear_srgb_to_oklab(srgb_to_linear(clamp(srgb, vec3<f32>(0.0), vec3<f32>(1.0))));
+    let lab = zone_tint_oklab(srgb);
     let l = lab.x;
 
     // Normalised Gaussian weights, offset by the nearest zone's exponent so a narrow zone
@@ -2251,6 +2257,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     // After every tonal step and the Black & White conversion, before grain, so the zones
     // follow the tones on screen and grain stays neutral.
+    if (SAMPLE_PROBE == SAMPLE_PROBE_ZONE_TINT) {
+        textureStore(output_texture, id.xy, vec4<f32>(zone_tint_oklab(final_rgb).x, 0.0, 0.0, 1.0));
+        return;
+    }
     if (adjustments.global.zone_tint.enabled == 1u) {
         final_rgb = apply_zone_tint(final_rgb, adjustments.global.zone_tint);
     }

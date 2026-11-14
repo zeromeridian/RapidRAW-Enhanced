@@ -5,6 +5,24 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.58.0-dev-zone-color-pickers — 2026-11-14
+
+### Develop
+
+- **Zone Color Grading** has two pickers in its header that choose zones
+  from the photo itself:
+  - **Pick a zone** (pipette): click the photo to select the zone of the
+    tones under the cursor. Shift-click selects every zone from the
+    current one to the clicked one; Cmd/Ctrl-click adds or removes a zone.
+  - **Pick zones in an area**: drag a rectangle over part of the photo,
+    such as a sky or a face, to select every zone it contains. Zones with
+    only a few stray pixels in the rectangle are left out, and the wheel
+    shows the zone that fills most of it. Hold Shift or Cmd/Ctrl to add
+    the zones to the current selection.
+- Both pickers read the tones as they are before the grading, so a photo
+  that is already graded picks the same zones. They stay on until clicked
+  again, Escape is pressed or another panel is opened.
+
 ## 1.57.5-dev-zone-tint — 2026-11-14
 
 ### Develop

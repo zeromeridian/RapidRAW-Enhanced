@@ -232,6 +232,8 @@
       "fill": "Dazwischen füllen",
       "fillHint": "Füllt die Zonen zwischen der ersten und der letzten ausgewählten Zone entlang der Kurve, von Farbe, Stärke und Luminanz des einen Endes zu denen des anderen.",
       "hint": "Klicken Sie auf eine Zone, um sie einzufärben. Umschalt-Klick wählt einen Bereich, Cmd/Strg-Klick fügt eine Zone hinzu oder entfernt sie.",
+      "pickArea": "Zonen durch Aufziehen eines Rechtecks im Foto wählen (Umschalt oder Cmd/Strg ergänzt die Auswahl)",
+      "pickPoint": "Zone durch Klick ins Foto wählen (Umschalt wählt einen Bereich, Cmd/Strg fügt hinzu oder entfernt)",
       "protect": "Schutz",
       "softness": "Weichheit",
       "tintedZones": "Angepasste Zonen",

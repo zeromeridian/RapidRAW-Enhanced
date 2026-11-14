@@ -24,10 +24,12 @@ import {
 export type TargetedAdjustment =
   | { tool: 'colorMixer'; property: HslMixerProperty }
   | { tool: 'toneCurve'; channel: ActiveChannel }
-  | { tool: 'pointColor' };
+  | { tool: 'pointColor' }
+  /** Zone Color Grading: a click selects the zone under the cursor, `area` drags a rectangle instead. */
+  | { tool: 'zoneTint'; area: boolean };
 
 /** The render stage a target samples (`gpu_processing::SampleProbe`). */
-export type SampleProbe = 'hsl' | 'curve' | 'maskCurve' | 'pointColor';
+export type SampleProbe = 'hsl' | 'curve' | 'maskCurve' | 'pointColor' | 'zoneTint';
 
 /** A drag prepared at press time: `apply` maps the drag offset onto the adjustments at that time. */
 export interface TargetedDrag {
@@ -62,7 +64,7 @@ const withTargetAdjustments = (
 
 export const getSampleProbe = (target: TargetedAdjustment, maskId: string | null): SampleProbe => {
   if (target.tool === 'colorMixer') return 'hsl';
-  if (target.tool === 'pointColor') return 'pointColor';
+  if (target.tool === 'pointColor' || target.tool === 'zoneTint') return target.tool;
   return maskId ? 'maskCurve' : 'curve';
 };
 
@@ -162,8 +164,8 @@ export const beginTargetedDrag = (
     };
   }
 
-  // Point Color picks a colour on click (`useTargetedAdjustment`); it has no drag or reset.
-  if (target.tool === 'pointColor') return null;
+  // Point Color and Zone Color Grading pick on click (`useTargetedAdjustment`); no drag or reset.
+  if (target.tool === 'pointColor' || target.tool === 'zoneTint') return null;
   const { channel } = target;
   const tone = sampledTone(pixels, channel);
   if (tone === null) return null;
@@ -221,8 +223,8 @@ export const resetTargetedAdjustment = (
       : null;
   }
 
-  // Point Color picks a colour on click (`useTargetedAdjustment`); it has no drag or reset.
-  if (target.tool === 'pointColor') return null;
+  // Point Color and Zone Color Grading pick on click (`useTargetedAdjustment`); no drag or reset.
+  if (target.tool === 'pointColor' || target.tool === 'zoneTint') return null;
   const { channel } = target;
   const tone = sampledTone(pixels, channel);
   if (tone === null) return null;
