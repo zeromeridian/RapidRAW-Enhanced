@@ -701,6 +701,7 @@
     },
     "blendPad": {
       "addTool": "Dodaj narzędzie",
+      "atTheDot": "W punkcie",
       "bake": "Zapisz w suwakach",
       "bakeTooltip": "Zapisz w suwakach: wpisuje wartości padu do suwaków i wyśrodkowuje krążek",
       "center": "Wyśrodkuj krążek",
@@ -714,6 +715,7 @@
       "hint": "Przeciągnij krążek, aby mieszać narzędzia; przeciągnij kotwicę wzdłuż krawędzi, aby ją przesunąć. Shift – drobniejsze ruchy, strzałki – przesuwanie, dwukrotne kliknięcie krążka – wyśrodkowanie.",
       "maxTools": "Najwyżej {{count}} narzędzi",
       "mute": "Wycisz",
+      "now": "teraz {{value}}",
       "presets": {
         "delete": "Usuń ustawienie",
         "deleteMessage": "Usunąć ustawienie padu „{{name}}”? Tej operacji nie można cofnąć.",
@@ -739,6 +741,8 @@
       },
       "remove": "Usuń narzędzie",
       "reset": "Resetuj pad",
+      "reverse": "Odwrotnie po przeciwnej stronie",
+      "reverseHint": "Wł.: po przeciwnej stronie działa odwrotnie do celu. Wył.: narzędzie słabnie do 0 w środku i dalej nie działa.",
       "shape": "Kształt",
       "shapes": {
         "circle": "Koło",
@@ -748,7 +752,6 @@
         "square": "Kwadrat",
         "triangle": "Trójkąt"
       },
-      "target": "Cel",
       "title": "Blend Pad",
       "unmute": "Włącz ponownie"
     },

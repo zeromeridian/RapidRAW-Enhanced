@@ -677,6 +677,7 @@
     },
     "blendPad": {
       "addTool": "Ajouter un outil",
+      "atTheDot": "Au point",
       "bake": "Appliquer aux curseurs",
       "bakeTooltip": "Appliquer aux curseurs : écrit les valeurs du pad dans les curseurs et recentre le palet",
       "center": "Centrer le palet",
@@ -690,6 +691,7 @@
       "hint": "Faites glisser le palet pour mélanger les outils ; faites glisser une ancre le long du bord pour la déplacer. Maj pour des mouvements plus fins, flèches pour le déplacer, double-clic sur le palet pour le recentrer.",
       "maxTools": "{{count}} outils au maximum",
       "mute": "Désactiver",
+      "now": "actuel {{value}}",
       "presets": {
         "delete": "Supprimer le préréglage",
         "deleteMessage": "Supprimer le préréglage de pad « {{name}} » ? Cette action est irréversible.",
@@ -715,6 +717,8 @@
       },
       "remove": "Retirer l'outil",
       "reset": "Réinitialiser le pad",
+      "reverse": "Inverse du côté opposé",
+      "reverseHint": "Activé : le côté opposé donne l'inverse de la cible. Désactivé : l'outil s'estompe jusqu'à 0 au centre et n'agit pas au-delà.",
       "shape": "Forme",
       "shapes": {
         "circle": "Cercle",
@@ -724,7 +728,6 @@
         "square": "Carré",
         "triangle": "Triangle"
       },
-      "target": "Cible",
       "title": "Blend Pad",
       "unmute": "Réactiver"
     },

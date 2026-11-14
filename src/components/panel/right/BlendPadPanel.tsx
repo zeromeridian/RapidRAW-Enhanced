@@ -72,6 +72,44 @@ const toView = (point: Coord) => ({ x: point.x, y: -point.y });
 
 type Drag = { kind: 'puck'; last: Coord; virtual: Coord } | { kind: 'anchor'; id: string };
 
+/**
+ * The selected tool's line from its dot through the centre to its opposite edge point, with
+ * the value it gives at the far end (the target's reverse, or 0 without reverse).
+ */
+function SelectedAxis({ anchor, shape, step }: { anchor: BlendPadAnchor; shape: BlendPadShape; step: number }) {
+  const at = toView(anchorPoint(shape, anchor.t));
+  const oppositePad = oppositePoint(shape, anchor.t);
+  const opposite = toView(oppositePad);
+  const reach = Math.hypot(oppositePad.x, oppositePad.y) || 1;
+  const away = { x: oppositePad.x / reach, y: oppositePad.y / reach };
+  const textAnchor = Math.abs(away.x) <= 0.3 ? 'middle' : away.x > 0 ? 'start' : 'end';
+  const farValue = anchor.reverse === false ? 0 : -anchor.target;
+  return (
+    <g className="pointer-events-none">
+      <line
+        className="stroke-accent"
+        strokeDasharray="0.03 0.025"
+        strokeOpacity={0.7}
+        strokeWidth={0.01}
+        x1={at.x}
+        x2={opposite.x}
+        y1={at.y}
+        y2={opposite.y}
+      />
+      <text
+        className="fill-accent font-mono"
+        dominantBaseline="middle"
+        fontSize={0.085}
+        textAnchor={textAnchor}
+        x={opposite.x + away.x * 0.09}
+        y={opposite.y - away.y * 0.09}
+      >
+        {formatSigned(farValue, step)}
+      </text>
+    </g>
+  );
+}
+
 interface PadFieldProps {
   pad: BlendPad;
   selectedId: string | null;
@@ -200,6 +238,7 @@ function PadField({
   };
 
   const puckView = toView(puck);
+  const selected = pad.anchors.find((anchor) => anchor.id === selectedId);
 
   return (
     <svg
@@ -238,7 +277,7 @@ function PadField({
             >
               <stop offset={0} stopColor={toward} stopOpacity={anchor.muted ? 0 : 0.2} />
               <stop offset={0.5} stopColor={toward} stopOpacity={0} />
-              <stop offset={1} stopColor={away} stopOpacity={anchor.muted ? 0 : 0.1} />
+              <stop offset={1} stopColor={away} stopOpacity={anchor.muted || anchor.reverse === false ? 0 : 0.1} />
             </linearGradient>
           );
         })}
@@ -257,9 +296,10 @@ function PadField({
       })}
       <path className="stroke-text-secondary" d="M -0.05 0 H 0.05 M 0 -0.05 V 0.05" strokeWidth={0.008} />
 
-      {/* Where each anchor's reverse sits. */}
+      {/* Where each anchor's reverse sits (faint when the tool has no reverse). */}
       {pad.anchors.map((anchor) => {
         const opposite = toView(oppositePoint(shape, anchor.t));
+        const isSelected = anchor.id === selectedId;
         return (
           <circle
             className="fill-none stroke-text-secondary"
@@ -267,11 +307,14 @@ function PadField({
             cy={opposite.y}
             key={anchor.id}
             r={0.025}
-            strokeOpacity={anchor.id === selectedId ? 0.9 : 0.35}
+            strokeOpacity={anchor.reverse === false ? 0.15 : isSelected ? 0.9 : 0.35}
             strokeWidth={0.008}
           />
         );
       })}
+
+      {/* The selected tool's line, with what it gives at both ends. */}
+      {selected && <SelectedAxis anchor={selected} shape={shape} step={getStep(selected)} />}
 
       {pad.anchors.map((anchor) => {
         const point = anchorPoint(shape, anchor.t);
@@ -285,9 +328,7 @@ function PadField({
           : { x: at.x + direction.x * 0.18, y: at.y - direction.y * 0.18 };
         const textAnchor = isCorner || Math.abs(direction.x) <= 0.3 ? 'middle' : direction.x > 0 ? 'start' : 'end';
         const isAbove = direction.y > 0.3;
-        const value = isDragging
-          ? formatSigned(anchorValue(shape, anchor, puck, pad.amount), getStep(anchor))
-          : `→ ${formatSigned(anchor.target, getStep(anchor))}`;
+        const current = formatSigned(anchorValue(shape, anchor, puck, pad.amount), getStep(anchor));
         return (
           <g className="cursor-grab" key={anchor.id} opacity={anchor.muted ? 0.4 : 1}>
             {anchor.id === selectedId && (
@@ -304,15 +345,19 @@ function PadField({
             >
               {getLabel(anchor)}
             </text>
+            {/* What the tool gives now, then its target at the dot. */}
             <text
-              className={clsx('font-mono', isDragging ? 'fill-accent' : 'fill-text-secondary')}
+              className="font-mono"
               dominantBaseline="middle"
               fontSize={0.09}
               textAnchor={textAnchor}
               x={labelAt.x}
               y={labelAt.y + (isAbove ? 0 : 0.13)}
             >
-              {value}
+              <tspan className="fill-accent">{t('editor.blendPad.now', { value: current })}</tspan>
+              <tspan className="fill-text-secondary" fontSize={0.075}>
+                {` → ${formatSigned(anchor.target, getStep(anchor))}`}
+              </tspan>
             </text>
           </g>
         );
@@ -425,6 +470,7 @@ export default function BlendPadPanel() {
             target: targetWithShare(NEW_TOOL_SHARE, parameter),
             curve: 'linear',
             muted: false,
+            reverse: true,
           },
         ],
       }),
@@ -586,7 +632,14 @@ export default function BlendPadPanel() {
               </div>
               <Slider
                 defaultValue={targetWithShare(NEW_TOOL_SHARE, parameter)}
-                label={t('editor.blendPad.target')}
+                label={t('editor.blendPad.atTheDot')}
+                labelAddon={
+                  <span className="text-xs font-mono text-accent">
+                    {t('editor.blendPad.now', {
+                      value: formatSigned(anchorValue(pad.shape, anchor, pad.puck, pad.amount), parameter.step),
+                    })}
+                  </span>
+                }
                 max={reach}
                 min={-reach}
                 onChange={(event) => updateAnchor(anchor.id, { target: Number(event.target.value) })}
@@ -605,6 +658,13 @@ export default function BlendPadPanel() {
                   value={anchor.curve}
                 />
               </div>
+              <Switch
+                checked={anchor.reverse !== false}
+                id={`blend-pad-reverse-${anchor.id}`}
+                label={t('editor.blendPad.reverse')}
+                onChange={(reverse: boolean) => updateAnchor(anchor.id, { reverse })}
+                tooltip={t('editor.blendPad.reverseHint')}
+              />
             </div>
           );
         })}

@@ -5,6 +5,20 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.54.0-dev-orbit-blend-pad — 2026-11-13
+
+### Develop
+
+- **Orbit Blend Pad**: each tool's label now always shows what the tool
+  gives right now ("now +75"), followed by its value at the dot. The tool
+  cards show the same, and "Target" is now called "At the dot".
+- Select a tool (click its dot or its card) to see its line drawn from the
+  dot to the opposite side, with the value it gives at the far end.
+- New **Reverse on the opposite side** switch per tool. On (as before),
+  the far side gives the opposite; off, the tool fades to nothing at the
+  centre and stays off beyond it, so a tool that should only darken never
+  brightens.
+
 ## 1.53.0-dev-orbit-blend-pad — 2026-11-13
 
 ### Develop

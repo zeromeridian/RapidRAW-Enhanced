@@ -163,6 +163,7 @@ export const axisWeight = (shape: BlendPadShape, t: number, puck: Coord): number
 export const anchorValue = (shape: BlendPadShape, anchor: BlendPadAnchor, puck: Coord, amount: number): number => {
   if (anchor.muted) return 0;
   const weight = axisWeight(shape, anchor.t, clampToPad(shape, puck));
+  if (weight < 0 && anchor.reverse === false) return 0;
   const value = anchor.target * CURVES[anchor.curve](Math.abs(weight)) * Math.sign(weight) * amount;
   return value === 0 ? 0 : value;
 };
@@ -263,6 +264,7 @@ export const createBlendPad = (): BlendPad => ({
     target,
     curve: 'linear',
     muted: false,
+    reverse: true,
   })),
 });
 
@@ -352,6 +354,7 @@ export const sanitizeBlendPad = (value: unknown, parameters: Array<BlendPadParam
           target: Math.min(reach, Math.max(-reach, target)),
           curve: CURVE_NAMES.includes(candidate.curve as BlendPadCurve) ? (candidate.curve as BlendPadCurve) : 'linear',
           muted: candidate.muted === true,
+          reverse: candidate.reverse !== false,
         },
       ];
     })
@@ -408,7 +411,16 @@ export const updateBlendPadPreset = (preset: BlendPadPreset, pad: BlendPad): Ble
 export const isBlendPadPresetDirty = (preset: BlendPadPreset, pad: BlendPad) => {
   const comparable = (candidate: BlendPad) => {
     const { puck, anchors, ...rest } = presetPad(candidate, preset.includesPuck);
-    return JSON.stringify({ ...rest, puck, anchors: anchors.map(({ id: _id, ...anchor }) => anchor) });
+    // Same key order for every anchor; a missing `reverse` (older pads) is on.
+    const anchorData = anchors.map(({ param, t, target, curve, muted, reverse }) => ({
+      param,
+      t,
+      target,
+      curve,
+      muted,
+      reverse: reverse !== false,
+    }));
+    return JSON.stringify({ ...rest, puck, anchors: anchorData });
   };
   return comparable(preset.pad) !== comparable(pad);
 };

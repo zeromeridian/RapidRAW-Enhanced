@@ -210,6 +210,37 @@
       "offsets": { "contrast": 60 }
     },
     {
+      "name": "a tool without reverse gives nothing past the centre",
+      "pad": {
+        "version": 1,
+        "enabled": true,
+        "shape": "circle",
+        "amount": 1,
+        "puck": { "x": 0, "y": -0.6 },
+        "anchors": [
+          {
+            "id": "a",
+            "param": "whites",
+            "t": 0.25,
+            "target": -80,
+            "curve": "linear",
+            "muted": false,
+            "reverse": false
+          },
+          {
+            "id": "b",
+            "param": "contrast",
+            "t": 0.25,
+            "target": 50,
+            "curve": "linear",
+            "muted": false,
+            "reverse": true
+          }
+        ]
+      },
+      "offsets": { "contrast": -30 }
+    },
+    {
       "name": "hue wraps",
       "pad": {
         "version": 1,

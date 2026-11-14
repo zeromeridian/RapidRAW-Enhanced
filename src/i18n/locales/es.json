@@ -677,6 +677,7 @@
     },
     "blendPad": {
       "addTool": "Añadir herramienta",
+      "atTheDot": "En el punto",
       "bake": "Aplicar a los controles",
       "bakeTooltip": "Aplicar a los controles: escribe los valores del pad en los controles y centra el disco",
       "center": "Centrar el disco",
@@ -690,6 +691,7 @@
       "hint": "Arrastra el disco para mezclar las herramientas; arrastra un ancla por el borde para moverla. Mayús para movimientos más finos, flechas para desplazarlo y doble clic en el disco para centrarlo.",
       "maxTools": "Hasta {{count}} herramientas",
       "mute": "Silenciar",
+      "now": "ahora {{value}}",
       "presets": {
         "delete": "Eliminar ajuste",
         "deleteMessage": "¿Eliminar el ajuste del pad \"{{name}}\"? No se puede deshacer.",
@@ -715,6 +717,8 @@
       },
       "remove": "Quitar herramienta",
       "reset": "Restablecer el pad",
+      "reverse": "Inverso en el lado opuesto",
+      "reverseHint": "Activado: el lado opuesto da el inverso del objetivo. Desactivado: la herramienta se atenúa hasta 0 en el centro y no actúa más allá.",
       "shape": "Forma",
       "shapes": {
         "circle": "Círculo",
@@ -724,7 +728,6 @@
         "square": "Cuadrado",
         "triangle": "Triángulo"
       },
-      "target": "Objetivo",
       "title": "Blend Pad",
       "unmute": "Reactivar"
     },

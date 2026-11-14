@@ -405,6 +405,14 @@ struct Anchor {
     curve: Curve,
     #[serde(default)]
     muted: bool,
+    /// Whether the opposite side gives the target's reverse; off, the tool fades to 0 at the
+    /// centre and gives nothing beyond it. On when absent (pads saved before it existed).
+    #[serde(default = "reverse_by_default")]
+    reverse: bool,
+}
+
+fn reverse_by_default() -> bool {
+    true
 }
 
 fn full_amount() -> f64 {
@@ -456,6 +464,9 @@ impl Offsets {
                 continue;
             };
             let weight = pad.shape.axis_weight(anchor.t, puck);
+            if weight < 0.0 && !anchor.reverse {
+                continue;
+            }
             sums[index] +=
                 anchor.target * anchor.curve.apply(weight.abs()) * weight.signum() * amount;
         }
@@ -703,6 +714,30 @@ mod tests {
         assert_eq!(resolved.offset("hue"), -160.0);
         let single = offsets((0.0, 1.0), vec![anchor("hue", TOP, 150.0)]);
         assert_eq!(single.apply("hue", 100.0), -110.0);
+    }
+
+    #[test]
+    fn a_tool_without_reverse_gives_nothing_past_the_centre() {
+        let mut one_way = anchor("whites", TOP, -80.0);
+        one_way["reverse"] = json!(false);
+        assert_eq!(
+            offsets((0.0, 1.0), vec![one_way.clone()]).offset("whites"),
+            -80.0
+        );
+        assert_eq!(
+            offsets((0.0, 0.5), vec![one_way.clone()]).offset("whites"),
+            -40.0
+        );
+        assert_eq!(
+            offsets((0.0, -0.5), vec![one_way.clone()]).offset("whites"),
+            0.0
+        );
+        assert_eq!(offsets((0.0, -1.0), vec![one_way]).offset("whites"), 0.0);
+        // Absent, it reverses as before.
+        assert_eq!(
+            offsets((0.0, -1.0), vec![anchor("whites", TOP, -80.0)]).offset("whites"),
+            80.0
+        );
     }
 
     #[test]
