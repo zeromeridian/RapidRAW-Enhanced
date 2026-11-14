@@ -1,11 +1,10 @@
 # Orbit Blend Pad Plan
 
-Status (2026-11-13): **steps 1 (`1.49.0`, owner commit `59e355b6`), 2
-(`1.50.0`, owner commit `65c00ea1`), 3 (`1.51.0`, owner commit
-`a5b55723`), 4 (`1.52.0`, owner commit `90583026`) and 5 (`1.53.0`,
-uncommitted) done** on `dev/orbit-blend-pad`: all five planned steps
-built. Next: steps 6–8 below (owner, 2026-11-13); the owner's hands-on
-checks and merge whenever they choose.
+Status (2026-11-13): **steps 1–7 built** (`1.49.0`–`1.56.0`) on
+`dev/orbit-blend-pad`; all committed by the owner except step 7
+(`1.56.0`). Step 8 (a pad per mask) is **deferred** (owner, 2026-11-13).
+Remaining: the owner's hands-on checks and the merge into `develop`,
+whenever they choose. The Plan moves on to P1 item 14.
 `UPSTREAM_FEATURE_GAP.md` Plan item 27.
 
 **User guide:** `ORBIT_BLEND_PAD_GUIDE.md` explains every behaviour with
@@ -119,7 +118,8 @@ full at the start.
    distance from the centre sets strength). One `mode` field on the pad,
    resolved in Rust with the TS mirror and new shared vectors; mode
    picker in the panel; presets carry it.
-8. **A pad per mask** (`1.57.0`, L): each mask can have its own pad that
+8. **A pad per mask** (L; **deferred by the owner, 2026-11-13: later**;
+   restart when the owner asks; its version is chosen then): each mask can have its own pad that
    drives that mask's sliders (`MaskAdjustments`), resolved in
    `get_mask_adjustments_from_json` like the photo's; the pad panel edits
    the selected mask's pad when a mask is active; copy/paste and presets
