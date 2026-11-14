@@ -232,7 +232,6 @@
       "fill": "Wypełnij pomiędzy",
       "fillHint": "Wypełnia strefy między pierwszą a ostatnią zaznaczoną strefą wzdłuż krzywej, od koloru i siły jednego końca do drugiego.",
       "hint": "Kliknij strefę, aby ją zabarwić. Shift-klik zaznacza zakres, Cmd/Ctrl-klik dodaje lub usuwa strefę.",
-      "needsBlackAndWhite": "Włącz tryb czarno-biały, aby użyć tonowania stref.",
       "protect": "Ochrona",
       "softness": "Miękkość",
       "tintedZones": "Zabarwione strefy",

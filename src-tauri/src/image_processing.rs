@@ -2731,7 +2731,7 @@ fn get_global_adjustments_from_json(
 
         zone_tint: crate::zone_tint::ZoneTintSettings::from_json(
             js_adjustments.get("zoneTint"),
-            monochrome && is_visible("zoneTint"),
+            is_visible("zoneTint"),
         ),
     }
 }
@@ -4267,7 +4267,7 @@ mod tests {
     }
 
     #[test]
-    fn zone_tint_reaches_the_shader_only_for_a_visible_black_and_white_photo() {
+    fn zone_tint_reaches_the_shader_while_its_panel_is_visible() {
         let zone_tint = json!({ "zones": [{ "hue": 30, "strength": 40 }] });
         let tinted = |extra: serde_json::Value| {
             let mut adjustments = json!({ "monochrome": true, "zoneTint": zone_tint });
@@ -4277,10 +4277,11 @@ mod tests {
             get_global_adjustments_from_json(&adjustments, true, None).zone_tint
         };
         assert_eq!(tinted(json!({})).enabled, 1);
-        assert_eq!(tinted(json!({ "monochrome": false })).enabled, 0);
+        // Colour photos are tinted too, and the Color section's eye does not hide the tint.
+        assert_eq!(tinted(json!({ "monochrome": false })).enabled, 1);
         assert_eq!(
             tinted(json!({ "sectionVisibility": { "color": false } })).enabled,
-            0
+            1
         );
         assert_eq!(
             tinted(json!({ "sectionVisibility": { "zoneTint": false } })).enabled,
@@ -4295,7 +4296,7 @@ mod tests {
     }
 
     #[test]
-    fn a_zone_tint_counts_as_an_edit_only_on_a_black_and_white_photo() {
+    fn a_zone_tint_counts_as_an_edit_on_colour_and_black_and_white_photos() {
         let zone_tint = json!({ "zones": [{ "hue": 30, "strength": 40 }] });
         assert!(is_image_edited(
             &json!({ "monochrome": true, "zoneTint": zone_tint }),
@@ -4303,7 +4304,9 @@ mod tests {
             None
         ));
         let colour = json!({ "zoneTint": zone_tint, "toneMapper": "natural" });
-        assert!(!is_image_edited(&colour, true, None));
+        assert!(is_image_edited(&colour, true, None));
+        let neutral = json!({ "zoneTint": { "zones": [{ "hue": 30, "strength": 0 }] }, "toneMapper": "natural" });
+        assert!(!is_image_edited(&neutral, true, None));
     }
 
     #[test]

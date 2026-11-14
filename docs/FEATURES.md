@@ -327,9 +327,10 @@ details are in `RELEASE_NOTES.MD`.
   Variance, a hue–saturation field and luminance strip to refine the picked
   colour, before/after swatches, Hue/Saturation/Luminance range bars, and
   Visualize Range. Points travel with the edit (XMP, copy/paste, presets).
-- **Zone Tint** panel in the right toolbar for Black & White photos (whole
-  photo): a colour for each of the 11 Zone System zones (0–X) without
-  changing any tone. The zones form an upright grey scale (X at the top)
+- **Zone Tint** panel in the right toolbar (whole photo): a colour for
+  each of the 11 Zone System zones (0–X) without changing any tone,
+  toning a Black & White photo or grading a colour one by tonal zone (the
+  zone's colour shifts the colours there). The zones form an upright grey scale (X at the top)
   beside the colour wheel, each zone's tint a band along its edge; a
   Tinted zones list below names every coloured zone or range with its hue
   and strength, selects it on click and removes its tint with ×. Pick a
@@ -340,8 +341,8 @@ details are in `RELEASE_NOTES.MD`.
   (0–200 %) without changing the zones' own settings. Fill between blends
   the first and last selected zone's colours across the zones between them
   along a Blend Pad curve (Linear, Soft, Ease in). Masks in a blend mode keep the
-  tint. The panel's eye switches it off and its reset clears it; on a
-  colour photo it offers a Black & White switch. It travels with the edit
+  tint. The panel's eye switches it off and its reset clears it. It
+  travels with the edit
   (XMP, copy/paste, presets).
 - **Targeted adjustment pipettes**, as in Lightroom Classic: drag up or down
   on the photo to change what is under the cursor, double-click to reset it.

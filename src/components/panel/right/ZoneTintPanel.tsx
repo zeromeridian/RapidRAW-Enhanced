@@ -8,7 +8,6 @@ import Button from '../../ui/Button';
 import ColorWheel from '../../ui/ColorWheel';
 import Dropdown from '../../ui/Dropdown';
 import Slider from '../../ui/Slider';
-import Switch from '../../ui/Switch';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants } from '../../../types/typography';
 import { useEditorStore } from '../../../store/useEditorStore';
@@ -186,13 +185,15 @@ function ZoneScale({ onZoneClick, selected, zoneTint }: ZoneScaleProps) {
   );
 }
 
-/** Zone Tint: a colour per Zone System zone of a Black & White photo (`zone_tint.rs`). */
+/**
+ * Zone Tint: a colour per Zone System zone (`zone_tint.rs`), toning a Black & White photo or
+ * grading a colour one by tonal zone.
+ */
 export default function ZoneTintPanel() {
   const { t } = useTranslation();
   const { setAdjustments } = useEditorActions();
-  const { monochrome, storedZoneTint, sectionVisibility, setEditor } = useEditorStore(
+  const { storedZoneTint, sectionVisibility, setEditor } = useEditorStore(
     useShallow((state) => ({
-      monochrome: !!state.adjustments.monochrome,
       storedZoneTint: state.adjustments.zoneTint,
       sectionVisibility: state.adjustments.sectionVisibility ?? INITIAL_ADJUSTMENTS.sectionVisibility,
       setEditor: state.setEditor,
@@ -297,140 +298,127 @@ export default function ZoneTintPanel() {
         }
       />
       <div className="grow overflow-y-auto p-4 compact:p-3 flex flex-col gap-4 compact:gap-3">
-        {!monochrome ? (
-          <>
-            <Text variant={TextVariants.small} color={TextColors.secondary} className="block">
-              {t('adjustments.zoneTint.needsBlackAndWhite')}
-            </Text>
-            <Switch
-              checked={false}
-              label={t('adjustments.color.blackAndWhite')}
-              onChange={() => setAdjustments((prev) => ({ ...prev, monochrome: true }))}
-            />
-          </>
-        ) : (
-          <div className={clsx('flex flex-col gap-4 compact:gap-3 transition-opacity', !isVisible && 'opacity-40')}>
-            <div className="flex items-center gap-3">
-              <ZoneScale onZoneClick={handleZoneClick} selected={selected} zoneTint={zoneTint} />
-              <div className="grow min-w-0 max-w-60">
-                <ColorWheel
-                  defaultValue={NEUTRAL}
-                  label={zonesLabel(selected)}
-                  onChange={handleColorChange}
-                  onDragStateChange={handleDragStateChange}
-                  showLuminance={false}
-                  value={{ hue: shown.hue, saturation: shown.strength, luminance: 0 }}
-                />
-              </div>
-            </div>
-            <Text variant={TextVariants.small} color={TextColors.secondary} className="block">
-              {t('adjustments.zoneTint.hint')}
-            </Text>
-
-            <div className="flex items-center gap-2" data-tooltip={t('adjustments.zoneTint.fillHint')}>
-              <Dropdown
-                className="grow min-w-0"
-                onChange={(curve: BlendPadCurve) => setFillCurve(curve)}
-                options={curveOptions}
-                value={fillCurve}
-              />
-              <Button className="bg-surface text-text-primary shrink-0" disabled={!fillRange} onClick={handleFill}>
-                {t('adjustments.zoneTint.fill')}
-              </Button>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Slider
-                defaultValue={ZONE_TINT_AMOUNT.default * SLIDER_SCALE}
-                fillOrigin="min"
-                label={t('adjustments.effects.amount')}
-                max={ZONE_TINT_AMOUNT.max * SLIDER_SCALE}
-                min={ZONE_TINT_AMOUNT.min * SLIDER_SCALE}
-                onChange={(event) =>
-                  updateZoneTint((current) => ({ ...current, amount: Number(event.target.value) / SLIDER_SCALE }))
-                }
+        <div className={clsx('flex flex-col gap-4 compact:gap-3 transition-opacity', !isVisible && 'opacity-40')}>
+          <div className="flex items-center gap-3">
+            <ZoneScale onZoneClick={handleZoneClick} selected={selected} zoneTint={zoneTint} />
+            <div className="grow min-w-0 max-w-60">
+              <ColorWheel
+                defaultValue={NEUTRAL}
+                label={zonesLabel(selected)}
+                onChange={handleColorChange}
                 onDragStateChange={handleDragStateChange}
-                step={1}
-                value={Math.round((zoneTint.amount ?? ZONE_TINT_AMOUNT.default) * SLIDER_SCALE)}
-              />
-              <Slider
-                defaultValue={ZONE_TINT_SOFTNESS.default * SLIDER_SCALE}
-                label={t('adjustments.zoneTint.softness')}
-                max={ZONE_TINT_SOFTNESS.max * SLIDER_SCALE}
-                min={ZONE_TINT_SOFTNESS.min * SLIDER_SCALE}
-                onChange={(event) =>
-                  updateZoneTint((current) => ({ ...current, softness: Number(event.target.value) / SLIDER_SCALE }))
-                }
-                onDragStateChange={handleDragStateChange}
-                step={0.1}
-                value={zoneTint.softness * SLIDER_SCALE}
-              />
-              <Slider
-                defaultValue={ZONE_TINT_PROTECT.default * SLIDER_SCALE}
-                label={t('adjustments.zoneTint.protect')}
-                max={ZONE_TINT_PROTECT.max * SLIDER_SCALE}
-                min={ZONE_TINT_PROTECT.min * SLIDER_SCALE}
-                onChange={(event) =>
-                  updateZoneTint((current) => ({ ...current, protect: Number(event.target.value) / SLIDER_SCALE }))
-                }
-                onDragStateChange={handleDragStateChange}
-                step={0.5}
-                value={zoneTint.protect * SLIDER_SCALE}
+                showLuminance={false}
+                value={{ hue: shown.hue, saturation: shown.strength, luminance: 0 }}
               />
             </div>
-
-            {runs.length > 0 && (
-              <div className="flex flex-col gap-1">
-                <Text variant={TextVariants.label} color={TextColors.secondary}>
-                  {t('adjustments.zoneTint.tintedZones')}
-                </Text>
-                {runs.map((run) => (
-                  <div
-                    className={clsx(
-                      'flex items-center gap-1 rounded-md transition-colors',
-                      isSelectedRun(run) ? 'bg-surface' : 'hover:bg-surface',
-                    )}
-                    key={run.from}
-                  >
-                    <button
-                      className="grow min-w-0 flex items-center gap-2 px-2 py-1.5 text-left"
-                      onClick={() => selectRun(run)}
-                    >
-                      <span
-                        className="w-3 h-3 shrink-0 rounded-full border border-white/20"
-                        style={{ backgroundColor: tintColor(run.hue, run.strength) }}
-                      />
-                      <Text variant={TextVariants.small} className="grow truncate">
-                        {zonesLabel(zoneRange(run.from, run.to))}
-                      </Text>
-                      <Text
-                        variant={TextVariants.small}
-                        color={TextColors.secondary}
-                        className="flex items-center gap-2 tabular-nums"
-                      >
-                        <span>
-                          <span className="font-bold">{t('ui.colorWheel.hueAbbreviation')}</span> {Math.round(run.hue)}
-                          &deg;
-                        </span>
-                        <span>
-                          <span className="font-bold">{t('ui.colorWheel.saturationAbbreviation')}</span>{' '}
-                          {Math.round(run.strength)}
-                        </span>
-                      </Text>
-                    </button>
-                    <button
-                      className="p-1.5 mr-0.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-bg-primary transition-colors"
-                      data-tooltip={t('adjustments.zoneTint.untint')}
-                      onClick={() => setZonesTint(zoneRange(run.from, run.to), 0, 0, t('adjustments.zoneTint.untint'))}
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
-        )}
+          <Text variant={TextVariants.small} color={TextColors.secondary} className="block">
+            {t('adjustments.zoneTint.hint')}
+          </Text>
+
+          <div className="flex items-center gap-2" data-tooltip={t('adjustments.zoneTint.fillHint')}>
+            <Dropdown
+              className="grow min-w-0"
+              onChange={(curve: BlendPadCurve) => setFillCurve(curve)}
+              options={curveOptions}
+              value={fillCurve}
+            />
+            <Button className="bg-surface text-text-primary shrink-0" disabled={!fillRange} onClick={handleFill}>
+              {t('adjustments.zoneTint.fill')}
+            </Button>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Slider
+              defaultValue={ZONE_TINT_AMOUNT.default * SLIDER_SCALE}
+              fillOrigin="min"
+              label={t('adjustments.effects.amount')}
+              max={ZONE_TINT_AMOUNT.max * SLIDER_SCALE}
+              min={ZONE_TINT_AMOUNT.min * SLIDER_SCALE}
+              onChange={(event) =>
+                updateZoneTint((current) => ({ ...current, amount: Number(event.target.value) / SLIDER_SCALE }))
+              }
+              onDragStateChange={handleDragStateChange}
+              step={1}
+              value={Math.round((zoneTint.amount ?? ZONE_TINT_AMOUNT.default) * SLIDER_SCALE)}
+            />
+            <Slider
+              defaultValue={ZONE_TINT_SOFTNESS.default * SLIDER_SCALE}
+              label={t('adjustments.zoneTint.softness')}
+              max={ZONE_TINT_SOFTNESS.max * SLIDER_SCALE}
+              min={ZONE_TINT_SOFTNESS.min * SLIDER_SCALE}
+              onChange={(event) =>
+                updateZoneTint((current) => ({ ...current, softness: Number(event.target.value) / SLIDER_SCALE }))
+              }
+              onDragStateChange={handleDragStateChange}
+              step={0.1}
+              value={zoneTint.softness * SLIDER_SCALE}
+            />
+            <Slider
+              defaultValue={ZONE_TINT_PROTECT.default * SLIDER_SCALE}
+              label={t('adjustments.zoneTint.protect')}
+              max={ZONE_TINT_PROTECT.max * SLIDER_SCALE}
+              min={ZONE_TINT_PROTECT.min * SLIDER_SCALE}
+              onChange={(event) =>
+                updateZoneTint((current) => ({ ...current, protect: Number(event.target.value) / SLIDER_SCALE }))
+              }
+              onDragStateChange={handleDragStateChange}
+              step={0.5}
+              value={zoneTint.protect * SLIDER_SCALE}
+            />
+          </div>
+
+          {runs.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <Text variant={TextVariants.label} color={TextColors.secondary}>
+                {t('adjustments.zoneTint.tintedZones')}
+              </Text>
+              {runs.map((run) => (
+                <div
+                  className={clsx(
+                    'flex items-center gap-1 rounded-md transition-colors',
+                    isSelectedRun(run) ? 'bg-surface' : 'hover:bg-surface',
+                  )}
+                  key={run.from}
+                >
+                  <button
+                    className="grow min-w-0 flex items-center gap-2 px-2 py-1.5 text-left"
+                    onClick={() => selectRun(run)}
+                  >
+                    <span
+                      className="w-3 h-3 shrink-0 rounded-full border border-white/20"
+                      style={{ backgroundColor: tintColor(run.hue, run.strength) }}
+                    />
+                    <Text variant={TextVariants.small} className="grow truncate">
+                      {zonesLabel(zoneRange(run.from, run.to))}
+                    </Text>
+                    <Text
+                      variant={TextVariants.small}
+                      color={TextColors.secondary}
+                      className="flex items-center gap-2 tabular-nums"
+                    >
+                      <span>
+                        <span className="font-bold">{t('ui.colorWheel.hueAbbreviation')}</span> {Math.round(run.hue)}
+                        &deg;
+                      </span>
+                      <span>
+                        <span className="font-bold">{t('ui.colorWheel.saturationAbbreviation')}</span>{' '}
+                        {Math.round(run.strength)}
+                      </span>
+                    </Text>
+                  </button>
+                  <button
+                    className="p-1.5 mr-0.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-bg-primary transition-colors"
+                    data-tooltip={t('adjustments.zoneTint.untint')}
+                    onClick={() => setZonesTint(zoneRange(run.from, run.to), 0, 0, t('adjustments.zoneTint.untint'))}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

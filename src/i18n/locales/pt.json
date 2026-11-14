@@ -232,7 +232,6 @@
       "fill": "Preencher entre",
       "fillHint": "Preenche as zonas entre a primeira e a última zona selecionada ao longo da curva, da cor e intensidade de uma ponta às da outra.",
       "hint": "Clique numa zona para a colorir. Shift-clique seleciona um intervalo, Cmd/Ctrl-clique adiciona ou remove uma zona.",
-      "needsBlackAndWhite": "Ative Preto e branco para usar a tonalidade por zonas.",
       "protect": "Proteção",
       "softness": "Suavidade",
       "tintedZones": "Zonas tonalizadas",
