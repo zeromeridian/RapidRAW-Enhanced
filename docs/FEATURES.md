@@ -248,7 +248,9 @@ details are in `RELEASE_NOTES.MD`.
   balances rotation and both perspective axes (and remains useful for a
   level-only scene), focused horizon-straightening **Level** correction,
   **Vertical** keystone correction, **Guided Perspective**, editable **Manual Transform**
-  controls, and a persistent **Constrain Crop** option. Auto straightens
+  controls, and a persistent **Constrain Crop** option that zooms the
+  corrected result to hide empty borders without changing how strongly it
+  is straightened. Auto straightens
   verticals first, adds a horizontal keystone only when it keeps them
   straight, and picks a balanced strength that limits uneven stretch and
   lost frame; Vertical corrects fully. After either, an **Auto Strength**

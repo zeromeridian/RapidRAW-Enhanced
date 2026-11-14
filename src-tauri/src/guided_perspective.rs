@@ -6,16 +6,15 @@
 //! `guidedPerspective` adjustment in normalized coordinates of the
 //! unoriented, lens-corrected source image, the space the geometry matrix
 //! starts from. `build_transform_matrix` composes the homography innermost,
-//! under the Rotate, Vertical, Horizontal, Aspect, Scale, and Offset sliders.
+//! under the Rotate, Vertical, Horizontal, Aspect, Scale, and Offset sliders
+//! and Constrain Crop's zoom.
 
 use nalgebra::{Matrix3, Vector3};
 use serde::{Deserialize, Serialize};
 
 use crate::AppState;
 use crate::geometry_analysis::clip_to_frame;
-use crate::image_processing::{
-    Crop, build_transform_matrix, compute_transform_constrain_scale, get_geometry_params_from_json,
-};
+use crate::image_processing::{Crop, get_geometry_params_from_json, rendered_transform_matrix};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -516,13 +515,7 @@ fn orient_point(
 
 /// The full forward geometry matrix of an image, as the warp renders it.
 fn forward_matrix(adjustments: &serde_json::Value, width: f32, height: f32) -> Matrix3<f32> {
-    let params = get_geometry_params_from_json(adjustments);
-    let constrain_scale = if params.constrain_crop {
-        compute_transform_constrain_scale(&params, width, height)
-    } else {
-        1.0
-    };
-    build_transform_matrix(&params, width, height, constrain_scale)
+    rendered_transform_matrix(&get_geometry_params_from_json(adjustments), width, height)
 }
 
 /// The largest crop (in oriented pixels, before straightening) that shows

@@ -460,11 +460,15 @@ fn interpolate_pixel(
     }
 }
 
+/// The forward (source to output) geometry matrix. `constrain_scale` is
+/// Constrain Crop's zoom: it scales the finished result about the centre,
+/// after the perspective, so it never changes how strongly the image is
+/// straightened.
 pub(crate) fn build_transform_matrix(
     params: &GeometryParams,
     width: f32,
     height: f32,
-    extra_scale: f32,
+    constrain_scale: f32,
 ) -> NaMatrix3<f32> {
     let cx = width / 2.0;
     let cy = height / 2.0;
@@ -480,7 +484,7 @@ pub(crate) fn build_transform_matrix(
         1.0 / (1.0 + params.aspect.abs() / 100.0)
     };
 
-    let scale_factor = (params.scale / 100.0) * extra_scale;
+    let scale_factor = params.scale / 100.0;
     let off_x = (params.x_offset / 100.0) * width;
     let off_y = (params.y_offset / 100.0) * height;
 
@@ -502,6 +506,17 @@ pub(crate) fn build_transform_matrix(
         1.0,
     );
     let m_offset = NaMatrix3::new(1.0, 0.0, off_x, 0.0, 1.0, off_y, 0.0, 0.0, 1.0);
+    let m_constrain = NaMatrix3::new(
+        constrain_scale,
+        0.0,
+        0.0,
+        0.0,
+        constrain_scale,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+    );
 
     // The guided homography works in centered coordinates, like the sliders.
     let m_guided = params
@@ -509,7 +524,7 @@ pub(crate) fn build_transform_matrix(
         .homography(width, height)
         .map_or_else(NaMatrix3::identity, |homography| homography.cast::<f32>());
 
-    t_center * m_offset * m_perspective * m_rotate * m_scale * m_guided * t_uncenter
+    t_center * m_constrain * m_offset * m_perspective * m_rotate * m_scale * m_guided * t_uncenter
 }
 
 fn transform_point(matrix: &NaMatrix3<f32>, x: f32, y: f32) -> Option<(f32, f32)> {
@@ -584,6 +599,21 @@ pub(crate) fn compute_transform_constrain_scale(
     high * 1.001
 }
 
+/// The forward geometry matrix exactly as the warp renders it, with
+/// Constrain Crop's zoom when it is on.
+pub(crate) fn rendered_transform_matrix(
+    params: &GeometryParams,
+    width: f32,
+    height: f32,
+) -> NaMatrix3<f32> {
+    let constrain_scale = if params.constrain_crop {
+        compute_transform_constrain_scale(params, width, height)
+    } else {
+        1.0
+    };
+    build_transform_matrix(params, width, height, constrain_scale)
+}
+
 fn build_transform_matrices(
     params: &GeometryParams,
     width: f32,
@@ -591,12 +621,7 @@ fn build_transform_matrices(
 ) -> (NaMatrix3<f32>, f32, f32, f64) {
     let cx = width / 2.0;
     let cy = height / 2.0;
-    let constrain_scale = if params.constrain_crop {
-        compute_transform_constrain_scale(params, width, height)
-    } else {
-        1.0
-    };
-    let forward = build_transform_matrix(params, width, height, constrain_scale);
+    let forward = rendered_transform_matrix(params, width, height);
     let half_diagonal =
         ((width as f64 * width as f64 + height as f64 * height as f64).sqrt()) / 2.0;
 
@@ -3957,7 +3982,7 @@ mod tests {
         AllAdjustments, DEFAULT_GLOW_HUE, GeometryParams, GlobalAdjustments, MAX_POINT_COLORS,
         MaskAdjustments, build_transform_matrix, calculate_histogram_from_image,
         compute_transform_constrain_scale, get_global_adjustments_from_json,
-        get_mask_adjustments_from_json, is_image_edited, transform_covers_output,
+        get_mask_adjustments_from_json, is_image_edited, transform_covers_output, transform_point,
         warp_image_geometry,
     };
     use image::{DynamicImage, Rgb, Rgb32FImage};
@@ -3987,6 +4012,35 @@ mod tests {
         assert!(scale > 1.0);
         let constrained = build_transform_matrix(&params, 1600.0, 1000.0, scale);
         assert!(transform_covers_output(&constrained, 1600.0, 1000.0));
+    }
+
+    #[test]
+    fn constrain_crop_zooms_after_the_perspective() {
+        let (width, height) = (1600.0, 1000.0);
+        let params = GeometryParams {
+            vertical: 40.0,
+            horizontal: -15.0,
+            rotate: 3.0,
+            x_offset: 4.0,
+            constrain_crop: true,
+            ..GeometryParams::default()
+        };
+        let scale = compute_transform_constrain_scale(&params, width, height);
+        assert!(scale > 1.0);
+        let free = build_transform_matrix(&params, width, height, 1.0);
+        let constrained = build_transform_matrix(&params, width, height, scale);
+        // Every source point lands where the unzoomed correction puts it,
+        // scaled about the output centre: the straightening is unchanged.
+        for (x, y) in [(0.0, 0.0), (1600.0, 0.0), (400.0, 900.0), (1200.0, 300.0)] {
+            let (fx, fy) = transform_point(&free, x, y).unwrap();
+            let (cx, cy) = transform_point(&constrained, x, y).unwrap();
+            let expected = (
+                width / 2.0 + (fx - width / 2.0) * scale,
+                height / 2.0 + (fy - height / 2.0) * scale,
+            );
+            assert!((cx - expected.0).abs() < 1e-2, "{cx} vs {}", expected.0);
+            assert!((cy - expected.1).abs() < 1e-2, "{cy} vs {}", expected.1);
+        }
     }
 
     #[test]
