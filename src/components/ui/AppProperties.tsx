@@ -203,6 +203,7 @@ export enum Panel {
   Metadata = 'metadata',
   Presets = 'presets',
   Tagging = 'tagging',
+  ZoneTint = 'zoneTint',
 }
 
 export enum RawStatus {
@@ -267,7 +268,6 @@ export interface CollapsibleSectionsState {
   curves: boolean;
   details: boolean;
   effects: boolean;
-  zoneTint: boolean;
 }
 
 /** How the Develop adjustment panels are arranged (Customize Panels and Favorites). */

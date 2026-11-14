@@ -28,6 +28,7 @@ const RIGHT_PANEL_ORDER = [
   Panel.Adjustments,
   Panel.Favorites,
   Panel.BlendPad,
+  Panel.ZoneTint,
   Panel.Crop,
   Panel.Geometry,
   Panel.LensCorrection,
@@ -261,7 +262,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   renderedRightPanel: Panel.Adjustments,
   lastEditingPanel: Panel.Adjustments,
   slideDirection: 1,
-  collapsibleSectionsState: { basic: true, color: false, curves: true, details: false, effects: false, zoneTint: true },
+  collapsibleSectionsState: { basic: true, color: false, curves: true, details: false, effects: false },
 
   isCreateFolderModalOpen: false,
   isRenameFolderModalOpen: false,

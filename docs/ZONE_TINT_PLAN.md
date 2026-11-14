@@ -1,7 +1,9 @@
 # Zone Tint Plan
 
-Status (2026-11-14): **Phases 1 and 2 done, uncommitted** on
-`dev/zone-tint` (from `develop` `492bfffe`), built as `1.57.0`; the GPU
+Status (2026-11-14): **Phases 1 and 2 done** on `dev/zone-tint` (from
+`develop` `492bfffe`, committed as `b23d9d3d`), built as `1.57.0`; Zone
+Tint then moved to its own right-toolbar panel with a new zone strip
+(`1.57.1`, uncommitted); the GPU
 exit check and the hands-on check still have to run on the Mac. Next:
 Phase 3. `UPSTREAM_FEATURE_GAP.md` Plan item 28 (P0, owner
 2026-11-13: after item 27, the Orbit Blend Pad, whose steps 1–7 are done).
@@ -69,12 +71,19 @@ changes about it, the decisions still open, and progress.
 - **Hue control:** a colour wheel (hue and strength in one control, like
   Colour Grading's wheels), not a hue slider. The wheel's angle must be
   the OKLab hue the Rust side uses (`zoneTint.zones[n].hue`, 0° = +a).
-- **Place in the GUI:** its own collapsible "Zone Tint" section in the
-  Adjustments panel (like Details or Effects), shown only while Black &
-  White is on; not inside the Color section and not docked under the
-  histogram. Agent choice (Phase 2): the 11 swatches are equal width;
-  placed by display value, Zones 0–II would share the first ~9 % of the
-  strip, and the section no longer sits under the histogram.
+- **Place in the GUI** (revised by the owner 2026-11-14, after `1.57.0`):
+  its own panel in the right toolbar (`Panel.ZoneTint`, `Blend` icon,
+  after the Orbit Blend Pad), no longer an Adjustments section; not
+  inside the Color section and not docked under the histogram. The
+  first version (`1.57.0`) was a collapsible Adjustments section shown
+  only while Black & White was on. Agent choice (Phase 2): the 11
+  swatches are equal width; placed by display value, Zones 0–II would
+  share the first ~9 % of the strip.
+- **Zone strip layout** (owner 2026-11-14: "more streamlined and easier
+  to read"; agent design): one continuous grey ramp without gaps, each
+  zone's tint as a band along its top, an accent underline under the
+  selected zones, and the zone numbers in a row below the ramp; the
+  wheel's label joins neighbouring zones into ranges ("Zones IV–VII").
 
 - **Blend-mode backdrop:** carries the Zone Tint, so masks in a
   non-Normal blend mode keep the zone colours. Done in `shader.wgsl`: the
@@ -130,3 +139,13 @@ changes about it, the decisions still open, and progress.
   `a_zone_tint_counts_as_an_edit_only_on_a_black_and_white_photo`.
   Strings in all 12 locales. Exit check (tint, save, reopen, export match
   the preview): **not run in the app yet**.
+- **Own panel and new strip** (`1.57.1`, 2026-11-14, uncommitted):
+  `components/adjustments/ZoneTint.tsx` became
+  `components/panel/right/ZoneTintPanel.tsx` (header with eye and reset;
+  on a colour photo the hint plus a Black & White switch). `zoneTint` left
+  `ADJUSTMENT_SECTIONS`, `Sections`, `CollapsibleSectionsState` and
+  `ADJUSTMENT_SECTION_COMPONENTS`; `isAdjustmentSectionShown` is gone.
+  `sectionVisibility.zoneTint` stays (the panel's eye, Rust
+  `is_visible("zoneTint")`). The Adjustments reset no longer clears Zone
+  Tint; saved section orders or a `section:zoneTint` favourite drop it
+  silently. Strings reused (no locale changes).

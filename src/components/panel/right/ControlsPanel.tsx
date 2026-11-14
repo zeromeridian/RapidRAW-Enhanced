@@ -16,7 +16,6 @@ import {
   ADJUSTMENT_SECTIONS,
   getAdjustmentSectionOrder,
   getInitialAdjustments,
-  isAdjustmentSectionShown,
 } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { OPTION_SEPARATOR, Orientation } from '../../ui/AppProperties';
@@ -274,30 +273,28 @@ export default function Controls() {
 
       <AdjustmentPanelContext.Provider value={PHOTO_PANEL_CONTEXT}>
         <div className="grow overflow-y-scroll p-4 compact:p-0 flex flex-col gap-2 compact:gap-2.5">
-          {getAdjustmentSectionOrder(appSettings?.adjustmentLayout?.sectionOrder)
-            .filter((sectionName) => isAdjustmentSectionShown(sectionName, adjustments, false))
-            .map((sectionName: string) => {
-              const SectionComponent = ADJUSTMENT_SECTION_COMPONENTS[sectionName];
+          {getAdjustmentSectionOrder(appSettings?.adjustmentLayout?.sectionOrder).map((sectionName: string) => {
+            const SectionComponent = ADJUSTMENT_SECTION_COMPONENTS[sectionName];
 
-              const title = t(`editor.adjustments.sections.${sectionName}`);
-              const sectionVisibility = adjustments.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
+            const title = t(`editor.adjustments.sections.${sectionName}`);
+            const sectionVisibility = adjustments.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
 
-              return (
-                <div className="shrink-0 group" key={sectionName}>
-                  <CollapsibleSection
-                    isContentVisible={sectionVisibility[sectionName as keyof SectionVisibility]}
-                    isOpen={collapsibleSectionsState[sectionName as keyof typeof collapsibleSectionsState]}
-                    onContextMenu={(e: any) => handleSectionContextMenu(e, sectionName)}
-                    onToggle={() => handleToggleSection(sectionName)}
-                    onToggleVisibility={() => handleToggleVisibility(sectionName)}
-                    title={title}
-                    titleAddon={<FavoriteStar favorite={favoriteKey('section', sectionName)} />}
-                  >
-                    <SectionComponent {...sectionProps} />
-                  </CollapsibleSection>
-                </div>
-              );
-            })}
+            return (
+              <div className="shrink-0 group" key={sectionName}>
+                <CollapsibleSection
+                  isContentVisible={sectionVisibility[sectionName as keyof SectionVisibility]}
+                  isOpen={collapsibleSectionsState[sectionName as keyof typeof collapsibleSectionsState]}
+                  onContextMenu={(e: any) => handleSectionContextMenu(e, sectionName)}
+                  onToggle={() => handleToggleSection(sectionName)}
+                  onToggleVisibility={() => handleToggleVisibility(sectionName)}
+                  title={title}
+                  titleAddon={<FavoriteStar favorite={favoriteKey('section', sectionName)} />}
+                >
+                  <SectionComponent {...sectionProps} />
+                </CollapsibleSection>
+              </div>
+            );
+          })}
         </div>
       </AdjustmentPanelContext.Provider>
     </div>

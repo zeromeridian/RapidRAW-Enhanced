@@ -712,7 +712,6 @@ export interface Sections {
   color: Array<string>;
   details: Array<string>;
   effects: Array<string>;
-  zoneTint: Array<string>;
 }
 
 export interface SectionVisibility {
@@ -722,6 +721,7 @@ export interface SectionVisibility {
   color: boolean;
   details: boolean;
   effects: boolean;
+  /** Zone Tint's own panel, not an Adjustments section; Rust checks it as `is_visible("zoneTint")`. */
   zoneTint: boolean;
 }
 
@@ -1621,18 +1621,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     Effect.FogTemperature,
     Effect.FogTint,
   ],
-  zoneTint: ['zoneTint'],
 };
-
-/**
- * Whether a section shows in a panel: Zone Tint only on a Black & White photo, and not in
- * masks yet (`ZONE_TINT_PLAN.md` Phase 4).
- */
-export const isAdjustmentSectionShown = (
-  section: string,
-  adjustments: Partial<Adjustments>,
-  isForMask: boolean,
-): boolean => section !== 'zoneTint' || (!isForMask && !!adjustments.monochrome);
 
 const reconcileOrder = (defaultOrder: string[], order: string[] = []): string[] => {
   const savedOrder = order.filter((id, index) => defaultOrder.includes(id) && order.indexOf(id) === index);
