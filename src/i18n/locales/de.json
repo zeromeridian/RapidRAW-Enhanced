@@ -229,6 +229,8 @@
       "vignette": "Vignettierung"
     },
     "zoneTint": {
+      "fill": "Dazwischen füllen",
+      "fillHint": "Füllt die Zonen zwischen der ersten und der letzten ausgewählten Zone entlang der Kurve, von Farbe und Stärke des einen Endes zu denen des anderen.",
       "hint": "Klicken Sie auf eine Zone, um sie einzufärben. Umschalt-Klick wählt einen Bereich, Cmd/Strg-Klick fügt eine Zone hinzu oder entfernt sie.",
       "needsBlackAndWhite": "Schalten Sie Schwarzweiß ein, um die Zonentönung zu verwenden.",
       "protect": "Schutz",

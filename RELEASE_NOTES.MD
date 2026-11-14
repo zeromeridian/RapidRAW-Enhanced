@@ -5,6 +5,20 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.57.3-dev-zone-tint — 2026-11-14
+
+### Develop
+
+- **Zone Tint** has a new **Amount** slider that makes the whole tint
+  weaker or stronger, up to double, without changing the colours you set
+  for each zone. Edits made before keep their look.
+- **Fill between** blends a colour across a range of zones: colour the
+  first and last zone, Shift-click to select the range, pick a curve
+  (Linear, Soft or Ease in, as on the Orbit Blend Pad) and fill. The
+  zones in between move from one end's colour and strength to the
+  other's; opposite colours, like cool shadows and warm highlights, meet
+  in a soft neutral. Each filled zone can still be changed on its own.
+
 ## 1.57.2-dev-zone-tint — 2026-11-14
 
 ### Develop

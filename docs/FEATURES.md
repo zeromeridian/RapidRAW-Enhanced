@@ -336,7 +336,10 @@ details are in `RELEASE_NOTES.MD`.
   zone, or a range with Shift-click (Cmd/Ctrl-click
   adds or removes one), and set its colour and strength on a colour wheel;
   neighbouring zones blend smoothly, Softness sets how far a zone reaches,
-  and Protect keeps black and white neutral. Masks in a blend mode keep the
+  and Protect keeps black and white neutral. Amount scales the whole tint
+  (0–200 %) without changing the zones' own settings. Fill between blends
+  the first and last selected zone's colours across the zones between them
+  along a Blend Pad curve (Linear, Soft, Ease in). Masks in a blend mode keep the
   tint. The panel's eye switches it off and its reset clears it; on a
   colour photo it offers a Black & White switch. It travels with the edit
   (XMP, copy/paste, presets).

@@ -229,6 +229,8 @@
       "vignette": "Vignettatura"
     },
     "zoneTint": {
+      "fill": "Riempi tra",
+      "fillHint": "Riempie le zone tra la prima e l'ultima zona selezionata lungo la curva, dal colore e dall'intensità di un estremo a quelli dell'altro.",
       "hint": "Fai clic su una zona per colorarla. Maiusc-clic seleziona un intervallo, Cmd/Ctrl-clic aggiunge o rimuove una zona.",
       "needsBlackAndWhite": "Attiva Bianco e nero per usare la tinta per zone.",
       "protect": "Protezione",
