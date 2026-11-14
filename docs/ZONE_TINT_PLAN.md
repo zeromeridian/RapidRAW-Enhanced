@@ -9,7 +9,8 @@ Amount and Fill between along a curve (`1.57.3`), colour photos too
 (up to `bc3d2b40`) and merged into `develop` and `main` (`7d5093a4`).
 Zone pickers on the photo (`1.58.0`, branch `dev/zone-color-pickers`
 from `7d5093a4`, committed by the owner as `3392b413`), then
-overlapping grades (`1.59.0`, uncommitted on the same branch). How the
+overlapping grades (`1.59.0`, owner commit `ce7e142c`). Next: a view
+toggle per grade ("Remaining" item 2). How the
 tool behaves: `ZONE_COLOR_GRADING_GUIDE.md`. The GPU exit check and the hands-on
 check still have to run on the Mac. Next: the rest of Phase 3. `UPSTREAM_FEATURE_GAP.md` Plan item 28 (P0, owner
 2026-11-13: after item 27, the Orbit Blend Pad, whose steps 1–7 are done).
@@ -201,26 +202,54 @@ changes about it, the decisions still open, and progress.
 1. **Owner checks on the Mac:** Phase 1 GPU exit check (`cargo test --lib
    zone_tint -- --nocapture` from `src-tauri`; must not print "No GPU
    adapter"); Phase 2 hands-on exit check (tint, save, reopen, export
-   match the preview; steps in `HANDOFF.md`); the `1.58.0` pickers.
-2. **Phase 3** (spec): hover readout, Alt/Option mask preview, mask
+   match the preview; steps in `HANDOFF.md`); the `1.58.0` pickers and
+   `1.59.0` grades.
+2. **Next: a view toggle per grade** (owner request 2026-11-14, to build
+   in the next step; documented only for now). An eye on each row of
+   the Grades list hides or shows that grade. Agent proposal, to confirm
+   with the owner when it starts:
+   - A `visible` flag on `ZoneTintGrade`, absent meaning shown, so
+     existing edits are unaffected. The sum that Rust renders
+     (`sumGrades`) skips hidden grades, so nothing changes on the Rust
+     side and XMP carries the flag.
+   - A hidden grade stays in the list (dimmed) and on the scale (faded
+     band). Overlap flags count only shown grades, because hidden ones
+     don't combine.
+   - **Owner rule (2026-11-14): raise every open point below with the
+     owner when this item is implemented.** Ask them one at a time and
+     don't settle any of them silently with the proposal. Record each
+     answer here. In the handoff after implementation, list any point
+     still unanswered.
+   - Open questions:
+     - Does editing a hidden grade on the wheel show it again? (Proposal:
+       yes, otherwise the edit is invisible.)
+     - Does Fill between also take its zones out of hidden grades?
+       (Proposal: yes, so the ramp stays exact when they're shown again.)
+     - Are the ramp's ends read from the shown grades only? (Proposal:
+       yes, it's what you see.)
+     - Does a toggle count as an undo step? (Proposal: yes, like the
+       panel's eye.)
+   - Strings needed: show grade and hide grade, in 12 locales. Update
+     `ZONE_COLOR_GRADING_GUIDE.md` and `FEATURES.md` when it lands.
+3. **Phase 3** (spec): hover readout, Alt/Option mask preview, mask
    smoothing (blur pass, `maskSmoothing` 0–4 px slider; the pickers'
    `zoneTint` probe reads L before it, so they would not follow the
    smoothing), the four starter
    presets (Selenium, Sepia, Split, Platinum; multi-select is already
    done). Exit check: smoothing 1–2 px removes colour speckle on a grainy
    high-ISO file.
-3. **Phase 4** (spec): Advanced mode (move a zone's centre, its own width,
+4. **Phase 4** (spec): Advanced mode (move a zone's centre, its own width,
    double-click resets; data and render exist, controls do not; re-check
    the luminance order guarantee, which assumes evenly spaced centres) and
    Zone Color Grading inside masks. Exit check: a sky gradient mask with a
    Zone VIII colour colours only the sky's highlights.
-4. **Spec acceptance checks not yet covered by tests:** no banding on a
+5. **Spec acceptance checks not yet covered by tests:** no banding on a
    16-bit sky gradient, no clipping or hue shift at strength 100 on Zones I
    and IX, no colour speckle at ISO 6400+ (after Phase 3), under 5 % more
    preview frame time.
-5. **Decisions below**, plus whether the starter presets (specified for
+6. **Decisions below**, plus whether the starter presets (specified for
    B&W) change now that colour photos and luminance exist.
-6. **Later, separate:** Curve Stamp export (ColrBent).
+7. **Later, separate:** Curve Stamp export (ColrBent).
 
 ## Open decisions (ask the owner when the phase starts)
 
@@ -303,7 +332,7 @@ changes about it, the decisions still open, and progress.
   and updated: `zone_tint_reaches_the_shader_while_its_panel_is_visible`,
   `a_zone_tint_counts_as_an_edit_on_colour_and_black_and_white_photos`,
   `zone_tint_is_off_unless_a_visible_block_tints_a_zone`.
-- **Grades** (`1.59.0`, 2026-11-14, uncommitted, branch
+- **Grades** (`1.59.0`, 2026-11-14, owner commit `ce7e142c`, branch
   `dev/zone-color-pickers` on top of `3392b413`): `ZoneTintGrade`,
   `createZoneTintGrade` and `ZoneTint.grades` in `utils/adjustments.ts`;
   `utils/zoneTint.ts` gains the grade maths (`zoneTintGrades`,
