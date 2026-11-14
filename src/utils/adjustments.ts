@@ -584,7 +584,7 @@ export interface ZoneTintZone {
 }
 
 /**
- * Zone Tint, rendered by `zone_tint.rs` on Black & White photos only: a colour per zone 0–X of
+ * Zone Tint, rendered by `zone_tint.rs` on colour and Black & White photos: a colour per zone 0–X of
  * OKLab lightness, added without changing any tone. Absent (`null`) means off.
  */
 export interface ZoneTint {

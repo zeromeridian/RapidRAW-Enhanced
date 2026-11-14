@@ -232,7 +232,6 @@
       "fill": "Remplir entre",
       "fillHint": "Remplit les zones entre la première et la dernière zone sélectionnée selon la courbe, de la couleur et de l'intensité d'une extrémité à celles de l'autre.",
       "hint": "Cliquez sur une zone pour la colorer. Maj-clic sélectionne une plage, Cmd/Ctrl-clic ajoute ou retire une zone.",
-      "needsBlackAndWhite": "Activez Noir et blanc pour utiliser la teinte par zones.",
       "protect": "Protection",
       "softness": "Douceur",
       "tintedZones": "Zones teintées",

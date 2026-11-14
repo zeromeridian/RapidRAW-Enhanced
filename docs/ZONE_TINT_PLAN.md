@@ -4,7 +4,8 @@ Status (2026-11-14): **Phases 1 and 2 done** on `dev/zone-tint` (from
 `develop` `492bfffe`, committed as `b23d9d3d`), built as `1.57.0`; Zone
 Tint then moved to its own right-toolbar panel (`1.57.1`) with an
 upright zone scale and a tinted zones list (`1.57.2`), then an overall
-Amount and Fill between along a curve (`1.57.3`, uncommitted); the GPU
+Amount and Fill between along a curve (`1.57.3`), then colour photos too
+(`1.57.4`, uncommitted); the GPU
 exit check and the hands-on check still have to run on the Mac. Next:
 Phase 3. `UPSTREAM_FEATURE_GAP.md` Plan item 28 (P0, owner
 2026-11-13: after item 27, the Orbit Blend Pad, whose steps 1–7 are done).
@@ -107,6 +108,14 @@ changes about it, the decisions still open, and progress.
   colour-wheel vectors (hue direction, strength length), like the
   shader's sum, so opposite hues meet in a neutral middle instead of
   sweeping through the hues between (a blue → amber hue blend went green).
+- **Colour photos** (owner 2026-11-14, answering the spec's open
+  question "out of scope for now"): Zone Tint works on colour photos too,
+  as a grade by tonal zone. No shader change: `apply_zone_tint` already
+  adds (a, b) at the pixel's L after the monochrome step, so on colour it
+  shifts the existing chroma, kept in gamut by the same search. The only
+  gate left is the panel's eye (`is_visible("zoneTint")`); the Color
+  section's eye no longer hides it, and switching Black & White off keeps
+  the tint. Overlaps Colour Grading's three wheels, which stay as they are.
 
 - **Blend-mode backdrop:** carries the Zone Tint, so masks in a
   non-Normal blend mode keep the zone colours. Done in `shader.wgsl`: the
@@ -118,7 +127,8 @@ changes about it, the decisions still open, and progress.
 ## Open decisions (ask the owner when the phase starts)
 
 - Lightroom 3-way grading import onto Zones II, V, VIII (spec).
-- Colour images and monoRAW: out of scope now (spec); confirm.
+- monoRAW: out of scope now (spec); confirm. (Colour images: decided,
+  see "Colour photos" above.)
 
 ## Progress
 
@@ -185,3 +195,12 @@ changes about it, the decisions still open, and progress.
   `.fillHint` in 12 locales; curve names reuse the Blend Pad's). The
   Blend Pad's curve list moved from `BlendPadPanel.tsx` to
   `utils/blendPad.ts` so both panels share it.
+- **Colour photos** (`1.57.4`, 2026-11-14, uncommitted):
+  `ZoneTintSettings::from_json` takes `visible` instead of `monochrome`;
+  a block without any colour now returns the default settings, so it no
+  longer counts as an edit (it did on B&W photos before: the zones'
+  centres and widths differed from the default). The panel lost its B&W
+  gate and the `needsBlackAndWhite` string (12 locales). Tests renamed
+  and updated: `zone_tint_reaches_the_shader_while_its_panel_is_visible`,
+  `a_zone_tint_counts_as_an_edit_on_colour_and_black_and_white_photos`,
+  `zone_tint_is_off_unless_a_visible_block_tints_a_zone`.

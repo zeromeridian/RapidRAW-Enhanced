@@ -232,7 +232,6 @@
       "fill": "填充中间",
       "fillHint": "沿曲线填充所选首尾区域之间的区域，从一端的颜色和强度过渡到另一端。",
       "hint": "点击一个区域为其着色。Shift 点击选择一个范围，Cmd/Ctrl 点击添加或移除区域。",
-      "needsBlackAndWhite": "打开黑白以使用区域着色。",
       "protect": "保护",
       "softness": "柔和度",
       "tintedZones": "已着色区域",

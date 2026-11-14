@@ -5,6 +5,17 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.57.4-dev-zone-tint — 2026-11-14
+
+### Develop
+
+- **Zone Tint** now works on colour photos too, as a colour grade by
+  tonal zone: each zone's colour shifts the colours already there, and
+  the brightness stays the same. On Black & White photos it tones as
+  before. A tint set in Black & White stays when you switch back to
+  colour.
+- A photo whose Zone Tint has no colour left no longer counts as edited.
+
 ## 1.57.3-dev-zone-tint — 2026-11-14
 
 ### Develop

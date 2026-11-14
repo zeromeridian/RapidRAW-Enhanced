@@ -1,5 +1,6 @@
-//! Zone Tint: colours the 11 Zone System zones (0–X) of a Black & White photo without
-//! changing its tones (`docs/ZONE_TINT_PLAN.md`, spec `docs/BW Zone System Coloring.md`).
+//! Zone Tint: colours the 11 Zone System zones (0–X) of a photo without changing its tones,
+//! toning a Black & White photo or grading a colour one by tonal zone
+//! (`docs/ZONE_TINT_PLAN.md`, spec `docs/BW Zone System Coloring.md`).
 //!
 //! The zones sit on OKLab lightness L at n / 10. The shader (`apply_zone_tint` in
 //! `shader.wgsl`) weighs each pixel's L against every zone with a normalised Gaussian, sums
@@ -38,7 +39,7 @@ const MAX_CENTER_OFFSET: f32 = 0.05;
 pub struct ZoneTintSettings {
     /// Per zone: OKLab a and b at full weight, the centre in L, and 1 / (2σ²).
     pub zones: [[f32; 4]; ZONE_COUNT],
-    /// 1 when the photo is Black & White and at least one zone has a colour.
+    /// 1 when the panel is visible and at least one zone has a colour.
     pub enabled: u32,
     pub protect: f32,
     _pad1: f32,
@@ -85,11 +86,12 @@ struct Zone {
 }
 
 impl ZoneTintSettings {
-    /// Settings for `zoneTint`, or disabled ones when the photo is in colour, the block is
-    /// missing, switched off, from a newer version, or tints no zone.
-    pub fn from_json(js_zone_tint: Option<&serde_json::Value>, monochrome: bool) -> Self {
+    /// Settings for `zoneTint`, or disabled ones when the panel is hidden (`visible`), the block
+    /// is missing, switched off, from a newer version, or tints no zone. Colour and Black &
+    /// White photos alike: on colour the zones' colours shift the existing ones.
+    pub fn from_json(js_zone_tint: Option<&serde_json::Value>, visible: bool) -> Self {
         let Some(tint) = js_zone_tint
-            .filter(|_| monochrome)
+            .filter(|_| visible)
             .and_then(|value| ZoneTint::deserialize(value).ok())
             .filter(|tint| tint.enabled && tint.version == VERSION)
         else {
@@ -124,7 +126,12 @@ impl ZoneTintSettings {
                 1.0 / (2.0 * sigma * sigma),
             ];
         }
-        settings.enabled = u32::from(tinted);
+        // Without a colour the block is off exactly like a missing one, so an edit whose
+        // zones are all neutral (or whose Amount is 0) does not count as an edit.
+        if !tinted {
+            return Self::default();
+        }
+        settings.enabled = 1;
         settings
     }
 }
@@ -198,7 +205,7 @@ mod tests {
     }
 
     #[test]
-    fn zone_tint_is_off_unless_a_black_and_white_photo_tints_a_zone() {
+    fn zone_tint_is_off_unless_a_visible_block_tints_a_zone() {
         let tinted = json!({ "zones": [{ "hue": 30, "strength": 40 }] });
         assert_eq!(settings(tinted.clone()).enabled, 1);
         assert_eq!(
@@ -214,7 +221,7 @@ mod tests {
         let newer = json!({ "version": 2, "zones": [{ "hue": 30, "strength": 40 }] });
         assert_eq!(settings(newer).enabled, 0);
         let neutral = json!({ "zones": [{ "hue": 30, "strength": 0 }] });
-        assert_eq!(settings(neutral).enabled, 0);
+        assert_eq!(settings(neutral), ZoneTintSettings::default());
         assert_eq!(settings(json!("not a block")).enabled, 0);
     }
 
