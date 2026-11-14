@@ -27,6 +27,12 @@ const CURVES: Record<BlendPadCurve, (x: number) => number> = {
   easeIn: (x) => x * x,
 };
 
+/** Every curve, in the order the panels offer them. */
+export const BLEND_PAD_CURVES = Object.keys(CURVES) as Array<BlendPadCurve>;
+
+/** A curve's value at x in 0–1, also used by Zone Tint's ramp. */
+export const applyBlendPadCurve = (curve: BlendPadCurve, x: number) => CURVES[curve](x);
+
 /** Every pad shape, in the order the panel offers them. */
 export const BLEND_PAD_SHAPES: Array<BlendPadShape> = [
   'circle',

@@ -227,6 +227,17 @@
       "roundness": "丸み",
       "size": "サイズ",
       "vignette": "周辺光量補正"
+    },
+    "zoneTint": {
+      "fill": "間を補間",
+      "fillHint": "選択した最初と最後のゾーンの間を、一方の端の色・強さ・輝度からもう一方の端までカーブに沿って埋めます。",
+      "hint": "ゾーンをクリックして色を付けます。Shift+クリックで範囲を選択し、Cmd/Ctrl+クリックでゾーンを追加または解除します。",
+      "protect": "保護",
+      "softness": "柔らかさ",
+      "tintedZones": "調整済みのゾーン",
+      "untint": "ゾーンをリセット",
+      "zone": "ゾーン {{zone}}",
+      "zones": "ゾーン {{zones}}"
     }
   },
   "contextMenus": {
@@ -410,7 +421,8 @@
         "color": "カラー",
         "curves": "トーンカーブ",
         "details": "ディテール",
-        "effects": "効果"
+        "effects": "効果",
+        "zoneTint": "ゾーンカラーグレーディング"
       },
       "title": "補正",
       "tooltips": {
@@ -2197,6 +2209,7 @@
       "hue": "色相",
       "hueAbbreviation": "H:",
       "luminance": "輝度",
+      "luminanceAbbreviation": "L:",
       "reset": "リセット",
       "saturation": "彩度",
       "saturationAbbreviation": "S:"

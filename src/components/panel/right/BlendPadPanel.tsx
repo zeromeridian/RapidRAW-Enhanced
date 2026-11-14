@@ -25,6 +25,7 @@ import type {
   Coord,
 } from '../../../utils/adjustments';
 import {
+  BLEND_PAD_CURVES,
   BLEND_PAD_MODES,
   BLEND_PAD_SHAPES,
   MAX_BLEND_PAD_ANCHORS,
@@ -57,7 +58,6 @@ const FINE_NUDGE = 0.005;
 const NEW_TOOL_SHARE = 0.4;
 const WARM = 'rgb(199 144 61)';
 const COOL = 'rgb(80 140 134)';
-const CURVES: Array<BlendPadCurve> = ['linear', 'soft', 'easeIn'];
 
 const ARROW_NUDGES: Record<string, Coord> = {
   ArrowLeft: { x: -1, y: 0 },
@@ -424,7 +424,7 @@ export default function BlendPadPanel() {
     [parameters, controlLabel],
   );
   const curveOptions = useMemo(
-    () => CURVES.map((curve) => ({ label: t(`editor.blendPad.curves.${curve}`), value: curve })),
+    () => BLEND_PAD_CURVES.map((curve) => ({ label: t(`editor.blendPad.curves.${curve}`), value: curve })),
     [t],
   );
   const shapeOptions = useMemo(

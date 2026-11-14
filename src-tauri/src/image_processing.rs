@@ -1738,6 +1738,8 @@ pub struct GlobalAdjustments {
     pub point_color_visualize: u32,
     _pad_point_color1: f32,
     _pad_point_color2: f32,
+
+    pub zone_tint: crate::zone_tint::ZoneTintSettings,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
@@ -2543,6 +2545,7 @@ fn get_global_adjustments_from_json(
     } else {
         ([PointColorSettings::default(); MAX_POINT_COLORS], 0)
     };
+    let monochrome = is_visible("color") && js_adjustments["monochrome"].as_bool().unwrap_or(false);
 
     GlobalAdjustments {
         exposure: get_val("basic", "exposure", SCALES.exposure, None),
@@ -2558,13 +2561,7 @@ fn get_global_adjustments_from_json(
         tint: get_val("color", "tint", SCALES.tint, None),
         vibrance: get_val("color", "vibrance", SCALES.vibrance, None),
         hue: get_val("color", "hue", 1.0, None),
-        monochrome: if is_visible("color")
-            && js_adjustments["monochrome"].as_bool().unwrap_or(false)
-        {
-            1
-        } else {
-            0
-        },
+        monochrome: u32::from(monochrome),
         _pad_color2: 0.0,
         _pad_color3: 0.0,
 
@@ -2731,6 +2728,11 @@ fn get_global_adjustments_from_json(
             .map_or(0, |index| index as u32 + 1),
         _pad_point_color1: 0.0,
         _pad_point_color2: 0.0,
+
+        zone_tint: crate::zone_tint::ZoneTintSettings::from_json(
+            js_adjustments.get("zoneTint"),
+            is_visible("zoneTint"),
+        ),
     }
 }
 
@@ -4262,6 +4264,49 @@ mod tests {
         );
         assert_eq!(many.point_color_count as usize, MAX_POINT_COLORS);
         assert_eq!(many.point_color_visualize, 0);
+    }
+
+    #[test]
+    fn zone_tint_reaches_the_shader_while_its_panel_is_visible() {
+        let zone_tint = json!({ "zones": [{ "hue": 30, "strength": 40 }] });
+        let tinted = |extra: serde_json::Value| {
+            let mut adjustments = json!({ "monochrome": true, "zoneTint": zone_tint });
+            if let (Some(target), Some(extra)) = (adjustments.as_object_mut(), extra.as_object()) {
+                target.extend(extra.clone());
+            }
+            get_global_adjustments_from_json(&adjustments, true, None).zone_tint
+        };
+        assert_eq!(tinted(json!({})).enabled, 1);
+        // Colour photos are tinted too, and the Color section's eye does not hide the tint.
+        assert_eq!(tinted(json!({ "monochrome": false })).enabled, 1);
+        assert_eq!(
+            tinted(json!({ "sectionVisibility": { "color": false } })).enabled,
+            1
+        );
+        assert_eq!(
+            tinted(json!({ "sectionVisibility": { "zoneTint": false } })).enabled,
+            0
+        );
+        assert_eq!(
+            get_global_adjustments_from_json(&json!({ "monochrome": true }), true, None)
+                .zone_tint
+                .enabled,
+            0
+        );
+    }
+
+    #[test]
+    fn a_zone_tint_counts_as_an_edit_on_colour_and_black_and_white_photos() {
+        let zone_tint = json!({ "zones": [{ "hue": 30, "strength": 40 }] });
+        assert!(is_image_edited(
+            &json!({ "monochrome": true, "zoneTint": zone_tint }),
+            true,
+            None
+        ));
+        let colour = json!({ "zoneTint": zone_tint, "toneMapper": "natural" });
+        assert!(is_image_edited(&colour, true, None));
+        let neutral = json!({ "zoneTint": { "zones": [{ "hue": 30, "strength": 0 }] }, "toneMapper": "natural" });
+        assert!(!is_image_edited(&neutral, true, None));
     }
 
     #[test]

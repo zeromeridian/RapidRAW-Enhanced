@@ -2664,6 +2664,127 @@ mod tests {
         assert_eq!(render(None), fresh_full, "blurs refreshed after the region");
     }
 
+    /// OKLab of a display sRGB pixel, for checking the shader's Zone Tint.
+    fn srgb_to_oklab(pixel: &[u16]) -> [f32; 3] {
+        let linear = |value: u16| crate::zone_tint::srgb_to_linear(value as f32 / u16::MAX as f32);
+        crate::zone_tint::linear_srgb_to_oklab([
+            linear(pixel[0]),
+            linear(pixel[1]),
+            linear(pixel[2]),
+        ])
+    }
+
+    #[test]
+    fn zone_tint_colours_its_zones_and_keeps_every_tone() {
+        let Some(context) = headless_gpu_context() else {
+            eprintln!("No GPU adapter; skipping the Zone Tint render test.");
+            return;
+        };
+        // A grey ramp even in OKLab L (linear value = L³).
+        let (width, height) = (1024, 4);
+        let image =
+            image::DynamicImage::ImageRgb32F(image::ImageBuffer::from_fn(width, height, |x, _| {
+                let value = (x as f32 / (width - 1) as f32).powi(3);
+                image::Rgb([value, value, value])
+            }));
+        let input = upload_test_image(&context, &image);
+        let processor = super::GpuProcessor::new(context, width, 256).expect("processor");
+        let mask_view = processor.mask_texture_view(&[], width, height);
+        let render = |zone_tint: serde_json::Value| -> Vec<[f32; 3]> {
+            let mut adjustments = AllAdjustments::default();
+            adjustments.global.monochrome = 1;
+            adjustments.global.zone_tint =
+                crate::zone_tint::ZoneTintSettings::from_json(Some(&zone_tint), true);
+            let request = super::RenderRequest {
+                adjustments,
+                mask_bitmaps: &[],
+                lut: None,
+                roi: None,
+                probe: None,
+                motion_blur: Default::default(),
+            };
+            match processor
+                .run(
+                    super::RenderInput::from_cache(&input),
+                    &mask_view,
+                    request,
+                    false,
+                    false,
+                    super::RenderOutputPrecision::SixteenBit,
+                )
+                .expect("render")
+                .0
+            {
+                super::RenderedPixels::U16(pixels) => pixels[..width as usize * 4]
+                    .chunks(4)
+                    .map(srgb_to_oklab)
+                    .collect(),
+                super::RenderedPixels::U8(_) => unreachable!("16-bit render"),
+            }
+        };
+        let chroma = |lab: &[f32; 3]| lab[1].hypot(lab[2]);
+
+        let plain = render(serde_json::json!({}));
+        let mut zones = vec![serde_json::json!({}); 11];
+        zones[7] = serde_json::json!({ "hue": 60, "strength": 100 });
+        let zone_seven = render(serde_json::json!({ "zones": zones }));
+        let all_zones = render(serde_json::json!({
+            "zones": vec![serde_json::json!({ "hue": 200, "strength": 50 }); 11],
+        }));
+
+        let mut checked_peak = 0;
+        for ((plain, seven), all) in plain.iter().zip(&zone_seven).zip(&all_zones) {
+            let l = plain[0];
+            assert!((seven[0] - l).abs() < 1e-3, "Zone VII tint moved L {l}");
+            assert!((all[0] - l).abs() < 1e-3, "full tint moved L {l}");
+            if (l - 0.7).abs() < 0.01 {
+                // About 92 % of strength 100 (chroma 0.10) at the zone's centre.
+                assert!(chroma(seven) > 0.08, "Zone VII centre at L {l}");
+                checked_peak += 1;
+            }
+            if (l - 0.4).abs() < 0.02 {
+                assert!(chroma(seven) < 2e-3, "Zone IV stays neutral at L {l}");
+            }
+            if (0.3..0.8).contains(&l) {
+                assert!((chroma(all) - 0.05).abs() < 3e-3, "uniform tint at L {l}");
+            }
+            if !(0.005..=0.995).contains(&l) {
+                assert!(
+                    chroma(all) < 2e-3,
+                    "Protect keeps the ends neutral at L {l}"
+                );
+            }
+        }
+        assert!(checked_peak > 0, "the ramp crosses Zone VII");
+
+        // Luminance: Zone V up and Zone VI down by the most, at the narrowest softness, still
+        // keeps every tone in order, and lifts Zone V's centre by about half a zone.
+        let mut zones = vec![serde_json::json!({}); 11];
+        zones[5] = serde_json::json!({ "luminance": 100 });
+        zones[6] = serde_json::json!({ "luminance": -100 });
+        let moved = render(serde_json::json!({ "softness": 0.02, "zones": zones }));
+        for pair in moved.windows(2) {
+            assert!(
+                pair[1][0] >= pair[0][0] - 2e-3,
+                "tones keep their order at L {}",
+                pair[0][0]
+            );
+        }
+        let mut checked_centre = 0;
+        for (plain, moved) in plain.iter().zip(&moved) {
+            let l = plain[0];
+            assert!(
+                chroma(moved) < 2e-3,
+                "luminance alone stays neutral at L {l}"
+            );
+            if (l - 0.5).abs() < 0.005 {
+                assert!((moved[0] - l - 0.05).abs() < 0.01, "Zone V lifted at L {l}");
+                checked_centre += 1;
+            }
+        }
+        assert!(checked_centre > 0, "the ramp crosses Zone V");
+    }
+
     #[test]
     fn inactive_masks_do_not_activate_flare_generation() {
         let mut adjustments = AllAdjustments::default();

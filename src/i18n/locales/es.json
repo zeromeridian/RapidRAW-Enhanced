@@ -227,6 +227,17 @@
       "roundness": "Redondez",
       "size": "Tamaño",
       "vignette": "Viñeteado"
+    },
+    "zoneTint": {
+      "fill": "Rellenar entre",
+      "fillHint": "Rellena las zonas entre la primera y la última zona seleccionada siguiendo la curva, del color, la intensidad y la luminancia de un extremo a los del otro.",
+      "hint": "Haz clic en una zona para colorearla. Mayús-clic selecciona un rango; Cmd/Ctrl-clic añade o quita una zona.",
+      "protect": "Proteger",
+      "softness": "Suavidad",
+      "tintedZones": "Zonas ajustadas",
+      "untint": "Restablecer zonas",
+      "zone": "Zona {{zone}}",
+      "zones": "Zonas {{zones}}"
     }
   },
   "contextMenus": {
@@ -429,7 +440,8 @@
         "color": "Color",
         "curves": "Curvas",
         "details": "Detalles",
-        "effects": "Efectos"
+        "effects": "Efectos",
+        "zoneTint": "Gradación de color por zonas"
       },
       "title": "Ajustes",
       "tooltips": {
@@ -2247,6 +2259,7 @@
       "hue": "Tono",
       "hueAbbreviation": "T:",
       "luminance": "Luminancia",
+      "luminanceAbbreviation": "L:",
       "reset": "Restablecer",
       "saturation": "Saturación",
       "saturationAbbreviation": "S:"

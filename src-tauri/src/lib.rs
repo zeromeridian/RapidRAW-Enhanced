@@ -59,6 +59,7 @@ mod tagging_utils;
 mod tiff_metadata;
 mod tone_mapping;
 mod window_customizer;
+mod zone_tint;
 
 use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::fs;

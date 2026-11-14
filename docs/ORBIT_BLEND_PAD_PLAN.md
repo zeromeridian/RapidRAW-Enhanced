@@ -192,7 +192,7 @@ more shapes (ellipse, custom outline). Restart: when the owner asks.
   square and rectangle sit flat; the rectangle is 3:2 landscape; the
   puck is clamped toward the centre (radially), not to the nearest edge
   point.
-- Step 5 (`1.53.0`, 2026-11-13, uncommitted). Owner decision
+- Step 5 (`1.53.0`, 2026-11-13, owner commit `a55bbe31`). Owner decision
   2026-11-13: pad presets hold only the pad and live in the pad panel,
   stored like the tone curve presets (app settings,
   `AppSettings.blend_pad_presets`); regular presets keep including the
@@ -213,7 +213,7 @@ more shapes (ellipse, custom outline). Restart: when the owner asks.
   the Node check round-trips every vector case through a preset and
   checks the cleaning (unknown tool, limit, bad values, newer version,
   clashing names).
-- Step 7 (`1.56.0`, 2026-11-13, uncommitted): `blend_pad::Mode`
+- Step 7 (`1.56.0`, 2026-11-13, owner commit `b6787ff9`): `blend_pad::Mode`
   (Axis default, Normalized, Polar; `mode` on the pad, absent = Axis; an
   unknown mode makes Rust ignore the pad, TS cleaning maps it to Axis).
   `from_pad` now collects the taking-part tools (valid, not muted, known

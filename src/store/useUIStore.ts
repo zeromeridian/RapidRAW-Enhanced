@@ -28,6 +28,7 @@ const RIGHT_PANEL_ORDER = [
   Panel.Adjustments,
   Panel.Favorites,
   Panel.BlendPad,
+  Panel.ZoneTint,
   Panel.Crop,
   Panel.Geometry,
   Panel.LensCorrection,

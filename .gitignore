@@ -56,3 +56,4 @@ CODE_AUDIT_FINDINGS.md
 /.rust-cache/
 RapidRAW-Enhanced-ToDo-List.md
 UPSTREAM_FEATURE_GAP.md
+Claude outputs/**
