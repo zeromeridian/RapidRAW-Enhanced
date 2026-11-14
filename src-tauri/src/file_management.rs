@@ -1132,8 +1132,11 @@ mod output_naming_tests {
         .unwrap();
 
         let zone_tint = serde_json::json!({
-            "version": 1, "softness": 0.05, "protect": 0.1,
-            "zones": [{ "hue": 0, "strength": 0 }, { "hue": 30, "strength": 60 }],
+            "version": 1, "softness": 0.05, "protect": 0.1, "amount": 1.5,
+            "zones": [
+                { "hue": 0, "strength": 0, "luminance": 40 },
+                { "hue": 30, "strength": 60, "luminance": -25 },
+            ],
         });
         let source = ImageMetadata {
             adjustments: serde_json::json!({ "monochrome": true, "zoneTint": zone_tint }),
