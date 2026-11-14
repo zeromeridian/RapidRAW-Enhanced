@@ -653,6 +653,7 @@
     },
     "blendPad": {
       "addTool": "Werkzeug hinzufügen",
+      "atTheDot": "Am Punkt",
       "bake": "In Regler übernehmen",
       "bakeTooltip": "In Regler übernehmen: die Werte des Pads in die Regler schreiben und den Puck zentrieren",
       "center": "Puck zentrieren",
@@ -666,6 +667,7 @@
       "hint": "Den Puck ziehen, um die Werkzeuge zu mischen; einen Ankerpunkt am Rand entlang ziehen, um ihn zu verschieben. Umschalt für feinere Bewegungen, Pfeiltasten zum Verschieben, Doppelklick auf den Puck zentriert ihn.",
       "maxTools": "Höchstens {{count}} Werkzeuge",
       "mute": "Stummschalten",
+      "now": "jetzt {{value}}",
       "presets": {
         "delete": "Vorgabe löschen",
         "deleteMessage": "Pad-Vorgabe „{{name}}“ löschen? Das kann nicht rückgängig gemacht werden.",
@@ -691,6 +693,8 @@
       },
       "remove": "Werkzeug entfernen",
       "reset": "Pad zurücksetzen",
+      "reverse": "Umkehrung auf der Gegenseite",
+      "reverseHint": "An: Die Gegenseite gibt das Gegenteil des Ziels. Aus: Das Werkzeug läuft zur Mitte hin auf 0 aus und wirkt dahinter nicht.",
       "shape": "Form",
       "shapes": {
         "circle": "Kreis",
@@ -700,7 +704,6 @@
         "square": "Quadrat",
         "triangle": "Dreieck"
       },
-      "target": "Ziel",
       "title": "Blend-Pad",
       "unmute": "Wieder einschalten"
     },

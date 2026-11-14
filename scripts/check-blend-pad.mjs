@@ -56,6 +56,11 @@ for (const shape of BLEND_PAD_SHAPES) {
     !isBlendPadPresetDirty(tools, { ...pad, puck: { x: -0.3, y: 0.1 } }),
     'a preset without the puck counts a moved puck as a change',
   );
+  const older = { ...pad, anchors: pad.anchors.map(({ reverse: _reverse, ...anchor }) => anchor) };
+  check(
+    !isBlendPadPresetDirty(createBlendPadPreset('Older', pad, true), older),
+    'a pad without reverse fields (saved before it existed) looks modified',
+  );
   const many = { ...pad, anchors: Array.from({ length: 12 }, (_, i) => ({ ...pad.anchors[0], id: `a${i}` })) };
   const [limited] = sanitizeBlendPadPresets([{ name: 'Many', pad: many }], parameters);
   check(limited?.pad.anchors.length === 8, 'the anchor limit is not enforced');

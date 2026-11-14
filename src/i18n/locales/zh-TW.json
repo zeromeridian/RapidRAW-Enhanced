@@ -651,6 +651,7 @@
     },
     "blendPad": {
       "addTool": "新增工具",
+      "atTheDot": "錨點處",
       "bake": "寫入滑桿",
       "bakeTooltip": "寫入滑桿：將混合板的值寫入滑桿，並將滑塊置中",
       "center": "將滑塊置中",
@@ -664,6 +665,7 @@
       "hint": "拖曳滑塊以混合各工具；沿邊緣拖曳錨點可移動它。按住 Shift 可微調，方向鍵可輕移，按兩下滑塊可回到中心。",
       "maxTools": "最多 {{count}} 個工具",
       "mute": "停用",
+      "now": "目前 {{value}}",
       "presets": {
         "delete": "刪除預設集",
         "deleteMessage": "刪除混合板預設集「{{name}}」？此動作無法復原。",
@@ -689,6 +691,8 @@
       },
       "remove": "移除工具",
       "reset": "重設混合板",
+      "reverse": "對側反向",
+      "reverseHint": "開啟：對側給出目標值的反向。關閉：工具在中心衰減到 0，越過中心後不起作用。",
       "shape": "形狀",
       "shapes": {
         "circle": "圓形",
@@ -698,7 +702,6 @@
         "square": "正方形",
         "triangle": "三角形"
       },
-      "target": "目標值",
       "title": "混合板",
       "unmute": "重新啟用"
     },

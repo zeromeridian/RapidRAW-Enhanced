@@ -680,6 +680,7 @@
     },
     "blendPad": {
       "addTool": "Add tool",
+      "atTheDot": "At the dot",
       "bake": "Bake into sliders",
       "bakeTooltip": "Bake into sliders: write the pad's values into the sliders and center the puck",
       "center": "Center the puck",
@@ -693,6 +694,7 @@
       "hint": "Drag the puck to blend the tools; drag an anchor along the edge to move it. Hold Shift for finer moves, use the arrow keys to nudge, and double-click the puck to center it.",
       "maxTools": "Up to {{count}} tools",
       "mute": "Mute",
+      "now": "now {{value}}",
       "presets": {
         "delete": "Delete preset",
         "deleteMessage": "Delete pad preset \"{{name}}\"? This cannot be undone.",
@@ -718,6 +720,8 @@
       },
       "remove": "Remove tool",
       "reset": "Reset the pad",
+      "reverse": "Reverse on the opposite side",
+      "reverseHint": "On: the opposite side gives the reverse of the target. Off: the tool fades to 0 at the center and does nothing beyond it.",
       "shape": "Shape",
       "shapes": {
         "circle": "Circle",
@@ -727,7 +731,6 @@
         "square": "Square",
         "triangle": "Triangle"
       },
-      "target": "Target",
       "title": "Blend Pad",
       "unmute": "Unmute"
     },

@@ -530,6 +530,11 @@ export interface BlendPadAnchor {
   target: number;
   curve: BlendPadCurve;
   muted: boolean;
+  /**
+   * Whether the opposite side gives the target's reverse (default, also when absent); off,
+   * the tool fades to 0 at the centre and gives nothing beyond it.
+   */
+  reverse?: boolean;
 }
 
 /**

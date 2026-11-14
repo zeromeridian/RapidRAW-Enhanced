@@ -29,12 +29,14 @@ const Switch = ({
   checked,
   className = '',
   disabled = false,
+  id,
   label,
   onChange,
   tooltip,
   trackClassName,
 }: SwitchProps) => {
-  const uniqueId = `switch-${label.replace(/\s+/g, '-').toLowerCase()}`;
+  // Pass `id` when several switches share a label, so each label toggles its own switch.
+  const uniqueId = id ?? `switch-${label.replace(/\s+/g, '-').toLowerCase()}`;
 
   const spring = {
     type: 'spring',

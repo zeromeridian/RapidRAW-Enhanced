@@ -8,6 +8,9 @@ built. Next: steps 6–8 below (owner, 2026-11-13); the owner's hands-on
 checks and merge whenever they choose.
 `UPSTREAM_FEATURE_GAP.md` Plan item 27.
 
+**User guide:** `ORBIT_BLEND_PAD_GUIDE.md` explains every behaviour with
+examples (owner, 2026-11-13); keep it in step with each change.
+
 **Owner decisions (2026-11-13):** brought forward, ahead of the remaining
 P1 items (14–16). **No standalone prototype:** the pad is built inside
 ThisIsRAW in five steps, one MINOR version each. The owner's prototype
@@ -89,19 +92,30 @@ full at the start.
    JSON, cleaned by the resolver's sanitising, versioned.
 
 **Further steps (owner, 2026-11-13: schedule these), smallest first:**
-6. **Remember each tool's target** (`1.54.0`, S): an anchor keeps the
+5a. **Clarity** (`1.54.0`, S–M; owner 2026-11-13 after a hands-on test:
+   Whites −80 with the puck opposite brightened the photo, correctly, but
+   the label showed only "→ −80"). All three agreed fixes:
+   (1) pad labels and tool cards always show the tool's current value
+   ("now +75"), the target smaller; (2) the selected tool's line drawn
+   from its dot to its opposite ring, labelled with the value at both
+   ends, and "Target" renamed "At the dot"; (3) a per-tool **Reverse**
+   switch (on by default, as now): off, the tool fades to 0 at the
+   centre and gives nothing beyond it. (3) changes the maths: Rust and
+   the TS mirror, a shared vector, an optional anchor field (pad format
+   stays version 1), presets carry it.
+6. **Remember each tool's target** (`1.55.0`, S): an anchor keeps the
    last target per tool, so switching Exposure → Contrast → Exposure
    restores the Exposure target instead of converting the share. Stored
    with the anchor (pad format stays version 1, the extra field is
    optional; Rust ignores it).
-7. **Blend modes** (`1.55.0`, M): besides Axis (today), **Normalized**
+7. **Blend modes** (`1.56.0`, M): besides Axis (today), **Normalized**
    (inverse-distance weights that always sum to 1: crossfades between
    tools, never neutral; guard the puck exactly on an anchor) and
    **Polar** (direction picks the blend of the two nearest anchors,
    distance from the centre sets strength). One `mode` field on the pad,
    resolved in Rust with the TS mirror and new shared vectors; mode
    picker in the panel; presets carry it.
-8. **A pad per mask** (`1.56.0`, L): each mask can have its own pad that
+8. **A pad per mask** (`1.57.0`, L): each mask can have its own pad that
    drives that mask's sliders (`MaskAdjustments`), resolved in
    `get_mask_adjustments_from_json` like the photo's; the pad panel edits
    the selected mask's pad when a mask is active; copy/paste and presets
@@ -195,6 +209,17 @@ more shapes (ellipse, custom outline). Restart: when the owner asks.
   the Node check round-trips every vector case through a preset and
   checks the cleaning (unknown tool, limit, bad values, newer version,
   clashing names).
+- Step 5a (`1.54.0`, 2026-11-13, uncommitted; step 5 committed by the
+  owner): pad labels always show "now X" (accent) and "→ target" (grey,
+  `tspan`s); tool cards: "At the dot" with "now X" as the slider's label
+  addon; selected tool: dashed line dot → opposite point with the far
+  value (`SelectedAxis`); per-tool **Reverse** (`Anchor.reverse` in Rust,
+  `#[serde(default = true)]`; `BlendPadAnchor.reverse?` in TS, absent =
+  on; off: a negative weight contributes nothing); reverse-off tools fade
+  their opposite ring and the far half of their glow. The preset
+  "modified" check treats a missing `reverse` as on. Shared `Switch` now
+  honours its `id` prop (several "Reverse" switches share a label).
+  Vectors 19 cases. `ORBIT_BLEND_PAD_GUIDE.md` written (owner request).
 
 ## Owner's specification (2026-11-13; verbatim, headings one level down)
 
