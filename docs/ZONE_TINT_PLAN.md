@@ -3,7 +3,8 @@
 Status (2026-11-14): **Phases 1 and 2 done** on `dev/zone-tint` (from
 `develop` `492bfffe`, committed as `b23d9d3d`), built as `1.57.0`; Zone
 Tint then moved to its own right-toolbar panel (`1.57.1`) with an
-upright zone scale and a tinted zones list (`1.57.2`, uncommitted); the GPU
+upright zone scale and a tinted zones list (`1.57.2`), then an overall
+Amount and Fill between along a curve (`1.57.3`, uncommitted); the GPU
 exit check and the hands-on check still have to run on the Mac. Next:
 Phase 3. `UPSTREAM_FEATURE_GAP.md` Plan item 28 (P0, owner
 2026-11-13: after item 27, the Orbit Blend Pad, whose steps 1–7 are done).
@@ -91,6 +92,21 @@ changes about it, the decisions still open, and progress.
   tinted zone, neighbours with the same hue and strength on one line,
   lightest first like the scale, with hue and strength; a click selects
   the zones, × removes their tint (one history step).
+- **Overall Amount** (owner 2026-11-14; range agent choice): a stored
+  `zoneTint.amount` (0–2, default 1, absent = 1) that multiplies every
+  zone's strength in `zone_tint.rs`, the product capped at 100; the zones'
+  own values never change. Not in the owner's spec's data model (an
+  addition, version stays 1).
+- **Ramp across a range** (owner 2026-11-14, chosen over a strength
+  curve editor and a curve for Amount): "Fill between" writes the zones
+  strictly between the first and last selected zone (an unbroken range of
+  three or more) from the ends' tints along a Blend Pad curve
+  (`BLEND_PAD_CURVES`, `applyBlendPadCurve` in `utils/blendPad.ts`), as
+  ordinary per-zone values in one history step. Agent design: the ends
+  are the end zones themselves (no extra pickers); tints blend as
+  colour-wheel vectors (hue direction, strength length), like the
+  shader's sum, so opposite hues meet in a neutral middle instead of
+  sweeping through the hues between (a blue → amber hue blend went green).
 
 - **Blend-mode backdrop:** carries the Zone Tint, so masks in a
   non-Normal blend mode keep the zone colours. Done in `shader.wgsl`: the
@@ -161,3 +177,11 @@ changes about it, the decisions still open, and progress.
   `tintRuns` builds the list; `setZonesTint` is shared by the wheel and
   ×. New strings `adjustments.zoneTint.tintedZones` and `.untint` in all
   12 locales; the list's H/S labels reuse the wheel's.
+- **Amount and Fill between** (`1.57.3`, 2026-11-14, uncommitted):
+  `zone_tint.rs` reads `amount` (test
+  `the_amount_scales_every_zone_up_to_full_strength`); the panel gains the
+  Amount slider (reuses `adjustments.effects.amount`) and the curve
+  dropdown with Fill between (new strings `adjustments.zoneTint.fill`,
+  `.fillHint` in 12 locales; curve names reuse the Blend Pad's). The
+  Blend Pad's curve list moved from `BlendPadPanel.tsx` to
+  `utils/blendPad.ts` so both panels share it.

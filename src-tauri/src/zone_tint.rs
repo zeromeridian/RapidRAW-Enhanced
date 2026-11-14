@@ -18,6 +18,10 @@ const VERSION: u32 = 1;
 /// OKLab chroma of a zone at strength 100.
 const MAX_CHROMA: f32 = 0.10;
 const MAX_STRENGTH: f32 = 100.0;
+/// The overall Amount scales every zone's strength, up to double; the product still stops at
+/// `MAX_STRENGTH`.
+const DEFAULT_AMOUNT: f32 = 1.0;
+const MAX_AMOUNT: f32 = 2.0;
 /// Zone softness (σ in L) and its range, also the range of a zone's own width.
 const DEFAULT_SOFTNESS: f32 = 0.04;
 const MIN_SOFTNESS: f32 = 0.02;
@@ -50,6 +54,8 @@ struct ZoneTint {
     zones: Vec<Zone>,
     softness: f32,
     protect: f32,
+    /// Absent in blocks saved before it: 1, so they render as before.
+    amount: f32,
 }
 
 impl Default for ZoneTint {
@@ -60,6 +66,7 @@ impl Default for ZoneTint {
             zones: Vec::new(),
             softness: DEFAULT_SOFTNESS,
             protect: DEFAULT_PROTECT,
+            amount: DEFAULT_AMOUNT,
         }
     }
 }
@@ -90,6 +97,7 @@ impl ZoneTintSettings {
         };
 
         let softness = tint.softness.clamp(MIN_SOFTNESS, MAX_SOFTNESS);
+        let amount = tint.amount.clamp(0.0, MAX_AMOUNT);
         let mut settings = Self {
             protect: tint.protect.clamp(0.0, MAX_PROTECT),
             ..Self::default()
@@ -98,7 +106,7 @@ impl ZoneTintSettings {
         for (index, slot) in settings.zones.iter_mut().enumerate() {
             let zone = tint.zones.get(index);
             let chroma = zone.map_or(0.0, |zone| {
-                zone.strength.clamp(0.0, MAX_STRENGTH) / MAX_STRENGTH * MAX_CHROMA
+                (zone.strength.max(0.0) * amount).min(MAX_STRENGTH) / MAX_STRENGTH * MAX_CHROMA
             });
             let hue = zone.map_or(0.0, |zone| oklab_hue(zone.hue));
             let offset = zone.map_or(0.0, |zone| {
@@ -231,6 +239,33 @@ mod tests {
         assert!((inverse_two_sigma_sq - 1.0 / (2.0 * MAX_SOFTNESS * MAX_SOFTNESS)).abs() < 1e-2);
         // Zones without an entry keep the block's softness.
         assert!((tint.zones[5][3] - 1.0 / (2.0 * MAX_SOFTNESS * MAX_SOFTNESS)).abs() < 1e-2);
+    }
+
+    #[test]
+    fn the_amount_scales_every_zone_up_to_full_strength() {
+        let chroma = |amount: serde_json::Value| {
+            let tint = settings(json!({
+                "amount": amount,
+                "zones": [{ "hue": 0, "strength": 80 }, { "hue": 0, "strength": 20 }],
+            }));
+            [0, 1].map(|zone| tint.zones[zone][0].hypot(tint.zones[zone][1]) / MAX_CHROMA)
+        };
+        let close =
+            |[a, b]: [f32; 2], [x, y]: [f32; 2]| (a - x).abs() < 1e-6 && (b - y).abs() < 1e-6;
+
+        assert!(close(chroma(json!(1.0)), [0.8, 0.2]));
+        assert!(close(chroma(json!(0.5)), [0.4, 0.1]));
+        // Doubled, the strong zone stops at full strength and the weak one doubles.
+        assert!(close(chroma(json!(2.0)), [1.0, 0.4]));
+        // Out of range, the amount is clamped to 0–2.
+        assert!(close(chroma(json!(5.0)), [1.0, 0.4]));
+        assert_eq!(
+            settings(json!({ "amount": 0, "zones": [{ "strength": 80 }] })).enabled,
+            0
+        );
+        // A block saved before the amount existed renders at 100 %.
+        let older = settings(json!({ "zones": [{ "hue": 0, "strength": 80 }] }));
+        assert!((older.zones[0][0].hypot(older.zones[0][1]) / MAX_CHROMA - 0.8).abs() < 1e-6);
     }
 
     #[test]

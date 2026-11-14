@@ -571,6 +571,8 @@ export const ZONE_TINT_ZONE_COUNT = 11;
 /** Zone Tint defaults and ranges; mirror the constants in `zone_tint.rs`. */
 export const ZONE_TINT_SOFTNESS = { default: 0.04, min: 0.02, max: 0.08 } as const;
 export const ZONE_TINT_PROTECT = { default: 0.08, min: 0, max: 0.2 } as const;
+/** `zone_tint::MAX_AMOUNT`: the overall Amount scales every zone's strength, up to double. */
+export const ZONE_TINT_AMOUNT = { default: 1, min: 0, max: 2 } as const;
 
 /** One Zone System zone's colour: the colour wheel's hue (degrees) and strength (0–100, 0 neutral). */
 export interface ZoneTintZone {
@@ -594,6 +596,8 @@ export interface ZoneTint {
   softness: number;
   /** How far from black and white the colour fades out, in OKLab L. */
   protect: number;
+  /** Multiplies every zone's strength when rendered; absent in older edits, which means 1. */
+  amount?: number;
 }
 
 export const createZoneTint = (): ZoneTint => ({
@@ -602,6 +606,7 @@ export const createZoneTint = (): ZoneTint => ({
   zones: Array.from({ length: ZONE_TINT_ZONE_COUNT }, () => ({ hue: 0, strength: 0 })),
   softness: ZONE_TINT_SOFTNESS.default,
   protect: ZONE_TINT_PROTECT.default,
+  amount: ZONE_TINT_AMOUNT.default,
 });
 
 interface Hsl {

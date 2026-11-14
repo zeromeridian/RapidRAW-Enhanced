@@ -4,7 +4,9 @@ import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import PanelHeader from '../../ui/PanelHeader';
+import Button from '../../ui/Button';
 import ColorWheel from '../../ui/ColorWheel';
+import Dropdown from '../../ui/Dropdown';
 import Slider from '../../ui/Slider';
 import Switch from '../../ui/Switch';
 import Text from '../../ui/Text';
@@ -12,18 +14,22 @@ import { TextColors, TextVariants } from '../../../types/typography';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import {
+  BlendPadCurve,
   HueSatLum,
   INITIAL_ADJUSTMENTS,
+  ZONE_TINT_AMOUNT,
   ZONE_TINT_PROTECT,
   ZONE_TINT_SOFTNESS,
   ZONE_TINT_ZONE_COUNT,
   ZoneTint,
+  ZoneTintZone,
   createZoneTint,
 } from '../../../utils/adjustments';
+import { BLEND_PAD_CURVES, applyBlendPadCurve } from '../../../utils/blendPad';
 
 const ZONE_NAMES = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 const MIDDLE_GREY_ZONE = 5;
-/** Softness and Protect are OKLab L values; the sliders show them ×100. */
+/** Softness and Protect are OKLab L values, Amount a factor; the sliders show them ×100. */
 const SLIDER_SCALE = 100;
 const NEUTRAL: HueSatLum = { hue: 0, saturation: 0, luminance: 0 };
 const NEUTRAL_ZONE = { hue: 0, strength: 0 };
@@ -66,6 +72,40 @@ const formatZones = (zones: number[]) => {
 };
 
 const zoneRange = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, index) => from + index);
+
+/** The selection as its first and last zone when it is one unbroken range with zones between them. */
+const fillableRange = (selected: number[]): [number, number] | null => {
+  const from = selected[0];
+  const to = selected[selected.length - 1];
+  return selected.length >= 3 && to - from === selected.length - 1 ? [from, to] : null;
+};
+
+/** A zone's tint as a point on the colour wheel: the hue's direction, the strength's length. */
+const tintVector = ({ hue, strength }: ZoneTintZone) => {
+  const angle = (hue * Math.PI) / 180;
+  return [strength * Math.cos(angle), strength * Math.sin(angle)];
+};
+
+/**
+ * Fills the zones strictly between `from` and `to` along the curve, blending one end's tint
+ * into the other's on the colour wheel, as the shader sums the zones' colours. Opposite hues
+ * (cool shadows, warm highlights) meet in a soft neutral instead of sweeping through the hues
+ * between them, and an untinted end fades the other end's colour out without changing its hue.
+ */
+const fillZones = (zones: ZoneTintZone[], from: number, to: number, curve: BlendPadCurve): ZoneTintZone[] => {
+  const [startX, startY] = tintVector(zones[from] ?? NEUTRAL_ZONE);
+  const [endX, endY] = tintVector(zones[to] ?? NEUTRAL_ZONE);
+  return Array.from({ length: ZONE_TINT_ZONE_COUNT }, (_, zone) => {
+    const existing = zones[zone] ?? NEUTRAL_ZONE;
+    if (zone <= from || zone >= to) return existing;
+    const share = applyBlendPadCurve(curve, (zone - from) / (to - from));
+    const x = startX + (endX - startX) * share;
+    const y = startY + (endY - startY) * share;
+    const strength = Math.hypot(x, y);
+    const hue = strength > 1e-6 ? ((((Math.atan2(y, x) * 180) / Math.PI) % 360) + 360) % 360 : existing.hue;
+    return { ...existing, hue, strength };
+  });
+};
 
 /** Neighbouring zones that share one tint. */
 interface TintRun {
@@ -160,6 +200,7 @@ export default function ZoneTintPanel() {
   );
   const [selected, setSelected] = useState<number[]>([MIDDLE_GREY_ZONE]);
   const [anchor, setAnchor] = useState(MIDDLE_GREY_ZONE);
+  const [fillCurve, setFillCurve] = useState<BlendPadCurve>('linear');
 
   const title = t('editor.adjustments.sections.zoneTint');
   const isVisible = sectionVisibility.zoneTint;
@@ -203,6 +244,16 @@ export default function ZoneTintPanel() {
     zones.length === 1
       ? t('adjustments.zoneTint.zone', { zone: ZONE_NAMES[zones[0]] })
       : t('adjustments.zoneTint.zones', { zones: formatZones(zones) });
+
+  const fillRange = fillableRange(selected);
+  const curveOptions = BLEND_PAD_CURVES.map((curve) => ({ label: t(`editor.blendPad.curves.${curve}`), value: curve }));
+  const handleFill = () => {
+    if (!fillRange) return;
+    updateZoneTint(
+      (current) => ({ ...current, zones: fillZones(current.zones, ...fillRange, fillCurve) }),
+      t('adjustments.zoneTint.fill'),
+    );
+  };
 
   const runs = tintRuns(zoneTint);
   const isSelectedRun = ({ from, to }: TintRun) =>
@@ -276,7 +327,32 @@ export default function ZoneTintPanel() {
               {t('adjustments.zoneTint.hint')}
             </Text>
 
+            <div className="flex items-center gap-2" data-tooltip={t('adjustments.zoneTint.fillHint')}>
+              <Dropdown
+                className="grow min-w-0"
+                onChange={(curve: BlendPadCurve) => setFillCurve(curve)}
+                options={curveOptions}
+                value={fillCurve}
+              />
+              <Button className="bg-surface text-text-primary shrink-0" disabled={!fillRange} onClick={handleFill}>
+                {t('adjustments.zoneTint.fill')}
+              </Button>
+            </div>
+
             <div className="flex flex-col gap-2">
+              <Slider
+                defaultValue={ZONE_TINT_AMOUNT.default * SLIDER_SCALE}
+                fillOrigin="min"
+                label={t('adjustments.effects.amount')}
+                max={ZONE_TINT_AMOUNT.max * SLIDER_SCALE}
+                min={ZONE_TINT_AMOUNT.min * SLIDER_SCALE}
+                onChange={(event) =>
+                  updateZoneTint((current) => ({ ...current, amount: Number(event.target.value) / SLIDER_SCALE }))
+                }
+                onDragStateChange={handleDragStateChange}
+                step={1}
+                value={Math.round((zoneTint.amount ?? ZONE_TINT_AMOUNT.default) * SLIDER_SCALE)}
+              />
               <Slider
                 defaultValue={ZONE_TINT_SOFTNESS.default * SLIDER_SCALE}
                 label={t('adjustments.zoneTint.softness')}
