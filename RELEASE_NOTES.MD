@@ -5,6 +5,24 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.57.0-dev-zone-tint — 2026-11-14
+
+### Develop
+
+- New **Zone Tint** section for Black & White photos: give each of the
+  11 Zone System zones, from 0 (black) to X (white), its own colour
+  without changing the photo's tones. It shows up below the other
+  sections while Black & White is on.
+- Click a zone to colour it. Shift-click selects a range of zones and
+  Cmd/Ctrl-click adds or removes one, so one colour can go on several
+  zones at once; each zone can still be changed on its own later.
+- Pick the colour and its strength on a colour wheel. Neighbouring zones
+  blend smoothly, **Softness** sets how far each zone reaches, and
+  **Protect** keeps the deepest blacks and brightest whites neutral.
+- The tint stays even inside masks set to a blend mode. It is saved with
+  the edit, in XMP, copy/paste and presets; the section's eye turns it
+  off for a quick before and after.
+
 ## 1.56.2-dev-editor-copies — 2026-11-14
 
 ### External editors

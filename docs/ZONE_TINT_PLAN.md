@@ -1,8 +1,12 @@
 # Zone Tint Plan
 
-Status (2026-11-13): **not started.** `UPSTREAM_FEATURE_GAP.md` Plan item 28
-(P0, owner 2026-11-13: after the remaining P1 items and after item 27, the
-Orbit Blend Pad). Four phases, each shippable and gated by its exit check.
+Status (2026-11-14): **Phases 1 and 2 done, uncommitted** on
+`dev/zone-tint` (from `develop` `492bfffe`), built as `1.57.0`; the GPU
+exit check and the hands-on check still have to run on the Mac. Next:
+Phase 3. `UPSTREAM_FEATURE_GAP.md` Plan item 28 (P0, owner
+2026-11-13: after item 27, the Orbit Blend Pad, whose steps 1–7 are done).
+Item 30 (import from card or camera) follows it. Four phases, each
+shippable and gated by its exit check.
 
 **Specification:** the owner's `BW Zone System Coloring.md` (2026-11-13)
 is the source of truth for the zone model, colour maths, UI, data model,
@@ -55,12 +59,74 @@ changes about it, the decisions still open, and progress.
 - **Curve Stamp** does not exist in TIR yet (ColrBent's); treat it as a
   separate later item.
 
-## Open decisions (ask the owner when the item starts)
+## Owner decisions (2026-11-14)
 
-- Hue control: full wheel per zone or hue slider with swatch (spec).
-- Blend-mode backdrop with Zone Tint (above).
+- **Ranges of zones:** Shift-click selects every zone between the
+  selected one and the clicked one, Cmd/Ctrl-click toggles single zones;
+  hue and strength are written into each selected zone, so each can still
+  be fine-tuned later (no separate "band" layer). This moves the spec's
+  multi-select from Phase 3 into Phase 2.
+- **Hue control:** a colour wheel (hue and strength in one control, like
+  Colour Grading's wheels), not a hue slider. The wheel's angle must be
+  the OKLab hue the Rust side uses (`zoneTint.zones[n].hue`, 0° = +a).
+- **Place in the GUI:** its own collapsible "Zone Tint" section in the
+  Adjustments panel (like Details or Effects), shown only while Black &
+  White is on; not inside the Color section and not docked under the
+  histogram. Agent choice (Phase 2): the 11 swatches are equal width;
+  placed by display value, Zones 0–II would share the first ~9 % of the
+  strip, and the section no longer sits under the histogram.
+
+- **Blend-mode backdrop:** carries the Zone Tint, so masks in a
+  non-Normal blend mode keep the zone colours. Done in `shader.wgsl`: the
+  monochrome-and-tinted backdrop is computed once per pixel, only where a
+  blend-mode mask covers it.
+- **Versioning:** no build for Phase 1; the first build is `1.57.0`
+  with Phase 2.
+
+## Open decisions (ask the owner when the phase starts)
+
 - Lightroom 3-way grading import onto Zones II, V, VIII (spec).
 - Colour images and monoRAW: out of scope now (spec); confirm.
 
-**Progress:** none yet. Record each finished phase here (version, date,
-exit check result).
+## Progress
+
+- **Phase 1, maths and shader** (2026-11-14, uncommitted, no version
+  yet: nothing writes `zoneTint`, so renders are unchanged).
+  `zone_tint.rs`: the `zoneTint` block (spec data model: version 1,
+  enabled, zones with hue, strength, centerOffset, width, softness,
+  protect; maskSmoothing is left for Phase 3) becomes
+  `ZoneTintSettings` (per zone a, b, centre, 1/(2σ²); Protect; enabled
+  only for a Black & White photo with its Color section visible and at
+  least one tinted zone, a newer version is ignored), the last field of
+  `GlobalAdjustments`. `shader.wgsl`: `linear_srgb_to_oklab`,
+  `oklab_to_linear_srgb`, `apply_zone_tint` (normalised Gaussian weights
+  offset by the nearest zone so narrow zones cannot underflow, Protect,
+  chroma reduced along the hue by a 12-step search when out of gamut),
+  called right after the global and mask monochrome steps, before
+  grain. Tests: `zone_tint::tests` (chroma vector, off cases, clamping),
+  `zone_tint_reaches_the_shader_only_for_a_visible_black_and_white_photo`,
+  the layout test, and the GPU exit check
+  `zone_tint_colours_its_zones_and_keeps_every_tone` (grey ramp, 16-bit
+  output: L within 0.001, Zone VII peak, Zone IV neutral, uniform tint,
+  clean ends), which **skips in the sandbox (no GPU adapter)**; run
+  `cargo test --lib zone_tint` from `src-tauri` on the Mac.
+- **Phase 2, panel and saving** (`1.57.0`, 2026-11-14, uncommitted).
+  A sixth Adjustments section `zoneTint` (`ADJUSTMENT_SECTIONS`,
+  `SectionVisibility`, `CollapsibleSectionsState`, open by default),
+  shown only while Black & White is on and never in masks
+  (`isAdjustmentSectionShown`, used by `ControlsPanel` and `MasksPanel`);
+  its eye switches the tint off (Rust checks `is_visible("zoneTint")`).
+  `components/adjustments/ZoneTint.tsx`: the swatch strip (zone grey,
+  tint dot, Shift-click range, Cmd/Ctrl-click toggle, never empty), the
+  shared `ColorWheel` (new `showLuminance` prop, off here) whose hue and
+  saturation become the selected zones' hue and strength, Softness and
+  Protect sliders (L ×100). `zoneTint` is `null` until edited
+  (`createZoneTint`); reset, copy/paste (own group), presets, history
+  label and XMP need nothing else. **Hue is the wheel's (HSV) hue**:
+  `zone_tint::oklab_hue` turns it into the OKLab direction of that
+  colour, so the photo turns the colour the wheel shows (test
+  `wheel_hues_tint_toward_the_colour_the_wheel_shows`). Tests added:
+  `zone_tint_round_trips_through_xmp`,
+  `a_zone_tint_counts_as_an_edit_only_on_a_black_and_white_photo`.
+  Strings in all 12 locales. Exit check (tint, save, reopen, export match
+  the preview): **not run in the app yet**.

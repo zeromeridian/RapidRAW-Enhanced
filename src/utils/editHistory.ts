@@ -47,6 +47,7 @@ const KEY_NAMES: Record<string, string> = {
   colorCalibration: 'Color Calibration',
   pointColors: 'Point Color',
   blendPad: 'Blend Pad',
+  zoneTint: 'Zone Tint',
   toneMapper: 'Tone Mapper',
   showClipping: 'Show Clipping',
   sectionVisibility: 'Section Visibility',
@@ -229,6 +230,7 @@ export function describeHistoryChange(before: Adjustments, after: Adjustments): 
       }
       case 'pointColors':
       case 'blendPad':
+      case 'zoneTint':
         return [formatKey(key)];
       case 'colorGrading':
       case 'colorCalibration':

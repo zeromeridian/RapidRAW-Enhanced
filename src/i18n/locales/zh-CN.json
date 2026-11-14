@@ -227,6 +227,14 @@
       "roundness": "圆度",
       "size": "大小",
       "vignette": "暗角"
+    },
+    "zoneTint": {
+      "hint": "点击一个区域为其着色。Shift 点击选择一个范围，Cmd/Ctrl 点击添加或移除区域。",
+      "needsBlackAndWhite": "打开黑白以使用区域着色。",
+      "protect": "保护",
+      "softness": "柔和度",
+      "zone": "区域 {{zone}}",
+      "zones": "区域 {{zones}}"
     }
   },
   "contextMenus": {
@@ -410,7 +418,8 @@
         "color": "颜色",
         "curves": "曲线",
         "details": "细节",
-        "effects": "效果"
+        "effects": "效果",
+        "zoneTint": "区域着色"
       },
       "title": "调整",
       "tooltips": {

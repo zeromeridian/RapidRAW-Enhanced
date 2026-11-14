@@ -28,6 +28,16 @@ struct PointColor {
     luminance_range: vec4<f32>,
 }
 
+// Zone Tint (`zone_tint::ZoneTintSettings`). Per zone: OKLab a and b at full weight, the
+// centre in OKLab L and 1 / (2σ²).
+struct ZoneTint {
+    zones: array<vec4<f32>, 11>,
+    enabled: u32,
+    protect: f32,
+    _pad1: f32,
+    _pad2: f32,
+}
+
 struct ColorGradeSettings {
     hue: f32,
     saturation: f32,
@@ -142,6 +152,8 @@ struct GlobalAdjustments {
     point_color_visualize: u32,
     _pad_point_color1: f32,
     _pad_point_color2: f32,
+
+    zone_tint: ZoneTint,
 }
 
 struct MaskAdjustments {
@@ -295,6 +307,88 @@ fn linear_to_srgb_extended(c: vec3<f32>) -> vec3<f32> {
     let higher = (1.0 + a) * pow(safe_c, vec3<f32>(1.0 / 2.4)) - a;
     let lower = safe_c * 12.92;
     return select(higher, lower, safe_c <= cutoff);
+}
+
+// OKLab (Björn Ottosson) from and to linear sRGB.
+fn linear_srgb_to_oklab(c: vec3<f32>) -> vec3<f32> {
+    let lms = vec3<f32>(
+        0.4122214708 * c.r + 0.5363325363 * c.g + 0.0514459929 * c.b,
+        0.2119034982 * c.r + 0.6806995451 * c.g + 0.1073969566 * c.b,
+        0.0883024619 * c.r + 0.2817188376 * c.g + 0.6299787005 * c.b,
+    );
+    let root = sign(lms) * pow(abs(lms), vec3<f32>(1.0 / 3.0));
+    return vec3<f32>(
+        0.2104542553 * root.x + 0.7936177850 * root.y - 0.0040720468 * root.z,
+        1.9779984951 * root.x - 2.4285922050 * root.y + 0.4505937099 * root.z,
+        0.0259040371 * root.x + 0.7827717662 * root.y - 0.8086757660 * root.z,
+    );
+}
+
+fn oklab_to_linear_srgb(lab: vec3<f32>) -> vec3<f32> {
+    let root = vec3<f32>(
+        lab.x + 0.3963377774 * lab.y + 0.2158037573 * lab.z,
+        lab.x - 0.1055613458 * lab.y - 0.0638541728 * lab.z,
+        lab.x - 0.0894841775 * lab.y - 1.2914855480 * lab.z,
+    );
+    let lms = root * root * root;
+    return vec3<f32>(
+        4.0767416621 * lms.x - 3.3077115913 * lms.y + 0.2309699292 * lms.z,
+        -1.2684380046 * lms.x + 2.6097574011 * lms.y - 0.3413193965 * lms.z,
+        -0.0041960863 * lms.x - 0.7034186147 * lms.y + 1.7076147010 * lms.z,
+    );
+}
+
+fn in_unit_gamut(c: vec3<f32>) -> bool {
+    return all(c >= vec3<f32>(0.0)) && all(c <= vec3<f32>(1.0));
+}
+
+// Zone Tint on display sRGB: adds the zones' chroma at the pixel's OKLab L, never changing L.
+// Chroma that would leave sRGB is reduced along the same hue instead of clipped.
+fn apply_zone_tint(srgb: vec3<f32>, tint: ZoneTint) -> vec3<f32> {
+    let lab = linear_srgb_to_oklab(srgb_to_linear(clamp(srgb, vec3<f32>(0.0), vec3<f32>(1.0))));
+    let l = lab.x;
+
+    // Normalised Gaussian weights, offset by the nearest zone's exponent so a narrow zone
+    // far from L cannot underflow every weight.
+    var nearest = 1e30;
+    for (var n = 0u; n < 11u; n = n + 1u) {
+        let d = l - tint.zones[n].z;
+        nearest = min(nearest, d * d * tint.zones[n].w);
+    }
+    var weight_sum = 0.0;
+    var chroma = vec2<f32>(0.0);
+    for (var n = 0u; n < 11u; n = n + 1u) {
+        let zone = tint.zones[n];
+        let d = l - zone.z;
+        let weight = exp(nearest - d * d * zone.w);
+        weight_sum += weight;
+        chroma += weight * zone.xy;
+    }
+    var protection = 1.0;
+    if (tint.protect > 0.0) {
+        protection = smoothstep(0.0, tint.protect, l) * (1.0 - smoothstep(1.0 - tint.protect, 1.0, l));
+    }
+    chroma *= protection / weight_sum;
+    if (all(chroma == vec2<f32>(0.0))) {
+        return srgb;
+    }
+
+    let full = oklab_to_linear_srgb(vec3<f32>(l, lab.yz + chroma));
+    if (in_unit_gamut(full)) {
+        return linear_to_srgb(full);
+    }
+    // The untinted pixel is in gamut, so search the largest share of the chroma that fits.
+    var inside = 0.0;
+    var outside = 1.0;
+    for (var i = 0u; i < 12u; i = i + 1u) {
+        let share = 0.5 * (inside + outside);
+        if (in_unit_gamut(oklab_to_linear_srgb(vec3<f32>(l, lab.yz + chroma * share)))) {
+            inside = share;
+        } else {
+            outside = share;
+        }
+    }
+    return linear_to_srgb(oklab_to_linear_srgb(vec3<f32>(l, lab.yz + chroma * inside)));
 }
 
 fn rgb_to_hsv(c: vec3<f32>) -> vec3<f32> {
@@ -2126,6 +2220,11 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             final_rgb = mix(final_rgb, monochrome_srgb(final_rgb), influence);
         }
     }
+    // After every tonal step and the Black & White conversion, before grain, so the zones
+    // follow the tones on screen and grain stays neutral.
+    if (adjustments.global.zone_tint.enabled == 1u) {
+        final_rgb = apply_zone_tint(final_rgb, adjustments.global.zone_tint);
+    }
 
     final_rgb += grain_delta(
         final_rgb,
@@ -2153,16 +2252,21 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     // Normal retains the established local-adjustment rendering. Other modes
     // composite that adjusted result against the input in mask-list order.
     // A Black & White image blends against a monochrome input so the
-    // backdrop cannot reintroduce color.
+    // backdrop cannot reintroduce color; it carries the Zone Tint so the blend keeps it.
     var backdrop_rgb = blend_backdrop_rgb;
-    if (adjustments.global.monochrome == 1u) {
-        backdrop_rgb = monochrome_srgb(backdrop_rgb);
-    }
+    var backdrop_ready = adjustments.global.monochrome == 0u;
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let mode = adjustments.mask_adjustments[i].blend_mode;
         if (mode != 0u) {
             let influence = get_mask_influence(i, absolute_coord);
             if (influence > 0.001) {
+                if (!backdrop_ready) {
+                    backdrop_rgb = monochrome_srgb(backdrop_rgb);
+                    if (adjustments.global.zone_tint.enabled == 1u) {
+                        backdrop_rgb = apply_zone_tint(backdrop_rgb, adjustments.global.zone_tint);
+                    }
+                    backdrop_ready = true;
+                }
                 let blended = blend_colors(backdrop_rgb, final_rgb, mode);
                 final_rgb = mix(final_rgb, blended, influence);
             }
