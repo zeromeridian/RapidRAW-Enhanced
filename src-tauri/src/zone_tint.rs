@@ -248,6 +248,26 @@ impl ZoneWeights {
     }
 }
 
+/// Marks a file of exported Zone Color Grading presets.
+const PRESET_FILE_FORMAT: &str = "ThisIsRAW Zone Color Grading presets";
+
+/// Writes Zone Color Grading presets to a JSON file (`preset_file`); the panel builds and
+/// cleans them (`utils/zoneTint.ts`).
+#[tauri::command]
+pub fn export_zone_tint_presets(
+    presets: Vec<serde_json::Value>,
+    file_path: String,
+) -> Result<(), String> {
+    crate::preset_file::write(PRESET_FILE_FORMAT, presets, &file_path)
+}
+
+/// Reads the presets of a Zone Color Grading preset file (`preset_file`); the panel cleans
+/// every one.
+#[tauri::command]
+pub fn import_zone_tint_presets(file_path: String) -> Result<Vec<serde_json::Value>, String> {
+    crate::preset_file::read(&file_path)
+}
+
 /// The sRGB transfer curve, display value to linear.
 pub(crate) fn srgb_to_linear(value: f32) -> f32 {
     if value <= 0.04045 {

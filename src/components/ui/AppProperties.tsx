@@ -92,6 +92,8 @@ export enum Invokes {
   GetBlendPadParameters = 'get_blend_pad_parameters',
   ExportBlendPadPresets = 'export_blend_pad_presets',
   ImportBlendPadPresets = 'import_blend_pad_presets',
+  ExportZoneTintPresets = 'export_zone_tint_presets',
+  ImportZoneTintPresets = 'import_zone_tint_presets',
   HandleExportPresetsToFile = 'handle_export_presets_to_file',
   HandleImportPresetsFromFile = 'handle_import_presets_from_file',
   HandleImportPresetsFromFiles = 'handle_import_presets_from_files',
@@ -363,6 +365,8 @@ export interface AppSettings {
   toneCurvePresets?: ToneCurvePreset[];
   /** Orbit Blend Pad presets as saved; read them through `sanitizeBlendPadPresets`. */
   blendPadPresets?: Array<unknown>;
+  /** Zone Color Grading presets; absent until first changed, which offers the starter presets. */
+  zoneTintPresets?: Array<unknown> | null;
   leftPanelWidth?: number;
   rightPanelWidth?: number;
   lightsOutDimLevel?: LightsOutDimLevel;

@@ -24,6 +24,7 @@ it, then move the colour wheel. Each coloured selection becomes a
 | Part | What it is |
 |---|---|
 | **Header buttons** | Pipette (pick a zone on the photo), rectangle (pick zones in an area of the photo), eye (switch the whole tool off and on), reset (remove everything). |
+| **Preset bar** | Named looks: pick one to load it, save, update, and the ⋯ menu (rename, delete, export, import). Starts with Selenium, Sepia, Split Tone and Platinum. |
 | **Zone scale** | The eleven zones as an upright grey ramp, X at the top, 0 at the bottom. The names are on the left; an accent bar marks the selected zones, and an outline the zone under the cursor on the photo. |
 | **Hover readout** | Beside the cursor on the photo: the zone under it and its lightness, e.g. "Zone VI · L 0.62". |
 | **Alt/Option preview** | Hold Alt (Option on macOS) over a zone or a grade: the photo shows in red where it colours. |
@@ -341,6 +342,33 @@ Colour Zone X with a warm hue 30° strength 60. With Protect at 8 the
 brightest highlights stay neutral white and the warmth starts in the
 light greys below them. Set Protect to 0: the paper white itself turns
 cream.
+
+## Presets
+
+The bar at the top of the panel keeps named Zone Color Grading looks,
+like the Orbit Blend Pad's presets.
+
+- **What a preset holds:** the whole panel: every grade (hidden ones
+  stay hidden), Softness, Protect, Smoothing and Amount.
+- **Loading** one from the list **replaces** the photo's Zone Color
+  Grading with it, in one undo step, and switches the panel's eye on so
+  you see the result. Fine-tune it afterwards like any grading.
+- **Save** (disk icon) saves the current look as a new preset. Once you
+  change a loaded look, the list shows a red **\*** and the button
+  becomes **Update**, which overwrites that preset.
+- The **⋯** menu: save as new, rename, delete, export one or all as a
+  JSON file, and import a file (names that already exist get a number).
+- **Starter presets:** the list begins with four looks:
+  - **Selenium:** a cool purple-brown in Zones III–V.
+  - **Sepia:** warmth in VI–VIII.
+  - **Split Tone:** cool II–IV and warm VII–VIII.
+  - **Platinum:** a gentle warmth across every zone.
+
+  Change, rename or delete them like your own; once deleted they do not
+  come back.
+- These presets are kept in the app settings, not with the photo. The
+  regular **Presets** panel saves Zone Color Grading too, together with
+  the rest of an edit.
 
 ## Switching off, resetting, saving
 

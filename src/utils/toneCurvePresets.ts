@@ -7,6 +7,7 @@ import {
   ParametricCurveSettings,
   getDefaultCurves,
 } from './adjustments';
+import { normalizePresetName } from './namedPresets';
 
 export interface ToneCurvePreset {
   builtIn?: boolean;
@@ -87,8 +88,8 @@ export const cloneToneCurveParametric = (curve: unknown): ParametricCurve => {
   };
 };
 
-/** A preset name as compared for clashes: case and outer spaces ignored. */
-export const normalizePresetName = (name: string) => name.trim().toLowerCase();
+/** A preset name as compared for clashes: case and outer spaces ignored (`namedPresets.ts`). */
+export { normalizePresetName };
 
 export const hasToneCurvePresetNameConflict = (name: string, presets: ToneCurvePreset[]) => {
   const normalizedName = normalizePresetName(name);

@@ -624,6 +624,8 @@ export interface ZoneTint {
   amount?: number;
   /** Mask smoothing, 0–4: grain no longer picks the zones; absent in older edits, which means 0. */
   maskSmoothing?: number;
+  /** The Zone Color Grading preset this look was loaded from or saved as (the bar's selection). */
+  presetId?: string;
 }
 
 export const createZoneTintGrade = (zones: Array<ZoneTintZone | null>, id: string = uuidv4()): ZoneTintGrade => ({

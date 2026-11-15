@@ -708,6 +708,11 @@ pub struct AppSettings {
     /// Named Orbit Blend Pad setups (`BlendPadPreset` in `utils/blendPad.ts`), cleaned there.
     #[serde(default)]
     pub blend_pad_presets: Vec<Value>,
+    /// Named Zone Color Grading looks (`ZoneTintPreset` in `utils/zoneTint.ts`), cleaned
+    /// there. `None` until first changed, so the panel offers its starter presets; an empty
+    /// list means every preset was deleted.
+    #[serde(default)]
+    pub zone_tint_presets: Option<Vec<Value>>,
     #[serde(default)]
     pub left_panel_width: Option<u32>,
     #[serde(default)]
@@ -855,6 +860,7 @@ impl Default for AppSettings {
             copy_name_suffix: String::new(),
             tone_curve_presets: Vec::new(),
             blend_pad_presets: Vec::new(),
+            zone_tint_presets: None,
             left_panel_width: None,
             right_panel_width: None,
             catalog_directory: None,
@@ -1098,6 +1104,26 @@ mod tests {
         assert_eq!(restored.blend_pad_presets, settings.blend_pad_presets);
         let older: AppSettings = serde_json::from_str("{}").expect("older settings load");
         assert!(older.blend_pad_presets.is_empty());
+    }
+
+    #[test]
+    fn zone_tint_presets_keep_never_set_apart_from_all_deleted() {
+        let older: AppSettings = serde_json::from_str("{}").expect("older settings load");
+        assert_eq!(older.zone_tint_presets, None);
+
+        for presets in [
+            Some(Vec::new()),
+            Some(vec![json!({ "id": "z", "name": "Cool" })]),
+        ] {
+            let settings = AppSettings {
+                zone_tint_presets: presets.clone(),
+                ..AppSettings::default()
+            };
+            let serialized = serde_json::to_string(&settings).expect("settings should serialize");
+            let restored: AppSettings =
+                serde_json::from_str(&serialized).expect("settings should deserialize");
+            assert_eq!(restored.zone_tint_presets, presets);
+        }
     }
 
     #[test]

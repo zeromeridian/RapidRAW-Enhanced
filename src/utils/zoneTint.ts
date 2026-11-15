@@ -5,13 +5,19 @@
  */
 import {
   BlendPadCurve,
+  ZONE_TINT_AMOUNT,
+  ZONE_TINT_MASK_SMOOTHING,
+  ZONE_TINT_PROTECT,
+  ZONE_TINT_SOFTNESS,
   ZONE_TINT_ZONE_COUNT,
   ZoneTint,
   ZoneTintGrade,
   ZoneTintZone,
+  createZoneTint,
   createZoneTintGrade,
 } from './adjustments';
 import { applyBlendPadCurve } from './blendPad';
+import { presetIdentities } from './namedPresets';
 
 export const MIDDLE_GREY_ZONE = 5;
 
@@ -358,3 +364,164 @@ export const sampleAreaZones = (
   const zones = shiftKey || metaKey || ctrlKey ? [...new Set([...current.zones, ...picked])] : picked;
   return { zones: zones.sort((a, b) => a - b), anchor, gradeId: null };
 };
+
+/** Everything a Zone Color Grading preset holds (owner 2026-11-15: the whole panel). */
+export interface ZoneTintLook {
+  grades: ZoneTintGrade[];
+  softness: number;
+  protect: number;
+  amount: number;
+  maskSmoothing: number;
+}
+
+/** A named Zone Color Grading look, kept in the app settings (`zoneTintPresets`). */
+export interface ZoneTintPreset {
+  id: string;
+  name: string;
+  look: ZoneTintLook;
+}
+
+/**
+ * The look of a block, rebuilt key by key so two looks compare as text however they were
+ * stored: a saved edit comes back from Rust with every object's keys sorted, and a zone
+ * without luminance (older edits) reads as 0.
+ */
+const zoneTintLook = (zoneTint: ZoneTint): ZoneTintLook => ({
+  grades: zoneTintGrades(zoneTint).map(({ id, zones, visible }) => {
+    const canonicalZones = zones.map(
+      (settings) => settings && { hue: settings.hue, strength: settings.strength, luminance: luminanceOf(settings) },
+    );
+    return visible === false ? { id, zones: canonicalZones, visible } : { id, zones: canonicalZones };
+  }),
+  softness: zoneTint.softness,
+  protect: zoneTint.protect,
+  amount: zoneTint.amount ?? ZONE_TINT_AMOUNT.default,
+  maskSmoothing: zoneTint.maskSmoothing ?? ZONE_TINT_MASK_SMOOTHING.default,
+});
+
+export const createZoneTintPreset = (name: string, zoneTint: ZoneTint): ZoneTintPreset => ({
+  id: crypto.randomUUID(),
+  name: name.trim(),
+  look: zoneTintLook(zoneTint),
+});
+
+/** Overwrites a preset with the current look, keeping its id and name. */
+export const updateZoneTintPreset = (preset: ZoneTintPreset, zoneTint: ZoneTint): ZoneTintPreset => ({
+  ...preset,
+  look: zoneTintLook(zoneTint),
+});
+
+export const isZoneTintPresetDirty = (preset: ZoneTintPreset, zoneTint: ZoneTint) =>
+  JSON.stringify(zoneTintLook(zoneTint)) !== JSON.stringify(zoneTintLook(loadZoneTintPreset(preset)));
+
+/**
+ * The block a preset loads: its look replaces the photo's Zone Color Grading entirely (owner
+ * 2026-11-15), Advanced mode's zone shapes included, and remembers the preset.
+ */
+export const loadZoneTintPreset = (preset: ZoneTintPreset): ZoneTint => {
+  const { grades, softness, protect, amount, maskSmoothing } = preset.look;
+  return withZoneTintGrades(
+    { ...createZoneTint(), softness, protect, amount, maskSmoothing, presetId: preset.id },
+    grades,
+  );
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+
+const numberIn = (value: unknown, { min, max, default: fallback }: { min: number; max: number; default: number }) =>
+  typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
+
+const sanitizeZone = (value: unknown): ZoneTintZone | null =>
+  isRecord(value)
+    ? {
+        hue: ((numberIn(value.hue, { min: -1e6, max: 1e6, default: 0 }) % 360) + 360) % 360,
+        strength: numberIn(value.strength, { min: 0, max: MAX_STRENGTH, default: 0 }),
+        luminance: numberIn(value.luminance, { min: -MAX_LUMINANCE, max: MAX_LUMINANCE, default: 0 }),
+      }
+    : null;
+
+const sanitizeGrade = (value: unknown): ZoneTintGrade | null => {
+  if (!isRecord(value) || !Array.isArray(value.zones)) return null;
+  const candidates: unknown[] = value.zones;
+  const zones = Array.from({ length: ZONE_TINT_ZONE_COUNT }, (_, zone) => sanitizeZone(candidates[zone]));
+  if (!zones.some(Boolean)) return null;
+  const grade = createZoneTintGrade(zones, typeof value.id === 'string' && value.id ? value.id : undefined);
+  return value.visible === false ? { ...grade, visible: false } : grade;
+};
+
+/**
+ * Presets from untrusted data (settings or a file): each look cleaned and kept within the
+ * panel's ranges; those without a name or a look dropped; ids and names made unique against
+ * `existing`.
+ */
+export const sanitizeZoneTintPresets = (values: unknown, existing: ZoneTintPreset[] = []): ZoneTintPreset[] => {
+  const identity = presetIdentities(existing);
+  const presets: ZoneTintPreset[] = [];
+  for (const candidate of Array.isArray(values) ? values : []) {
+    if (!isRecord(candidate) || typeof candidate.name !== 'string' || !candidate.name.trim()) continue;
+    if (!isRecord(candidate.look)) continue;
+    const { look } = candidate;
+    const grades = (Array.isArray(look.grades) ? look.grades : []).flatMap((grade) => sanitizeGrade(grade) ?? []);
+    presets.push({
+      ...identity(candidate.id, candidate.name),
+      look: {
+        grades,
+        softness: numberIn(look.softness, ZONE_TINT_SOFTNESS),
+        protect: numberIn(look.protect, ZONE_TINT_PROTECT),
+        amount: numberIn(look.amount, ZONE_TINT_AMOUNT),
+        maskSmoothing: numberIn(look.maskSmoothing, ZONE_TINT_MASK_SMOOTHING),
+      },
+    });
+  }
+  return presets;
+};
+
+/** A starter grade: one colour over a range of zones. */
+const starterGrade = (id: string, from: number, to: number, hue: number, strength: number) =>
+  createZoneTintGrade(
+    Array.from({ length: ZONE_TINT_ZONE_COUNT }, (_, zone) =>
+      zone >= from && zone <= to ? { hue, strength, luminance: 0 } : null,
+    ),
+    id,
+  );
+
+/** The names of the starter presets, in the app's language. */
+export interface ZoneTintStarterNames {
+  selenium: string;
+  sepia: string;
+  split: string;
+  platinum: string;
+}
+
+/**
+ * The spec's four starter looks (agent-chosen values, owner 2026-11-15: shipped, editable and
+ * deletable like any preset): Selenium, a cool purple-brown in III–V; Sepia, warm VI–VIII;
+ * Split, cool II–IV and warm VII–VIII; Platinum, a gentle warmth across every zone.
+ */
+const zoneTintStarterPresets = (names: ZoneTintStarterNames): ZoneTintPreset[] => {
+  const look = (grades: ZoneTintGrade[]): ZoneTintLook => ({
+    grades,
+    softness: ZONE_TINT_SOFTNESS.default,
+    protect: ZONE_TINT_PROTECT.default,
+    amount: ZONE_TINT_AMOUNT.default,
+    maskSmoothing: ZONE_TINT_MASK_SMOOTHING.default,
+  });
+  return [
+    { id: 'zone-starter-selenium', name: names.selenium, look: look([starterGrade('selenium', 3, 5, 320, 18)]) },
+    { id: 'zone-starter-sepia', name: names.sepia, look: look([starterGrade('sepia', 6, 8, 35, 35)]) },
+    {
+      id: 'zone-starter-split',
+      name: names.split,
+      look: look([starterGrade('split-cool', 2, 4, 215, 28), starterGrade('split-warm', 7, 8, 40, 28)]),
+    },
+    { id: 'zone-starter-platinum', name: names.platinum, look: look([starterGrade('platinum', 0, 10, 38, 10)]) },
+  ];
+};
+
+/**
+ * The presets in the app settings, or the starter presets while the setting was never
+ * written (`null`/absent); once the list is changed, even emptied, the starters are not
+ * offered again.
+ */
+export const zoneTintPresetsFromSettings = (value: unknown, names: ZoneTintStarterNames): ZoneTintPreset[] =>
+  value == null ? zoneTintStarterPresets(names) : sanitizeZoneTintPresets(value);

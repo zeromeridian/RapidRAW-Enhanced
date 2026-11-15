@@ -5,6 +5,28 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.64.1-dev-zone-presets — 2026-11-15
+
+### Develop
+
+- **Zone Color Grading** presets: a photo with an unchanged preset no
+  longer shows that preset as modified (\*) after the app is restarted,
+  for the built-in and your own presets alike.
+
+## 1.64.0-dev-zone-presets — 2026-11-15
+
+### Develop
+
+- **Zone Color Grading** has its own presets, like the Orbit Blend
+  Pad: a bar at the top of the panel saves the whole look (grades,
+  Softness, Protect, Smoothing and Amount) under a name. Loading one
+  replaces the photo's grading and switches the tool on; change it and
+  **Update** the preset, or save it as a new one.
+- Four starter looks are included: **Selenium**, **Sepia**, **Split
+  Tone** and **Platinum**. Change, rename or delete them like your own.
+- Presets can be renamed, deleted, and exported or imported as JSON
+  files.
+
 ## 1.63.0-dev-zone-mask-smoothing — 2026-11-15
 
 ### Develop

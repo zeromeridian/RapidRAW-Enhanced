@@ -1,4 +1,4 @@
-import { MouseEvent, useCallback, useEffect, useState } from 'react';
+import { MouseEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Eye, EyeOff, Layers, Pipette, RotateCcw, SquareDashedMousePointer, X } from 'lucide-react';
 import clsx from 'clsx';
@@ -13,6 +13,7 @@ import Text from '../../ui/Text';
 import { TextColors, TextVariants } from '../../../types/typography';
 import { canvasToolState, useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
+import { Invokes } from '../../ui/AppProperties';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import {
   BlendPadCurve,
@@ -33,19 +34,27 @@ import {
   NEUTRAL_ZONE,
   ZONE_NAMES,
   ZoneSelection,
+  ZoneTintPreset,
+  createZoneTintPreset,
   fillGrades,
   gradeSelection,
   gradeZones,
   isGradeShown,
   isUniformGrade,
+  isZoneTintPresetDirty,
+  loadZoneTintPreset,
   luminanceOf,
   nextZoneSelection,
   overlappingZones,
+  sanitizeZoneTintPresets,
   setGradeShown,
   updateGrade,
+  updateZoneTintPreset,
   withZoneTintGrades,
   zoneTintGrades,
+  zoneTintPresetsFromSettings,
 } from '../../../utils/zoneTint';
+import NamedPresetBar from './NamedPresetBar';
 
 /** Softness and Protect are OKLab L values, Amount a factor; the sliders show them ×100. */
 const SLIDER_SCALE = 100;
@@ -340,6 +349,33 @@ export default function ZoneTintPanel() {
     updateGrades((current) => fillGrades(current, ...fillRange, fillCurve), t('adjustments.zoneTint.fill'));
   };
 
+  // Zone Color Grading presets (owner 2026-11-15): the whole look, replacing the photo's.
+  const appSettings = useSettingsStore((state) => state.appSettings);
+  const handleSettingsChange = useSettingsStore((state) => state.handleSettingsChange);
+  const presets = useMemo(
+    () =>
+      zoneTintPresetsFromSettings(appSettings?.zoneTintPresets, {
+        selenium: t('adjustments.zoneTint.presets.selenium'),
+        sepia: t('adjustments.zoneTint.presets.sepia'),
+        split: t('adjustments.zoneTint.presets.split'),
+        platinum: t('adjustments.zoneTint.presets.platinum'),
+      }),
+    [appSettings?.zoneTintPresets, t],
+  );
+  const selectedPreset = presets.find((preset) => preset.id === zoneTint.presetId) ?? null;
+  // Loading always shows the result, so it switches the panel's eye on (owner 2026-11-15).
+  const handleLoadPreset = (preset: ZoneTintPreset) => {
+    setSelection({ ...selection, gradeId: null });
+    setAdjustments(
+      (prev) => ({
+        ...prev,
+        zoneTint: loadZoneTintPreset(preset),
+        sectionVisibility: { ...(prev.sectionVisibility ?? INITIAL_ADJUSTMENTS.sectionVisibility), zoneTint: true },
+      }),
+      preset.name,
+    );
+  };
+
   const handleToggleVisibility = () =>
     setAdjustments((prev) => {
       const visibility = prev.sectionVisibility ?? INITIAL_ADJUSTMENTS.sectionVisibility;
@@ -395,6 +431,33 @@ export default function ZoneTintPanel() {
         }
       />
       <div className="grow overflow-y-auto p-4 compact:p-3 flex flex-col gap-4 compact:gap-3">
+        <NamedPresetBar
+          create={(name) => createZoneTintPreset(name, zoneTint)}
+          exportCommand={Invokes.ExportZoneTintPresets}
+          importCommand={Invokes.ImportZoneTintPresets}
+          isDirty={!!selectedPreset && isZoneTintPresetDirty(selectedPreset, zoneTint)}
+          labels={{
+            placeholder: t('adjustments.zoneTint.presets.placeholder'),
+            save: t('adjustments.zoneTint.presets.save'),
+            saveTitle: t('adjustments.zoneTint.presets.saveTitle'),
+            renameTitle: t('adjustments.zoneTint.presets.renameTitle'),
+            deleteTitle: t('adjustments.zoneTint.presets.deleteTitle'),
+            deleteMessage: (name) => t('adjustments.zoneTint.presets.deleteMessage', { name }),
+            nameConflict: t('adjustments.zoneTint.presets.nameConflict'),
+            fileName: t('adjustments.zoneTint.presets.fileName'),
+            importNone: t('adjustments.zoneTint.presets.importNone'),
+            imported: (count) => t('adjustments.zoneTint.presets.imported', { count }),
+          }}
+          onLoad={handleLoadPreset}
+          onPresetsChange={(next) => {
+            if (appSettings) void handleSettingsChange({ ...appSettings, zoneTintPresets: next });
+          }}
+          onSaved={(preset) => updateZoneTint((current) => ({ ...current, presetId: preset.id }))}
+          presets={presets}
+          sanitize={sanitizeZoneTintPresets}
+          selected={selectedPreset}
+          update={(preset) => updateZoneTintPreset(preset, zoneTint)}
+        />
         <div className={clsx('flex flex-col gap-4 compact:gap-3 transition-opacity', !isVisible && 'opacity-40')}>
           <div className="flex items-center gap-3">
             <ZoneScale

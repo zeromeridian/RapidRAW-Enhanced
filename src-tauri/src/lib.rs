@@ -51,6 +51,7 @@ mod negative_conversion;
 mod panorama_stitching;
 mod panorama_utils;
 mod preset_converter;
+mod preset_file;
 mod preview_jpeg;
 mod raw_processing;
 mod relight;
@@ -2809,6 +2810,8 @@ pub fn run() {
             blend_pad::get_blend_pad_parameters,
             blend_pad::export_blend_pad_presets,
             blend_pad::import_blend_pad_presets,
+            zone_tint::export_zone_tint_presets,
+            zone_tint::import_zone_tint_presets,
             file_management::read_exif_for_paths,
             file_management::read_xmp_from_folder,
             lightroom_xmp::preview_lightroom_xmp_edits,

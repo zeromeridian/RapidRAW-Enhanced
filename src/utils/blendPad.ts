@@ -4,6 +4,7 @@
  * (`node scripts/check-blend-pad.mjs` and `cargo test`). Type imports only, so Node can run it.
  */
 import type { BlendPad, BlendPadAnchor, BlendPadCurve, BlendPadMode, BlendPadShape, Coord } from './adjustments';
+import { presetIdentities } from './namedPresets';
 
 /** A slider the pad can drive, as `blend_pad::Parameter` (read with `get_blend_pad_parameters`). */
 export interface BlendPadParameter {
@@ -517,9 +518,6 @@ export interface BlendPadPreset {
   pad: BlendPad;
 }
 
-/** `normalizePresetName` in `toneCurvePresets.ts`, repeated so this file stays free of runtime imports. */
-const normalizePresetName = (name: string) => name.trim().toLowerCase();
-
 const CENTRE: Coord = { x: 0, y: 0 };
 
 /** The preset's pad as it is saved: the puck kept only when the preset includes it. */
@@ -577,22 +575,14 @@ export const sanitizeBlendPadPresets = (
   parameters: Array<BlendPadParameter>,
   existing: Array<BlendPadPreset> = [],
 ): Array<BlendPadPreset> => {
-  const ids = new Set(existing.map((preset) => preset.id));
-  const names = new Set(existing.map((preset) => normalizePresetName(preset.name)));
+  const identity = presetIdentities(existing);
   const presets: Array<BlendPadPreset> = [];
   for (const candidate of Array.isArray(values) ? values : []) {
     if (!isRecord(candidate) || typeof candidate.name !== 'string' || !candidate.name.trim()) continue;
     const pad = sanitizeBlendPad(candidate.pad, parameters);
     if (!pad) continue;
-    const baseName = candidate.name.trim();
-    let name = baseName;
-    for (let suffix = 2; names.has(normalizePresetName(name)); suffix += 1) name = `${baseName} ${suffix}`;
-    const id =
-      typeof candidate.id === 'string' && candidate.id && !ids.has(candidate.id) ? candidate.id : crypto.randomUUID();
-    ids.add(id);
-    names.add(normalizePresetName(name));
     const includesPuck = candidate.includesPuck === true;
-    presets.push({ id, name, includesPuck, pad: presetPad(pad, includesPuck) });
+    presets.push({ ...identity(candidate.id, candidate.name), includesPuck, pad: presetPad(pad, includesPuck) });
   }
   return presets;
 };
