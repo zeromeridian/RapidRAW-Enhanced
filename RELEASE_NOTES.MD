@@ -5,6 +5,19 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.68.0-dev-develop-regroup — 2026-11-15
+
+### Develop
+
+- The tool bar moved from the narrow strip beside the right sidebar to a
+  row **above** it, with bigger icons that share the full width.
+- The tools follow the editing workflow: **Presets**; **Crop, Geometry,
+  Lens Correction**; **Adjustments, Blend Pad, Zone Color Grading**;
+  **Masks, AI**.
+- Clicking the highlighted tool no longer closes the sidebar. The top
+  bar's switches, the hide-panels shortcut, Lights Out and full screen
+  hide it as before.
+
 ## 1.67.0-dev-develop-regroup — 2026-11-15
 
 ### Develop

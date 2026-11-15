@@ -43,7 +43,10 @@ details are in `RELEASE_NOTES.MD`.
   open panel highlighted. Library: one right panel at a time; Develop opens
   the active photo. Develop: Info, Tagging, and Export show that panel for
   the edited photo only, and Develop returns to the last editing tool; the
-  vertical tool strip keeps only the editing tools. The top bar also stays in
+  tool bar above the right sidebar keeps only the editing tools, in
+  workflow order (Presets; Crop, Geometry, Lens Correction; Adjustments,
+  Blend Pad, Zone Color Grading; Masks, AI), with large icons sharing its
+  width; clicking the highlighted tool keeps it open. The top bar also stays in
   fullscreen and with native window decorations (without its window
   buttons).
 - **Quick Filter** and **Select by** sit in the title bar, left-aligned with
@@ -219,7 +222,7 @@ details are in `RELEASE_NOTES.MD`.
   label; the right-click menu offers the same) and arrange them by drag.
   They edit the photo's own values, with the same history, XMP and Speed
   Edit. For the photo only; masks keep their full panels.
-- **Orbit Blend Pad** tab in the Develop tool strip: up to 8 tools sit on
+- **Orbit Blend Pad** tab in the Develop tool bar: up to 8 tools sit on
   a circle (new pads start with Exposure, Whites, Blacks), each
   with a target; dragging one puck adds their values on top of the
   sliders (they combine or cancel), full target at a tool's anchor and
@@ -339,7 +342,7 @@ details are in `RELEASE_NOTES.MD`.
   Variance, a hue–saturation field and luminance strip to refine the picked
   colour, before/after swatches, Hue/Saturation/Luminance range bars, and
   Visualize Range. Points travel with the edit (XMP, copy/paste, presets).
-- **Zone Color Grading** panel in the right toolbar (whole photo; formerly
+- **Zone Color Grading** panel in the Develop tool bar (whole photo; formerly
   Zone Tint): a colour and a luminance for each of the 11 Zone System
   zones (0–X), toning a Black & White photo or grading a colour one by
   tonal zone (the zone's colour shifts the colours there). The colour never
