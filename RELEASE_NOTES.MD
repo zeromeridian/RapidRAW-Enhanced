@@ -5,6 +5,24 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.65.0-dev-zone-advanced-mode — 2026-11-15
+
+### Develop
+
+- **Zone Color Grading** has an **Advanced** switch. It shows
+  **Centre** and **Width** for the selected zones: move a zone's centre
+  by up to half a zone, or give it its own width instead of the
+  Softness. Double-click a slider to reset it. Changed zones carry a
+  small tick on the zone scale, also with the switch off, and the
+  switch is remembered for every photo.
+- Zone presets now also keep each zone's centre and width. Presets
+  saved earlier load with every zone in its standard place.
+- **Fix:** opposite Luminance settings on neighbouring zones (for
+  example Zone V +100 next to Zone VI −100) could make a slightly
+  darker grey come out brighter than a lighter one. Tones now always
+  keep their order: only in such cases are the luminance shifts reduced
+  together, just enough. Every other edit looks exactly as before.
+
 ## 1.64.1-dev-zone-presets — 2026-11-15
 
 ### Develop

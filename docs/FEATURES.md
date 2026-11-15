@@ -332,7 +332,7 @@ details are in `RELEASE_NOTES.MD`.
   zones (0–X), toning a Black & White photo or grading a colour one by
   tonal zone (the zone's colour shifts the colours there). The colour never
   changes a tone; Luminance (−100 to 100) moves the zone's tones by up to
-  half a zone and always keeps them in order. Select a zone, or a range
+  half a zone and keeps them in order. Select a zone, or a range
   with Shift-click (Cmd/Ctrl-click adds or removes one), on an upright
   grey scale (X at the top) or from the photo: a pipette selects the zone
   under a click (same modifiers), a rectangle picker selects every zone
@@ -355,8 +355,14 @@ details are in `RELEASE_NOTES.MD`.
   smoothly, Softness sets how far a zone's colour reaches, and Protect
   keeps black and white free of colour; Smoothing (0–4) picks each
   pixel's zone from its surroundings so grain does not speckle the
-  colour. Its own preset bar, like the Blend Pad's, keeps named looks
-  (the whole panel; loading replaces the photo's grading), with
+  colour. An **Advanced** switch (a view setting for every photo) shows
+  Centre and Width sliders for the selected zones: a zone's centre moves
+  by up to half a zone and it can have its own width instead of the
+  Softness; double-click resets; moved zones stay marked on the scale
+  with the switch off. Luminance that would reverse tones (opposite
+  shifts on close zones) is scaled down just enough to keep them in
+  order. Its own preset bar, like the Blend Pad's, keeps named looks
+  (the whole panel, zone shapes included; loading replaces the photo's grading), with
   editable and deletable Selenium, Sepia, Split Tone and Platinum
   starters, and JSON export and import. Amount scales the whole effect
   (0–200 %) without changing the stored settings. Fill between makes one

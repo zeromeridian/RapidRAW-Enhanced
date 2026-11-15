@@ -22,10 +22,18 @@ const MAX_STRENGTH: f32 = 100.0;
 /// A zone's Luminance runs −100 to 100; at ±100 it moves the zone's tones by half a zone.
 const MAX_LUMINANCE: f32 = 100.0;
 const MAX_LUMINANCE_SHIFT: f32 = 0.05;
-/// Luminance spreads at least this wide (σ in L), whatever the softness. Together with
-/// `MAX_LUMINANCE_SHIFT` this keeps the tones in order: neighbouring zones at +100 and −100
-/// still map darker tones below lighter ones.
+/// Luminance spreads at least this wide (σ in L), whatever the softness, passed to the shader
+/// as the largest 1 / (2σ²) it weighs zones with.
 const MIN_LUMINANCE_SOFTNESS: f32 = DEFAULT_SOFTNESS;
+const LUMINANCE_WEIGHT_CAP: f32 = 1.0 / (2.0 * MIN_LUMINANCE_SOFTNESS * MIN_LUMINANCE_SOFTNESS);
+/// The tone map L → L + shift must rise at least this steeply everywhere, so darker tones stay
+/// below lighter ones. Opposite shifts on close zones (neighbours at +100 and −100, or zones
+/// moved apart in Advanced mode) would fall below it; then every shift is scaled down just
+/// enough (owner 2026-11-15), and every other edit renders exactly as set.
+const MIN_TONE_SLOPE: f32 = 0.1;
+/// Where the tone map's slope is checked: this many even steps over L 0–1, far finer than the
+/// narrowest luminance weighing (σ 0.04).
+const TONE_SLOPE_SAMPLES: usize = 1024;
 /// The overall Amount scales every zone's strength and luminance, up to double; the product
 /// still stops at `MAX_STRENGTH` and `MAX_LUMINANCE`.
 const DEFAULT_AMOUNT: f32 = 1.0;
@@ -137,6 +145,7 @@ impl ZoneTintSettings {
         let mut tinted = false;
         let mut moves = false;
         let mut zones = settings.zones;
+        let mut shifts = [0.0; ZONE_COUNT];
         for (index, slot) in zones.iter_mut().enumerate() {
             let zone = tint.zones.get(index);
             let chroma = zone.map_or(0.0, |zone| {
@@ -150,7 +159,7 @@ impl ZoneTintSettings {
                     / MAX_LUMINANCE
                     * MAX_LUMINANCE_SHIFT
             });
-            settings.luminance[index / 4][index % 4] = shift;
+            shifts[index] = shift;
             tinted |= chroma > 0.0;
             moves |= shift != 0.0;
             *slot = [
@@ -165,13 +174,57 @@ impl ZoneTintSettings {
         if !tinted && !moves {
             return Self::default();
         }
+        let order_scale = tone_order_scale(&zones, &shifts);
+        for (index, shift) in shifts.iter().enumerate() {
+            settings.luminance[index / 4][index % 4] = shift * order_scale;
+        }
         settings.zones = zones;
         settings.enabled = 1;
         settings.has_luminance = u32::from(moves);
-        settings.luminance_weight_cap =
-            1.0 / (2.0 * MIN_LUMINANCE_SOFTNESS * MIN_LUMINANCE_SOFTNESS);
+        settings.luminance_weight_cap = LUMINANCE_WEIGHT_CAP;
         settings
     }
+}
+
+/// The factor (0–1] that keeps the shader's tone map L → L + shift(L) rising at least
+/// `MIN_TONE_SLOPE` steeply: 1 when it already does, else the shifts scaled down just enough.
+/// The shift is linear in the zones' shifts, so its slope is too, and one factor is exact.
+fn tone_order_scale(zones: &[[f32; 4]; ZONE_COUNT], shifts: &[f32; ZONE_COUNT]) -> f32 {
+    if shifts.iter().all(|shift| *shift == 0.0) {
+        return 1.0;
+    }
+    let steepest_fall = (0..=TONE_SLOPE_SAMPLES)
+        .map(|step| shift_slope(zones, shifts, step as f32 / TONE_SLOPE_SAMPLES as f32))
+        .fold(0.0, f32::min);
+    let allowed_fall = 1.0 - MIN_TONE_SLOPE;
+    if -steepest_fall > allowed_fall {
+        allowed_fall / -steepest_fall
+    } else {
+        1.0
+    }
+}
+
+/// The slope at `l` of the luminance shift `apply_zone_tint` adds, Σ pᵢ sᵢ with pᵢ the zones'
+/// normalised weights exp(−kᵢ (l − cᵢ)²) (kᵢ capped at `LUMINANCE_WEIGHT_CAP`): since
+/// dpᵢ/dl = pᵢ (gᵢ − ḡ) with gᵢ = −2 kᵢ (l − cᵢ), it is Σ pᵢ sᵢ gᵢ − (Σ pᵢ sᵢ)(Σ pᵢ gᵢ).
+fn shift_slope(zones: &[[f32; 4]; ZONE_COUNT], shifts: &[f32; ZONE_COUNT], l: f32) -> f32 {
+    let k = |zone: &[f32; 4]| zone[3].min(LUMINANCE_WEIGHT_CAP);
+    let exponent = |zone: &[f32; 4]| {
+        let d = l - zone[2];
+        d * d * k(zone)
+    };
+    // Offset by the nearest zone's exponent, as the shader does, so no weight underflows.
+    let nearest = zones.iter().map(exponent).fold(f32::INFINITY, f32::min);
+    let (mut total, mut shift, mut gradient, mut shift_gradient) = (0.0, 0.0, 0.0, 0.0);
+    for (zone, zone_shift) in zones.iter().zip(shifts) {
+        let weight = (nearest - exponent(zone)).exp();
+        let g = -2.0 * k(zone) * (l - zone[2]);
+        total += weight;
+        shift += weight * zone_shift;
+        gradient += weight * g;
+        shift_gradient += weight * zone_shift * g;
+    }
+    shift_gradient / total - (shift / total) * (gradient / total)
 }
 
 /// Zone `index`'s centre in L (n / 10 plus its offset) and 1 / (2σ²) of its own width or the
@@ -429,16 +482,16 @@ mod tests {
     #[test]
     fn a_zone_luminance_moves_its_tones_without_needing_a_colour() {
         let mut zones = vec![json!({}); ZONE_COUNT];
-        zones[5] = json!({ "luminance": 100 });
-        zones[6] = json!({ "luminance": -50 });
+        zones[2] = json!({ "luminance": 100 });
+        zones[5] = json!({ "luminance": -50 });
         zones[10] = json!({ "luminance": 400 });
         let tint = settings(json!({ "zones": zones }));
 
         assert_eq!(tint.enabled, 1);
         assert_eq!(tint.has_luminance, 1);
         let shift = |zone: usize| tint.luminance[zone / 4][zone % 4];
-        assert!((shift(5) - MAX_LUMINANCE_SHIFT).abs() < 1e-6);
-        assert!((shift(6) + MAX_LUMINANCE_SHIFT / 2.0).abs() < 1e-6);
+        assert!((shift(2) - MAX_LUMINANCE_SHIFT).abs() < 1e-6);
+        assert!((shift(5) + MAX_LUMINANCE_SHIFT / 2.0).abs() < 1e-6);
         // Out of range, a zone's luminance is clamped to ±100.
         assert!((shift(10) - MAX_LUMINANCE_SHIFT).abs() < 1e-6);
         assert_eq!(shift(0), 0.0);
@@ -452,6 +505,93 @@ mod tests {
         let colour_only = settings(json!({ "zones": [{ "hue": 30, "strength": 40 }] }));
         assert_eq!(colour_only.has_luminance, 0);
         assert_eq!(colour_only.luminance, [[0.0; 4]; 3]);
+    }
+
+    /// The tone map `apply_zone_tint` applies before it clamps to 0–1, written out like the
+    /// shader (not with `shift_slope`), so the tests check the order independently.
+    fn tone_map(tint: &ZoneTintSettings, l: f32) -> f32 {
+        let exponent = |zone: &[f32; 4]| {
+            let d = l - zone[2];
+            d * d * zone[3].min(tint.luminance_weight_cap)
+        };
+        let nearest = tint
+            .zones
+            .iter()
+            .map(exponent)
+            .fold(f32::INFINITY, f32::min);
+        let (mut total, mut shift) = (0.0, 0.0);
+        for (index, zone) in tint.zones.iter().enumerate() {
+            let weight = (nearest - exponent(zone)).exp();
+            total += weight;
+            shift += weight * tint.luminance[index / 4][index % 4];
+        }
+        l + shift / total
+    }
+
+    /// The smallest slope of the tone map, by finite differences on a grid finer than
+    /// `TONE_SLOPE_SAMPLES` and offset from it. Steps that the shader's clamp clips to black or
+    /// white are left out: flat there, but never reversed.
+    fn min_tone_slope(tint: &ZoneTintSettings) -> f32 {
+        let steps = 4099;
+        (0..steps)
+            .filter_map(|step| {
+                let (a, b) = (step as f32 / steps as f32, (step + 1) as f32 / steps as f32);
+                let (from, to) = (tone_map(tint, a), tone_map(tint, b));
+                let inside = |value: f32| (0.0..=1.0).contains(&value);
+                (inside(from) && inside(to)).then_some((to - from) * steps as f32)
+            })
+            .fold(f32::INFINITY, f32::min)
+    }
+
+    #[test]
+    fn opposite_luminance_on_close_zones_keeps_every_tone_in_order() {
+        // Neighbours at +100 and −100 reversed tones before the scale (slope ≈ −0.56).
+        let mut zones = vec![json!({}); ZONE_COUNT];
+        zones[5] = json!({ "luminance": 100 });
+        zones[6] = json!({ "luminance": -100 });
+        let neighbours = settings(json!({ "softness": 0.02, "zones": zones.clone() }));
+        assert!(min_tone_slope(&neighbours) >= MIN_TONE_SLOPE - 0.01);
+        // Scaled together: Zone V still rises and Zone VI falls by as much.
+        let shift = |tint: &ZoneTintSettings, zone: usize| tint.luminance[zone / 4][zone % 4];
+        assert!(shift(&neighbours, 5) > 0.02 && shift(&neighbours, 5) < MAX_LUMINANCE_SHIFT);
+        assert!((shift(&neighbours, 5) + shift(&neighbours, 6)).abs() < 1e-6);
+
+        // Advanced mode: the same zones moved apart, the steepest case, and every mix of moves,
+        // widths and opposite shifts across the scale.
+        zones[5] = json!({ "luminance": 100, "centerOffset": -0.05 });
+        zones[6] = json!({ "luminance": -100, "centerOffset": 0.05 });
+        assert!(min_tone_slope(&settings(json!({ "zones": zones }))) >= MIN_TONE_SLOPE - 0.01);
+        for case in 0..60_usize {
+            let zones: Vec<_> = (0..ZONE_COUNT)
+                .map(|zone| {
+                    let pick = (case * 7 + zone * 13) % 5;
+                    let luminance = [100.0, -100.0, 0.0, 60.0, -35.0][pick];
+                    let offset = [-0.05, 0.05, 0.0, 0.03, -0.02][(pick + case) % 5];
+                    let width = [0.02, 0.08, 0.04, 0.03, 0.06][(zone + case) % 5];
+                    json!({ "luminance": luminance, "centerOffset": offset, "width": width })
+                })
+                .collect();
+            let tint = settings(json!({ "softness": 0.02, "zones": zones }));
+            let slope = min_tone_slope(&tint);
+            assert!(slope >= MIN_TONE_SLOPE - 0.01, "case {case}: slope {slope}");
+        }
+    }
+
+    #[test]
+    fn luminance_that_keeps_tones_in_order_renders_as_set() {
+        // Zone V alone at +100, and neighbours at ±50, already rise steeply enough.
+        for (five, six) in [(100.0, 0.0), (50.0, -50.0)] {
+            let mut zones = vec![json!({}); ZONE_COUNT];
+            zones[5] = json!({ "luminance": five });
+            zones[6] = json!({ "luminance": six });
+            let tint = settings(json!({ "zones": zones }));
+            assert!(
+                (tint.luminance[1][1] - five / MAX_LUMINANCE * MAX_LUMINANCE_SHIFT).abs() < 1e-6
+            );
+            assert!(
+                (tint.luminance[1][2] - six / MAX_LUMINANCE * MAX_LUMINANCE_SHIFT).abs() < 1e-6
+            );
+        }
     }
 
     #[test]

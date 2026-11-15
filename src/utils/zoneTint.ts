@@ -6,6 +6,7 @@
 import {
   BlendPadCurve,
   ZONE_TINT_AMOUNT,
+  ZONE_TINT_CENTER_OFFSET,
   ZONE_TINT_MASK_SMOOTHING,
   ZONE_TINT_PROTECT,
   ZONE_TINT_SOFTNESS,
@@ -23,9 +24,6 @@ export const MIDDLE_GREY_ZONE = 5;
 
 /** The Zone System's names for zones 0–X. */
 export const ZONE_NAMES = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
-
-/** `zone_tint::MAX_CENTER_OFFSET`: how far a zone's centre may move from n / 10. */
-const MAX_CENTER_OFFSET = 0.05;
 
 /**
  * A rectangle pick keeps the zones that cover at least this share of its pixels, so a few
@@ -294,10 +292,48 @@ export const gradeSelection = (grade: ZoneTintGrade): ZoneSelection => {
   return { zones, anchor: zones[0] ?? MIDDLE_GREY_ZONE, gradeId: grade.id };
 };
 
+/**
+ * Advanced mode's shape of a zone: how far its centre moved (OKLab L) and its own width (σ),
+ * `null` following the block's softness.
+ */
+export interface ZoneShape {
+  centerOffset: number;
+  width: number | null;
+}
+
+const STANDARD_ZONE_SHAPE: ZoneShape = { centerOffset: ZONE_TINT_CENTER_OFFSET.default, width: null };
+
+export const zoneShape = (zone: ZoneTintZone | undefined): ZoneShape => ({
+  centerOffset: zone?.centerOffset ?? STANDARD_ZONE_SHAPE.centerOffset,
+  width: zone?.width ?? STANDARD_ZONE_SHAPE.width,
+});
+
+export const isStandardZoneShape = ({ centerOffset, width }: ZoneShape) =>
+  centerOffset === STANDARD_ZONE_SHAPE.centerOffset && width === STANDARD_ZONE_SHAPE.width;
+
+/** A zone with this shape; the standard shape carries no fields, as in edits made before Advanced mode. */
+const withZoneShape = (
+  { centerOffset: _centerOffset, width: _width, ...zone }: ZoneTintZone,
+  shape: ZoneShape,
+): ZoneTintZone => ({
+  ...zone,
+  ...(shape.centerOffset !== STANDARD_ZONE_SHAPE.centerOffset && { centerOffset: shape.centerOffset }),
+  ...(shape.width !== STANDARD_ZONE_SHAPE.width && { width: shape.width }),
+});
+
+/** The block with `change` written into the shape of each zone in `zones`, keeping their colours. */
+export const setZoneShapes = (zoneTint: ZoneTint, zones: number[], change: Partial<ZoneShape>): ZoneTint => ({
+  ...zoneTint,
+  zones: Array.from({ length: ZONE_TINT_ZONE_COUNT }, (_, zone) => {
+    const settings = zoneTint.zones[zone] ?? NEUTRAL_ZONE;
+    return zones.includes(zone) ? withZoneShape(settings, { ...zoneShape(settings), ...change }) : settings;
+  }),
+});
+
 /** Zone n's centre in OKLab L, as `zone_tint.rs` places it. */
-const zoneCentre = (zoneTint: ZoneTint, zone: number) => {
-  const offset = zoneTint.zones[zone]?.centerOffset ?? 0;
-  return zone / (ZONE_TINT_ZONE_COUNT - 1) + Math.max(-MAX_CENTER_OFFSET, Math.min(MAX_CENTER_OFFSET, offset));
+export const zoneCentre = (zoneTint: ZoneTint, zone: number) => {
+  const { min, max } = ZONE_TINT_CENTER_OFFSET;
+  return zone / (ZONE_TINT_ZONE_COUNT - 1) + Math.max(min, Math.min(max, zoneShape(zoneTint.zones[zone]).centerOffset));
 };
 
 /** The zone whose centre is nearest to an OKLab lightness. */
@@ -368,6 +404,8 @@ export const sampleAreaZones = (
 /** Everything a Zone Color Grading preset holds (owner 2026-11-15: the whole panel). */
 export interface ZoneTintLook {
   grades: ZoneTintGrade[];
+  /** Advanced mode's zone shapes, one per zone; absent in presets saved before it: standard. */
+  shapes: ZoneShape[];
   softness: number;
   protect: number;
   amount: number;
@@ -393,6 +431,7 @@ const zoneTintLook = (zoneTint: ZoneTint): ZoneTintLook => ({
     );
     return visible === false ? { id, zones: canonicalZones, visible } : { id, zones: canonicalZones };
   }),
+  shapes: Array.from({ length: ZONE_TINT_ZONE_COUNT }, (_, zone) => zoneShape(zoneTint.zones[zone])),
   softness: zoneTint.softness,
   protect: zoneTint.protect,
   amount: zoneTint.amount ?? ZONE_TINT_AMOUNT.default,
@@ -416,14 +455,14 @@ export const isZoneTintPresetDirty = (preset: ZoneTintPreset, zoneTint: ZoneTint
 
 /**
  * The block a preset loads: its look replaces the photo's Zone Color Grading entirely (owner
- * 2026-11-15), Advanced mode's zone shapes included, and remembers the preset.
+ * 2026-11-15), Advanced mode's zone shapes included (a preset holds the whole panel), and
+ * remembers the preset.
  */
 export const loadZoneTintPreset = (preset: ZoneTintPreset): ZoneTint => {
-  const { grades, softness, protect, amount, maskSmoothing } = preset.look;
-  return withZoneTintGrades(
-    { ...createZoneTint(), softness, protect, amount, maskSmoothing, presetId: preset.id },
-    grades,
-  );
+  const { grades, shapes, softness, protect, amount, maskSmoothing } = preset.look;
+  const base = createZoneTint();
+  const zones = base.zones.map((zone, index) => withZoneShape(zone, shapes[index] ?? STANDARD_ZONE_SHAPE));
+  return withZoneTintGrades({ ...base, zones, softness, protect, amount, maskSmoothing, presetId: preset.id }, grades);
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
@@ -449,6 +488,17 @@ const sanitizeGrade = (value: unknown): ZoneTintGrade | null => {
   return value.visible === false ? { ...grade, visible: false } : grade;
 };
 
+const sanitizeShape = (value: unknown): ZoneShape =>
+  isRecord(value)
+    ? {
+        centerOffset: numberIn(value.centerOffset, ZONE_TINT_CENTER_OFFSET),
+        width:
+          typeof value.width === 'number' && Number.isFinite(value.width)
+            ? numberIn(value.width, ZONE_TINT_SOFTNESS)
+            : STANDARD_ZONE_SHAPE.width,
+      }
+    : STANDARD_ZONE_SHAPE;
+
 /**
  * Presets from untrusted data (settings or a file): each look cleaned and kept within the
  * panel's ranges; those without a name or a look dropped; ids and names made unique against
@@ -462,10 +512,12 @@ export const sanitizeZoneTintPresets = (values: unknown, existing: ZoneTintPrese
     if (!isRecord(candidate.look)) continue;
     const { look } = candidate;
     const grades = (Array.isArray(look.grades) ? look.grades : []).flatMap((grade) => sanitizeGrade(grade) ?? []);
+    const shapes: unknown[] = Array.isArray(look.shapes) ? look.shapes : [];
     presets.push({
       ...identity(candidate.id, candidate.name),
       look: {
         grades,
+        shapes: Array.from({ length: ZONE_TINT_ZONE_COUNT }, (_, zone) => sanitizeShape(shapes[zone])),
         softness: numberIn(look.softness, ZONE_TINT_SOFTNESS),
         protect: numberIn(look.protect, ZONE_TINT_PROTECT),
         amount: numberIn(look.amount, ZONE_TINT_AMOUNT),
@@ -501,6 +553,7 @@ export interface ZoneTintStarterNames {
 const zoneTintStarterPresets = (names: ZoneTintStarterNames): ZoneTintPreset[] => {
   const look = (grades: ZoneTintGrade[]): ZoneTintLook => ({
     grades,
+    shapes: Array.from({ length: ZONE_TINT_ZONE_COUNT }, () => STANDARD_ZONE_SHAPE),
     softness: ZONE_TINT_SOFTNESS.default,
     protect: ZONE_TINT_PROTECT.default,
     amount: ZONE_TINT_AMOUNT.default,

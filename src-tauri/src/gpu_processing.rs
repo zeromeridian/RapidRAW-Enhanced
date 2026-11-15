@@ -2803,20 +2803,39 @@ mod tests {
         }
         assert!(checked_peak > 0, "the ramp crosses Zone VII");
 
-        // Luminance: Zone V up and Zone VI down by the most, at the narrowest softness, still
-        // keeps every tone in order, and lifts Zone V's centre by about half a zone.
+        // Luminance keeps every tone in order, compared as the range each pixel's rounding
+        // allows (a ramp step is ≈ 0.001 in L, a reversal drops more than half of that per
+        // step): Zone V up and Zone VI down by the most at the narrowest softness, and the
+        // same zones moved apart in Advanced mode, the steepest case.
+        let in_order = |pixels: &[[u16; 3]], case: &str| {
+            for pair in pixels.windows(2) {
+                assert!(
+                    lightness(&pair[1], 0.5) >= lightness(&pair[0], -0.5),
+                    "{case}: tones keep their order at L {}",
+                    lightness(&pair[0], 0.0)
+                );
+            }
+        };
         let mut zones = vec![serde_json::json!({}); 11];
         zones[5] = serde_json::json!({ "luminance": 100 });
         zones[6] = serde_json::json!({ "luminance": -100 });
+        in_order(
+            &render(serde_json::json!({ "softness": 0.02, "zones": zones })),
+            "neighbours",
+        );
+        zones[5] = serde_json::json!({ "luminance": 100, "centerOffset": -0.05 });
+        zones[6] = serde_json::json!({ "luminance": -100, "centerOffset": 0.05 });
+        in_order(
+            &render(serde_json::json!({ "zones": zones })),
+            "moved apart",
+        );
+
+        // Zone V alone at +100 lifts its centre by about half a zone.
+        let mut zones = vec![serde_json::json!({}); 11];
+        zones[5] = serde_json::json!({ "luminance": 100 });
         let moved_pixels = render(serde_json::json!({ "softness": 0.02, "zones": zones }));
+        in_order(&moved_pixels, "Zone V");
         let moved = to_lab(&moved_pixels);
-        for pair in moved.windows(2) {
-            assert!(
-                pair[1][0] >= pair[0][0] - 2e-3,
-                "tones keep their order at L {}",
-                pair[0][0]
-            );
-        }
         let mut checked_centre = 0;
         for (index, (plain, moved)) in plain.iter().zip(&moved).enumerate() {
             let l = plain[0];

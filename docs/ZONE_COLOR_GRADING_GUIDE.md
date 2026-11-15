@@ -35,6 +35,7 @@ it, then move the colour wheel. Each coloured selection becomes a
 | **Softness** | How far each zone's colour reaches into its neighbours. |
 | **Protect** | How strongly pure black and pure white are kept free of colour. |
 | **Smoothing** | Picks each pixel's zone from its surroundings, so grain does not speckle the colour. |
+| **Advanced** | A switch that shows **Centre** and **Width** for the selected zones: move a zone or give it its own width. A small accent tick on the scale marks every zone changed this way, also with the switch off. |
 | **Grades list** | Every grade, lightest first, with its zones, its hue (H), strength (S) and luminance (L), or "Gradient" for a ramp. An "Overlaps …" line names the zones it shares with other shown grades. Click a grade to edit it; the eye hides or shows it; × removes it. |
 
 ## Zones: which tones belong where
@@ -106,9 +107,20 @@ in a zone tinted orange moves towards neutral.
 
 Select Zone 0, move Luminance to +60. The deepest blacks lift by 0.03 L
 (three tenths of a zone): a faded, matte look. Protect does not hold
-luminance back, so even pure black lifts. Neighbouring zones always
-keep their order: Zone V at +100 next to Zone VI at −100 never makes a
-Zone V tone brighter than a Zone VI tone.
+luminance back, so even pure black lifts.
+
+Tones always keep their order: a darker grey never comes out brighter
+than a lighter one. Opposite shifts on close zones would break that,
+for example Zone V at +100 right next to Zone VI at −100: the top of
+Zone V would be pushed above the bottom of Zone VI. Then every
+luminance shift of the photo is reduced together, just enough that the
+tones stay in order (from `1.65.0`; earlier builds let such a pair
+reverse slightly). In this example both end up at about 58 % of their
+setting: Zone V still rises and Zone VI still falls, by the same
+amount, but less than the sliders say. Settings that keep the order on
+their own, such as V +50 next to VI −50, or V +100 with VI unchanged,
+render exactly as set. Zones moved apart with Advanced (see below) make
+the reduction start sooner.
 
 ## Selecting zones
 
@@ -317,7 +329,7 @@ These apply to the whole tool, all grades together.
 - **Softness** (2–8, default 4) is how far a zone's colour reaches: at
   2, Zone V's colour stays close to Zone V's tones; at 8 it spreads well
   into IV and VI and neighbouring colours blend more. Luminance never
-  spreads narrower than the default, so tones keep their order.
+  spreads narrower than the default (4).
 - **Protect** (0–20, default 8) fades the colour out towards pure black
   and pure white, so Zone 0 stays black and Zone X stays paper white
   even with Zones 0 and X coloured. At 0 a coloured paper white is
@@ -343,13 +355,58 @@ brightest highlights stay neutral white and the warmth starts in the
 light greys below them. Set Protect to 0: the paper white itself turns
 cream.
 
+## Advanced: moving a zone and its own width
+
+Turn on the **Advanced** switch below the sliders. Two sliders appear
+for the selected zones (their names stand above them):
+
+- **Centre** (−5 to +5, default 0) moves the zones' centres by up to half
+  a zone: +5 moves Zone VII from L 0.70 to 0.75, so its colour and
+  luminance apply to slightly lighter tones, and the tones between VII
+  and VIII fall more to VII. −5 moves it darker.
+- **Width** (2–8) gives the zones their own width instead of the
+  Softness: a narrower zone keeps its colour close to its centre, a
+  wider one reaches further into its neighbours. Until set it shows
+  **Auto** and follows Softness; it only follows Softness again after a
+  reset.
+- Double-click a slider to reset it: Centre to the standard place, Width
+  to Auto.
+
+With several zones selected, the sliders show the zone the selection
+started from (the one the wheel shows) and a change is written into
+every selected zone. The colours, grades and luminance of those zones
+stay as they are; only where they apply moves. Luminance still never
+spreads narrower than a width of 4, and the tones keep their order (see
+Example 3).
+
+On the scale, a changed zone gets a small accent tick at its centre:
+above the middle of its row when moved lighter, below when moved darker,
+in the middle when only its width changed. Hover the zone for "Centre
+or width changed". The pickers, the hover readout and the Alt/Option
+preview follow the moved centres.
+
+The switch only shows or hides the two sliders; it is remembered for
+every photo and is not part of an edit. With it off, changed zones keep
+their centre and width (the tick still shows them). To undo them,
+switch it on and double-click the sliders, or reset the whole tool.
+
+### Example 8: a narrow highlight accent
+
+On a Black & White portrait, select Zone VIII and give it a warm hue
+40° strength 50. The warmth reaches into VII and IX. Switch Advanced
+on, set Width to 2: the warmth now sits on the brightest skin tones
+only. Set Centre to +3: it moves onto the specular highlights. Switch
+Advanced off: the look stays and Zone VIII shows its tick.
+
 ## Presets
 
 The bar at the top of the panel keeps named Zone Color Grading looks,
 like the Orbit Blend Pad's presets.
 
 - **What a preset holds:** the whole panel: every grade (hidden ones
-  stay hidden), Softness, Protect, Smoothing and Amount.
+  stay hidden), Softness, Protect, Smoothing, Amount, and each zone's
+  Advanced centre and width. A preset saved before `1.65.0` has none,
+  so loading it puts every zone back in its standard place.
 - **Loading** one from the list **replaces** the photo's Zone Color
   Grading with it, in one undo step, and switches the panel's eye on so
   you see the result. Fine-tune it afterwards like any grading.

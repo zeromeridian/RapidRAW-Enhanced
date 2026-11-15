@@ -575,6 +575,11 @@ export const ZONE_TINT_PROTECT = { default: 0.08, min: 0, max: 0.2 } as const;
 export const ZONE_TINT_MASK_SMOOTHING = { default: 0, min: 0, max: 4 } as const;
 /** `zone_tint::MAX_AMOUNT`: the overall Amount scales every zone's strength, up to double. */
 export const ZONE_TINT_AMOUNT = { default: 1, min: 0, max: 2 } as const;
+/**
+ * `zone_tint::MAX_CENTER_OFFSET`: Advanced mode moves a zone's centre by up to half a zone in
+ * OKLab L; its own width shares `ZONE_TINT_SOFTNESS`'s range.
+ */
+export const ZONE_TINT_CENTER_OFFSET = { default: 0, min: -0.05, max: 0.05 } as const;
 
 /**
  * One Zone System zone's colour: the colour wheel's hue (degrees) and strength (0–100, 0
@@ -585,7 +590,10 @@ export interface ZoneTintZone {
   hue: number;
   strength: number;
   luminance?: number;
-  /** Advanced mode (Phase 4): the centre's offset in OKLab L and the zone's own width. */
+  /**
+   * Advanced mode: the centre's offset in OKLab L and the zone's own width (σ); absent, the
+   * standard place and the block's softness (`ZoneShape` in `utils/zoneTint.ts`).
+   */
   centerOffset?: number;
   width?: number | null;
 }

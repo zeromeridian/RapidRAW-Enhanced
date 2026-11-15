@@ -713,6 +713,9 @@ pub struct AppSettings {
     /// list means every preset was deleted.
     #[serde(default)]
     pub zone_tint_presets: Option<Vec<Value>>,
+    /// Whether Zone Color Grading shows its Advanced controls (a view switch for every photo).
+    #[serde(default)]
+    pub zone_tint_advanced: bool,
     #[serde(default)]
     pub left_panel_width: Option<u32>,
     #[serde(default)]
@@ -861,6 +864,7 @@ impl Default for AppSettings {
             tone_curve_presets: Vec::new(),
             blend_pad_presets: Vec::new(),
             zone_tint_presets: None,
+            zone_tint_advanced: false,
             left_panel_width: None,
             right_panel_width: None,
             catalog_directory: None,

@@ -9,6 +9,7 @@ import Button from '../../ui/Button';
 import ColorWheel from '../../ui/ColorWheel';
 import Dropdown from '../../ui/Dropdown';
 import Slider from '../../ui/Slider';
+import Switch from '../../ui/Switch';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants } from '../../../types/typography';
 import { canvasToolState, useEditorStore } from '../../../store/useEditorStore';
@@ -20,6 +21,7 @@ import {
   HueSatLum,
   INITIAL_ADJUSTMENTS,
   ZONE_TINT_AMOUNT,
+  ZONE_TINT_CENTER_OFFSET,
   ZONE_TINT_MASK_SMOOTHING,
   ZONE_TINT_PROTECT,
   ZONE_TINT_SOFTNESS,
@@ -34,12 +36,14 @@ import {
   NEUTRAL_ZONE,
   ZONE_NAMES,
   ZoneSelection,
+  ZoneShape,
   ZoneTintPreset,
   createZoneTintPreset,
   fillGrades,
   gradeSelection,
   gradeZones,
   isGradeShown,
+  isStandardZoneShape,
   isUniformGrade,
   isZoneTintPresetDirty,
   loadZoneTintPreset,
@@ -48,26 +52,34 @@ import {
   overlappingZones,
   sanitizeZoneTintPresets,
   setGradeShown,
+  setZoneShapes,
   updateGrade,
   updateZoneTintPreset,
   withZoneTintGrades,
+  zoneCentre,
+  zoneShape,
   zoneTintGrades,
   zoneTintPresetsFromSettings,
 } from '../../../utils/zoneTint';
 import NamedPresetBar from './NamedPresetBar';
 
-/** Softness and Protect are OKLab L values, Amount a factor; the sliders show them ×100. */
+/**
+ * Softness, Protect and Advanced mode's centre and width are OKLab L values, Amount a factor;
+ * the sliders show them ×100.
+ */
 const SLIDER_SCALE = 100;
 const NEUTRAL: HueSatLum = { hue: 0, saturation: 0, luminance: 0 };
 /** `zone_tint::MAX_LUMINANCE_SHIFT`: luminance ±100 moves a zone's tones by half a zone. */
 const MAX_LUMINANCE_SHIFT = 0.05;
+/** One zone's span in OKLab L, so a centre's offset can be drawn within its row on the scale. */
+const ZONE_SPAN = 1 / (ZONE_TINT_ZONE_COUNT - 1);
 
 /**
- * The display grey of a zone's centre after its luminance: OKLab L = n / 10 (plus the shift) is
- * linear luminance L³.
+ * The display grey of a zone's centre (OKLab L, by default n / 10) after its luminance: OKLab L
+ * is linear luminance L³.
  */
-const zoneGrey = (zone: number, luminance: number) => {
-  const l = Math.min(Math.max(zone / (ZONE_TINT_ZONE_COUNT - 1) + (luminance / 100) * MAX_LUMINANCE_SHIFT, 0), 1);
+const zoneGrey = (zone: number, luminance: number, centre = zone * ZONE_SPAN) => {
+  const l = Math.min(Math.max(centre + (luminance / 100) * MAX_LUMINANCE_SHIFT, 0), 1);
   const linear = l ** 3;
   const display = linear <= 0.0031308 ? linear * 12.92 : 1.055 * linear ** (1 / 2.4) - 0.055;
   const level = Math.round(display * 255);
@@ -120,7 +132,8 @@ interface ZoneScaleProps {
  * The eleven zones as an upright grey scale, X at the top: names on the left, the selection
  * marked beside them, each zone's grades as bands on the scale's right edge, side by side (and
  * flagged) where shown grades overlap; a hidden grade's band is faded. The zone under the
- * cursor on the photo is outlined and its name lit.
+ * cursor on the photo is outlined and its name lit. A zone whose centre or width Advanced mode
+ * changed carries a tick at its centre, shown with the Advanced controls off too.
  */
 function ZoneScale({ grades, hovered, onZoneClick, onPreviewTarget, selected, zoneTint }: ZoneScaleProps) {
   const { t } = useTranslation();
@@ -140,12 +153,19 @@ function ZoneScale({ grades, hovered, onZoneClick, onPreviewTarget, selected, zo
         const isSideBySide = bands.length > 1;
         const isSelected = selected.includes(zone);
         const isHovered = hovered === zone;
+        const shape = zoneShape(combined);
+        const isReshaped = !isStandardZoneShape(shape);
+        const centre = zoneCentre(zoneTint, zone);
+        const tooltips = [
+          isOverlap && t('adjustments.zoneTint.overlapCount', { count: shownCount }),
+          isReshaped && t('adjustments.zoneTint.reshaped'),
+        ].filter(Boolean);
         return (
           <button
             aria-label={t('adjustments.zoneTint.zone', { zone: name })}
             aria-pressed={isSelected}
             className="group flex items-stretch gap-1.5 h-5 compact:h-[18px] focus:outline-none"
-            data-tooltip={isOverlap ? t('adjustments.zoneTint.overlapCount', { count: shownCount }) : undefined}
+            data-tooltip={tooltips.length > 0 ? tooltips.join(' · ') : undefined}
             key={name}
             onClick={(event) => onZoneClick(zone, event)}
             onPointerEnter={() => onPreviewTarget([zone])}
@@ -168,8 +188,15 @@ function ZoneScale({ grades, hovered, onZoneClick, onPreviewTarget, selected, zo
                 zone === ZONE_NAMES.length - 1 && 'rounded-t-md',
                 zone > 0 && 'border-b border-white/5',
               )}
-              style={{ backgroundColor: zoneGrey(zone, luminanceOf(combined)) }}
+              style={{ backgroundColor: zoneGrey(zone, luminanceOf(combined), centre) }}
             >
+              {isReshaped && (
+                // Up for a lighter centre, since X is at the top; ±half a zone spans the row.
+                <span
+                  className="absolute left-0 w-2 h-0.5 -translate-y-1/2 bg-accent pointer-events-none"
+                  style={{ top: `${50 - ((centre - zone * ZONE_SPAN) / ZONE_SPAN) * 100}%` }}
+                />
+              )}
               {bands.length > 0 && (
                 <span className="absolute inset-y-0 right-0 flex">
                   {bands.map((band) => (
@@ -363,6 +390,14 @@ export default function ZoneTintPanel() {
     [appSettings?.zoneTintPresets, t],
   );
   const selectedPreset = presets.find((preset) => preset.id === zoneTint.presetId) ?? null;
+
+  // Advanced mode (owner 2026-11-15): a view switch for every photo, kept in the app settings;
+  // with it off, moved zones still render and stay marked on the scale. Its sliders show the
+  // anchor zone's shape and write into every selected zone.
+  const isAdvanced = appSettings?.zoneTintAdvanced ?? false;
+  const shownShape = zoneShape(zoneTint.zones[anchor]);
+  const setShapes = (change: Partial<ZoneShape>) =>
+    updateZoneTint((current) => setZoneShapes(current, selected, change));
   // Loading always shows the result, so it switches the panel's eye on (owner 2026-11-15).
   const handleLoadPreset = (preset: ZoneTintPreset) => {
     setSelection({ ...selection, gradeId: null });
@@ -548,6 +583,52 @@ export default function ZoneTintPanel() {
               step={0.1}
               value={zoneTint.maskSmoothing ?? ZONE_TINT_MASK_SMOOTHING.default}
             />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Switch
+              checked={isAdvanced}
+              label={t('adjustments.zoneTint.advanced')}
+              onChange={(checked) => {
+                if (appSettings) void handleSettingsChange({ ...appSettings, zoneTintAdvanced: checked });
+              }}
+              tooltip={t('adjustments.zoneTint.advancedHint')}
+            />
+            {isAdvanced && (
+              <>
+                <Text variant={TextVariants.small} color={TextColors.secondary} className="block">
+                  {zonesLabel(selected)}
+                </Text>
+                <Slider
+                  defaultValue={ZONE_TINT_CENTER_OFFSET.default * SLIDER_SCALE}
+                  label={t('adjustments.zoneTint.centre')}
+                  max={ZONE_TINT_CENTER_OFFSET.max * SLIDER_SCALE}
+                  min={ZONE_TINT_CENTER_OFFSET.min * SLIDER_SCALE}
+                  onChange={(event) => setShapes({ centerOffset: Number(event.target.value) / SLIDER_SCALE })}
+                  onDragStateChange={handleDragStateChange}
+                  step={0.1}
+                  value={shownShape.centerOffset * SLIDER_SCALE}
+                />
+                <Slider
+                  defaultValue={zoneTint.softness * SLIDER_SCALE}
+                  label={t('adjustments.zoneTint.width')}
+                  labelAddon={
+                    shownShape.width === null && (
+                      <Text variant={TextVariants.small} color={TextColors.secondary} className="ml-1">
+                        {t('adjustments.zoneTint.widthAuto')}
+                      </Text>
+                    )
+                  }
+                  max={ZONE_TINT_SOFTNESS.max * SLIDER_SCALE}
+                  min={ZONE_TINT_SOFTNESS.min * SLIDER_SCALE}
+                  onChange={(event) => setShapes({ width: Number(event.target.value) / SLIDER_SCALE })}
+                  onDragStateChange={handleDragStateChange}
+                  onReset={() => setShapes({ width: null })}
+                  step={0.1}
+                  value={(shownShape.width ?? zoneTint.softness) * SLIDER_SCALE}
+                />
+              </>
+            )}
           </div>
 
           {grades.length > 0 && (

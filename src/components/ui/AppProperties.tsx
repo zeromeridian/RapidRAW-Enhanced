@@ -367,6 +367,8 @@ export interface AppSettings {
   blendPadPresets?: Array<unknown>;
   /** Zone Color Grading presets; absent until first changed, which offers the starter presets. */
   zoneTintPresets?: Array<unknown> | null;
+  /** Whether Zone Color Grading shows its Advanced controls; a view switch, not part of an edit. */
+  zoneTintAdvanced?: boolean;
   leftPanelWidth?: number;
   rightPanelWidth?: number;
   lightsOutDimLevel?: LightsOutDimLevel;
