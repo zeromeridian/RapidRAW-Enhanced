@@ -39,6 +39,9 @@ const DEFAULT_PROTECT: f32 = 0.08;
 const MAX_PROTECT: f32 = 0.20;
 /// How far a zone's centre may move from n / 10.
 const MAX_CENTER_OFFSET: f32 = 0.05;
+/// Mask smoothing's range: 0 off, up to the pipeline's tonal blur (≈ 3.5 px at 1080p,
+/// scaled with the image) and a little past it, as the spec's 0–4 px.
+const MAX_MASK_SMOOTHING: f32 = 4.0;
 
 /// Zone Tint as the shader applies it.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default, PartialEq)]
@@ -55,6 +58,11 @@ pub struct ZoneTintSettings {
     pub has_luminance: u32,
     /// Per zone, four to a vector: the shift in OKLab L at full weight.
     pub luminance: [[f32; 4]; 3],
+    /// Mask smoothing (`maskSmoothing`, 0 to `MAX_MASK_SMOOTHING`) in x; the rest pads the
+    /// vector. The shader picks the zones' colour weights from the pixel's lightness scaled by
+    /// how much brighter its blurred input is (the pipeline's own blurs), so grain does not
+    /// speckle the colour.
+    pub smoothing: [f32; 4],
 }
 
 /// The edit's `zoneTint` block.
@@ -68,6 +76,8 @@ struct ZoneTint {
     protect: f32,
     /// Absent in blocks saved before it: 1, so they render as before.
     amount: f32,
+    /// Absent in blocks saved before it: 0, no smoothing.
+    mask_smoothing: f32,
 }
 
 impl Default for ZoneTint {
@@ -79,6 +89,7 @@ impl Default for ZoneTint {
             softness: DEFAULT_SOFTNESS,
             protect: DEFAULT_PROTECT,
             amount: DEFAULT_AMOUNT,
+            mask_smoothing: 0.0,
         }
     }
 }
@@ -115,6 +126,12 @@ impl ZoneTintSettings {
         let amount = tint.amount.clamp(0.0, MAX_AMOUNT);
         let mut settings = Self {
             protect: tint.protect.clamp(0.0, MAX_PROTECT),
+            smoothing: [
+                tint.mask_smoothing.clamp(0.0, MAX_MASK_SMOOTHING),
+                0.0,
+                0.0,
+                0.0,
+            ],
             ..Self::default()
         };
         let mut tinted = false;
@@ -297,6 +314,26 @@ mod tests {
             assert_eq!(zone[..2], [0.0, 0.0], "zone {index}");
             assert!((zone[2] - index as f32 / 10.0).abs() < 1e-6, "zone {index}");
         }
+    }
+
+    #[test]
+    fn mask_smoothing_reaches_the_shader_within_its_range() {
+        let tinted = |extra: serde_json::Value| {
+            let mut block = json!({ "zones": [{ "hue": 30, "strength": 40 }] });
+            block
+                .as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            settings(block).smoothing
+        };
+        // Absent in older edits: off.
+        assert_eq!(tinted(json!({})), [0.0; 4]);
+        assert_eq!(
+            tinted(json!({ "maskSmoothing": 1.5 })),
+            [1.5, 0.0, 0.0, 0.0]
+        );
+        assert_eq!(tinted(json!({ "maskSmoothing": 9 }))[0], MAX_MASK_SMOOTHING);
+        assert_eq!(tinted(json!({ "maskSmoothing": -1 }))[0], 0.0);
     }
 
     #[test]

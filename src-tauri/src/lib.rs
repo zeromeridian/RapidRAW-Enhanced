@@ -576,7 +576,7 @@ async fn sample_adjustment_probe(
 }
 
 /// Zone Color Grading's Alt/Option mask preview: where the chosen `zones` colour the Develop
-/// preview (`zone_tint::ZoneWeights` over the `zoneTint` probe's lightness), as the mask
+/// preview (`zone_tint::ZoneWeights` over the `zoneTint` probe's smoothed lightness), as the mask
 /// overlay's red PNG data URL at the preview's size.
 #[tauri::command]
 async fn generate_zone_tint_overlay(
@@ -599,7 +599,8 @@ async fn generate_zone_tint_overlay(
         )?
         .to_rgba8();
         let strength = image::GrayImage::from_fn(lightness.width(), lightness.height(), |x, y| {
-            let l = lightness.get_pixel(x, y)[0] as f32 / 255.0;
+            // Green: the lightness the colour is weighed by, after mask smoothing.
+            let l = lightness.get_pixel(x, y)[1] as f32 / 255.0;
             Luma([(weights.weight(l) * 255.0).round() as u8])
         });
         mask_generation::mask_overlay_data_url(&strength)

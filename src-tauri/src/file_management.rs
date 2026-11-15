@@ -1132,7 +1132,7 @@ mod output_naming_tests {
         .unwrap();
 
         let zone_tint = serde_json::json!({
-            "version": 1, "softness": 0.05, "protect": 0.1, "amount": 1.5,
+            "version": 1, "softness": 0.05, "protect": 0.1, "amount": 1.5, "maskSmoothing": 2.0,
             "zones": [
                 { "hue": 0, "strength": 0, "luminance": 40 },
                 { "hue": 30, "strength": 60, "luminance": -25 },

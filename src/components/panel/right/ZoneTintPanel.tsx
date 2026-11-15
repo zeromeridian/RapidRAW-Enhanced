@@ -19,6 +19,7 @@ import {
   HueSatLum,
   INITIAL_ADJUSTMENTS,
   ZONE_TINT_AMOUNT,
+  ZONE_TINT_MASK_SMOOTHING,
   ZONE_TINT_PROTECT,
   ZONE_TINT_SOFTNESS,
   ZONE_TINT_ZONE_COUNT,
@@ -470,6 +471,19 @@ export default function ZoneTintPanel() {
               onDragStateChange={handleDragStateChange}
               step={0.5}
               value={zoneTint.protect * SLIDER_SCALE}
+            />
+            <Slider
+              defaultValue={ZONE_TINT_MASK_SMOOTHING.default}
+              fillOrigin="min"
+              label={t('adjustments.zoneTint.smoothing')}
+              max={ZONE_TINT_MASK_SMOOTHING.max}
+              min={ZONE_TINT_MASK_SMOOTHING.min}
+              onChange={(event) =>
+                updateZoneTint((current) => ({ ...current, maskSmoothing: Number(event.target.value) }))
+              }
+              onDragStateChange={handleDragStateChange}
+              step={0.1}
+              value={zoneTint.maskSmoothing ?? ZONE_TINT_MASK_SMOOTHING.default}
             />
           </div>
 

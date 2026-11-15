@@ -240,6 +240,7 @@
       "pickPoint": "Zone durch Klick ins Foto wählen (Umschalt wählt einen Bereich, Cmd/Strg fügt hinzu oder entfernt)",
       "previewHint": "{{key}} über einer Zone oder einem Grading halten, um zu sehen, wo es das Foto färbt.",
       "protect": "Schutz",
+      "smoothing": "Glättung",
       "softness": "Weichheit",
       "removeGrade": "Grading entfernen",
       "hideGrade": "Grading ausblenden",

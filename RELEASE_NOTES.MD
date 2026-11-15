@@ -5,6 +5,19 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.63.0-dev-zone-mask-smoothing — 2026-11-15
+
+### Develop
+
+- **Zone Color Grading** has a **Smoothing** slider (0–4). On grainy
+  photos, neighbouring pixels of the same surface could fall into
+  different zones and take different colours, so the colour looked
+  speckled; Smoothing picks each pixel's zone from its surroundings, so
+  the colour stays even. The photo itself is not blurred, and brightness
+  and black and white stay as they were.
+- The Alt/Option preview shows where the colour goes with smoothing.
+  Edits made before keep their look (Smoothing 0).
+
 ## 1.62.0-dev-zone-mask-preview — 2026-11-15
 
 ### Develop

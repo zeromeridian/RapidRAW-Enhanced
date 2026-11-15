@@ -29,7 +29,8 @@ struct PointColor {
 }
 
 // Zone Tint (`zone_tint::ZoneTintSettings`). Per zone: OKLab a and b at full weight, the
-// centre in OKLab L and 1 / (2σ²); then each zone's shift in L, four zones to a vector.
+// centre in OKLab L and 1 / (2σ²); then each zone's shift in L, four zones to a vector; then
+// the mask smoothing in x.
 struct ZoneTint {
     zones: array<vec4<f32>, 11>,
     enabled: u32,
@@ -37,6 +38,7 @@ struct ZoneTint {
     luminance_weight_cap: f32,
     has_luminance: u32,
     luminance: array<vec4<f32>, 3>,
+    smoothing: vec4<f32>,
 }
 
 struct ColorGradeSettings {
@@ -349,24 +351,61 @@ fn zone_tint_oklab(srgb: vec3<f32>) -> vec3<f32> {
     return linear_srgb_to_oklab(srgb_to_linear(clamp(srgb, vec3<f32>(0.0), vec3<f32>(1.0))));
 }
 
+// Zone Tint's mask smoothing (`smoothing.x`, 0–4): how much lighter the pixel's neighbourhood
+// is than the pixel itself, as a factor on OKLab L (the cube root of the luminance ratio).
+// It reads the pipeline's own input blurs (sharpness ≈ 1 px, tonal ≈ 3.5 px at 1080p, both
+// scaled with the image), blending from none at 0 through the fine blur at 1 to the tonal
+// blur from 3.5; so grain, which lives in the input, no longer picks the zones. Approximate
+// (owner 2026-11-15): where curves or masks change neighbouring tones very differently it
+// follows the input's tones. 1 means no smoothing.
+fn zone_tint_smoothing_factor(coord: vec2<u32>, is_raw: u32, smoothing: f32) -> f32 {
+    if (smoothing <= 0.0) {
+        return 1.0;
+    }
+    let pixel = textureLoad(input_texture, coord, 0).rgb;
+    let fine = textureLoad(sharpness_blur_texture, coord, 0).rgb;
+    let coarse = textureLoad(tonal_blur_texture, coord, 0).rgb;
+    let y = get_luma(select(pixel, srgb_to_linear(pixel), is_raw == 0u));
+    let y_fine = get_luma(select(fine, srgb_to_linear(fine), is_raw == 0u));
+    let y_coarse = get_luma(select(coarse, srgb_to_linear(coarse), is_raw == 0u));
+    let y_blurred = mix(
+        mix(y, y_fine, clamp(smoothing, 0.0, 1.0)),
+        y_coarse,
+        clamp((smoothing - 1.0) / 2.5, 0.0, 1.0)
+    );
+    if (y < 1e-5 || y_blurred <= 0.0) {
+        return 1.0;
+    }
+    return pow(y_blurred / y, 1.0 / 3.0);
+}
+
+// The lightness Zone Tint weighs a pixel's zones by: its own L moved by the smoothing factor,
+// by at most one zone.
+fn zone_tint_weight_lightness(l: f32, smoothing_factor: f32) -> f32 {
+    return clamp(l * smoothing_factor, max(l - 0.1, 0.0), min(l + 0.1, 1.0));
+}
+
 // Zone Tint on display sRGB: adds the zones' chroma at the pixel's OKLab L, never changing L.
-// Chroma that would leave sRGB is reduced along the same hue instead of clipped.
-fn apply_zone_tint(srgb: vec3<f32>, tint: ZoneTint) -> vec3<f32> {
+// Chroma that would leave sRGB is reduced along the same hue instead of clipped. The zones'
+// colour weights use the smoothed lightness (`smoothing_factor`); Protect and the luminance
+// shifts use the pixel's own L, so black and white stay neutral and tones keep their order.
+fn apply_zone_tint(srgb: vec3<f32>, tint: ZoneTint, smoothing_factor: f32) -> vec3<f32> {
     let lab = zone_tint_oklab(srgb);
     let l = lab.x;
+    let weight_l = zone_tint_weight_lightness(l, smoothing_factor);
 
     // Normalised Gaussian weights, offset by the nearest zone's exponent so a narrow zone
     // far from L cannot underflow every weight.
     var nearest = 1e30;
     for (var n = 0u; n < 11u; n = n + 1u) {
-        let d = l - tint.zones[n].z;
+        let d = weight_l - tint.zones[n].z;
         nearest = min(nearest, d * d * tint.zones[n].w);
     }
     var weight_sum = 0.0;
     var chroma = vec2<f32>(0.0);
     for (var n = 0u; n < 11u; n = n + 1u) {
         let zone = tint.zones[n];
-        let d = l - zone.z;
+        let d = weight_l - zone.z;
         let weight = exp(nearest - d * d * zone.w);
         weight_sum += weight;
         chroma += weight * zone.xy;
@@ -2257,12 +2296,21 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     // After every tonal step and the Black & White conversion, before grain, so the zones
     // follow the tones on screen and grain stays neutral.
+    let zone_smoothing_factor = zone_tint_smoothing_factor(
+        absolute_coord,
+        is_raw,
+        adjustments.global.zone_tint.smoothing.x
+    );
     if (SAMPLE_PROBE == SAMPLE_PROBE_ZONE_TINT) {
-        textureStore(output_texture, id.xy, vec4<f32>(zone_tint_oklab(final_rgb).x, 0.0, 0.0, 1.0));
+        // Red: the pixel's L (the pickers); green: the smoothed L the colour is weighed by
+        // (the mask preview).
+        let l = zone_tint_oklab(final_rgb).x;
+        let weight_l = zone_tint_weight_lightness(l, zone_smoothing_factor);
+        textureStore(output_texture, id.xy, vec4<f32>(l, weight_l, 0.0, 1.0));
         return;
     }
     if (adjustments.global.zone_tint.enabled == 1u) {
-        final_rgb = apply_zone_tint(final_rgb, adjustments.global.zone_tint);
+        final_rgb = apply_zone_tint(final_rgb, adjustments.global.zone_tint, zone_smoothing_factor);
     }
 
     final_rgb += grain_delta(
@@ -2302,7 +2350,11 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
                 if (!backdrop_ready) {
                     backdrop_rgb = monochrome_srgb(backdrop_rgb);
                     if (adjustments.global.zone_tint.enabled == 1u) {
-                        backdrop_rgb = apply_zone_tint(backdrop_rgb, adjustments.global.zone_tint);
+                        backdrop_rgb = apply_zone_tint(
+                            backdrop_rgb,
+                            adjustments.global.zone_tint,
+                            zone_smoothing_factor
+                        );
                     }
                     backdrop_ready = true;
                 }

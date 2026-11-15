@@ -240,6 +240,7 @@
       "pickPoint": "写真をクリックしてゾーンを選択（Shift で範囲選択、Cmd/Ctrl で追加・解除）",
       "previewHint": "ゾーンやグレードの上で {{key}} を押し続けると、写真のどこに色が付くかを表示します。",
       "protect": "保護",
+      "smoothing": "スムージング",
       "softness": "柔らかさ",
       "removeGrade": "グレードを削除",
       "hideGrade": "グレードを非表示",

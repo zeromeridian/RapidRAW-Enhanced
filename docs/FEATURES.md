@@ -353,7 +353,9 @@ details are in `RELEASE_NOTES.MD`.
   dimmed, has no effect and does not overlap; editing it shows it again)
   and removes it with ×. Neighbouring zones blend
   smoothly, Softness sets how far a zone's colour reaches, and Protect
-  keeps black and white free of colour. Amount scales the whole effect
+  keeps black and white free of colour; Smoothing (0–4) picks each
+  pixel's zone from its surroundings so grain does not speckle the
+  colour. Amount scales the whole effect
   (0–200 %) without changing the stored settings. Fill between makes one
   gradient grade on the zones between the first and last selected zone,
   from one end's colour to the other's along a Blend Pad curve (Linear,

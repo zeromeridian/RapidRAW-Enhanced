@@ -240,6 +240,7 @@
       "pickPoint": "Scegli una zona facendo clic sulla foto (Maiusc seleziona un intervallo, Cmd/Ctrl aggiunge o rimuove)",
       "previewHint": "Tieni premuto {{key}} su una zona o una gradazione per vedere dove colora la foto.",
       "protect": "Protezione",
+      "smoothing": "Levigatura",
       "softness": "Morbidezza",
       "removeGrade": "Rimuovi gradazione",
       "hideGrade": "Nascondi gradazione",

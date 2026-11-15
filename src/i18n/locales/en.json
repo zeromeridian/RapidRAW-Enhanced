@@ -241,6 +241,7 @@
       "pickPoint": "Pick a zone by clicking the photo (Shift selects a range, Cmd/Ctrl adds or removes)",
       "previewHint": "Hold {{key}} over a zone or a grade to see where it colours the photo.",
       "protect": "Protect",
+      "smoothing": "Smoothing",
       "softness": "Softness",
       "removeGrade": "Remove grade",
       "hideGrade": "Hide grade",

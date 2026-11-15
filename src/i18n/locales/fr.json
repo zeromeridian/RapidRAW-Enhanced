@@ -240,6 +240,7 @@
       "pickPoint": "Choisir une zone en cliquant sur la photo (Maj sélectionne une plage, Cmd/Ctrl ajoute ou retire)",
       "previewHint": "Maintenez {{key}} sur une zone ou un étalonnage pour voir où il colore la photo.",
       "protect": "Protection",
+      "smoothing": "Lissage",
       "softness": "Douceur",
       "removeGrade": "Supprimer l'étalonnage",
       "hideGrade": "Masquer l'étalonnage",

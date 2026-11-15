@@ -240,6 +240,7 @@
       "pickPoint": "사진을 클릭해 존 선택 (Shift로 범위 선택, Cmd/Ctrl로 추가 또는 제거)",
       "previewHint": "존이나 그레이드 위에서 {{key}} 키를 누르고 있으면 사진에서 색이 입혀지는 곳이 보입니다.",
       "protect": "보호",
+      "smoothing": "스무딩",
       "softness": "부드러움",
       "removeGrade": "그레이드 제거",
       "hideGrade": "그레이드 숨기기",

@@ -571,6 +571,8 @@ export const ZONE_TINT_ZONE_COUNT = 11;
 /** Zone Tint defaults and ranges; mirror the constants in `zone_tint.rs`. */
 export const ZONE_TINT_SOFTNESS = { default: 0.04, min: 0.02, max: 0.08 } as const;
 export const ZONE_TINT_PROTECT = { default: 0.08, min: 0, max: 0.2 } as const;
+/** `zone_tint::MAX_MASK_SMOOTHING`: how far the zones' colour weights are smoothed, 0 off. */
+export const ZONE_TINT_MASK_SMOOTHING = { default: 0, min: 0, max: 4 } as const;
 /** `zone_tint::MAX_AMOUNT`: the overall Amount scales every zone's strength, up to double. */
 export const ZONE_TINT_AMOUNT = { default: 1, min: 0, max: 2 } as const;
 
@@ -620,6 +622,8 @@ export interface ZoneTint {
   protect: number;
   /** Multiplies every zone's strength when rendered; absent in older edits, which means 1. */
   amount?: number;
+  /** Mask smoothing, 0–4: grain no longer picks the zones; absent in older edits, which means 0. */
+  maskSmoothing?: number;
 }
 
 export const createZoneTintGrade = (zones: Array<ZoneTintZone | null>, id: string = uuidv4()): ZoneTintGrade => ({

@@ -41,7 +41,8 @@ pub enum SampleProbe {
     MaskCurve,
     /// The perceptual hue, saturation and luma Point Color selects by, after the colour mixer.
     PointColor,
-    /// The OKLab lightness Zone Tint picks its zones by, in red.
+    /// The OKLab lightness Zone Tint picks its zones by, in red; in green the same after mask
+    /// smoothing, which weighs the colour.
     ZoneTint,
 }
 

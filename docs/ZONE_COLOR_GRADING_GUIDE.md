@@ -33,6 +33,7 @@ it, then move the colour wheel. Each coloured selection becomes a
 | **Amount** | Scales the whole tool, 0–200 %. |
 | **Softness** | How far each zone's colour reaches into its neighbours. |
 | **Protect** | How strongly pure black and pure white are kept free of colour. |
+| **Smoothing** | Picks each pixel's zone from its surroundings, so grain does not speckle the colour. |
 | **Grades list** | Every grade, lightest first, with its zones, its hue (H), strength (S) and luminance (L), or "Gradient" for a ramp. An "Overlaps …" line names the zones it shares with other shown grades. Click a grade to edit it; the eye hides or shows it; × removes it. |
 
 ## Zones: which tones belong where
@@ -304,7 +305,7 @@ wheel writes the moved value into every zone of it, so moving its hue
 gives all its zones that hue (their strengths stay). To change the ramp
 itself, change an end and run Fill between again.
 
-## Amount, Softness, Protect
+## Amount, Softness, Protect, Smoothing
 
 These apply to the whole tool, all grades together.
 
@@ -320,6 +321,19 @@ These apply to the whole tool, all grades together.
   and pure white, so Zone 0 stays black and Zone X stays paper white
   even with Zones 0 and X coloured. At 0 a coloured paper white is
   possible. Protect never limits luminance.
+- **Smoothing** (0–4, default 0) stops grain from picking the zones. On a
+  grainy photo neighbouring pixels of one surface jump between zones,
+  so each takes a different colour and the colour looks speckled.
+  Smoothing picks each pixel's zone from the tones of its surroundings
+  instead (at 1 a fine area, at 3.5 and above a wider one, scaled with
+  the image size so the export matches the preview). It changes only
+  where the colour goes: the brightness, the luminance shifts and
+  Protect still follow each pixel's own tone, and nothing is blurred.
+  The surroundings are judged from the photo before editing, so where
+  strong curves or masks change neighbouring tones very differently the
+  colour follows the original tones a little more. The pickers and the
+  hover readout still read each pixel's own tone; the Alt/Option preview
+  shows the smoothed result.
 
 ### Example 7: Protect
 
