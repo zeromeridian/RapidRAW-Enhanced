@@ -2760,8 +2760,11 @@ mod tests {
         let all_pixels = render(serde_json::json!({
             "zones": vec![serde_json::json!({ "hue": 200, "strength": 50 }); 11],
         }));
-        let (plain, zone_seven, all_zones) =
-            (to_lab(&plain_pixels), to_lab(&seven_pixels), to_lab(&all_pixels));
+        let (plain, zone_seven, all_zones) = (
+            to_lab(&plain_pixels),
+            to_lab(&seven_pixels),
+            to_lab(&all_pixels),
+        );
 
         let mut checked_peak = 0;
         for (index, ((plain, seven), all)) in

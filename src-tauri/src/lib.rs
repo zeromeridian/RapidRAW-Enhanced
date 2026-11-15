@@ -554,68 +554,112 @@ async fn sample_adjustment_probe(
     app_handle: tauri::AppHandle,
 ) -> Result<Response, String> {
     tokio::task::spawn_blocking(move || {
-        let state = app_handle.state::<AppState>();
-        let context = get_or_init_gpu_context(&state, &app_handle)?;
-        let loaded_image = state
-            .original_image
-            .lock()
-            .unwrap()
-            .clone()
-            .ok_or("No original image loaded")?;
-        let mut adjustments = js_adjustments;
-        hydrate_adjustments(&state, &mut adjustments);
-
-        let transform_hash = calculate_transform_hash(&adjustments);
-        let (image, scale, unscaled_crop_offset) = state
-            .cached_preview
-            .lock()
-            .unwrap()
-            .as_ref()
-            .filter(|cached| cached.transform_hash == transform_hash)
-            .map(|cached| {
-                (
-                    Arc::clone(&cached.image),
-                    cached.scale,
-                    cached.unscaled_crop_offset,
-                )
-            })
-            .ok_or("The Develop preview is not ready")?;
-
-        let (width, height) = image.dimensions();
-        let half_x = (radius_x * width as f32).max(1.0);
-        let half_y = (radius_y * height as f32).max(1.0);
-        let x0 = (x * width as f32 - half_x).clamp(0.0, width as f32 - 1.0) as u32;
-        let y0 = (y * height as f32 - half_y).clamp(0.0, height as f32 - 1.0) as u32;
-        let x1 = ((x * width as f32 + half_x).ceil() as u32).clamp(x0 + 1, width);
-        let y1 = ((y * height as f32 + half_y).ceil() as u32).clamp(y0 + 1, height);
-
-        let editor_render = EditorRender::prepare(
-            &app_handle,
-            &state,
-            &loaded_image,
-            &adjustments,
-            (width, height),
-            scale,
-            unscaled_crop_offset,
-        );
-        let roi = crate::gpu_processing::Roi {
-            x: x0,
-            y: y0,
-            width: x1 - x0,
-            height: y1 - y0,
-        };
-        let sample = process_and_get_dynamic_image(
-            &context,
-            &state,
-            &image,
-            transform_hash,
-            editor_render.request(Some(roi), Some(probe)),
-            "sample_adjustment_probe",
-        )?;
+        let sample =
+            render_adjustment_probe(&app_handle, js_adjustments, probe, |width, height| {
+                let half_x = (radius_x * width as f32).max(1.0);
+                let half_y = (radius_y * height as f32).max(1.0);
+                let x0 = (x * width as f32 - half_x).clamp(0.0, width as f32 - 1.0) as u32;
+                let y0 = (y * height as f32 - half_y).clamp(0.0, height as f32 - 1.0) as u32;
+                let x1 = ((x * width as f32 + half_x).ceil() as u32).clamp(x0 + 1, width);
+                let y1 = ((y * height as f32 + half_y).ceil() as u32).clamp(y0 + 1, height);
+                crate::gpu_processing::Roi {
+                    x: x0,
+                    y: y0,
+                    width: x1 - x0,
+                    height: y1 - y0,
+                }
+            })?;
         Ok(Response::new(sample.into_bytes()))
     })
     .await
     .map_err(|e| format!("Task panicked: {}", e))?
+}
+
+/// Zone Color Grading's Alt/Option mask preview: where the chosen `zones` colour the Develop
+/// preview (`zone_tint::ZoneWeights` over the `zoneTint` probe's lightness), as the mask
+/// overlay's red PNG data URL at the preview's size.
+#[tauri::command]
+async fn generate_zone_tint_overlay(
+    js_adjustments: serde_json::Value,
+    zones: Vec<usize>,
+    app_handle: tauri::AppHandle,
+) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || {
+        let weights = zone_tint::ZoneWeights::from_json(js_adjustments.get("zoneTint"), &zones);
+        let lightness = render_adjustment_probe(
+            &app_handle,
+            js_adjustments,
+            crate::gpu_processing::SampleProbe::ZoneTint,
+            |width, height| crate::gpu_processing::Roi {
+                x: 0,
+                y: 0,
+                width,
+                height,
+            },
+        )?
+        .to_rgba8();
+        let strength = image::GrayImage::from_fn(lightness.width(), lightness.height(), |x, y| {
+            let l = lightness.get_pixel(x, y)[0] as f32 / 255.0;
+            Luma([(weights.weight(l) * 255.0).round() as u8])
+        });
+        mask_generation::mask_overlay_data_url(&strength)
+    })
+    .await
+    .map_err(|e| format!("Task panicked: {}", e))?
+}
+
+/// The Develop preview rendered at `probe`'s stage inside the rectangle `region` chooses from
+/// the preview's size; fails while the preview for these adjustments is not ready.
+fn render_adjustment_probe(
+    app_handle: &tauri::AppHandle,
+    mut adjustments: serde_json::Value,
+    probe: crate::gpu_processing::SampleProbe,
+    region: impl FnOnce(u32, u32) -> crate::gpu_processing::Roi,
+) -> Result<DynamicImage, String> {
+    let state = app_handle.state::<AppState>();
+    let context = get_or_init_gpu_context(&state, app_handle)?;
+    let loaded_image = state
+        .original_image
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or("No original image loaded")?;
+    hydrate_adjustments(&state, &mut adjustments);
+
+    let transform_hash = calculate_transform_hash(&adjustments);
+    let (image, scale, unscaled_crop_offset) = state
+        .cached_preview
+        .lock()
+        .unwrap()
+        .as_ref()
+        .filter(|cached| cached.transform_hash == transform_hash)
+        .map(|cached| {
+            (
+                Arc::clone(&cached.image),
+                cached.scale,
+                cached.unscaled_crop_offset,
+            )
+        })
+        .ok_or("The Develop preview is not ready")?;
+
+    let (width, height) = image.dimensions();
+    let editor_render = EditorRender::prepare(
+        app_handle,
+        &state,
+        &loaded_image,
+        &adjustments,
+        (width, height),
+        scale,
+        unscaled_crop_offset,
+    );
+    process_and_get_dynamic_image(
+        &context,
+        &state,
+        &image,
+        transform_hash,
+        editor_render.request(Some(region(width, height)), Some(probe)),
+        "sample_adjustment_probe",
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2735,6 +2779,7 @@ pub fn run() {
             ai_commands::generate_relight_normal_map,
             ai_commands::get_depth_preview,
             sample_adjustment_probe,
+            generate_zone_tint_overlay,
             ai_denoise::get_ai_denoise_cache_size,
             ai_denoise::clear_ai_denoise_cache,
             inpainting::invoke_generative_replace_with_mask_def,

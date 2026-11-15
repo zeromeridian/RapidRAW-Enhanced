@@ -95,6 +95,8 @@ interface EditorState {
   zoneTintSelection: ZoneSelection;
   /** Zone Color Grading's hover readout: the zone under the cursor on the photo, or null. */
   zoneTintHover: ZoneHover | null;
+  /** The zones Zone Color Grading's Alt/Option mask preview shows on the photo, or null. */
+  zoneTintPreviewZones: number[] | null;
   activeRelightLightId: string | null;
   liveRotation: number | null;
   /** The Crop panel's values when it was opened (null outside Crop); Escape restores them. */
@@ -186,6 +188,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   isPointColorRangeVisualized: false,
   zoneTintSelection: INITIAL_ZONE_SELECTION,
   zoneTintHover: null,
+  zoneTintPreviewZones: null,
   activeRelightLightId: null,
   liveRotation: null,
   cropSessionSnapshot: null,

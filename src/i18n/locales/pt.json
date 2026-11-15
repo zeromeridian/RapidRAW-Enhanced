@@ -238,6 +238,7 @@
       "overlaps": "Sobrepõe-se em {{zones}}",
       "pickArea": "Escolher zonas arrastando um retângulo na foto (Shift ou Cmd/Ctrl adiciona à seleção)",
       "pickPoint": "Escolher uma zona clicando na foto (Shift seleciona um intervalo, Cmd/Ctrl adiciona ou remove)",
+      "previewHint": "Mantenha {{key}} sobre uma zona ou uma gradação para ver onde ela colore a foto.",
       "protect": "Proteção",
       "softness": "Suavidade",
       "removeGrade": "Remover gradação",

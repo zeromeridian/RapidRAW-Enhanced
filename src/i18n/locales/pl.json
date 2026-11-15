@@ -238,6 +238,7 @@
       "overlaps": "Nakłada się w {{zones}}",
       "pickArea": "Wybierz strefy, przeciągając prostokąt na zdjęciu (Shift lub Cmd/Ctrl dodaje do zaznaczenia)",
       "pickPoint": "Wybierz strefę, klikając zdjęcie (Shift zaznacza zakres, Cmd/Ctrl dodaje lub usuwa)",
+      "previewHint": "Przytrzymaj {{key}} nad strefą lub gradacją, aby zobaczyć, gdzie barwi zdjęcie.",
       "protect": "Ochrona",
       "softness": "Miękkość",
       "removeGrade": "Usuń gradację",

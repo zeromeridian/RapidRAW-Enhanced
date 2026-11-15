@@ -5,6 +5,19 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.62.0-dev-zone-mask-preview — 2026-11-15
+
+### Develop
+
+- **Zone Color Grading** can show where it colours: hold **Alt**
+  (**Option** on macOS) over a zone on the scale, and the photo shows that
+  zone's area in red, like a mask overlay, stronger where the zone gives
+  more of its colour. Over a row in the **Grades** list it shows all of
+  that grade's zones together.
+- The preview follows Softness and Protect, so you see exactly how a
+  zone fades into its neighbours. It works for zones without a colour
+  too, and changes nothing.
+
 ## 1.61.0-dev-zone-grading-phase-3 — 2026-11-15
 
 ### Develop

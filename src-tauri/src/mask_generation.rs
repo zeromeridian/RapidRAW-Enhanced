@@ -1526,25 +1526,30 @@ fn generate_mask_overlay_blocking(
         scaled_crop_offset,
         warped_image.as_deref(),
     ) {
-        let mut rgba_mask = RgbaImage::new(width, height);
-        for (x, y, pixel) in gray_mask.enumerate_pixels() {
-            let intensity = pixel[0];
-            let alpha = (intensity as f32 * 0.5) as u8;
-            rgba_mask.put_pixel(x, y, Rgba([255, 0, 0, alpha]));
-        }
-
-        let mut buf = Cursor::new(Vec::new());
-        rgba_mask
-            .write_to(&mut buf, ImageFormat::Png)
-            .map_err(|e| e.to_string())?;
-
-        let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
-        let data_url = format!("data:image/png;base64,{}", base64_str);
-
-        Ok(data_url)
+        mask_overlay_data_url(&gray_mask)
     } else {
         Ok("".to_string())
     }
+}
+
+/// A mask's strength as the Develop overlay shows it: red, half opaque at full strength, as a
+/// PNG data URL. Also Zone Color Grading's mask preview (`generate_zone_tint_overlay`).
+pub fn mask_overlay_data_url(gray_mask: &GrayImage) -> Result<String, String> {
+    let (width, height) = gray_mask.dimensions();
+    let mut rgba_mask = RgbaImage::new(width, height);
+    for (x, y, pixel) in gray_mask.enumerate_pixels() {
+        let intensity = pixel[0];
+        let alpha = (intensity as f32 * 0.5) as u8;
+        rgba_mask.put_pixel(x, y, Rgba([255, 0, 0, alpha]));
+    }
+
+    let mut buf = Cursor::new(Vec::new());
+    rgba_mask
+        .write_to(&mut buf, ImageFormat::Png)
+        .map_err(|e| e.to_string())?;
+
+    let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
+    Ok(format!("data:image/png;base64,{}", base64_str))
 }
 
 pub fn resolve_warped_image_for_masks(

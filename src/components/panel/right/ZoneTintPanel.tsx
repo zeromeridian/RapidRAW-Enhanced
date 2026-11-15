@@ -1,4 +1,4 @@
-import { MouseEvent, useCallback, useState } from 'react';
+import { MouseEvent, useCallback, useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Eye, EyeOff, Layers, Pipette, RotateCcw, SquareDashedMousePointer, X } from 'lucide-react';
 import clsx from 'clsx';
@@ -12,6 +12,7 @@ import Slider from '../../ui/Slider';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants } from '../../../types/typography';
 import { canvasToolState, useEditorStore } from '../../../store/useEditorStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import {
   BlendPadCurve,
@@ -99,6 +100,8 @@ interface ZoneScaleProps {
   /** The zone under the cursor on the photo (the hover readout), or null. */
   hovered: number | null;
   onZoneClick(zone: number, event: MouseEvent): void;
+  /** The pointer entered a zone (its zones, for the Alt/Option mask preview) or left it (null). */
+  onPreviewTarget(zones: number[] | null): void;
   selected: number[];
   zoneTint: ZoneTint;
 }
@@ -109,7 +112,7 @@ interface ZoneScaleProps {
  * flagged) where shown grades overlap; a hidden grade's band is faded. The zone under the
  * cursor on the photo is outlined and its name lit.
  */
-function ZoneScale({ grades, hovered, onZoneClick, selected, zoneTint }: ZoneScaleProps) {
+function ZoneScale({ grades, hovered, onZoneClick, onPreviewTarget, selected, zoneTint }: ZoneScaleProps) {
   const { t } = useTranslation();
 
   return (
@@ -135,6 +138,8 @@ function ZoneScale({ grades, hovered, onZoneClick, selected, zoneTint }: ZoneSca
             data-tooltip={isOverlap ? t('adjustments.zoneTint.overlapCount', { count: shownCount }) : undefined}
             key={name}
             onClick={(event) => onZoneClick(zone, event)}
+            onPointerEnter={() => onPreviewTarget([zone])}
+            onPointerLeave={() => onPreviewTarget(null)}
           >
             <span
               className={clsx(
@@ -233,6 +238,31 @@ export default function ZoneTintPanel() {
   const { zones: selected, anchor } = selection;
   const setSelection = (zoneTintSelection: ZoneSelection) => setEditor({ zoneTintSelection });
   const [fillCurve, setFillCurve] = useState<BlendPadCurve>('linear');
+  const osPlatform = useSettingsStore((state) => state.osPlatform);
+
+  // Alt/Option mask preview (owner 2026-11-15): while Alt/Option is held over a zone on the
+  // scale or a row of the Grades list, the photo shows where those zones colour it.
+  const [previewTarget, setPreviewTarget] = useState<number[] | null>(null);
+  const [isAltHeld, setIsAltHeld] = useState(false);
+  useEffect(() => {
+    const track = (e: KeyboardEvent | PointerEvent) => setIsAltHeld(e.altKey);
+    const release = () => setIsAltHeld(false);
+    window.addEventListener('keydown', track);
+    window.addEventListener('keyup', track);
+    window.addEventListener('pointermove', track);
+    window.addEventListener('blur', release);
+    return () => {
+      window.removeEventListener('keydown', track);
+      window.removeEventListener('keyup', track);
+      window.removeEventListener('pointermove', track);
+      window.removeEventListener('blur', release);
+    };
+  }, []);
+  const previewZones = isAltHeld ? previewTarget : null;
+  useEffect(() => {
+    setEditor({ zoneTintPreviewZones: previewZones });
+  }, [previewZones, setEditor]);
+  useEffect(() => () => setEditor({ zoneTintPreviewZones: null }), [setEditor]);
 
   const title = t('editor.adjustments.sections.zoneTint');
   const isVisible = sectionVisibility.zoneTint;
@@ -369,6 +399,7 @@ export default function ZoneTintPanel() {
             <ZoneScale
               grades={grades}
               hovered={hoveredZone}
+              onPreviewTarget={setPreviewTarget}
               onZoneClick={handleZoneClick}
               selected={selected}
               zoneTint={zoneTint}
@@ -385,6 +416,9 @@ export default function ZoneTintPanel() {
           </div>
           <Text variant={TextVariants.small} color={TextColors.secondary} className="block">
             {t('adjustments.zoneTint.hint')}
+          </Text>
+          <Text variant={TextVariants.small} color={TextColors.secondary} className="block">
+            {t('adjustments.zoneTint.previewHint', { key: osPlatform === 'macos' ? 'Option' : 'Alt' })}
           </Text>
 
           <div className="flex items-center gap-2" data-tooltip={t('adjustments.zoneTint.fillHint')}>
@@ -458,6 +492,8 @@ export default function ZoneTintPanel() {
                       grade.id === activeGrade?.id ? 'bg-surface' : 'hover:bg-surface',
                     )}
                     key={grade.id}
+                    onPointerEnter={() => setPreviewTarget(zones)}
+                    onPointerLeave={() => setPreviewTarget(null)}
                   >
                     <button
                       className={clsx(

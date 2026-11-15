@@ -339,7 +339,9 @@ details are in `RELEASE_NOTES.MD`.
   holding a fair share of the dragged area (Shift or Cmd/Ctrl adds them);
   both read the tones before the grading. While the panel is open, a
   label beside the cursor names the zone under it and its lightness
-  ("Zone VI · L 0.62") and outlines that zone on the scale. Moving the colour wheel turns
+  ("Zone VI · L 0.62") and outlines that zone on the scale. Holding
+  Alt/Option over a zone or a grade shows in red, like a mask overlay,
+  where on the photo it colours (Softness and Protect included). Moving the colour wheel turns
   the selection into a **grade** with its own colour, strength and
   luminance; each further coloured selection is another grade, and
   grades that share zones add up there (colours as colour-wheel vectors,

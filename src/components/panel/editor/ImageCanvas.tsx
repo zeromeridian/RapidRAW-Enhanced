@@ -24,6 +24,7 @@ import { useImageNaturalSize } from '../../../hooks/useImageNaturalSize';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
 import { useTargetedAdjustment } from '../../../hooks/useTargetedAdjustment';
 import { useZoneHoverReadout } from '../../../hooks/useZoneHoverReadout';
+import { useZoneTintOverlay } from '../../../hooks/useZoneTintOverlay';
 import { useTranslation } from 'react-i18next';
 import type { OverlayMode } from '../right/CropPanel';
 import CompositionOverlays from './overlays/CompositionOverlays';
@@ -1589,6 +1590,8 @@ const ImageCanvas = memo(
     const photoFrameRef = useRef<SVGSVGElement>(null);
     const isZoneTintPanelOpen = useUIStore((state) => state.activeRightPanel === Panel.ZoneTint);
     useZoneHoverReadout(photoFrameRef, isZoneTintPanelOpen && hasRenderSize && isPhotoShown && !isCropViewVisible);
+    // Its Alt/Option mask preview shows in the mask overlay's place.
+    const zoneTintOverlayUrl = useZoneTintOverlay(isZoneTintPanelOpen && !isCropViewVisible);
 
     const isRelightPickerActive = useEditorStore((state) => state.isRelightPickerActive);
     const isMaskShapeDragging = useEditorStore((state) => state.isMaskShapeDragging);
@@ -1855,9 +1858,9 @@ const ImageCanvas = memo(
       if (maskOverlayUrl && (isMasking || isAiEditing)) {
         setDisplayedMaskUrl(maskOverlayUrl);
       } else {
-        setDisplayedMaskUrl(null);
+        setDisplayedMaskUrl(zoneTintOverlayUrl);
       }
-    }, [maskOverlayUrl, isMasking, isAiEditing]);
+    }, [maskOverlayUrl, isMasking, isAiEditing, zoneTintOverlayUrl]);
 
     useEffect(() => {
       if (isToolActive) {

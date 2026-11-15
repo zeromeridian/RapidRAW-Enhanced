@@ -126,13 +126,7 @@ impl ZoneTintSettings {
                 (zone.strength.max(0.0) * amount).min(MAX_STRENGTH) / MAX_STRENGTH * MAX_CHROMA
             });
             let hue = zone.map_or(0.0, |zone| oklab_hue(zone.hue));
-            let offset = zone.map_or(0.0, |zone| {
-                zone.center_offset
-                    .clamp(-MAX_CENTER_OFFSET, MAX_CENTER_OFFSET)
-            });
-            let sigma = zone
-                .and_then(|zone| zone.width)
-                .map_or(softness, |width| width.clamp(MIN_SOFTNESS, MAX_SOFTNESS));
+            let (centre, inverse_two_sigma_sq) = zone_shape(zone, index, softness);
             let shift = zone.map_or(0.0, |zone| {
                 (zone.luminance.clamp(-MAX_LUMINANCE, MAX_LUMINANCE) * amount)
                     .clamp(-MAX_LUMINANCE, MAX_LUMINANCE)
@@ -145,8 +139,8 @@ impl ZoneTintSettings {
             *slot = [
                 chroma * hue.cos(),
                 chroma * hue.sin(),
-                index as f32 / (ZONE_COUNT - 1) as f32 + offset,
-                1.0 / (2.0 * sigma * sigma),
+                centre,
+                inverse_two_sigma_sq,
             ];
         }
         // Without a colour or a luminance shift the block is off exactly like a missing one,
@@ -160,6 +154,80 @@ impl ZoneTintSettings {
         settings.luminance_weight_cap =
             1.0 / (2.0 * MIN_LUMINANCE_SOFTNESS * MIN_LUMINANCE_SOFTNESS);
         settings
+    }
+}
+
+/// Zone `index`'s centre in L (n / 10 plus its offset) and 1 / (2σ²) of its own width or the
+/// block's softness: where the shader places and how widely it weighs the zone.
+fn zone_shape(zone: Option<&Zone>, index: usize, softness: f32) -> (f32, f32) {
+    let offset = zone.map_or(0.0, |zone| {
+        zone.center_offset
+            .clamp(-MAX_CENTER_OFFSET, MAX_CENTER_OFFSET)
+    });
+    let sigma = zone
+        .and_then(|zone| zone.width)
+        .map_or(softness, |width| width.clamp(MIN_SOFTNESS, MAX_SOFTNESS));
+    (
+        index as f32 / (ZONE_COUNT - 1) as f32 + offset,
+        1.0 / (2.0 * sigma * sigma),
+    )
+}
+
+/// How strongly chosen zones colour each tone, for the panel's Alt/Option mask preview: the
+/// shader's weighing (`apply_zone_tint`: normalised Gaussian weights, then Protect) summed over
+/// the chosen zones, so the preview shows exactly where their colour goes. It uses the block's
+/// zone shapes whatever their colours, so an uncoloured zone previews too.
+pub struct ZoneWeights {
+    shapes: [(f32, f32); ZONE_COUNT],
+    chosen: [bool; ZONE_COUNT],
+    protect: f32,
+}
+
+impl ZoneWeights {
+    pub fn from_json(js_zone_tint: Option<&serde_json::Value>, chosen: &[usize]) -> Self {
+        let tint = js_zone_tint
+            .and_then(|value| ZoneTint::deserialize(value).ok())
+            .filter(|tint| tint.version == VERSION)
+            .unwrap_or_default();
+        let softness = tint.softness.clamp(MIN_SOFTNESS, MAX_SOFTNESS);
+        Self {
+            shapes: std::array::from_fn(|index| zone_shape(tint.zones.get(index), index, softness)),
+            chosen: std::array::from_fn(|index| chosen.contains(&index)),
+            protect: tint.protect.clamp(0.0, MAX_PROTECT),
+        }
+    }
+
+    /// The chosen zones' share (0–1) of the colour at OKLab lightness `l`.
+    pub fn weight(&self, l: f32) -> f32 {
+        // Offset by the nearest zone's exponent, as the shader does, so narrow zones far from
+        // `l` cannot underflow every weight.
+        let exponent = |(centre, inverse_two_sigma_sq): (f32, f32)| {
+            let d = l - centre;
+            d * d * inverse_two_sigma_sq
+        };
+        let nearest = self
+            .shapes
+            .iter()
+            .map(|shape| exponent(*shape))
+            .fold(f32::INFINITY, f32::min);
+        let (mut chosen, mut total) = (0.0, 0.0);
+        for (shape, is_chosen) in self.shapes.iter().zip(self.chosen) {
+            let weight = (nearest - exponent(*shape)).exp();
+            total += weight;
+            if is_chosen {
+                chosen += weight;
+            }
+        }
+        let smoothstep = |edge0: f32, edge1: f32, x: f32| {
+            let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
+            t * t * (3.0 - 2.0 * t)
+        };
+        let protection = if self.protect > 0.0 {
+            smoothstep(0.0, self.protect, l) * (1.0 - smoothstep(1.0 - self.protect, 1.0, l))
+        } else {
+            1.0
+        };
+        chosen / total * protection
     }
 }
 
@@ -229,6 +297,32 @@ mod tests {
             assert_eq!(zone[..2], [0.0, 0.0], "zone {index}");
             assert!((zone[2] - index as f32 / 10.0).abs() < 1e-6, "zone {index}");
         }
+    }
+
+    #[test]
+    fn the_mask_preview_weighs_the_chosen_zones_like_the_shader() {
+        let block = json!({ "version": 1, "zones": [] });
+        let zone_five = ZoneWeights::from_json(Some(&block), &[5]);
+        // Most of the colour at the zone's centre (its neighbours keep ≈ 4 % each at the
+        // default softness; Protect is 1 there), gone two zones away.
+        assert!((zone_five.weight(0.5) - 0.919).abs() < 0.005);
+        assert!(zone_five.weight(0.3) < 1e-3);
+        assert!(zone_five.weight(0.7) < 1e-3);
+        // Halfway to the next zone, the two share the colour.
+        assert!((zone_five.weight(0.55) - 0.5).abs() < 0.05);
+
+        // Every zone together is the whole colour, faded by Protect at black and white only.
+        let all = ZoneWeights::from_json(Some(&block), &(0..ZONE_COUNT).collect::<Vec<_>>());
+        for l in [0.2, 0.45, 0.8] {
+            assert!((all.weight(l) - 1.0).abs() < 1e-5, "L {l}");
+        }
+        assert_eq!(all.weight(0.0), 0.0);
+        assert_eq!(all.weight(1.0), 0.0);
+
+        // Neighbours of one choice add up, and nothing chosen is no colour.
+        let pair = ZoneWeights::from_json(Some(&block), &[5, 6]);
+        assert!(pair.weight(0.55) > 0.95);
+        assert_eq!(ZoneWeights::from_json(None, &[]).weight(0.5), 0.0);
     }
 
     #[test]

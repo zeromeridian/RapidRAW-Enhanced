@@ -239,6 +239,7 @@
       "overlaps": "Overlaps {{zones}}",
       "pickArea": "Pick zones by dragging a rectangle on the photo (Shift or Cmd/Ctrl adds to the selection)",
       "pickPoint": "Pick a zone by clicking the photo (Shift selects a range, Cmd/Ctrl adds or removes)",
+      "previewHint": "Hold {{key}} over a zone or a grade to see where it colours the photo.",
       "protect": "Protect",
       "softness": "Softness",
       "removeGrade": "Remove grade",

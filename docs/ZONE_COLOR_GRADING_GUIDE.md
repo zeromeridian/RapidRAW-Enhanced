@@ -26,6 +26,7 @@ it, then move the colour wheel. Each coloured selection becomes a
 | **Header buttons** | Pipette (pick a zone on the photo), rectangle (pick zones in an area of the photo), eye (switch the whole tool off and on), reset (remove everything). |
 | **Zone scale** | The eleven zones as an upright grey ramp, X at the top, 0 at the bottom. The names are on the left; an accent bar marks the selected zones, and an outline the zone under the cursor on the photo. |
 | **Hover readout** | Beside the cursor on the photo: the zone under it and its lightness, e.g. "Zone VI · L 0.62". |
+| **Alt/Option preview** | Hold Alt (Option on macOS) over a zone or a grade: the photo shows in red where it colours. |
 | **Colour bands** | On the scale's right edge, each grade's colour in the zones it covers. Where two or more grades share a zone, their colours sit side by side and a small layers icon appears (shown grades only). A hidden grade's band is faded. |
 | **Colour wheel** | Hue (angle), strength (distance from the centre) and Luminance (slider under the wheel) for the selection. Its title names the selected zones, e.g. "Zones II–IV". |
 | **Fill between** | A curve (Linear, Soft, Ease in) and a button that fills the zones between the first and last selected zone with a smooth ramp. |
@@ -165,6 +166,24 @@ on the scale. Nothing is selected or changed.
   zone a click would pick.
 - It works with the pickers on or off, and hides while the cursor is off
   the photo or Speed Edit shows its own label.
+
+### Seeing where a zone or grade applies (Alt/Option)
+
+Hold **Alt** (**Option** on macOS) and point at a zone on the scale: the
+photo shows that zone's area in red, the same overlay masks use, and
+stronger where the zone gives more of its colour. Point at a row in the
+**Grades** list instead to see all of that grade's zones together.
+Release the key or move away and the overlay goes.
+
+- It shows exactly how the colour is shared out: a zone is strongest at
+  its own tones and fades into its neighbours as far as **Softness**
+  lets it, and **Protect** keeps pure black and white free, so Zone 0
+  and Zone X show little or nothing there.
+- It does not depend on the zone's colour, so a zone you have not
+  coloured yet previews too: a quick way to see what a selection would
+  touch before you move the wheel.
+- Like the pickers, it reads the tones **before** the grading.
+- Nothing is changed or selected.
 
 ## Grades
 
