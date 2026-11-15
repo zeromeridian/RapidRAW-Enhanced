@@ -454,6 +454,7 @@
         "detail": "디테일",
         "finish": "마무리",
         "light": "빛",
+        "lensGeometry": "렌즈 및 지오메트리",
         "lightAtmosphere": "빛과 분위기",
         "look": "룩",
         "zoneTint": "존 컬러 그레이딩"
@@ -1006,7 +1007,9 @@
         "overlayLabel": "Guided Perspective guides",
         "removeGuide": "Remove guide",
         "verticalGuide": "Vertical Guide {{number}}"
-      }
+      },
+      "lensProfile": "렌즈 프로필",
+      "perspective": "원근"
     },
     "speedEdit": {
       "copied": "<0>{{label}}</0> <1>{{value}}</1> 복사됨",

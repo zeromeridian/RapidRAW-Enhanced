@@ -22,7 +22,6 @@ import TransformModal from '../../modals/TransformModal';
 import Slider, { SliderChangeEvent } from '../../ui/Slider';
 import Switch from '../../ui/Switch';
 import Text from '../../ui/Text';
-import PanelHeader from '../../ui/PanelHeader';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useGuidedPerspectiveSession } from '../../../hooks/useGuidedPerspectiveSession';
 import { useEditorStore } from '../../../store/useEditorStore';
@@ -32,7 +31,8 @@ import { swapOrientationForQuarterTurn, withGuideLines } from '../../../utils/gu
 
 type AutoGeometryMode = 'auto' | 'level' | 'vertical';
 
-export default function GeometryPanel() {
+/** Lens & Geometry's Perspective part: Auto, Level, Vertical, Guided, Manual Transform, Constrain Crop. */
+export default function Perspective() {
   const { t } = useTranslation();
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const adjustments = useEditorStore((state) => state.adjustments);
@@ -140,10 +140,9 @@ export default function GeometryPanel() {
   );
 
   return (
-    <div className="flex flex-col h-full">
-      <PanelHeader title={t('editor.geometry.title')} />
-
-      <div className="grow overflow-y-auto p-4 compact:p-2.5 custom-scrollbar">
+    <section className="flex flex-col gap-4 compact:gap-2.5">
+      <Text variant={TextVariants.title}>{t('editor.geometry.perspective')}</Text>
+      <div>
         {selectedImage ? (
           <div className="space-y-4 compact:space-y-2">
             <div className="grid grid-cols-2 gap-2">
@@ -357,6 +356,6 @@ export default function GeometryPanel() {
         }}
         currentAdjustments={adjustments}
       />
-    </div>
+    </section>
   );
 }

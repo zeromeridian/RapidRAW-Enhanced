@@ -13,6 +13,13 @@ import { findGroupVariants, getVariantLabel } from '../../../utils/imageGrouping
 import { getDisplayFilename } from '../../../utils/outputNaming';
 import { useUIStore } from '../../../store/useUIStore';
 
+/**
+ * The photo's toolbar row: its height and side insets. Develop's tool bar above the right sidebar
+ * uses the same row inside the same 8 px as the photo pane's `p-2` (`EditorView`), so the two rows
+ * line up and the space on either side of the divider between them is the same.
+ */
+export const TOOLBAR_ROW = 'h-14 compact:h-11 px-4 compact:px-2';
+
 interface EditorToolbarProps {
   canRedo: boolean;
   canUndo: boolean;
@@ -220,7 +227,9 @@ const EditorToolbar = memo(
     ].filter((item) => item.value);
 
     return (
-      <div className="relative shrink-0 flex items-center justify-between px-4 compact:px-2 h-14 compact:h-11 gap-4 compact:gap-2 z-40">
+      <div
+        className={clsx('relative shrink-0 flex items-center justify-between gap-4 compact:gap-2 z-40', TOOLBAR_ROW)}
+      >
         <div className="flex items-center gap-2 shrink-0 z-40">
           <button
             className="bg-surface text-text-primary p-2 compact:p-1.5 rounded-full hover:bg-card-active transition-colors shrink-0"

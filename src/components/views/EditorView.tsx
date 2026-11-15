@@ -12,8 +12,7 @@ import BlendPadPanel from '../panel/right/BlendPadPanel';
 import ZoneTintPanel from '../panel/right/ZoneTintPanel';
 import MetadataPanel from '../panel/right/MetadataPanel';
 import CropPanel from '../panel/right/CropPanel';
-import GeometryPanel from '../panel/right/GeometryPanel';
-import LensCorrectionPanel from '../panel/right/LensCorrectionPanel';
+import LensGeometryPanel from '../panel/right/LensGeometryPanel';
 import TaggingPanel from '../panel/right/TaggingPanel';
 import MasksPanel from '../panel/right/MasksPanel';
 import AIPanel from '../panel/right/AIPanel';
@@ -250,8 +249,7 @@ export default function EditorView({
             {renderedRightPanel === Panel.ZoneTint && <ZoneTintPanel />}
             {renderedRightPanel === Panel.Metadata && <MetadataPanel />}
             {renderedRightPanel === Panel.Crop && <CropPanel />}
-            {renderedRightPanel === Panel.Geometry && <GeometryPanel />}
-            {renderedRightPanel === Panel.LensCorrection && <LensCorrectionPanel />}
+            {renderedRightPanel === Panel.LensGeometry && <LensGeometryPanel />}
             {renderedRightPanel === Panel.Masks && <MasksPanel />}
             {renderedRightPanel === Panel.Presets && (
               <PresetsPanel
@@ -342,7 +340,8 @@ export default function EditorView({
                 style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
               >
                 <div style={{ width: `${rightPanelWidth}px` }} className="h-full flex flex-col">
-                  <div className="shrink-0 border-b border-surface">
+                  {/* `px-2 pt-2` matches the photo pane's `p-2` around its toolbar, so both rows line up. */}
+                  <div className="shrink-0 px-2 pt-2 border-b border-surface">
                     {/* The tool bar keeps its tool open: a click on the highlighted one does nothing. */}
                     <RightPanelSwitcher
                       activePanel={activeRightPanel}

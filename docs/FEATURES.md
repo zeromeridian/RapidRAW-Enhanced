@@ -43,9 +43,9 @@ details are in `RELEASE_NOTES.MD`.
   open panel highlighted. Library: one right panel at a time; Develop opens
   the active photo. Develop: Info, Tagging, and Export show that panel for
   the edited photo only, and Develop returns to the last editing tool; the
-  tool bar above the right sidebar keeps only the editing tools, in
-  workflow order (Presets; Crop, Geometry, Lens Correction; Adjustments,
-  Blend Pad, Zone Color Grading; Masks, AI), with large icons sharing its
+  tool bar above the right sidebar keeps only the editing tools (Adjust,
+  Crop, Lens & Geometry; Blend Pad, Zone Color Grading; Masks, Inpaint;
+  Presets), with large icons sharing its
   width; clicking the highlighted tool keeps it open. The top bar also stays in
   fullscreen and with native window decorations (without its window
   buttons).
@@ -181,7 +181,7 @@ details are in `RELEASE_NOTES.MD`.
   Presence, Hue, Color Mixer and Point Color, Calibration), Look (Color
   Grading, LUT), Light & Atmosphere (Relight, Fog, Glow, Halation, Light
   Flares), Blur (Lens, Motion, Gaussian), Detail (Sharpening, Noise
-  Reduction, AI Denoise, Chromatic Aberration), Finish (Vignette, Grain),
+  Reduction, AI Denoise), Finish (Vignette, Grain),
   in the photo's and the masks' panels and the Copy & Paste dialog. Each
   section's eye switches its own tools (one stored eye per tool); older
   edits with an old section eye off render unchanged, and a section only
@@ -279,7 +279,7 @@ details are in `RELEASE_NOTES.MD`.
   and tabletops are ignored), and follow quarter-turn orientation.
   Guided Perspective (ported from upstream RapidRAW) draws up to two vertical
   and two horizontal guides directly on the uncropped, live-corrected image,
-  with draggable endpoints and a guide list in the Geometry panel. Any two or
+  with draggable endpoints and a guide list in Lens & Geometry's Perspective part. Any two or
   more guides (1V+1H, 2V, 2H, 2V+1H, 2H+1V, 2V+2H) become exactly vertical and
   horizontal through an exact homography under the manual sliders. Leaving
   guide drawing crops to the largest rectangle without empty borders,
@@ -292,9 +292,12 @@ details are in `RELEASE_NOTES.MD`.
   contrast and line-length analysis recognizes shorter, lower-contrast
   structures, while robust grouped-line perspective estimation handles both
   parallel and converging architectural edges.
-- A dedicated **Lens Correction** sidebar module applies Auto detection or a
-  manually selected Lensfun profile directly to the full Develop image, with
-  independent distortion, chromatic-aberration, and vignetting controls. Lens
+- **Lens & Geometry** panel (one tool bar button): Lens Profile applies Auto
+  detection or a manually selected Lensfun profile directly to the full
+  Develop image, with independent distortion and vignetting controls;
+  Chromatic Aberration holds the profile's correction and the manual
+  Red/Cyan and Blue/Yellow sliders; Perspective holds the geometry tools
+  below. Every change applies live with undo. Lens
   settings, including Auto mode, persist in Tool and Style presets without
   requiring crop and transform data to be included. Auto finds the built-in
   lens of fixed-lens cameras (Ricoh GR, Fujifilm X100) through the camera's

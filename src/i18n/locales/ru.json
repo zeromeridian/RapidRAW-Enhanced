@@ -492,6 +492,7 @@
         "detail": "Детали",
         "finish": "Завершение",
         "light": "Свет",
+        "lensGeometry": "Объектив и геометрия",
         "lightAtmosphere": "Свет и атмосфера",
         "look": "Стиль",
         "zoneTint": "Цветокоррекция по зонам"
@@ -1058,7 +1059,9 @@
         "overlayLabel": "Guided Perspective guides",
         "removeGuide": "Remove guide",
         "verticalGuide": "Vertical Guide {{number}}"
-      }
+      },
+      "lensProfile": "Профиль объектива",
+      "perspective": "Перспектива"
     },
     "speedEdit": {
       "copied": "Скопировано: <0>{{label}}</0> <1>{{value}}</1>",

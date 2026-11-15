@@ -5,7 +5,8 @@ import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import Text from '../../ui/Text';
 import { TextVariants, TextWeights } from '../../../types/typography';
-import { getSectionEye, isGroupVisible } from '../../../utils/adjustments';
+import { LENS_GEOMETRY_SECTION, getSectionEye, isGroupVisible } from '../../../utils/adjustments';
+import ChromaticAberration from '../../adjustments/ChromaticAberration';
 import { ADJUSTMENT_CONTROLS_BY_ID, Favorite } from '../../../utils/adjustmentControls';
 import { ADJUSTMENT_SECTION_COMPONENTS } from '../../adjustments/sectionComponents';
 import AdjustmentSlider from '../../adjustments/AdjustmentSlider';
@@ -37,6 +38,16 @@ function FavoriteContent({ favorite, label, sectionProps }: Omit<FavoriteRowProp
           setAdjustments={sectionProps.setAdjustments}
         />
       </div>
+    );
+  }
+
+  if (favorite.section === LENS_GEOMETRY_SECTION) {
+    return (
+      <ChromaticAberration
+        adjustments={sectionProps.adjustments}
+        onDragStateChange={sectionProps.onDragStateChange}
+        setAdjustments={sectionProps.setAdjustments}
+      />
     );
   }
 

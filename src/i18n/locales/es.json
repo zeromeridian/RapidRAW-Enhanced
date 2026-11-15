@@ -473,6 +473,7 @@
         "detail": "Detalle",
         "finish": "Acabado",
         "light": "Luz",
+        "lensGeometry": "Objetivo y geometría",
         "lightAtmosphere": "Luz y atmósfera",
         "look": "Estilo",
         "zoneTint": "Gradación de color por zonas"
@@ -1033,7 +1034,9 @@
         "overlayLabel": "Guided Perspective guides",
         "removeGuide": "Remove guide",
         "verticalGuide": "Vertical Guide {{number}}"
-      }
+      },
+      "lensProfile": "Perfil de objetivo",
+      "perspective": "Perspectiva"
     },
     "speedEdit": {
       "copied": "<0>{{label}}</0> <1>{{value}}</1> copiado",

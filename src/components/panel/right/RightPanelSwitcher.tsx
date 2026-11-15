@@ -7,15 +7,17 @@ import {
   Paintbrush,
   SwatchBook,
   FileInput,
-  Scan,
   Aperture,
   Tag,
   Orbit,
   Blend,
   type LucideIcon,
 } from 'lucide-react';
+import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
+import type { ParseKeys } from 'i18next';
 import { Panel } from '../../ui/AppProperties';
+import { TOOLBAR_ROW } from '../editor/EditorToolbar';
 import { useIsTitleBarShown } from '../../../window/TitleBar';
 
 interface PanelOptions {
@@ -30,16 +32,14 @@ interface RightPanelSwitcherProps {
   isInstantTransition: boolean;
 }
 
-/** Develop's tools in editing order: start from a preset, fix the frame, adjust, then local work. */
+/** Develop's tools: adjust and frame the photo, grade it, local work, then presets (owner's order). */
 const editingPanelGroups: Array<Array<PanelOptions>> = [
-  [{ id: Panel.Presets, icon: SwatchBook, title: 'editor.switcher.tooltips.presets' }],
-  [
-    { id: Panel.Crop, icon: Crop, title: 'editor.switcher.tooltips.crop' },
-    { id: Panel.Geometry, icon: Scan, title: 'editor.switcher.tooltips.geometry' },
-    { id: Panel.LensCorrection, icon: Aperture, title: 'editor.crop.tooltips.lens' },
-  ],
   [
     { id: Panel.Adjustments, icon: SlidersHorizontal, title: 'editor.switcher.tooltips.adjust' },
+    { id: Panel.Crop, icon: Crop, title: 'editor.switcher.tooltips.crop' },
+    { id: Panel.LensGeometry, icon: Aperture, title: 'editor.adjustments.sections.lensGeometry' },
+  ],
+  [
     { id: Panel.BlendPad, icon: Orbit, title: 'editor.blendPad.title' },
     { id: Panel.ZoneTint, icon: Blend, title: 'editor.adjustments.sections.zoneTint' },
   ],
@@ -47,6 +47,7 @@ const editingPanelGroups: Array<Array<PanelOptions>> = [
     { id: Panel.Masks, icon: Layers, title: 'editor.switcher.tooltips.masks' },
     { id: Panel.Ai, icon: Paintbrush, title: 'editor.switcher.tooltips.inpaint' },
   ],
+  [{ id: Panel.Presets, icon: SwatchBook, title: 'editor.switcher.tooltips.presets' }],
 ];
 
 // Info, Tagging, and Export are top-bar switches; only without the top bar (Android) are they here.
@@ -73,7 +74,7 @@ export default function RightPanelSwitcher({
 
   return (
     <LayoutGroup id="right-panel-switcher">
-      <div className="flex items-center p-1 gap-0.5">
+      <div className={clsx('flex items-center gap-0.5', TOOLBAR_ROW)}>
         {panelGroups.map((group, groupIndex) => (
           <div key={groupIndex} className="contents">
             {groupIndex > 0 && <div className="w-px h-6 shrink-0 bg-surface" />}
@@ -86,7 +87,7 @@ export default function RightPanelSwitcher({
                 }`}
                 key={id}
                 onClick={() => onPanelSelect(id)}
-                data-tooltip={t(title)}
+                data-tooltip={t(title as ParseKeys)}
               >
                 {activePanel === id && (
                   <motion.div

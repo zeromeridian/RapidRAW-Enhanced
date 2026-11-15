@@ -454,6 +454,7 @@
         "detail": "ディテール",
         "finish": "仕上げ",
         "light": "ライト",
+        "lensGeometry": "レンズとジオメトリ",
         "lightAtmosphere": "光と雰囲気",
         "look": "ルック",
         "zoneTint": "ゾーンカラーグレーディング"
@@ -1006,7 +1007,9 @@
         "overlayLabel": "Guided Perspective guides",
         "removeGuide": "Remove guide",
         "verticalGuide": "Vertical Guide {{number}}"
-      }
+      },
+      "lensProfile": "レンズプロファイル",
+      "perspective": "遠近補正"
     },
     "speedEdit": {
       "copied": "<0>{{label}}</0> <1>{{value}}</1> をコピーしました",

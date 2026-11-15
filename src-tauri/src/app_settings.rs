@@ -241,9 +241,10 @@ pub struct AdjustmentLayout {
     pub version: u32,
 }
 
-/// The layout of the regrouped sections (`1.66.0`): Light, Curves, Color, Look,
-/// Light & Atmosphere, Blur, Detail, Finish, replacing Basic, Curves, Color, Details, Effects.
-const ADJUSTMENT_LAYOUT_VERSION: u32 = 1;
+/// Version 1 (`1.66.0`): the regrouped sections Light, Curves, Color, Look, Light & Atmosphere,
+/// Blur, Detail, Finish, replacing Basic, Curves, Color, Details, Effects. Version 2 (`1.69.0`):
+/// Chromatic Aberration left Detail for the Lens & Geometry panel.
+const ADJUSTMENT_LAYOUT_VERSION: u32 = 2;
 
 const OLD_SECTION_ORDER: [&str; 5] = ["basic", "curves", "color", "details", "effects"];
 
@@ -356,12 +357,40 @@ fn regrouped_favorite(favorite: &str) -> Vec<String> {
     entries.iter().map(|entry| entry.to_string()).collect()
 }
 
-/// Converts a layout of the old sections to the regrouped ones, once; true when it changed.
+/// Brings a saved layout up to `ADJUSTMENT_LAYOUT_VERSION`, one version at a time, once; true
+/// when it changed.
 fn migrate_adjustment_layout(layout: &mut AdjustmentLayout) -> bool {
     if layout.version >= ADJUSTMENT_LAYOUT_VERSION {
         return false;
     }
+    if layout.version < 1 {
+        regroup_sections(layout);
+    }
+    if layout.version < 2 {
+        move_chromatic_aberration(layout);
+    }
+    layout.version = ADJUSTMENT_LAYOUT_VERSION;
+    true
+}
 
+/// Version 2: a starred Detail section keeps its chromatic aberration as a favourite of its own,
+/// right after it (unless it is starred already).
+fn move_chromatic_aberration(layout: &mut AdjustmentLayout) {
+    const TOOL: &str = "tool:chromaticAberration";
+    if layout.favorites.iter().any(|favorite| favorite == TOOL) {
+        return;
+    }
+    if let Some(index) = layout
+        .favorites
+        .iter()
+        .position(|favorite| favorite == "section:detail")
+    {
+        layout.favorites.insert(index + 1, TOOL.to_string());
+    }
+}
+
+/// Version 1: converts a layout of the old sections to the regrouped ones.
+fn regroup_sections(layout: &mut AdjustmentLayout) {
     let is_default_order = layout.section_order.is_empty()
         || layout
             .section_order
@@ -427,9 +456,8 @@ fn migrate_adjustment_layout(layout: &mut AdjustmentLayout) -> bool {
         tool_order,
         open_sections,
         favorites,
-        version: ADJUSTMENT_LAYOUT_VERSION,
+        version: 1,
     };
-    true
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1407,7 +1435,7 @@ mod tests {
                 "light": true, "lightAtmosphere": true, "look": false
             })
         );
-        assert_eq!(layout["version"], 1);
+        assert_eq!(layout["version"], 2);
     }
 
     #[test]
@@ -1462,6 +1490,7 @@ mod tests {
                 "tool:colorGrading",
                 "section:light",
                 "section:detail",
+                "tool:chromaticAberration",
                 "tool:presence",
                 "section:lightAtmosphere",
                 "section:blur",
@@ -1479,9 +1508,35 @@ mod tests {
             "sectionOrder": ["color", "light"],
             "toolOrder": {},
             "openSections": { "look": true },
-            "favorites": ["section:color"],
-            "version": 1
+            "favorites": ["section:color", "section:detail", "tool:chromaticAberration"],
+            "version": 2
         });
         assert_eq!(migrated_layout(converted.clone()), converted);
+    }
+
+    #[test]
+    fn a_starred_detail_keeps_chromatic_aberration_after_it_moved_to_lens_and_geometry() {
+        let layout = migrated_layout(json!({
+            "favorites": ["section:detail", "section:light"],
+            "version": 1
+        }));
+        assert_eq!(
+            layout["favorites"],
+            json!([
+                "section:detail",
+                "tool:chromaticAberration",
+                "section:light"
+            ])
+        );
+        assert_eq!(layout["version"], 2);
+
+        let starred_alone = migrated_layout(json!({
+            "favorites": ["tool:chromaticAberration", "section:detail"],
+            "version": 1
+        }));
+        assert_eq!(
+            starred_alone["favorites"],
+            json!(["tool:chromaticAberration", "section:detail"])
+        );
     }
 }

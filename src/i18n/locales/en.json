@@ -480,6 +480,7 @@
         "detail": "Detail",
         "finish": "Finish",
         "light": "Light",
+        "lensGeometry": "Lens & Geometry",
         "lightAtmosphere": "Light & Atmosphere",
         "look": "Look",
         "zoneTint": "Zone Color Grading"
@@ -815,8 +816,9 @@
         "removeGuide": "Remove guide",
         "verticalGuide": "Vertical Guide {{number}}"
       },
-      "resetTooltip": "Reset Geometry",
-      "title": "Geometry"
+      "lensProfile": "Lens Profile",
+      "perspective": "Perspective",
+      "resetTooltip": "Reset Geometry"
     },
     "externalEdit": {
       "done": "Done",

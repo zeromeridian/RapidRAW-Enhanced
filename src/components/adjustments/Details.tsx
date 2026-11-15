@@ -98,13 +98,6 @@ export default function DetailsPanel({
           />
         </AiEffectSection>
       )}
-
-      {!isForMask && adjustmentVisibility.chromaticAberration !== false && (
-        <AdjustmentTool id="chromaticAberration">
-          <AdjustmentSlider control={DetailsAdjustment.ChromaticAberrationRedCyan} {...sliderProps} />
-          <AdjustmentSlider control={DetailsAdjustment.ChromaticAberrationBlueYellow} {...sliderProps} />
-        </AdjustmentTool>
-      )}
     </div>
   );
 }

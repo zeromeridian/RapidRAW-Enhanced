@@ -454,6 +454,7 @@
         "detail": "细节",
         "finish": "收尾",
         "light": "光线",
+        "lensGeometry": "镜头与几何",
         "lightAtmosphere": "光线与氛围",
         "look": "风格",
         "zoneTint": "区域颜色分级"
@@ -1006,7 +1007,9 @@
         "overlayLabel": "Guided Perspective guides",
         "removeGuide": "Remove guide",
         "verticalGuide": "Vertical Guide {{number}}"
-      }
+      },
+      "lensProfile": "镜头配置文件",
+      "perspective": "透视"
     },
     "speedEdit": {
       "copied": "已复制 <0>{{label}}</0> <1>{{value}}</1>",

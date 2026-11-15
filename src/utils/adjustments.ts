@@ -1360,10 +1360,6 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         DetailsAdjustment.AiDenoiseDetail,
       ],
     },
-    {
-      label: 'modals.copyPaste.groups.chromaticAberration',
-      keys: [DetailsAdjustment.ChromaticAberrationRedCyan, DetailsAdjustment.ChromaticAberrationBlueYellow],
-    },
   ],
   finish: [
     {
@@ -1396,7 +1392,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
       ],
     },
   ],
-  lensCorrection: [
+  lensGeometry: [
     {
       label: 'modals.copyPaste.groups.lensCorrection',
       keys: [
@@ -1410,6 +1406,10 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         LensAdjustment.LensTcaEnabled,
         LensAdjustment.LensVignetteEnabled,
       ],
+    },
+    {
+      label: 'modals.copyPaste.groups.chromaticAberration',
+      keys: [DetailsAdjustment.ChromaticAberrationRedCyan, DetailsAdjustment.ChromaticAberrationBlueYellow],
     },
   ],
   masks: [{ label: 'modals.copyPaste.groups.masks', keys: ['masks'] }],
@@ -1657,8 +1657,6 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     DetailsAdjustment.AiDenoiseEnabled,
     DetailsAdjustment.AiDenoiseAmount,
     DetailsAdjustment.AiDenoiseDetail,
-    DetailsAdjustment.ChromaticAberrationRedCyan,
-    DetailsAdjustment.ChromaticAberrationBlueYellow,
   ],
   finish: [
     Effect.VignetteAmount,
@@ -1728,12 +1726,20 @@ export const ADJUSTMENT_SECTION_TOOLS: Record<string, Array<AdjustmentSectionToo
     { id: 'sharpening', label: 'adjustments.details.sharpening' },
     { id: 'noiseReduction', label: 'adjustments.details.noiseReduction' },
     { id: 'aiDenoise', label: 'adjustments.details.aiDenoise' },
-    { id: 'chromaticAberration', label: 'adjustments.details.chromaticAberration' },
   ],
   finish: [
     { id: 'vignette', label: 'adjustments.effects.vignette' },
     { id: 'grain', label: 'adjustments.effects.grain' },
   ],
+};
+
+/** The Lens & Geometry panel: not an Adjustments section, but its chromatic aberration block can be a favourite. */
+export const LENS_GEOMETRY_SECTION = 'lensGeometry';
+
+/** Every tool block by where it is shown: the Adjustments sections, and Lens & Geometry. */
+const TOOLS_BY_SECTION: Record<string, Array<AdjustmentSectionTool>> = {
+  ...ADJUSTMENT_SECTION_TOOLS,
+  [LENS_GEOMETRY_SECTION]: [{ id: 'chromaticAberration', label: 'adjustments.details.chromaticAberration' }],
 };
 
 /**
@@ -1771,8 +1777,8 @@ export const isGroupVisible = (visibility: SectionVisibility | undefined, group:
 
 /** The tool groups a section's eye switches (Curves is one group; the tone mapper is under no eye). */
 export const getSectionGroups = (section: string): Array<string> =>
-  ADJUSTMENT_SECTION_TOOLS[section]
-    ? ADJUSTMENT_SECTION_TOOLS[section].map((tool) => tool.id).filter((id) => id !== TONE_MAPPER_TOOL)
+  TOOLS_BY_SECTION[section]
+    ? TOOLS_BY_SECTION[section].map((tool) => tool.id).filter((id) => id !== TONE_MAPPER_TOOL)
     : [section];
 
 export type SectionEye = 'on' | 'off' | 'partial';
@@ -1803,9 +1809,7 @@ export const withSectionEyeToggled = (visibility: SectionVisibility, section: st
   withSectionVisible(visibility, section, getSectionEye(visibility, section) !== 'on');
 
 export const ADJUSTMENT_TOOLS_BY_ID: Record<string, AdjustmentSectionTool & { section: string }> = Object.fromEntries(
-  Object.entries(ADJUSTMENT_SECTION_TOOLS).flatMap(([section, tools]) =>
-    tools.map((tool) => [tool.id, { ...tool, section }]),
-  ),
+  Object.entries(TOOLS_BY_SECTION).flatMap(([section, tools]) => tools.map((tool) => [tool.id, { ...tool, section }])),
 );
 
 /** A section's blocks in the order Customize Panels set; unknown ids are dropped and new blocks appended. */

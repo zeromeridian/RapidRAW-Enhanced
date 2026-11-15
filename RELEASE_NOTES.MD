@@ -5,6 +5,40 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.69.2-dev-develop-regroup — 2026-11-15
+
+### Develop
+
+- The tool bar above the right sidebar now sits exactly level with the
+  photo's toolbar, with the same spacing on both sides of the divider
+  between them.
+
+## 1.69.1-dev-develop-regroup — 2026-11-15
+
+### Develop
+
+- The tool bar above the right sidebar now lines up with the photo's
+  toolbar (undo, redo, settings) on its left.
+
+## 1.69.0-dev-develop-regroup — 2026-11-15
+
+### Develop
+
+- **Lens & Geometry**: Lens Correction and Geometry are now one panel
+  and one button, top to bottom **Lens Profile** (Auto or Manual, the
+  lens, Distortion, Vignetting), **Chromatic Aberration** (the profile's
+  correction and the manual Red/Cyan and Blue/Yellow sliders, moved here
+  from Detail) and **Perspective** (everything Geometry had). Every
+  change applies at once and can be undone step by step.
+- The tool bar now reads **Adjust, Crop, Lens & Geometry | Blend Pad,
+  Zone Color Grading | Masks, Inpaint | Presets**.
+- A starred Chromatic Aberration slider or block keeps working from
+  Favorites, and a starred Detail section keeps chromatic aberration as
+  a favourite of its own.
+- The lens panel's Reset also resets the manual chromatic aberration;
+  the Adjustments panel's Reset no longer does. In Copy & Paste
+  Settings, Chromatic Aberration is listed under Lens & Geometry.
+
 ## 1.68.0-dev-develop-regroup — 2026-11-15
 
 ### Develop
