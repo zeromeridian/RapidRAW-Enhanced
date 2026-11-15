@@ -241,6 +241,8 @@
       "protect": "보호",
       "softness": "부드러움",
       "removeGrade": "그레이드 제거",
+      "hideGrade": "그레이드 숨기기",
+      "showGrade": "그레이드 표시",
       "zone": "존 {{zone}}",
       "zones": "존 {{zones}}"
     }

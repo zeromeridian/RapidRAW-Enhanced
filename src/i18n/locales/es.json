@@ -241,6 +241,8 @@
       "protect": "Proteger",
       "softness": "Suavidad",
       "removeGrade": "Quitar gradación",
+      "hideGrade": "Ocultar gradación",
+      "showGrade": "Mostrar gradación",
       "zone": "Zona {{zone}}",
       "zones": "Zonas {{zones}}"
     }

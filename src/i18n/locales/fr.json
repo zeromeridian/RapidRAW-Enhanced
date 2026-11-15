@@ -241,6 +241,8 @@
       "protect": "Protection",
       "softness": "Douceur",
       "removeGrade": "Supprimer l'étalonnage",
+      "hideGrade": "Masquer l'étalonnage",
+      "showGrade": "Afficher l'étalonnage",
       "zone": "Zone {{zone}}",
       "zones": "Zones {{zones}}"
     }

@@ -25,13 +25,13 @@ it, then move the colour wheel. Each coloured selection becomes a
 |---|---|
 | **Header buttons** | Pipette (pick a zone on the photo), rectangle (pick zones in an area of the photo), eye (switch the whole tool off and on), reset (remove everything). |
 | **Zone scale** | The eleven zones as an upright grey ramp, X at the top, 0 at the bottom. The names are on the left; an accent bar marks the selected zones. |
-| **Colour bands** | On the scale's right edge, each grade's colour in the zones it covers. Where two or more grades share a zone, their colours sit side by side and a small layers icon appears. |
+| **Colour bands** | On the scale's right edge, each grade's colour in the zones it covers. Where two or more grades share a zone, their colours sit side by side and a small layers icon appears (shown grades only). A hidden grade's band is faded. |
 | **Colour wheel** | Hue (angle), strength (distance from the centre) and Luminance (slider under the wheel) for the selection. Its title names the selected zones, e.g. "Zones II–IV". |
 | **Fill between** | A curve (Linear, Soft, Ease in) and a button that fills the zones between the first and last selected zone with a smooth ramp. |
 | **Amount** | Scales the whole tool, 0–200 %. |
 | **Softness** | How far each zone's colour reaches into its neighbours. |
 | **Protect** | How strongly pure black and pure white are kept free of colour. |
-| **Grades list** | Every grade, lightest first, with its zones, its hue (H), strength (S) and luminance (L), or "Gradient" for a ramp. An "Overlaps …" line names the zones it shares with other grades. Click a grade to edit it; × removes it. |
+| **Grades list** | Every grade, lightest first, with its zones, its hue (H), strength (S) and luminance (L), or "Gradient" for a ramp. An "Overlaps …" line names the zones it shares with other shown grades. Click a grade to edit it; the eye hides or shows it; × removes it. |
 
 ## Zones: which tones belong where
 
@@ -166,6 +166,24 @@ grade, so moving the hue keeps the strength.
 
 **To remove a grade**, click its ×. The header's reset removes all
 grades and every other setting of the tool.
+
+**To hide a grade**, click the eye on its row; click it again to show
+it. A hidden grade keeps all its settings and is saved with the edit,
+but it has no effect on the photo:
+
+- Its row in the Grades list is dimmed and its band on the scale is
+  faded.
+- It does not combine with other grades, so it neither causes nor shows
+  an "Overlaps …" line or a layers icon.
+- Moving the wheel while a hidden grade is selected shows it again, so
+  the change is visible.
+- Fill between still takes its zones out of hidden grades, so the ramp
+  stays exact when they are shown again, and reads its ends from what
+  the shown grades give those zones.
+- Hiding and showing are undo steps.
+
+Hiding every grade leaves the photo as if the tool had no grades; the
+panel's own eye switches the whole tool off instead.
 
 ### How overlapping grades combine
 

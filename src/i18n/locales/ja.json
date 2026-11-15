@@ -241,6 +241,8 @@
       "protect": "保護",
       "softness": "柔らかさ",
       "removeGrade": "グレードを削除",
+      "hideGrade": "グレードを非表示",
+      "showGrade": "グレードを表示",
       "zone": "ゾーン {{zone}}",
       "zones": "ゾーン {{zones}}"
     }

@@ -345,7 +345,9 @@ details are in `RELEASE_NOTES.MD`.
   each grade's colour as a band, side by side with a layers mark where
   grades overlap; the Grades list shows every grade with its values and
   an "Overlaps …" line, selects it for editing on click (only the moved
-  value is written) and removes it with ×. Neighbouring zones blend
+  value is written), hides or shows it with its eye (a hidden grade is
+  dimmed, has no effect and does not overlap; editing it shows it again)
+  and removes it with ×. Neighbouring zones blend
   smoothly, Softness sets how far a zone's colour reaches, and Protect
   keeps black and white free of colour. Amount scales the whole effect
   (0–200 %) without changing the stored settings. Fill between makes one

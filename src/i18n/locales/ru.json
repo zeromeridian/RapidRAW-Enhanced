@@ -241,6 +241,8 @@
       "protect": "Защита",
       "softness": "Мягкость",
       "removeGrade": "Удалить градацию",
+      "hideGrade": "Скрыть градацию",
+      "showGrade": "Показать градацию",
       "zone": "Зона {{zone}}",
       "zones": "Зоны {{zones}}"
     }

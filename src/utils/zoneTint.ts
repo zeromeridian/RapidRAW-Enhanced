@@ -62,6 +62,17 @@ export const tintVector = ({ hue, strength }: ZoneTintZone) => {
 export const vectorHue = (x: number, y: number, fallback: number) =>
   Math.hypot(x, y) > 1e-6 ? ((((Math.atan2(y, x) * 180) / Math.PI) % 360) + 360) % 360 : fallback;
 
+/** Whether a grade is shown, so it renders and combines with the others. */
+export const isGradeShown = (grade: ZoneTintGrade) => grade.visible !== false;
+
+/** The grade shown or hidden; a shown grade carries no flag, as in edits made before the toggle. */
+const withGradeShown = ({ visible: _visible, ...grade }: ZoneTintGrade, isShown: boolean): ZoneTintGrade =>
+  isShown ? grade : { ...grade, visible: false };
+
+/** Shows or hides the grade `gradeId`. */
+export const setGradeShown = (grades: ZoneTintGrade[], gradeId: string, isShown: boolean) =>
+  grades.map((grade) => (grade.id === gradeId ? withGradeShown(grade, isShown) : grade));
+
 /** The zones in a grade, darkest first. */
 export const gradeZones = (grade: ZoneTintGrade) => grade.zones.flatMap((settings, zone) => (settings ? [zone] : []));
 
@@ -100,9 +111,9 @@ const gradesFromZones = (zones: ZoneTintZone[]): ZoneTintGrade[] => {
 };
 
 /**
- * The grades' sum per zone, which Rust renders: their colours add on the colour wheel (opposite
- * hues soften towards neutral) and their luminances add, each within its range. Advanced mode's
- * per-zone values come from `zones`.
+ * The shown grades' sum per zone, which Rust renders: their colours add on the colour wheel
+ * (opposite hues soften towards neutral) and their luminances add, each within its range. Hidden
+ * grades are left out. Advanced mode's per-zone values come from `zones`.
  */
 const sumGrades = (grades: ZoneTintGrade[], zones: ZoneTintZone[]): ZoneTintZone[] =>
   Array.from({ length: ZONE_TINT_ZONE_COUNT }, (_, zone) => {
@@ -111,7 +122,7 @@ const sumGrades = (grades: ZoneTintGrade[], zones: ZoneTintZone[]): ZoneTintZone
     let luminance = 0;
     grades.forEach((grade) => {
       const settings = grade.zones[zone];
-      if (!settings) return;
+      if (!settings || !isGradeShown(grade)) return;
       const [gx, gy] = tintVector(settings);
       x += gx;
       y += gy;
@@ -156,7 +167,8 @@ export const withZoneTintGrades = (zoneTint: ZoneTint, grades: ZoneTintGrade[]):
 
 /**
  * Writes `change` into every zone of the grade `gradeId`, keeping their other settings; a grade
- * that does not exist (a new selection, or one an undo removed) is added with `zones`.
+ * that does not exist (a new selection, or one an undo removed) is added with `zones`. Editing a
+ * hidden grade shows it again, so the edit is visible (owner, 2026-11-15).
  */
 export const updateGrade = (
   grades: ZoneTintGrade[],
@@ -172,7 +184,9 @@ export const updateGrade = (
     return [...grades, createZoneTintGrade(members, gradeId)];
   }
   return grades.map((g) =>
-    g.id === gradeId ? { ...g, zones: g.zones.map((settings) => settings && { ...settings, ...change }) } : g,
+    g.id === gradeId
+      ? withGradeShown({ ...g, zones: g.zones.map((settings) => settings && { ...settings, ...change }) }, true)
+      : g,
   );
 };
 
@@ -182,7 +196,8 @@ export const updateGrade = (
  * wheel, as the shader sums the zones' colours, and luminance likewise. Opposite hues (cool
  * shadows, warm highlights) meet in a soft neutral instead of sweeping through the hues between
  * them, and an untinted end fades the other's colour out without changing its hue. The ramp
- * replaces the other grades on those zones (owner, 2026-11-14); a grade left empty is removed.
+ * replaces the other grades on those zones (owner, 2026-11-14), hidden ones too, and its ends are
+ * what the shown grades sum to there (owner, 2026-11-15); a grade left empty is removed.
  */
 export const fillGrades = (zoneTint: ZoneTint, from: number, to: number, curve: BlendPadCurve): ZoneTintGrade[] => {
   const start = zoneTint.zones[from] ?? NEUTRAL_ZONE;
@@ -220,11 +235,19 @@ export const isUniformGrade = (grade: ZoneTintGrade) => {
   );
 };
 
-/** The zones a grade shares with any other grade that changes them. */
+/**
+ * The zones a shown grade shares with any other shown grade that changes them; hidden grades do
+ * not combine, so they neither overlap nor are overlapped.
+ */
 export const overlappingZones = (grade: ZoneTintGrade, grades: ZoneTintGrade[]) =>
-  gradeZones(grade).filter((zone) =>
-    grades.some((other) => other.id !== grade.id && other.zones[zone] && isAdjusted(other.zones[zone]!)),
-  );
+  isGradeShown(grade)
+    ? gradeZones(grade).filter((zone) =>
+        grades.some(
+          (other) =>
+            other.id !== grade.id && isGradeShown(other) && other.zones[zone] && isAdjusted(other.zones[zone]!),
+        ),
+      )
+    : [];
 
 /** The modifier keys of a click on the zone scale or the photo. */
 export interface ZoneSelectionModifiers {

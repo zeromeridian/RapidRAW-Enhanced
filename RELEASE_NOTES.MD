@@ -5,6 +5,20 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.60.0-dev-zone-grade-visibility — 2026-11-15
+
+### Develop
+
+- **Zone Color Grading**: each grade in the **Grades** list has an eye
+  that hides or shows it. A hidden grade keeps its settings but has no
+  effect on the photo; its row is dimmed and its band on the scale is
+  faded, and it no longer counts as an overlap.
+- Moving the wheel on a hidden grade shows it again. Hiding and showing
+  are undo steps, and the choice is saved with the edit.
+- **Fill between** reads its end colours from the grades you can see and
+  also clears its zones from hidden grades, so the ramp stays exact when
+  they are shown again.
+
 ## 1.59.0-dev-zone-color-pickers — 2026-11-14
 
 ### Develop

@@ -241,6 +241,8 @@
       "protect": "保护",
       "softness": "柔和度",
       "removeGrade": "移除分级",
+      "hideGrade": "隐藏分级",
+      "showGrade": "显示分级",
       "zone": "区域 {{zone}}",
       "zones": "区域 {{zones}}"
     }

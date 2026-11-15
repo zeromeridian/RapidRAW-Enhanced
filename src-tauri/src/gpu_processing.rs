@@ -2693,7 +2693,7 @@ mod tests {
         let input = upload_test_image(&context, &image);
         let processor = super::GpuProcessor::new(context, width, 256).expect("processor");
         let mask_view = processor.mask_texture_view(&[], width, height);
-        let render = |zone_tint: serde_json::Value| -> Vec<[f32; 3]> {
+        let render = |zone_tint: serde_json::Value| -> Vec<[u16; 3]> {
             let mut adjustments = AllAdjustments::default();
             adjustments.global.monochrome = 1;
             adjustments.global.zone_tint =
@@ -2720,26 +2720,65 @@ mod tests {
             {
                 super::RenderedPixels::U16(pixels) => pixels[..width as usize * 4]
                     .chunks(4)
-                    .map(srgb_to_oklab)
+                    .map(|pixel| [pixel[0], pixel[1], pixel[2]])
                     .collect(),
                 super::RenderedPixels::U8(_) => unreachable!("16-bit render"),
             }
         };
         let chroma = |lab: &[f32; 3]| lab[1].hypot(lab[2]);
+        // In the deepest shadows one 16-bit step is about 0.01 in OKLab L (the cube root is
+        // steep there), so L is compared as the range each pixel's rounding allows (every
+        // channel ±½ step): the tinted and plain ranges must meet within 1e-3. Away from black
+        // the ranges are far narrower than 1e-3, so this is the plain comparison there.
+        let lightness = |pixel: &[u16; 3], offset: f32| {
+            let linear = |value: u16| {
+                let display = (value as f32 + offset).clamp(0.0, u16::MAX as f32);
+                crate::zone_tint::srgb_to_linear(display / u16::MAX as f32)
+            };
+            crate::zone_tint::linear_srgb_to_oklab([
+                linear(pixel[0]),
+                linear(pixel[1]),
+                linear(pixel[2]),
+            ])[0]
+        };
+        let keeps_lightness = |tinted: &[u16; 3], plain: &[u16; 3]| {
+            let below = lightness(plain, -0.5) - lightness(tinted, 0.5);
+            let above = lightness(tinted, -0.5) - lightness(plain, 0.5);
+            below.max(above) < 1e-3
+        };
+        // A pixel within one step of the plain one carries no measurable colour either.
+        let within_one_step =
+            |a: &[u16; 3], b: &[u16; 3]| a.iter().zip(b).all(|(x, y)| x.abs_diff(*y) <= 1);
+        let to_lab = |pixels: &[[u16; 3]]| -> Vec<[f32; 3]> {
+            pixels.iter().map(|pixel| srgb_to_oklab(pixel)).collect()
+        };
 
-        let plain = render(serde_json::json!({}));
+        let plain_pixels = render(serde_json::json!({}));
         let mut zones = vec![serde_json::json!({}); 11];
         zones[7] = serde_json::json!({ "hue": 60, "strength": 100 });
-        let zone_seven = render(serde_json::json!({ "zones": zones }));
-        let all_zones = render(serde_json::json!({
+        let seven_pixels = render(serde_json::json!({ "zones": zones }));
+        let all_pixels = render(serde_json::json!({
             "zones": vec![serde_json::json!({ "hue": 200, "strength": 50 }); 11],
         }));
+        let (plain, zone_seven, all_zones) =
+            (to_lab(&plain_pixels), to_lab(&seven_pixels), to_lab(&all_pixels));
 
         let mut checked_peak = 0;
-        for ((plain, seven), all) in plain.iter().zip(&zone_seven).zip(&all_zones) {
+        for (index, ((plain, seven), all)) in
+            plain.iter().zip(&zone_seven).zip(&all_zones).enumerate()
+        {
             let l = plain[0];
-            assert!((seven[0] - l).abs() < 1e-3, "Zone VII tint moved L {l}");
-            assert!((all[0] - l).abs() < 1e-3, "full tint moved L {l}");
+            let all_unchanged = within_one_step(&all_pixels[index], &plain_pixels[index]);
+            assert!(
+                keeps_lightness(&seven_pixels[index], &plain_pixels[index]),
+                "Zone VII tint moved L {l} to {}",
+                seven[0]
+            );
+            assert!(
+                keeps_lightness(&all_pixels[index], &plain_pixels[index]),
+                "full tint moved L {l} to {}",
+                all[0]
+            );
             if (l - 0.7).abs() < 0.01 {
                 // About 92 % of strength 100 (chroma 0.10) at the zone's centre.
                 assert!(chroma(seven) > 0.08, "Zone VII centre at L {l}");
@@ -2753,7 +2792,7 @@ mod tests {
             }
             if !(0.005..=0.995).contains(&l) {
                 assert!(
-                    chroma(all) < 2e-3,
+                    all_unchanged || chroma(all) < 2e-3,
                     "Protect keeps the ends neutral at L {l}"
                 );
             }
@@ -2765,7 +2804,8 @@ mod tests {
         let mut zones = vec![serde_json::json!({}); 11];
         zones[5] = serde_json::json!({ "luminance": 100 });
         zones[6] = serde_json::json!({ "luminance": -100 });
-        let moved = render(serde_json::json!({ "softness": 0.02, "zones": zones }));
+        let moved_pixels = render(serde_json::json!({ "softness": 0.02, "zones": zones }));
+        let moved = to_lab(&moved_pixels);
         for pair in moved.windows(2) {
             assert!(
                 pair[1][0] >= pair[0][0] - 2e-3,
@@ -2774,10 +2814,11 @@ mod tests {
             );
         }
         let mut checked_centre = 0;
-        for (plain, moved) in plain.iter().zip(&moved) {
+        for (index, (plain, moved)) in plain.iter().zip(&moved).enumerate() {
             let l = plain[0];
+            let unchanged = within_one_step(&moved_pixels[index], &plain_pixels[index]);
             assert!(
-                chroma(moved) < 2e-3,
+                unchanged || chroma(moved) < 2e-3,
                 "luminance alone stays neutral at L {l}"
             );
             if (l - 0.5).abs() < 0.005 {

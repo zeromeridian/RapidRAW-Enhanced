@@ -242,6 +242,8 @@
       "protect": "Protect",
       "softness": "Softness",
       "removeGrade": "Remove grade",
+      "hideGrade": "Hide grade",
+      "showGrade": "Show grade",
       "zone": "Zone {{zone}}",
       "zones": "Zones {{zones}}"
     }

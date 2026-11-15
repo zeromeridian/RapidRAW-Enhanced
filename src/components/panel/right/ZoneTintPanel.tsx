@@ -33,10 +33,12 @@ import {
   fillGrades,
   gradeSelection,
   gradeZones,
+  isGradeShown,
   isUniformGrade,
   luminanceOf,
   nextZoneSelection,
   overlappingZones,
+  setGradeShown,
   updateGrade,
   withZoneTintGrades,
   zoneTintGrades,
@@ -102,7 +104,7 @@ interface ZoneScaleProps {
 /**
  * The eleven zones as an upright grey scale, X at the top: names on the left, the selection
  * marked beside them, each zone's grades as bands on the scale's right edge, side by side (and
- * flagged) where grades overlap.
+ * flagged) where shown grades overlap; a hidden grade's band is faded.
  */
 function ZoneScale({ grades, onZoneClick, selected, zoneTint }: ZoneScaleProps) {
   const { t } = useTranslation();
@@ -114,17 +116,19 @@ function ZoneScale({ grades, onZoneClick, selected, zoneTint }: ZoneScaleProps) 
         const bands = grades.flatMap((grade) => {
           const settings = grade.zones[zone];
           return settings && (settings.strength > 0 || luminanceOf(settings) !== 0)
-            ? [{ id: grade.id, color: gradeZoneColor(settings, zone) }]
+            ? [{ id: grade.id, color: gradeZoneColor(settings, zone), isShown: isGradeShown(grade) }]
             : [];
         });
-        const isOverlap = bands.length > 1;
+        const shownCount = bands.filter((band) => band.isShown).length;
+        const isOverlap = shownCount > 1;
+        const isSideBySide = bands.length > 1;
         const isSelected = selected.includes(zone);
         return (
           <button
             aria-label={t('adjustments.zoneTint.zone', { zone: name })}
             aria-pressed={isSelected}
             className="group flex items-stretch gap-1.5 h-5 compact:h-[18px] focus:outline-none"
-            data-tooltip={isOverlap ? t('adjustments.zoneTint.overlapCount', { count: bands.length }) : undefined}
+            data-tooltip={isOverlap ? t('adjustments.zoneTint.overlapCount', { count: shownCount }) : undefined}
             key={name}
             onClick={(event) => onZoneClick(zone, event)}
           >
@@ -150,7 +154,7 @@ function ZoneScale({ grades, onZoneClick, selected, zoneTint }: ZoneScaleProps) 
                 <span className="absolute inset-y-0 right-0 flex">
                   {bands.map((band) => (
                     <span
-                      className={clsx(isOverlap ? 'w-1.5' : 'w-2.5')}
+                      className={clsx(isSideBySide ? 'w-1.5' : 'w-2.5', !band.isShown && 'opacity-30')}
                       key={band.id}
                       style={{ backgroundColor: band.color }}
                     />
@@ -265,6 +269,15 @@ export default function ZoneTintPanel() {
     updateGrades(
       (current) => zoneTintGrades(current).filter((g) => g.id !== grade.id),
       t('adjustments.zoneTint.removeGrade'),
+    );
+  };
+
+  /** The grade's eye: one undo step, like the panel's own eye. */
+  const toggleGradeShown = (grade: ZoneTintGrade) => {
+    const isShown = !isGradeShown(grade);
+    updateGrades(
+      (current) => setGradeShown(zoneTintGrades(current), grade.id, isShown),
+      t(isShown ? 'adjustments.zoneTint.showGrade' : 'adjustments.zoneTint.hideGrade'),
     );
   };
 
@@ -421,6 +434,8 @@ export default function ZoneTintPanel() {
                 const overlap = overlappingZones(grade, grades);
                 const first = grade.zones[zones[0]] ?? NEUTRAL_ZONE;
                 const last = grade.zones[zones[zones.length - 1]] ?? NEUTRAL_ZONE;
+                const isShown = isGradeShown(grade);
+                const eyeLabel = t(isShown ? 'adjustments.zoneTint.hideGrade' : 'adjustments.zoneTint.showGrade');
                 return (
                   <div
                     className={clsx(
@@ -430,7 +445,10 @@ export default function ZoneTintPanel() {
                     key={grade.id}
                   >
                     <button
-                      className="grow min-w-0 flex items-center gap-2 px-2 py-1.5 text-left"
+                      className={clsx(
+                        'grow min-w-0 flex items-center gap-2 px-2 py-1.5 text-left transition-opacity',
+                        !isShown && 'opacity-40',
+                      )}
                       onClick={() => setSelection(gradeSelection(grade))}
                     >
                       <span
@@ -461,6 +479,15 @@ export default function ZoneTintPanel() {
                       >
                         <GradeValues grade={grade} />
                       </Text>
+                    </button>
+                    <button
+                      aria-label={eyeLabel}
+                      aria-pressed={!isShown}
+                      className="p-1.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-bg-primary transition-colors"
+                      data-tooltip={eyeLabel}
+                      onClick={() => toggleGradeShown(grade)}
+                    >
+                      {isShown ? <Eye size={14} /> : <EyeOff size={14} />}
                     </button>
                     <button
                       className="p-1.5 mr-0.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-bg-primary transition-colors"

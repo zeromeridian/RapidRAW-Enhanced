@@ -595,6 +595,8 @@ export interface ZoneTintZone {
 export interface ZoneTintGrade {
   id: string;
   zones: Array<ZoneTintZone | null>;
+  /** False while the grade is hidden (left out of the rendered sum); absent means shown. */
+  visible?: boolean;
 }
 
 /**

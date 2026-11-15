@@ -1137,10 +1137,12 @@ mod output_naming_tests {
                 { "hue": 0, "strength": 0, "luminance": 40 },
                 { "hue": 30, "strength": 60, "luminance": -25 },
             ],
-            // The editable grades (TS only); `zones` above is their sum, which Rust renders.
+            // The editable grades (TS only); `zones` above is the sum of the shown ones, which
+            // Rust renders. A hidden grade ("c") travels with its flag.
             "grades": [
                 { "id": "a", "zones": [{ "hue": 0, "strength": 0, "luminance": 40 }, null] },
                 { "id": "b", "zones": [null, { "hue": 30, "strength": 60, "luminance": -25 }] },
+                { "id": "c", "zones": [{ "hue": 200, "strength": 30, "luminance": 0 }, null], "visible": false },
             ],
         });
         let source = ImageMetadata {
