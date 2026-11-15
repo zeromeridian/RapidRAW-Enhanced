@@ -29,6 +29,7 @@ import {
 import { BLEND_PAD_CURVES } from '../../../utils/blendPad';
 import {
   NEUTRAL_ZONE,
+  ZONE_NAMES,
   ZoneSelection,
   fillGrades,
   gradeSelection,
@@ -44,7 +45,6 @@ import {
   zoneTintGrades,
 } from '../../../utils/zoneTint';
 
-const ZONE_NAMES = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 /** Softness and Protect are OKLab L values, Amount a factor; the sliders show them ×100. */
 const SLIDER_SCALE = 100;
 const NEUTRAL: HueSatLum = { hue: 0, saturation: 0, luminance: 0 };
@@ -96,6 +96,8 @@ const byLightestZone = (grades: ZoneTintGrade[]) =>
 
 interface ZoneScaleProps {
   grades: ZoneTintGrade[];
+  /** The zone under the cursor on the photo (the hover readout), or null. */
+  hovered: number | null;
   onZoneClick(zone: number, event: MouseEvent): void;
   selected: number[];
   zoneTint: ZoneTint;
@@ -104,9 +106,10 @@ interface ZoneScaleProps {
 /**
  * The eleven zones as an upright grey scale, X at the top: names on the left, the selection
  * marked beside them, each zone's grades as bands on the scale's right edge, side by side (and
- * flagged) where shown grades overlap; a hidden grade's band is faded.
+ * flagged) where shown grades overlap; a hidden grade's band is faded. The zone under the
+ * cursor on the photo is outlined and its name lit.
  */
-function ZoneScale({ grades, onZoneClick, selected, zoneTint }: ZoneScaleProps) {
+function ZoneScale({ grades, hovered, onZoneClick, selected, zoneTint }: ZoneScaleProps) {
   const { t } = useTranslation();
 
   return (
@@ -123,6 +126,7 @@ function ZoneScale({ grades, onZoneClick, selected, zoneTint }: ZoneScaleProps) 
         const isOverlap = shownCount > 1;
         const isSideBySide = bands.length > 1;
         const isSelected = selected.includes(zone);
+        const isHovered = hovered === zone;
         return (
           <button
             aria-label={t('adjustments.zoneTint.zone', { zone: name })}
@@ -136,6 +140,7 @@ function ZoneScale({ grades, onZoneClick, selected, zoneTint }: ZoneScaleProps) 
               className={clsx(
                 'w-8 self-center text-right text-[11px] leading-none select-none transition-colors',
                 isSelected ? 'text-text-primary font-semibold' : 'text-text-secondary group-hover:text-text-primary',
+                isHovered && 'text-text-primary',
               )}
             >
               {name}
@@ -160,6 +165,9 @@ function ZoneScale({ grades, onZoneClick, selected, zoneTint }: ZoneScaleProps) 
                     />
                   ))}
                 </span>
+              )}
+              {isHovered && (
+                <span className="absolute inset-0 border-2 border-accent pointer-events-none rounded-[inherit]" />
               )}
               {isOverlap && (
                 <Layers
@@ -212,9 +220,10 @@ function GradeValues({ grade }: { grade: ZoneTintGrade }) {
 export default function ZoneTintPanel() {
   const { t } = useTranslation();
   const { setAdjustments } = useEditorActions();
-  const { storedZoneTint, sectionVisibility, selection, picker, setEditor } = useEditorStore(
+  const { storedZoneTint, sectionVisibility, selection, hoveredZone, picker, setEditor } = useEditorStore(
     useShallow((state) => ({
       storedZoneTint: state.adjustments.zoneTint,
+      hoveredZone: state.zoneTintHover?.zone ?? null,
       sectionVisibility: state.adjustments.sectionVisibility ?? INITIAL_ADJUSTMENTS.sectionVisibility,
       selection: state.zoneTintSelection,
       picker: state.targetedAdjustment?.tool === 'zoneTint' ? state.targetedAdjustment : null,
@@ -357,7 +366,13 @@ export default function ZoneTintPanel() {
       <div className="grow overflow-y-auto p-4 compact:p-3 flex flex-col gap-4 compact:gap-3">
         <div className={clsx('flex flex-col gap-4 compact:gap-3 transition-opacity', !isVisible && 'opacity-40')}>
           <div className="flex items-center gap-3">
-            <ZoneScale grades={grades} onZoneClick={handleZoneClick} selected={selected} zoneTint={zoneTint} />
+            <ZoneScale
+              grades={grades}
+              hovered={hoveredZone}
+              onZoneClick={handleZoneClick}
+              selected={selected}
+              zoneTint={zoneTint}
+            />
             <div className="grow min-w-0 max-w-60">
               <ColorWheel
                 defaultValue={NEUTRAL}

@@ -5,6 +5,18 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.61.0-dev-zone-grading-phase-3 — 2026-11-15
+
+### Develop
+
+- **Zone Color Grading** shows which zone you are pointing at: with its
+  panel open, a small label beside the cursor on the photo names the
+  zone under it and its lightness, for example "Zone VI · L 0.62", and
+  that zone is outlined on the zone scale.
+- The label reads the tones before the grading, exactly as the pipette
+  does, so it always names the zone a click would pick. It works with
+  the pickers on or off and changes nothing.
+
 ## 1.60.0-dev-zone-grade-visibility — 2026-11-15
 
 ### Develop

@@ -24,7 +24,8 @@ it, then move the colour wheel. Each coloured selection becomes a
 | Part | What it is |
 |---|---|
 | **Header buttons** | Pipette (pick a zone on the photo), rectangle (pick zones in an area of the photo), eye (switch the whole tool off and on), reset (remove everything). |
-| **Zone scale** | The eleven zones as an upright grey ramp, X at the top, 0 at the bottom. The names are on the left; an accent bar marks the selected zones. |
+| **Zone scale** | The eleven zones as an upright grey ramp, X at the top, 0 at the bottom. The names are on the left; an accent bar marks the selected zones, and an outline the zone under the cursor on the photo. |
+| **Hover readout** | Beside the cursor on the photo: the zone under it and its lightness, e.g. "Zone VI · L 0.62". |
 | **Colour bands** | On the scale's right edge, each grade's colour in the zones it covers. Where two or more grades share a zone, their colours sit side by side and a small layers icon appears (shown grades only). A hidden grade's band is faded. |
 | **Colour wheel** | Hue (angle), strength (distance from the centre) and Luminance (slider under the wheel) for the selection. Its title names the selected zones, e.g. "Zones II–IV". |
 | **Fill between** | A curve (Linear, Soft, Ease in) and a button that fills the zones between the first and last selected zone with a smooth ramp. |
@@ -148,6 +149,22 @@ Rectangle on, drag over the sky of a landscape. The sky runs from Zone
 VII near the horizon to Zone IX at the top, so VII, VIII and IX are
 selected; a few dark birds in the rectangle (Zone II, under 3 % of it)
 are not. The wheel's title reads "Zones VII–IX".
+
+### Seeing a zone before you pick it
+
+While the panel is open, move the cursor over the photo: a small label
+beside the cursor names the zone of the tones under it and their
+lightness, for example **"Zone VI · L 0.62"**, and that zone is outlined
+on the scale. Nothing is selected or changed.
+
+- **L** is the lightness the zones are measured in, from 0 (black) to 1
+  (white). Zone n sits at L = n / 10, so 0.62 is Zone VI, a little
+  towards VII.
+- The label reads the same 16-pixel square as the pipette and, like the
+  pickers, the tones **before** the grading, so it shows exactly the
+  zone a click would pick.
+- It works with the pickers on or off, and hides while the cursor is off
+  the photo or Speed Edit shows its own label.
 
 ## Grades
 

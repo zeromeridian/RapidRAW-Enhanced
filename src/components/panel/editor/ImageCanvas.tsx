@@ -23,6 +23,7 @@ import { RenderSize } from '../../../hooks/useImageRenderSize';
 import { useImageNaturalSize } from '../../../hooks/useImageNaturalSize';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
 import { useTargetedAdjustment } from '../../../hooks/useTargetedAdjustment';
+import { useZoneHoverReadout } from '../../../hooks/useZoneHoverReadout';
 import { useTranslation } from 'react-i18next';
 import type { OverlayMode } from '../right/CropPanel';
 import CompositionOverlays from './overlays/CompositionOverlays';
@@ -1584,6 +1585,11 @@ const ImageCanvas = memo(
       setAdjustments,
     });
 
+    // Zone Color Grading's hover readout reads the zone under the cursor while its panel is open.
+    const photoFrameRef = useRef<SVGSVGElement>(null);
+    const isZoneTintPanelOpen = useUIStore((state) => state.activeRightPanel === Panel.ZoneTint);
+    useZoneHoverReadout(photoFrameRef, isZoneTintPanelOpen && hasRenderSize && isPhotoShown && !isCropViewVisible);
+
     const isRelightPickerActive = useEditorStore((state) => state.isRelightPickerActive);
     const isMaskShapeDragging = useEditorStore((state) => state.isMaskShapeDragging);
     const activeRelightLightId = useEditorStore((state) => state.activeRelightLightId);
@@ -3063,7 +3069,7 @@ const ImageCanvas = memo(
             : 1;
 
     return (
-      <div className="relative" style={{ width: '100%', height: '100%', cursor: effectiveCursor }}>
+      <div className="relative" data-zone-hover-area style={{ width: '100%', height: '100%', cursor: effectiveCursor }}>
         <div
           className="absolute inset-0 w-full h-full transition-opacity duration-200 flex items-center justify-center"
           style={{
@@ -3082,6 +3088,7 @@ const ImageCanvas = memo(
             <div className="absolute inset-0 w-full h-full">
               <svg
                 className="pointer-events-none"
+                ref={photoFrameRef}
                 {...lightsOutTarget(isPhotoShown && hasRenderSize && !isCropViewVisible, 0, true)}
                 viewBox={thumbnailSize ? `0 0 ${thumbnailSize.width} ${thumbnailSize.height}` : undefined}
                 style={

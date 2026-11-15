@@ -18,7 +18,7 @@ import { OverlayMode } from '../components/panel/right/CropPanel';
 import type { SpeedEditTarget } from '../components/ui/Slider';
 import { describeHistoryChange } from '../utils/editHistory';
 import type { TargetedAdjustment } from '../utils/targetedAdjustment';
-import { INITIAL_ZONE_SELECTION, ZoneSelection } from '../utils/zoneTint';
+import { INITIAL_ZONE_SELECTION, ZoneHover, ZoneSelection } from '../utils/zoneTint';
 
 /** Undo history keeps at most this many steps; the oldest is dropped first. */
 const MAX_HISTORY_STEPS = 50;
@@ -93,6 +93,8 @@ interface EditorState {
   isPointColorRangeVisualized: boolean;
   /** The zones Zone Color Grading edits, chosen on its scale or with its pickers on the photo. */
   zoneTintSelection: ZoneSelection;
+  /** Zone Color Grading's hover readout: the zone under the cursor on the photo, or null. */
+  zoneTintHover: ZoneHover | null;
   activeRelightLightId: string | null;
   liveRotation: number | null;
   /** The Crop panel's values when it was opened (null outside Crop); Escape restores them. */
@@ -183,6 +185,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   activePointColorId: null,
   isPointColorRangeVisualized: false,
   zoneTintSelection: INITIAL_ZONE_SELECTION,
+  zoneTintHover: null,
   activeRelightLightId: null,
   liveRotation: null,
   cropSessionSnapshot: null,

@@ -15,6 +15,9 @@ import { applyBlendPadCurve } from './blendPad';
 
 export const MIDDLE_GREY_ZONE = 5;
 
+/** The Zone System's names for zones 0–X. */
+export const ZONE_NAMES = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+
 /** `zone_tint::MAX_CENTER_OFFSET`: how far a zone's centre may move from n / 10. */
 const MAX_CENTER_OFFSET = 0.05;
 
@@ -309,13 +312,31 @@ const zoneCounts = (probe: Uint8Array, zoneTint: ZoneTint) => {
   return counts;
 };
 
-/** The zone of a point pick: the zone of the sampled pixels' mean lightness. */
-export const samplePickedZone = (probe: Uint8Array, zoneTint: ZoneTint): number | null => {
+/** The mean OKLab lightness of an RGBA8 `zoneTint` probe's pixels, or null when it is empty. */
+const meanLightness = (probe: Uint8Array): number | null => {
   const count = probe.length / 4;
   if (count === 0) return null;
   let lightness = 0;
   for (let i = 0; i < probe.length; i += 4) lightness += probe[i] / 255;
-  return nearestZone(lightness / count, zoneTint);
+  return lightness / count;
+};
+
+/** The zone of a point pick: the zone of the sampled pixels' mean lightness. */
+export const samplePickedZone = (probe: Uint8Array, zoneTint: ZoneTint): number | null => {
+  const lightness = meanLightness(probe);
+  return lightness === null ? null : nearestZone(lightness, zoneTint);
+};
+
+/** What the hover readout shows: the zone under the cursor and its lightness (OKLab L, 0–1). */
+export interface ZoneHover {
+  zone: number;
+  lightness: number;
+}
+
+/** The hover readout of a probe, read like a point pick. */
+export const sampleZoneHover = (probe: Uint8Array, zoneTint: ZoneTint): ZoneHover | null => {
+  const lightness = meanLightness(probe);
+  return lightness === null ? null : { zone: nearestZone(lightness, zoneTint), lightness };
 };
 
 /**

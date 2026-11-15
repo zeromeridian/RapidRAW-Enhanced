@@ -12,9 +12,9 @@ import {
 } from '../../../ui/Slider';
 import { Coord, DEFAULT_SPEED_EDIT_ADJUSTMENTS } from '../../../../utils/adjustments';
 import { formatKeyCode, isTextEntryTarget, normalizeCombo } from '../../../../utils/keyboardUtils';
+import { placeHud } from './hudPlacement';
 
 const DRAG_RANGE_PX = 400;
-const HUD_OFFSET = 16;
 const SPEED_EDIT_KEY = 'KeyW';
 const FINE_ADJUSTMENT_KEYS = ['shift', 'alt'];
 const PREVIOUS_KEY = 'KeyA';
@@ -64,27 +64,6 @@ const canSpeedEdit = (target: EventTarget | null) => {
   return (
     !!useEditorStore.getState().selectedImage && !ui.isSettingsOpen && !isModalOpen(ui) && !isTextEntryTarget(target)
   );
-};
-
-const toLocalPoint = (element: HTMLElement | null, client: Coord | null): Coord | null => {
-  if (!element || !client) return null;
-  const rect = element.getBoundingClientRect();
-  const x = client.x - rect.left;
-  const y = client.y - rect.top;
-  return x >= 0 && y >= 0 && x <= rect.width && y <= rect.height ? { x, y } : null;
-};
-
-const placeHud = (hud: HTMLElement | null, overlay: HTMLElement | null, client: Coord | null) => {
-  if (!hud || !overlay || !client) return;
-  if (hud.style.transform && !toLocalPoint(overlay, client)) return;
-  const rect = overlay.getBoundingClientRect();
-  const x = Math.min(Math.max(client.x - rect.left, 0), rect.width);
-  const y = Math.min(Math.max(client.y - rect.top, 0), rect.height);
-  const shift = (isFlipped: boolean) => (isFlipped ? `calc(-100% - ${HUD_OFFSET}px)` : `${HUD_OFFSET}px`);
-  hud.style.transition = hud.style.transform ? 'transform 150ms ease-out' : 'none';
-  hud.style.left = `${x}px`;
-  hud.style.top = `${y}px`;
-  hud.style.transform = `translate(${shift(x > rect.width * 0.75)}, ${shift(y > rect.height * 0.75)})`;
 };
 
 // The right panel shows one panel at a time, so the visible sliders are the active panel's.
