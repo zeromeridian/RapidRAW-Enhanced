@@ -5,6 +5,20 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.67.0-dev-develop-regroup — 2026-11-15
+
+### Develop
+
+- **Favorites** moved into the **Adjustments** panel: an **All /
+  ★ Favorites** switch at its top shows either every section or just
+  your starred sections, tools and sliders. The separate Favorites
+  button in the tool strip is gone.
+- The Adjustments header (Auto Adjust, histogram, Customize Panels,
+  Reset) and the histogram stay in both views, and the view you chose
+  is remembered after a restart.
+- Starring, reordering and everything a favourite does on the photo,
+  such as placing Relight lights, work as before.
+
 ## 1.66.0-dev-develop-regroup — 2026-11-15
 
 ### Develop

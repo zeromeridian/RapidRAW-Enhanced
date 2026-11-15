@@ -3,7 +3,6 @@ import { Reorder, useDragControls } from 'framer-motion';
 import { GripVertical } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
-import PanelHeader from '../../ui/PanelHeader';
 import Text from '../../ui/Text';
 import { TextVariants, TextWeights } from '../../../types/typography';
 import { getSectionEye, isGroupVisible } from '../../../utils/adjustments';
@@ -14,8 +13,6 @@ import { AdjustmentPanelContext, FavoriteStar } from '../../adjustments/Adjustme
 import { useAdjustmentSectionProps } from '../../../hooks/useAdjustmentSectionProps';
 import { useFavorites } from '../../../hooks/useFavorites';
 import { useReorderableList } from '../../../hooks/useReorderableList';
-
-const FAVORITES_PANEL_CONTEXT = { canFavorite: true };
 
 type SectionProps = ReturnType<typeof useAdjustmentSectionProps>;
 
@@ -72,9 +69,9 @@ function FavoriteRow({ favorite, label, onDragEnd, sectionProps }: FavoriteRowPr
   const { t } = useTranslation();
   const dragControls = useDragControls();
   const visibility = sectionProps.adjustments.sectionVisibility;
-  // A tool switched off with its section's eye in Adjustments has no effect; its favorites show
-  // that. A slider follows its tool's eye; a section or tool dims as a whole only when the section
-  // is off (in a partly off section, the section dims its hidden tools itself).
+  // A tool switched off with its section's eye has no effect; its favorites show that. A slider
+  // follows its tool's eye; a section or tool dims as a whole only when the section is off (in a
+  // partly off section, the section dims its hidden tools itself).
   const control = favorite.kind === 'control' ? ADJUSTMENT_CONTROLS_BY_ID[favorite.id] : undefined;
   const isSectionOn = control
     ? isGroupVisible(visibility, control.parent)
@@ -105,47 +102,48 @@ function FavoriteRow({ favorite, label, onDragEnd, sectionProps }: FavoriteRowPr
   );
 }
 
-/** The photo's starred sections, tools and sliders, in the order the user drags them into. */
-export default function FavoritesPanel() {
+interface FavoritesListProps {
+  sectionProps: SectionProps;
+}
+
+/**
+ * The Adjustments panel's Favorites view: the photo's starred sections, tools and sliders, in the
+ * order the user drags them into.
+ */
+export default function FavoritesList({ sectionProps }: FavoritesListProps) {
   const { t } = useTranslation();
-  const sectionProps = useAdjustmentSectionProps();
   const { favorites, getLabel, reorderFavorites } = useFavorites();
   const favoritesByKey = Object.fromEntries(favorites.map((favorite) => [favorite.key, favorite]));
   const savedOrder = useMemo(() => favorites.map((favorite) => favorite.key), [favorites]);
   const list = useReorderableList(savedOrder, reorderFavorites);
 
+  if (favorites.length === 0) {
+    return (
+      <Text variant={TextVariants.small} className="block text-center text-text-secondary px-4 py-8">
+        {t('editor.favorites.empty')}
+      </Text>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-full">
-      <PanelHeader title={t('editor.favorites.title')} />
-      <AdjustmentPanelContext.Provider value={FAVORITES_PANEL_CONTEXT}>
-        <div className="grow overflow-y-auto p-4 compact:p-1.5">
-          {favorites.length === 0 ? (
-            <Text variant={TextVariants.small} className="block text-center text-text-secondary px-4 py-8">
-              {t('editor.favorites.empty')}
-            </Text>
-          ) : (
-            <Reorder.Group
-              as="div"
-              axis="y"
-              className="flex flex-col gap-2 compact:gap-1.5"
-              onReorder={list.handleReorder}
-              values={list.order}
-            >
-              {list.order
-                .filter((key) => favoritesByKey[key])
-                .map((key) => (
-                  <FavoriteRow
-                    favorite={favoritesByKey[key]}
-                    key={key}
-                    label={getLabel(favoritesByKey[key])}
-                    onDragEnd={list.handleDragEnd}
-                    sectionProps={sectionProps}
-                  />
-                ))}
-            </Reorder.Group>
-          )}
-        </div>
-      </AdjustmentPanelContext.Provider>
-    </div>
+    <Reorder.Group
+      as="div"
+      axis="y"
+      className="flex flex-col gap-2 compact:gap-1.5"
+      onReorder={list.handleReorder}
+      values={list.order}
+    >
+      {list.order
+        .filter((key) => favoritesByKey[key])
+        .map((key) => (
+          <FavoriteRow
+            favorite={favoritesByKey[key]}
+            key={key}
+            label={getLabel(favoritesByKey[key])}
+            onDragEnd={list.handleDragEnd}
+            sectionProps={sectionProps}
+          />
+        ))}
+    </Reorder.Group>
   );
 }

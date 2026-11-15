@@ -791,8 +791,9 @@
     "favorites": {
       "add": "Ajouter aux favoris",
       "addItem": "Ajouter « {{name}} » aux favoris",
+      "all": "Tout",
       "dragToReorder": "Faites glisser pour réorganiser",
-      "empty": "Ajoutez une étoile à une section, un outil ou un curseur dans Ajustements pour le retrouver ici.",
+      "empty": "Ajoutez une étoile à une section, un outil ou un curseur dans Tout pour le retrouver ici.",
       "qualifiedLabel": "{{tool}} : {{control}}",
       "remove": "Retirer des favoris",
       "removeItem": "Retirer « {{name}} » des favoris",
@@ -997,7 +998,6 @@
         "crop": "Recadrer",
         "develop": "Développement",
         "export": "Exporter",
-        "favorites": "Favoris",
         "info": "Info",
         "inpaint": "Inpainting",
         "masks": "Masques",

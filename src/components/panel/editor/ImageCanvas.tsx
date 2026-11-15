@@ -1597,14 +1597,16 @@ const ImageCanvas = memo(
     const isMaskShapeDragging = useEditorStore((state) => state.isMaskShapeDragging);
     const activeRelightLightId = useEditorStore((state) => state.activeRelightLightId);
     const setEditor = useEditorStore((state) => state.setEditor);
-    // Relight's lights are placed from its panel, which Favorites can also show.
+    // Relight's lights are placed from its tool, shown in Light & Atmosphere or, in the Favorites
+    // view, by a Relight favourite.
+    const isFavoritesView = useSettingsStore((state) => state.appSettings?.showFavoriteAdjustments ?? false);
     const hasRelightFavorite = useSettingsStore((state) =>
       RELIGHT_FAVORITES.some((key) => state.appSettings?.adjustmentLayout?.favorites?.includes(key)),
     );
     const isRelightToolOpen = useUIStore(
       (state) =>
-        (state.activeRightPanel === Panel.Adjustments && state.collapsibleSectionsState.lightAtmosphere) ||
-        (state.activeRightPanel === Panel.Favorites && hasRelightFavorite),
+        state.activeRightPanel === Panel.Adjustments &&
+        (isFavoritesView ? hasRelightFavorite : state.collapsibleSectionsState.lightAtmosphere),
     );
     const activeRotation = liveRotation ?? adjustments.rotation ?? 0;
 

@@ -10,7 +10,6 @@ import {
   Scan,
   Aperture,
   Tag,
-  Star,
   Orbit,
   Blend,
   type LucideIcon,
@@ -29,22 +28,25 @@ interface RightPanelSwitcherProps {
   activePanel: Panel | null;
   onPanelSelect(id: Panel): void;
   isInstantTransition: boolean;
-  layout?: 'horizontal' | 'vertical';
 }
 
+/** Develop's tools in editing order: start from a preset, fix the frame, adjust, then local work. */
 const editingPanelGroups: Array<Array<PanelOptions>> = [
+  [{ id: Panel.Presets, icon: SwatchBook, title: 'editor.switcher.tooltips.presets' }],
   [
-    { id: Panel.Adjustments, icon: SlidersHorizontal, title: 'editor.switcher.tooltips.adjust' },
-    { id: Panel.Favorites, icon: Star, title: 'editor.switcher.tooltips.favorites' },
-    { id: Panel.BlendPad, icon: Orbit, title: 'editor.blendPad.title' },
-    { id: Panel.ZoneTint, icon: Blend, title: 'editor.adjustments.sections.zoneTint' },
     { id: Panel.Crop, icon: Crop, title: 'editor.switcher.tooltips.crop' },
     { id: Panel.Geometry, icon: Scan, title: 'editor.switcher.tooltips.geometry' },
     { id: Panel.LensCorrection, icon: Aperture, title: 'editor.crop.tooltips.lens' },
+  ],
+  [
+    { id: Panel.Adjustments, icon: SlidersHorizontal, title: 'editor.switcher.tooltips.adjust' },
+    { id: Panel.BlendPad, icon: Orbit, title: 'editor.blendPad.title' },
+    { id: Panel.ZoneTint, icon: Blend, title: 'editor.adjustments.sections.zoneTint' },
+  ],
+  [
     { id: Panel.Masks, icon: Layers, title: 'editor.switcher.tooltips.masks' },
     { id: Panel.Ai, icon: Paintbrush, title: 'editor.switcher.tooltips.inpaint' },
   ],
-  [{ id: Panel.Presets, icon: SwatchBook, title: 'editor.switcher.tooltips.presets' }],
 ];
 
 // Info, Tagging, and Export are top-bar switches; only without the top bar (Android) are they here.
@@ -57,35 +59,27 @@ const panelGroupsWithoutTopBar: Array<Array<PanelOptions>> = [
   ],
 ];
 
+/**
+ * Develop's tool bar: one row of tool buttons that share its width evenly, groups set apart by a
+ * line, so every tool fits even at the narrowest sidebar.
+ */
 export default function RightPanelSwitcher({
   activePanel,
   onPanelSelect,
   isInstantTransition,
-  layout = 'vertical',
 }: RightPanelSwitcherProps) {
   const { t } = useTranslation();
-  const isHorizontal = layout === 'horizontal';
   const panelGroups = useIsTitleBarShown() ? editingPanelGroups : panelGroupsWithoutTopBar;
 
   return (
     <LayoutGroup id="right-panel-switcher">
-      <div
-        className={
-          isHorizontal ? 'flex items-center overflow-x-auto p-1 gap-1' : 'flex flex-col px-0.5 py-1 gap-0.5 h-full'
-        }
-      >
+      <div className="flex items-center p-1 gap-0.5">
         {panelGroups.map((group, groupIndex) => (
-          <div key={groupIndex} className={isHorizontal ? 'flex items-center gap-1' : 'flex flex-col gap-0.5'}>
-            {groupIndex > 0 && (
-              <div
-                className={
-                  isHorizontal ? 'w-px h-6 bg-surface self-stretch my-auto' : 'w-6 h-px bg-surface self-center my-1'
-                }
-              />
-            )}
+          <div key={groupIndex} className="contents">
+            {groupIndex > 0 && <div className="w-px h-6 shrink-0 bg-surface" />}
             {group.map(({ id, icon: Icon, title }) => (
               <button
-                className={`relative rounded-md transition-colors duration-200 ${isHorizontal ? 'p-2 shrink-0' : 'p-1.5'} ${
+                className={`relative flex-1 min-w-0 flex justify-center py-2 rounded-md transition-colors duration-200 ${
                   activePanel === id
                     ? 'text-text-primary'
                     : 'text-text-secondary hover:bg-surface hover:text-text-primary'
@@ -101,7 +95,7 @@ export default function RightPanelSwitcher({
                     transition={isInstantTransition ? { duration: 0 } : { type: 'spring', bounce: 0.2, duration: 0.4 }}
                   />
                 )}
-                <Icon size={isHorizontal ? 20 : 18} className="relative z-10" />
+                <Icon size={22} className="relative z-10 shrink-0" />
               </button>
             ))}
           </div>

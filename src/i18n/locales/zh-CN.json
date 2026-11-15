@@ -765,8 +765,9 @@
     "favorites": {
       "add": "添加到收藏",
       "addItem": "将“{{name}}”添加到收藏",
+      "all": "全部",
       "dragToReorder": "拖动以重新排序",
-      "empty": "在调整中为分区、工具或滑块加星标，即可将其收集到这里。",
+      "empty": "在“全部”中为分区、工具或滑块加星标，即可将其收集到这里。",
       "qualifiedLabel": "{{tool}}：{{control}}",
       "remove": "从收藏中移除",
       "removeItem": "从收藏中移除“{{name}}”",
@@ -970,7 +971,6 @@
         "crop": "裁剪",
         "develop": "修改照片",
         "export": "导出",
-        "favorites": "收藏",
         "info": "信息",
         "inpaint": "修复",
         "masks": "蒙版",

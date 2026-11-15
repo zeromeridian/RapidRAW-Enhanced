@@ -213,7 +213,8 @@ details are in `RELEASE_NOTES.MD`.
   resets. A and D switch between the sliders chosen in Settings → Controls,
   the arrow keys nudge, R resets, C and V copy and paste a value, and Q and E
   change photos. A small display at the pointer shows the slider and value.
-- **Favorites** tab in the Develop tool strip: star whole sections, tool
+- **Favorites** view of the Adjustments panel (its All / ★ Favorites
+  switch, remembered across restarts): star whole sections, tool
   blocks, or single sliders (a star appears on hover beside the title or
   label; the right-click menu offers the same) and arrange them by drag.
   They edit the photo's own values, with the same history, XMP and Speed

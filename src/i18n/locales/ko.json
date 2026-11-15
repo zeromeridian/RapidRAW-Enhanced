@@ -765,8 +765,9 @@
     "favorites": {
       "add": "즐겨찾기에 추가",
       "addItem": "'{{name}}'을(를) 즐겨찾기에 추가",
+      "all": "전체",
       "dragToReorder": "드래그하여 순서 변경",
-      "empty": "조정에서 섹션, 도구 또는 슬라이더에 별표를 표시하면 여기에 모입니다.",
+      "empty": "전체에서 섹션, 도구 또는 슬라이더에 별표를 표시하면 여기에 모입니다.",
       "qualifiedLabel": "{{tool}}: {{control}}",
       "remove": "즐겨찾기에서 제거",
       "removeItem": "'{{name}}'을(를) 즐겨찾기에서 제거",
@@ -970,7 +971,6 @@
         "crop": "자르기",
         "develop": "현상",
         "export": "내보내기",
-        "favorites": "즐겨찾기",
         "info": "정보",
         "inpaint": "인페인팅",
         "masks": "마스크",

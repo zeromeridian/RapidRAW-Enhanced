@@ -8,7 +8,6 @@ import BottomBar from '../panel/BottomBar';
 import RightPanelSwitcher from '../panel/right/RightPanelSwitcher';
 import Resizer from '../ui/Resizer';
 import Controls from '../panel/right/ControlsPanel';
-import FavoritesPanel from '../panel/right/FavoritesPanel';
 import BlendPadPanel from '../panel/right/BlendPadPanel';
 import ZoneTintPanel from '../panel/right/ZoneTintPanel';
 import MetadataPanel from '../panel/right/MetadataPanel';
@@ -247,7 +246,6 @@ export default function EditorView({
             variants={panelVariants}
           >
             {renderedRightPanel === Panel.Adjustments && <Controls />}
-            {renderedRightPanel === Panel.Favorites && <FavoritesPanel />}
             {renderedRightPanel === Panel.BlendPad && <BlendPadPanel />}
             {renderedRightPanel === Panel.ZoneTint && <ZoneTintPanel />}
             {renderedRightPanel === Panel.Metadata && <MetadataPanel />}
@@ -324,7 +322,6 @@ export default function EditorView({
                 activePanel={activeRightPanel}
                 onPanelSelect={handleRightPanelSelect}
                 isInstantTransition={isInstantTransition}
-                layout="horizontal"
               />
             </div>
             <div className="shrink-0 border-t border-surface">{editorBottomBarComponent}</div>
@@ -336,7 +333,7 @@ export default function EditorView({
               onMouseDown={createResizeHandler('right', rightPanelWidth)}
               onDoubleClick={createResizeResetHandler('right')}
             />
-            <div className="flex bg-bg-secondary rounded-lg h-full">
+            <div className="bg-bg-secondary rounded-lg h-full">
               <div
                 className={clsx(
                   'h-full overflow-hidden',
@@ -345,21 +342,17 @@ export default function EditorView({
                 style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
               >
                 <div style={{ width: `${rightPanelWidth}px` }} className="h-full flex flex-col">
+                  <div className="shrink-0 border-b border-surface">
+                    {/* The tool bar keeps its tool open: a click on the highlighted one does nothing. */}
+                    <RightPanelSwitcher
+                      activePanel={activeRightPanel}
+                      onPanelSelect={(panel) => panel !== activeRightPanel && handleRightPanelSelect(panel)}
+                      isInstantTransition={isInstantTransition}
+                    />
+                  </div>
                   <div className="min-h-0 flex-1">{editorRightPanelContent}</div>
                   <AutoSyncFooter />
                 </div>
-              </div>
-              <div
-                className={clsx(
-                  'h-full border-l transition-colors',
-                  activeRightPanel ? 'border-surface' : 'border-transparent',
-                )}
-              >
-                <RightPanelSwitcher
-                  activePanel={activeRightPanel}
-                  onPanelSelect={handleRightPanelSelect}
-                  isInstantTransition={isInstantTransition}
-                />
               </div>
             </div>
           </>

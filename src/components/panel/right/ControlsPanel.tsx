@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { RotateCcw, Copy, ClipboardPaste, PencilSparkles, ChartArea } from 'lucide-react';
+import { RotateCcw, Copy, ClipboardPaste, PencilSparkles, ChartArea, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,8 @@ import { ADJUSTMENT_SECTION_COMPONENTS } from '../../adjustments/sectionComponen
 import { CustomizePanelsButton, customizePanelsMenuOption } from './AdjustmentSectionsSubMenu';
 import { AdjustmentPanelContext, FavoriteStar } from '../../adjustments/AdjustmentTool';
 import CollapsibleSection from '../../ui/CollapsibleSection';
+import SegmentedSwitch from '../../ui/SegmentedSwitch';
+import FavoritesList from './FavoritesList';
 import Waveform from '../editor/Waveform';
 import Resizer from '../../ui/Resizer';
 import {
@@ -25,6 +27,7 @@ import PanelHeader from '../../ui/PanelHeader';
 import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useWaveformControls } from '../../../hooks/useWaveformControls';
 import { useAdjustmentSectionProps } from '../../../hooks/useAdjustmentSectionProps';
@@ -42,6 +45,8 @@ export default function Controls() {
   const sectionProps = useAdjustmentSectionProps();
   const { adjustments, appSettings, histogram, setAdjustments, theme } = sectionProps;
   const { getFavoriteMenuOptions } = useFavorites();
+  const handleSettingsChange = useSettingsStore((state) => state.handleSettingsChange);
+  const isFavoritesView = appSettings?.showFavoriteAdjustments ?? false;
 
   const { collapsibleSectionsState, setUI } = useUIStore(
     useShallow((state) => ({
@@ -272,31 +277,59 @@ export default function Controls() {
         )}
       </AnimatePresence>
 
+      <div className="shrink-0 px-4 pt-3 compact:px-2 compact:pt-2">
+        <SegmentedSwitch
+          onChange={(view) =>
+            appSettings && handleSettingsChange({ ...appSettings, showFavoriteAdjustments: view === 'favorites' })
+          }
+          options={[
+            { value: 'all', label: t('editor.favorites.all') },
+            {
+              value: 'favorites',
+              label: (
+                <span className="inline-flex items-center gap-1">
+                  <Star size={12} />
+                  {t('editor.favorites.title')}
+                </span>
+              ),
+            },
+          ]}
+          value={isFavoritesView ? 'favorites' : 'all'}
+        />
+      </div>
+
       <AdjustmentPanelContext.Provider value={PHOTO_PANEL_CONTEXT}>
-        <div className="grow overflow-y-scroll p-4 compact:p-0 flex flex-col gap-2 compact:gap-2.5">
-          {getAdjustmentSectionOrder(appSettings?.adjustmentLayout?.sectionOrder).map((sectionName: string) => {
-            const SectionComponent = ADJUSTMENT_SECTION_COMPONENTS[sectionName];
+        <div
+          className={clsx(
+            'grow overflow-y-scroll p-4 flex flex-col gap-2 compact:gap-2.5',
+            isFavoritesView ? 'compact:p-1.5' : 'compact:p-0',
+          )}
+        >
+          {isFavoritesView && <FavoritesList sectionProps={sectionProps} />}
+          {!isFavoritesView &&
+            getAdjustmentSectionOrder(appSettings?.adjustmentLayout?.sectionOrder).map((sectionName: string) => {
+              const SectionComponent = ADJUSTMENT_SECTION_COMPONENTS[sectionName];
 
-            const title = t(`editor.adjustments.sections.${sectionName}`);
-            const eye = getSectionEye(adjustments.sectionVisibility, sectionName);
+              const title = t(`editor.adjustments.sections.${sectionName}`);
+              const eye = getSectionEye(adjustments.sectionVisibility, sectionName);
 
-            return (
-              <div className="shrink-0 group" key={sectionName}>
-                <CollapsibleSection
-                  isContentVisible={eye !== 'off'}
-                  isPartlyVisible={eye === 'partial'}
-                  isOpen={collapsibleSectionsState[sectionName as keyof typeof collapsibleSectionsState]}
-                  onContextMenu={(e: any) => handleSectionContextMenu(e, sectionName)}
-                  onToggle={() => handleToggleSection(sectionName)}
-                  onToggleVisibility={() => handleToggleVisibility(sectionName)}
-                  title={title}
-                  titleAddon={<FavoriteStar favorite={favoriteKey('section', sectionName)} />}
-                >
-                  <SectionComponent {...sectionProps} />
-                </CollapsibleSection>
-              </div>
-            );
-          })}
+              return (
+                <div className="shrink-0 group" key={sectionName}>
+                  <CollapsibleSection
+                    isContentVisible={eye !== 'off'}
+                    isPartlyVisible={eye === 'partial'}
+                    isOpen={collapsibleSectionsState[sectionName as keyof typeof collapsibleSectionsState]}
+                    onContextMenu={(e: any) => handleSectionContextMenu(e, sectionName)}
+                    onToggle={() => handleToggleSection(sectionName)}
+                    onToggleVisibility={() => handleToggleVisibility(sectionName)}
+                    title={title}
+                    titleAddon={<FavoriteStar favorite={favoriteKey('section', sectionName)} />}
+                  >
+                    <SectionComponent {...sectionProps} />
+                  </CollapsibleSection>
+                </div>
+              );
+            })}
         </div>
       </AdjustmentPanelContext.Provider>
     </div>

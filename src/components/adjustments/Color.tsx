@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import Slider from '../ui/Slider';
 import Switch from '../ui/Switch';
+import SegmentedSwitch from '../ui/SegmentedSwitch';
 import ColorWheel from '../ui/ColorWheel';
 import {
   ColorAdjustment,
@@ -557,21 +558,15 @@ export default function ColorPanel({
         }
       >
         {!isForMask && (
-          <div className="grid grid-cols-2 gap-1 mb-3 compact:mb-2">
-            {(['mixer', 'pointColor'] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => selectMixerMode(mode)}
-                className={`py-1 rounded-md text-xs transition-colors ${
-                  mixerMode === mode
-                    ? 'bg-accent text-button-text shadow-sm'
-                    : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary'
-                }`}
-              >
-                {t(`adjustments.color.pointColor.${mode}Mode`)}
-              </button>
-            ))}
-          </div>
+          <SegmentedSwitch
+            className="mb-3 compact:mb-2"
+            onChange={selectMixerMode}
+            options={(['mixer', 'pointColor'] as const).map((mode) => ({
+              value: mode,
+              label: t(`adjustments.color.pointColor.${mode}Mode`),
+            }))}
+            value={mixerMode}
+          />
         )}
         <div style={mixerTrackStyle}>
           {isPointColorMode ? (

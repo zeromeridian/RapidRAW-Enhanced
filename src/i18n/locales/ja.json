@@ -765,8 +765,9 @@
     "favorites": {
       "add": "お気に入りに追加",
       "addItem": "「{{name}}」をお気に入りに追加",
+      "all": "すべて",
       "dragToReorder": "ドラッグして並べ替え",
-      "empty": "補正でセクション・ツール・スライダーに星を付けると、ここに集まります。",
+      "empty": "「すべて」でセクション・ツール・スライダーに星を付けると、ここに集まります。",
       "qualifiedLabel": "{{tool}}：{{control}}",
       "remove": "お気に入りから削除",
       "removeItem": "「{{name}}」をお気に入りから削除",
@@ -970,7 +971,6 @@
         "crop": "切り抜き",
         "develop": "現像",
         "export": "書き出し",
-        "favorites": "お気に入り",
         "info": "情報",
         "inpaint": "インペイント",
         "masks": "マスク",

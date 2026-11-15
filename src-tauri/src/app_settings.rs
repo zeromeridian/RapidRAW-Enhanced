@@ -909,6 +909,9 @@ pub struct AppSettings {
     /// Whether Zone Color Grading shows its Advanced controls (a view switch for every photo).
     #[serde(default)]
     pub zone_tint_advanced: bool,
+    /// Whether the Adjustments panel shows the Favorites instead of every section.
+    #[serde(default)]
+    pub show_favorite_adjustments: bool,
     #[serde(default)]
     pub left_panel_width: Option<u32>,
     #[serde(default)]
@@ -1058,6 +1061,7 @@ impl Default for AppSettings {
             blend_pad_presets: Vec::new(),
             zone_tint_presets: None,
             zone_tint_advanced: false,
+            show_favorite_adjustments: false,
             left_panel_width: None,
             right_panel_width: None,
             catalog_directory: None,

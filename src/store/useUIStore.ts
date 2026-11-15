@@ -23,19 +23,19 @@ const updateCropSession = (current: Panel | null, next: Panel | null) => {
   }
 };
 
+/** The tool bar's order, so a panel slides in from the side of its button. */
 const RIGHT_PANEL_ORDER = [
   Panel.Metadata,
-  Panel.Adjustments,
-  Panel.Favorites,
-  Panel.BlendPad,
-  Panel.ZoneTint,
+  Panel.Presets,
   Panel.Crop,
   Panel.Geometry,
   Panel.LensCorrection,
+  Panel.Adjustments,
+  Panel.BlendPad,
+  Panel.ZoneTint,
   Panel.Masks,
   Panel.Ai,
   Panel.Tagging,
-  Panel.Presets,
   Panel.Export,
 ];
 

@@ -815,8 +815,9 @@
     "favorites": {
       "add": "Dodaj do ulubionych",
       "addItem": "Dodaj „{{name}}” do ulubionych",
+      "all": "Wszystkie",
       "dragToReorder": "Przeciągnij, aby zmienić kolejność",
-      "empty": "Oznacz gwiazdką sekcję, narzędzie lub suwak w Ustawieniach, aby zebrać je tutaj.",
+      "empty": "Oznacz gwiazdką sekcję, narzędzie lub suwak w widoku Wszystkie, aby zebrać je tutaj.",
       "qualifiedLabel": "{{tool}}: {{control}}",
       "remove": "Usuń z ulubionych",
       "removeItem": "Usuń „{{name}}” z ulubionych",
@@ -1022,7 +1023,6 @@
         "crop": "Kadruj",
         "develop": "Wywoływanie",
         "export": "Eksportuj",
-        "favorites": "Ulubione",
         "info": "Informacje",
         "inpaint": "Inpaint",
         "masks": "Maski",

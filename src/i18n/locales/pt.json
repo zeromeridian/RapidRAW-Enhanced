@@ -791,8 +791,9 @@
     "favorites": {
       "add": "Adicionar aos favoritos",
       "addItem": "Adicionar “{{name}}” aos favoritos",
+      "all": "Tudo",
       "dragToReorder": "Arraste para reordenar",
-      "empty": "Marque com estrela uma seção, ferramenta ou controle em Ajustes para reuni-lo aqui.",
+      "empty": "Marque com estrela uma seção, ferramenta ou controle em Tudo para reuni-lo aqui.",
       "qualifiedLabel": "{{tool}}: {{control}}",
       "remove": "Remover dos favoritos",
       "removeItem": "Remover “{{name}}” dos favoritos",
@@ -997,7 +998,6 @@
         "crop": "Cortar",
         "develop": "Revelação",
         "export": "Exportar",
-        "favorites": "Favoritos",
         "info": "Informações",
         "inpaint": "Preencher",
         "masks": "Máscaras",

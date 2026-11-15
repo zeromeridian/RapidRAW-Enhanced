@@ -794,8 +794,9 @@
     "favorites": {
       "add": "Add to Favorites",
       "addItem": "Add “{{name}}” to Favorites",
+      "all": "All",
       "dragToReorder": "Drag to reorder",
-      "empty": "Star a section, tool or slider in Adjustments to collect it here.",
+      "empty": "Star a section, tool or slider under All to collect it here.",
       "qualifiedLabel": "{{tool}}: {{control}}",
       "remove": "Remove from Favorites",
       "removeItem": "Remove “{{name}}” from Favorites",
@@ -1022,7 +1023,6 @@
         "crop": "Crop",
         "develop": "Develop",
         "export": "Export",
-        "favorites": "Favorites",
         "geometry": "Geometry",
         "info": "Info",
         "inpaint": "Inpaint",

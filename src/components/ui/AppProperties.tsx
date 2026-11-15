@@ -199,7 +199,6 @@ export enum Panel {
   BlendPad = 'blendPad',
   Crop = 'crop',
   Export = 'export',
-  Favorites = 'favorites',
   Geometry = 'geometry',
   LensCorrection = 'lensCorrection',
   Masks = 'masks',
@@ -374,6 +373,8 @@ export interface AppSettings {
   zoneTintPresets?: Array<unknown> | null;
   /** Whether Zone Color Grading shows its Advanced controls; a view switch, not part of an edit. */
   zoneTintAdvanced?: boolean;
+  /** Whether the Adjustments panel shows the Favorites instead of every section (its All / Favorites switch). */
+  showFavoriteAdjustments?: boolean;
   leftPanelWidth?: number;
   rightPanelWidth?: number;
   lightsOutDimLevel?: LightsOutDimLevel;

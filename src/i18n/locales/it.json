@@ -791,8 +791,9 @@
     "favorites": {
       "add": "Aggiungi ai preferiti",
       "addItem": "Aggiungi «{{name}}» ai preferiti",
+      "all": "Tutti",
       "dragToReorder": "Trascina per riordinare",
-      "empty": "Aggiungi una stella a una sezione, uno strumento o un cursore in Regolazioni per raccoglierlo qui.",
+      "empty": "Aggiungi una stella a una sezione, uno strumento o un cursore in Tutti per raccoglierlo qui.",
       "qualifiedLabel": "{{tool}}: {{control}}",
       "remove": "Rimuovi dai preferiti",
       "removeItem": "Rimuovi «{{name}}» dai preferiti",
@@ -997,7 +998,6 @@
         "crop": "Ritaglio",
         "develop": "Sviluppo",
         "export": "Esporta",
-        "favorites": "Preferiti",
         "info": "Info",
         "inpaint": "Inpainting",
         "masks": "Maschere",

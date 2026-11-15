@@ -767,8 +767,9 @@
     "favorites": {
       "add": "Zu Favoriten hinzufügen",
       "addItem": "„{{name}}“ zu Favoriten hinzufügen",
+      "all": "Alle",
       "dragToReorder": "Zum Neuordnen ziehen",
-      "empty": "Markiere einen Bereich, ein Werkzeug oder einen Regler in Anpassungen mit einem Stern, um ihn hier zu sammeln.",
+      "empty": "Markiere unter „Alle“ einen Bereich, ein Werkzeug oder einen Regler mit einem Stern, um ihn hier zu sammeln.",
       "qualifiedLabel": "{{tool}}: {{control}}",
       "remove": "Aus Favoriten entfernen",
       "removeItem": "„{{name}}“ aus Favoriten entfernen",
@@ -972,7 +973,6 @@
         "crop": "Zuschnitt",
         "develop": "Entwickeln",
         "export": "Exportieren",
-        "favorites": "Favoriten",
         "info": "Info",
         "inpaint": "Reparieren",
         "masks": "Masken",
