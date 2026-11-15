@@ -463,7 +463,7 @@ export default function ColorPanel({
   const sliderProps = { adjustments, setAdjustments, isForMask, onDragStateChange };
 
   return (
-    <div className="flex flex-col gap-4 compact:gap-2">
+    <div className="contents">
       <AdjustmentTool id="blackAndWhite" isUntitled>
         <Switch
           checked={!!adjustments.monochrome}

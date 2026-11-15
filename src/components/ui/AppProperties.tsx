@@ -266,11 +266,14 @@ export interface XmpStackMetadata {
 }
 
 export interface CollapsibleSectionsState {
-  basic: boolean;
-  color: boolean;
+  light: boolean;
   curves: boolean;
-  details: boolean;
-  effects: boolean;
+  color: boolean;
+  look: boolean;
+  lightAtmosphere: boolean;
+  blur: boolean;
+  detail: boolean;
+  finish: boolean;
 }
 
 /** How the Develop adjustment panels are arranged (Customize Panels and Favorites). */
@@ -280,6 +283,8 @@ export interface AdjustmentLayout {
   openSections?: Partial<CollapsibleSectionsState>;
   /** Starred items (`section:…`, `tool:…`, `control:…`) in the Favorites panel's order. */
   favorites?: string[];
+  /** Set by the settings migration once the layout uses the sections above (Rust `ADJUSTMENT_LAYOUT_VERSION`). */
+  version?: number;
 }
 
 export interface AppSettings {

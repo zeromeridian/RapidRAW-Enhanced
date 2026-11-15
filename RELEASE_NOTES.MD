@@ -5,6 +5,41 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.66.0-dev-develop-regroup — 2026-11-15
+
+### Develop
+
+- The **Adjustments** panel is regrouped to follow the editing workflow:
+  **Light, Curves, Color, Look, Light & Atmosphere, Blur, Detail,
+  Finish**. Nothing a tool does has changed, and every photo, preset and
+  XMP file looks exactly as before.
+  - **Light** (formerly Basic) starts with Black & White, then the tone
+    mapper, White Balance, the tone sliders (Exposure now at the top)
+    and Presence (Clarity, Dehaze, Structure, Centre).
+  - **Color** keeps Color Presence, Hue, the Color Mixer and Point
+    Color, and Calibration.
+  - **Look** holds Color Grading and the LUT.
+  - **Light & Atmosphere** holds Relight, Fog, Glow, Halation and Light
+    Flares; **Blur** holds Lens Blur, Motion Blur and Gaussian Blur.
+  - **Detail** (formerly Details) holds Sharpening, Noise Reduction,
+    AI Denoise and Chromatic Aberration; **Finish** holds Vignette and
+    Grain. The Effects section is gone.
+- Masks show the same sections in the same order, with their section
+  names now translated.
+- Your layout carries over: a custom section order keeps its order with
+  the new sections in place of the old ones, reordered tools keep their
+  order, open sections stay open, and every starred section, tool and
+  slider stays in Favorites. A starred section whose tools moved
+  elsewhere brings those tools along as their own favourites.
+- The Copy & Paste Settings dialog follows the new sections.
+- Each section's eye now switches only its own tools. An older edit with
+  an eye switched off still looks the same; where only some of a
+  section's tools are off, its eye is highlighted and those tools are
+  dimmed, and a click turns them all back on. Older versions of
+  ThisIsRAW ignore the new eyes and show every tool.
+- The tone mapper's Reset now resets only the tone mapper; Exposure has
+  its own double-click reset. Choosing a LUT switches on only the LUT.
+
 ## 1.65.0-dev-zone-advanced-mode — 2026-11-15
 
 ### Develop

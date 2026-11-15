@@ -11,11 +11,13 @@ import Waveform from '../editor/Waveform';
 import Resizer from '../../ui/Resizer';
 import {
   Adjustments,
-  SectionVisibility,
   INITIAL_ADJUSTMENTS,
   ADJUSTMENT_SECTIONS,
   getAdjustmentSectionOrder,
   getInitialAdjustments,
+  getSectionEye,
+  withSectionEyeToggled,
+  withSectionVisible,
 } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { OPTION_SEPARATOR, Orientation } from '../../ui/AppProperties';
@@ -82,16 +84,13 @@ export default function Controls() {
   );
 
   const handleToggleVisibility = (sectionName: string) => {
-    setAdjustments((prev: Adjustments) => {
-      const currentVisibility: SectionVisibility = prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
-      return {
-        ...prev,
-        sectionVisibility: {
-          ...currentVisibility,
-          [sectionName]: !currentVisibility[sectionName],
-        },
-      };
-    });
+    setAdjustments((prev: Adjustments) => ({
+      ...prev,
+      sectionVisibility: withSectionEyeToggled(
+        prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility,
+        sectionName,
+      ),
+    }));
   };
 
   const handleResetAdjustments = () => {
@@ -152,10 +151,11 @@ export default function Controls() {
       setAdjustments((prev: Adjustments) => ({
         ...prev,
         ...copiedSectionAdjustments.values,
-        sectionVisibility: {
-          ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility),
-          [sectionName]: true,
-        },
+        sectionVisibility: withSectionVisible(
+          prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility,
+          sectionName,
+          true,
+        ),
       }));
     };
 
@@ -168,10 +168,11 @@ export default function Controls() {
       setAdjustments((prev: Adjustments) => ({
         ...prev,
         ...resetValues,
-        sectionVisibility: {
-          ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility),
-          [sectionName]: true,
-        },
+        sectionVisibility: withSectionVisible(
+          prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility,
+          sectionName,
+          true,
+        ),
       }));
     };
 
@@ -277,12 +278,13 @@ export default function Controls() {
             const SectionComponent = ADJUSTMENT_SECTION_COMPONENTS[sectionName];
 
             const title = t(`editor.adjustments.sections.${sectionName}`);
-            const sectionVisibility = adjustments.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
+            const eye = getSectionEye(adjustments.sectionVisibility, sectionName);
 
             return (
               <div className="shrink-0 group" key={sectionName}>
                 <CollapsibleSection
-                  isContentVisible={sectionVisibility[sectionName as keyof SectionVisibility]}
+                  isContentVisible={eye !== 'off'}
+                  isPartlyVisible={eye === 'partial'}
                   isOpen={collapsibleSectionsState[sectionName as keyof typeof collapsibleSectionsState]}
                   onContextMenu={(e: any) => handleSectionContextMenu(e, sectionName)}
                   onToggle={() => handleToggleSection(sectionName)}

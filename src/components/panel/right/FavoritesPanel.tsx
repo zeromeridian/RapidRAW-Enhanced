@@ -6,8 +6,8 @@ import { useTranslation } from 'react-i18next';
 import PanelHeader from '../../ui/PanelHeader';
 import Text from '../../ui/Text';
 import { TextVariants, TextWeights } from '../../../types/typography';
-import { INITIAL_ADJUSTMENTS, SectionVisibility } from '../../../utils/adjustments';
-import { Favorite } from '../../../utils/adjustmentControls';
+import { getSectionEye, isGroupVisible } from '../../../utils/adjustments';
+import { ADJUSTMENT_CONTROLS_BY_ID, Favorite } from '../../../utils/adjustmentControls';
 import { ADJUSTMENT_SECTION_COMPONENTS } from '../../adjustments/sectionComponents';
 import AdjustmentSlider from '../../adjustments/AdjustmentSlider';
 import { AdjustmentPanelContext, FavoriteStar } from '../../adjustments/AdjustmentTool';
@@ -45,7 +45,7 @@ function FavoriteContent({ favorite, label, sectionProps }: Omit<FavoriteRowProp
 
   if (favorite.kind === 'tool') {
     return (
-      <AdjustmentPanelContext.Provider value={{ canFavorite: true, onlyTool: favorite.id }}>
+      <AdjustmentPanelContext.Provider value={{ canFavorite: true, tools: [favorite.id] }}>
         <SectionComponent {...sectionProps} />
       </AdjustmentPanelContext.Provider>
     );
@@ -71,10 +71,14 @@ function FavoriteContent({ favorite, label, sectionProps }: Omit<FavoriteRowProp
 function FavoriteRow({ favorite, label, onDragEnd, sectionProps }: FavoriteRowProps) {
   const { t } = useTranslation();
   const dragControls = useDragControls();
-  const sectionVisibility: SectionVisibility =
-    sectionProps.adjustments.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
-  // A section switched off with its eye in Adjustments has no effect; its favorites show that.
-  const isSectionOn = sectionVisibility[favorite.section as keyof SectionVisibility] !== false;
+  const visibility = sectionProps.adjustments.sectionVisibility;
+  // A tool switched off with its section's eye in Adjustments has no effect; its favorites show
+  // that. A slider follows its tool's eye; a section or tool dims as a whole only when the section
+  // is off (in a partly off section, the section dims its hidden tools itself).
+  const control = favorite.kind === 'control' ? ADJUSTMENT_CONTROLS_BY_ID[favorite.id] : undefined;
+  const isSectionOn = control
+    ? isGroupVisible(visibility, control.parent)
+    : getSectionEye(visibility, favorite.section) !== 'off';
 
   return (
     <Reorder.Item

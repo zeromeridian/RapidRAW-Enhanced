@@ -12,8 +12,10 @@ import { favoriteKey, withFavoriteToggled } from '../../utils/adjustmentControls
 interface AdjustmentPanelContextValue {
   /** Sections, tools and sliders show a Favorites star (the photo's panels; masks have none). */
   canFavorite: boolean;
-  /** Only this tool block is shown (a tool in the Favorites panel). */
-  onlyTool?: string;
+  /** Only these tool blocks are shown (a section's share of a component, a tool in Favorites). */
+  tools?: ReadonlyArray<string>;
+  /** Tool blocks whose eye is off inside a section whose eye is partly on; they show dimmed. */
+  hiddenTools?: ReadonlyArray<string>;
 }
 
 export const AdjustmentPanelContext = createContext<AdjustmentPanelContextValue>({ canFavorite: false });
@@ -79,15 +81,18 @@ export default function AdjustmentTool({
   isUntitled = false,
 }: AdjustmentToolProps) {
   const { t } = useTranslation();
-  const { onlyTool } = useContext(AdjustmentPanelContext);
+  const { tools, hiddenTools } = useContext(AdjustmentPanelContext);
   const tool = ADJUSTMENT_TOOLS_BY_ID[id];
   const order = useSettingsStore((state) =>
     getAdjustmentToolOrder(tool.section, state.appSettings?.adjustmentLayout?.toolOrder).indexOf(id),
   );
-  if (onlyTool && onlyTool !== id) return null;
+  if (tools && !tools.includes(id)) return null;
   const favorite = favoriteKey('tool', id);
   const blockProps = {
-    className: 'p-2 compact:p-1.5 bg-bg-tertiary rounded-md',
+    className: clsx(
+      'p-2 compact:p-1.5 bg-bg-tertiary rounded-md transition-opacity duration-300',
+      hiddenTools?.includes(id) && 'opacity-30',
+    ),
     style: { order },
     [FAVORITE_DATA_ATTRIBUTE]: favorite,
   };

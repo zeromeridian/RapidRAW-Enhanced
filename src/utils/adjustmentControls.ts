@@ -18,7 +18,7 @@ export interface AdjustmentControl {
   /** The adjustment key it sets. */
   id: string;
   label: string;
-  /** The tool block it belongs to, or the section when that section has no blocks (Basic). */
+  /** The tool block it belongs to, which is also the eye that hides it. */
   parent: string;
   min: number;
   max: number;
@@ -37,16 +37,16 @@ const signed = { min: -100, max: 100, step: 1 };
 const positive = { min: 0, max: 100, step: 1, fillOrigin: 'min' as const };
 
 export const ADJUSTMENT_CONTROLS: Array<AdjustmentControl> = [
-  { id: BasicAdjustment.Exposure, label: 'adjustments.basic.exposure', parent: 'basic', min: -5, max: 5, step: 0.01 },
-  { id: BasicAdjustment.Contrast, label: 'adjustments.basic.contrast', parent: 'basic', ...signed },
-  { id: BasicAdjustment.Highlights, label: 'adjustments.basic.highlights', parent: 'basic', ...signed },
-  { id: BasicAdjustment.Shadows, label: 'adjustments.basic.shadows', parent: 'basic', ...signed },
-  { id: BasicAdjustment.Whites, label: 'adjustments.basic.whites', parent: 'basic', ...signed },
-  { id: BasicAdjustment.Blacks, label: 'adjustments.basic.blacks', parent: 'basic', ...signed },
+  { id: BasicAdjustment.Exposure, label: 'adjustments.basic.exposure', parent: 'tone', min: -5, max: 5, step: 0.01 },
+  { id: BasicAdjustment.Contrast, label: 'adjustments.basic.contrast', parent: 'tone', ...signed },
+  { id: BasicAdjustment.Highlights, label: 'adjustments.basic.highlights', parent: 'tone', ...signed },
+  { id: BasicAdjustment.Shadows, label: 'adjustments.basic.shadows', parent: 'tone', ...signed },
+  { id: BasicAdjustment.Whites, label: 'adjustments.basic.whites', parent: 'tone', ...signed },
+  { id: BasicAdjustment.Blacks, label: 'adjustments.basic.blacks', parent: 'tone', ...signed },
   {
     id: BasicAdjustment.Brightness,
     label: 'adjustments.basic.brightness',
-    parent: 'basic',
+    parent: 'tone',
     min: -5,
     max: 5,
     step: 0.01,
@@ -255,8 +255,7 @@ const SPEED_EDIT_IDS = new Set<string>(SPEED_EDIT_ADJUSTMENTS.map((adjustment) =
 export const getControlSpeedEditId = (id: string) => (SPEED_EDIT_IDS.has(id) ? id : undefined);
 
 /** The section a control is shown in. */
-export const getControlSection = (control: AdjustmentControl) =>
-  ADJUSTMENT_TOOLS_BY_ID[control.parent]?.section ?? control.parent;
+export const getControlSection = (control: AdjustmentControl) => ADJUSTMENT_TOOLS_BY_ID[control.parent].section;
 
 export type FavoriteKind = 'section' | 'tool' | 'control';
 

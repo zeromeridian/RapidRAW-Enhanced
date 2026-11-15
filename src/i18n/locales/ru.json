@@ -485,12 +485,15 @@
         "resetSectionSettings": "Сбросить настройки раздела «{{section}}»"
       },
       "sections": {
-        "basic": "Основные",
         "blendPad": "Blend Pad",
+        "blur": "Размытие",
         "color": "Цвет",
         "curves": "Кривые",
-        "details": "Детали",
-        "effects": "Эффекты",
+        "detail": "Детали",
+        "finish": "Завершение",
+        "light": "Свет",
+        "lightAtmosphere": "Свет и атмосфера",
+        "look": "Стиль",
         "zoneTint": "Цветокоррекция по зонам"
       },
       "title": "Настройки",
@@ -2332,6 +2335,7 @@
     },
     "collapsibleSection": {
       "disableSection": "Отключить блок",
+      "enablePartlyHiddenSection": "Некоторые инструменты здесь выключены. Нажмите, чтобы включить все.",
       "enableSection": "Включить блок"
     },
     "colorWheel": {

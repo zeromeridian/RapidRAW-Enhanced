@@ -18,11 +18,10 @@ export function useControlLabel() {
       const control = ADJUSTMENT_CONTROLS_BY_ID[id];
       const label = t(control.label as ParseKeys);
       if (!control.qualify) return label;
-      const parent = ADJUSTMENT_TOOLS_BY_ID[control.parent];
-      const tool = parent ? t(parent.label as ParseKeys) : sectionLabel(control.parent);
+      const tool = t(ADJUSTMENT_TOOLS_BY_ID[control.parent].label as ParseKeys);
       return t('editor.favorites.qualifiedLabel', { tool, control: label });
     },
-    [t, sectionLabel],
+    [t],
   );
 
   return { controlLabel, sectionLabel };

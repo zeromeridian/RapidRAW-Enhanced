@@ -237,6 +237,199 @@ pub struct AdjustmentLayout {
     pub open_sections: BTreeMap<String, bool>,
     /// Starred sections, tools and controls in the order of the Favorites panel.
     pub favorites: Vec<String>,
+    /// `ADJUSTMENT_LAYOUT_VERSION` once converted; 0 (absent) is the layout of the old sections.
+    pub version: u32,
+}
+
+/// The layout of the regrouped sections (`1.66.0`): Light, Curves, Color, Look,
+/// Light & Atmosphere, Blur, Detail, Finish, replacing Basic, Curves, Color, Details, Effects.
+const ADJUSTMENT_LAYOUT_VERSION: u32 = 1;
+
+const OLD_SECTION_ORDER: [&str; 5] = ["basic", "curves", "color", "details", "effects"];
+
+/// The old sections' tools in their default order.
+const OLD_SECTION_TOOLS: &[(&str, &[&str])] = &[
+    (
+        "color",
+        &[
+            "blackAndWhite",
+            "whiteBalance",
+            "colorPresence",
+            "hue",
+            "colorGrading",
+            "colorMixer",
+            "colorCalibration",
+        ],
+    ),
+    (
+        "details",
+        &[
+            "sharpening",
+            "presence",
+            "noiseReduction",
+            "aiDenoise",
+            "chromaticAberration",
+        ],
+    ),
+    (
+        "effects",
+        &[
+            "glow",
+            "halation",
+            "lightFlares",
+            "lensBlur",
+            "relight",
+            "fog",
+            "lut",
+            "gaussianBlur",
+            "motionBlur",
+            "vignette",
+            "grain",
+        ],
+    ),
+];
+
+/// The new sections whose tools all come from one old section, with that section and their
+/// tools; a reordered old section passes its order on. Light and Look gather tools from several
+/// sections and start in their default order.
+const SINGLE_SOURCE_SECTIONS: &[(&str, &str, &[&str])] = &[
+    (
+        "color",
+        "color",
+        &["colorPresence", "hue", "colorMixer", "colorCalibration"],
+    ),
+    (
+        "lightAtmosphere",
+        "effects",
+        &["relight", "fog", "glow", "halation", "lightFlares"],
+    ),
+    (
+        "blur",
+        "effects",
+        &["lensBlur", "motionBlur", "gaussianBlur"],
+    ),
+    (
+        "detail",
+        "details",
+        &[
+            "sharpening",
+            "noiseReduction",
+            "aiDenoise",
+            "chromaticAberration",
+        ],
+    ),
+    ("finish", "effects", &["vignette", "grain"]),
+];
+
+/// The new sections that take an old section's place (and its open state).
+fn regrouped_sections(old: &str) -> &'static [&'static str] {
+    match old {
+        "basic" => &["light"],
+        "curves" => &["curves"],
+        "color" => &["color", "look"],
+        "details" => &["detail"],
+        "effects" => &["lightAtmosphere", "blur", "finish"],
+        _ => &[],
+    }
+}
+
+/// What a starred old section becomes: the new sections in its place, then each tool that moved
+/// elsewhere, so every starred tool stays in Favorites.
+fn regrouped_favorite(favorite: &str) -> Vec<String> {
+    let entries: &[&str] = match favorite {
+        "section:basic" => &["section:light"],
+        "section:color" => &[
+            "section:color",
+            "tool:blackAndWhite",
+            "tool:whiteBalance",
+            "tool:colorGrading",
+        ],
+        "section:details" => &["section:detail", "tool:presence"],
+        "section:effects" => &[
+            "section:lightAtmosphere",
+            "section:blur",
+            "section:finish",
+            "tool:lut",
+        ],
+        _ => return vec![favorite.to_string()],
+    };
+    entries.iter().map(|entry| entry.to_string()).collect()
+}
+
+/// Converts a layout of the old sections to the regrouped ones, once; true when it changed.
+fn migrate_adjustment_layout(layout: &mut AdjustmentLayout) -> bool {
+    if layout.version >= ADJUSTMENT_LAYOUT_VERSION {
+        return false;
+    }
+
+    let is_default_order = layout.section_order.is_empty()
+        || layout
+            .section_order
+            .iter()
+            .map(String::as_str)
+            .eq(OLD_SECTION_ORDER);
+    let mut section_order: Vec<String> = Vec::new();
+    if !is_default_order {
+        for section in layout
+            .section_order
+            .iter()
+            .flat_map(|old| regrouped_sections(old))
+        {
+            if !section_order.iter().any(|s| s == section) {
+                section_order.push(section.to_string());
+            }
+        }
+    }
+
+    let mut tool_order = HashMap::new();
+    for (section, source, tools) in SINGLE_SOURCE_SECTIONS {
+        let default = OLD_SECTION_TOOLS
+            .iter()
+            .find(|(old, _)| old == source)
+            .map_or(&[][..], |(_, tools)| tools);
+        let Some(saved) = layout
+            .tool_order
+            .get(*source)
+            .filter(|saved| !saved.iter().map(String::as_str).eq(default.iter().copied()))
+        else {
+            continue;
+        };
+        let order: Vec<String> = saved
+            .iter()
+            .filter(|tool| tools.contains(&tool.as_str()))
+            .cloned()
+            .collect();
+        if !order.is_empty() {
+            tool_order.insert(section.to_string(), order);
+        }
+    }
+
+    let mut open_sections = BTreeMap::new();
+    for (old, is_open) in &layout.open_sections {
+        for section in regrouped_sections(old) {
+            open_sections.insert(section.to_string(), *is_open);
+        }
+    }
+
+    let mut favorites: Vec<String> = Vec::new();
+    for favorite in &layout.favorites {
+        for (index, entry) in regrouped_favorite(favorite).into_iter().enumerate() {
+            // A tool the section adds that was also starred on its own keeps its own place.
+            let is_starred_alone = index > 0 && layout.favorites.contains(&entry);
+            if !is_starred_alone && !favorites.contains(&entry) {
+                favorites.push(entry);
+            }
+        }
+    }
+
+    *layout = AdjustmentLayout {
+        section_order,
+        tool_order,
+        open_sections,
+        favorites,
+        version: ADJUSTMENT_LAYOUT_VERSION,
+    };
+    true
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -983,6 +1176,7 @@ fn migrate_settings(settings: &mut AppSettings) -> bool {
     }
 
     settings_modified |= migrate_keyword_sets(settings);
+    settings_modified |= migrate_adjustment_layout(&mut settings.adjustment_layout);
 
     settings_modified
 }
@@ -1161,10 +1355,11 @@ mod tests {
     #[test]
     fn adjustment_layout_round_trips_and_fills_missing_fields() {
         let layout = json!({
-            "sectionOrder": ["color", "basic"],
-            "toolOrder": { "details": ["presence", "sharpening"] },
-            "openSections": { "basic": true, "color": false },
-            "favorites": ["control:clarity", "tool:colorGrading"]
+            "sectionOrder": ["color", "light"],
+            "toolOrder": { "detail": ["noiseReduction", "sharpening"] },
+            "openSections": { "light": true, "color": false },
+            "favorites": ["control:clarity", "tool:colorGrading"],
+            "version": 1
         });
         let settings: AppSettings =
             serde_json::from_value(json!({ "adjustmentLayout": layout.clone() }))
@@ -1178,5 +1373,111 @@ mod tests {
         .expect("a partial adjustment layout should deserialize");
         assert!(partial.adjustment_layout.section_order.is_empty());
         assert_eq!(partial.adjustment_layout.favorites, ["section:curves"]);
+        assert_eq!(partial.adjustment_layout.version, 0);
+    }
+
+    fn migrated_layout(layout: serde_json::Value) -> serde_json::Value {
+        let mut settings: AppSettings =
+            serde_json::from_value(json!({ "adjustmentLayout": layout }))
+                .expect("an old adjustment layout should deserialize");
+        migrate_settings(&mut settings);
+        serde_json::to_value(&settings.adjustment_layout).expect("the layout should serialize")
+    }
+
+    #[test]
+    fn an_untouched_old_layout_gets_the_new_default_order() {
+        let layout = migrated_layout(json!({
+            "sectionOrder": ["basic", "curves", "color", "details", "effects"],
+            "toolOrder": {
+                "effects": ["glow", "halation", "lightFlares", "lensBlur", "relight", "fog", "lut",
+                            "gaussianBlur", "motionBlur", "vignette", "grain"]
+            },
+            "openSections": { "basic": true, "curves": true, "color": false, "details": false, "effects": true }
+        }));
+        assert_eq!(layout["sectionOrder"], json!([]));
+        assert_eq!(layout["toolOrder"], json!({}));
+        assert_eq!(
+            layout["openSections"],
+            json!({
+                "blur": true, "color": false, "curves": true, "detail": false, "finish": true,
+                "light": true, "lightAtmosphere": true, "look": false
+            })
+        );
+        assert_eq!(layout["version"], 1);
+    }
+
+    #[test]
+    fn a_custom_old_layout_keeps_its_order_with_the_new_sections_in_place() {
+        let layout = migrated_layout(json!({
+            "sectionOrder": ["effects", "color", "basic", "curves", "details"],
+            "toolOrder": {
+                "color": ["hue", "whiteBalance", "colorMixer", "blackAndWhite", "colorPresence",
+                          "colorCalibration", "colorGrading"],
+                "details": ["sharpening", "presence", "noiseReduction", "aiDenoise", "chromaticAberration"],
+                "effects": ["grain", "fog", "motionBlur", "glow", "vignette", "lut", "relight",
+                            "halation", "lensBlur", "lightFlares", "gaussianBlur"]
+            }
+        }));
+        assert_eq!(
+            layout["sectionOrder"],
+            json!([
+                "lightAtmosphere",
+                "blur",
+                "finish",
+                "color",
+                "look",
+                "light",
+                "curves",
+                "detail"
+            ])
+        );
+        assert_eq!(
+            layout["toolOrder"],
+            json!({
+                "color": ["hue", "colorMixer", "colorPresence", "colorCalibration"],
+                "lightAtmosphere": ["fog", "glow", "relight", "halation", "lightFlares"],
+                "blur": ["motionBlur", "lensBlur", "gaussianBlur"],
+                "finish": ["grain", "vignette"]
+            })
+        );
+    }
+
+    #[test]
+    fn starred_sections_keep_every_tool_they_held() {
+        let layout = migrated_layout(json!({
+            "favorites": ["control:exposure", "tool:whiteBalance", "section:color", "section:basic",
+                          "section:details", "section:effects", "section:curves", "tool:relight"]
+        }));
+        assert_eq!(
+            layout["favorites"],
+            json!([
+                "control:exposure",
+                "tool:whiteBalance",
+                "section:color",
+                "tool:blackAndWhite",
+                "tool:colorGrading",
+                "section:light",
+                "section:detail",
+                "tool:presence",
+                "section:lightAtmosphere",
+                "section:blur",
+                "section:finish",
+                "tool:lut",
+                "section:curves",
+                "tool:relight"
+            ])
+        );
+    }
+
+    #[test]
+    fn a_converted_layout_is_left_alone() {
+        let converted = json!({
+            "sectionOrder": ["color", "light"],
+            "toolOrder": {},
+            "openSections": { "look": true },
+            "favorites": ["section:color"],
+            "version": 1
+        });
+        assert_eq!(migrated_layout(converted.clone()), converted);
     }
 }

@@ -181,7 +181,7 @@ export function useEditorActions() {
           lutName: name,
           lutSize: result.size,
           lutIntensity: 100,
-          sectionVisibility: { ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility), effects: true },
+          sectionVisibility: { ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility), lut: true },
         }));
       } catch (err) {
         toast.error(`Failed to load LUT: ${err}`);

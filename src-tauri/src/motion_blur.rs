@@ -14,7 +14,7 @@ use rayon::prelude::*;
 use serde_json::Value;
 use wgpu::util::DeviceExt;
 
-use crate::adjustment_utils::is_section_visible;
+use crate::adjustment_utils::is_group_visible;
 use crate::image_processing::{GpuContext, MAX_MASKS};
 use crate::mask_generation::{TransformParams, generate_edge_clamped_bitmap};
 
@@ -146,7 +146,7 @@ fn motion_blur(
     mixed: bool,
 ) -> Option<MotionBlur> {
     let amount = percent(&adj["motionBlurAmount"], 0.0);
-    if amount <= 0.0 || !is_section_visible(adj, "effects") {
+    if amount <= 0.0 || !is_group_visible(adj, "motionBlur") {
         return None;
     }
 

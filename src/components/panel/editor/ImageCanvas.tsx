@@ -51,7 +51,7 @@ interface DrawnLine {
   tool: ToolType;
 }
 
-const RELIGHT_FAVORITES = [favoriteKey('tool', 'relight'), favoriteKey('section', 'effects')];
+const RELIGHT_FAVORITES = [favoriteKey('tool', 'relight'), favoriteKey('section', 'lightAtmosphere')];
 const STROKE_SMOOTHING_SPACING = 4;
 const STROKE_SMOOTHING_MAX_STEPS = 16;
 
@@ -1603,7 +1603,7 @@ const ImageCanvas = memo(
     );
     const isRelightToolOpen = useUIStore(
       (state) =>
-        (state.activeRightPanel === Panel.Adjustments && state.collapsibleSectionsState.effects) ||
+        (state.activeRightPanel === Panel.Adjustments && state.collapsibleSectionsState.lightAtmosphere) ||
         (state.activeRightPanel === Panel.Favorites && hasRelightFavorite),
     );
     const activeRotation = liveRotation ?? adjustments.rotation ?? 0;

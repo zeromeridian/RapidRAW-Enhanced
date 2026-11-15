@@ -28,7 +28,7 @@ pub fn apply_lens_blur<'a>(
     image: Cow<'a, DynamicImage>,
     adjustments: &serde_json::Value,
 ) -> Cow<'a, DynamicImage> {
-    if !crate::adjustment_utils::is_effect_enabled(adjustments, "lensBlurEnabled") {
+    if !crate::adjustment_utils::is_tool_enabled(adjustments, "lensBlur", "lensBlurEnabled") {
         return image;
     }
 

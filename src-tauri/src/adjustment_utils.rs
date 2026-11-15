@@ -90,26 +90,73 @@ pub fn hydrate_adjustments(state: &tauri::State<AppState>, adjustments: &mut ser
     }
 }
 
-/// Whether an adjustment section is shown (a hidden section's controls do not render).
-pub fn is_section_visible(adjustments: &serde_json::Value, section: &str) -> bool {
-    adjustments
-        .get("sectionVisibility")
-        .and_then(|v| v.get(section))
-        .and_then(|s| s.as_bool())
+/// The section eyes saved before `1.66.0` and the tool groups each one hid. Edits now store one
+/// eye per tool group in `sectionVisibility`; a group without its own key follows its old eye,
+/// so older edits, presets and XMP render exactly as they did. Mirrors `LEGACY_VISIBILITY_GROUPS`
+/// in `src/utils/adjustments.ts`.
+pub const LEGACY_VISIBILITY_GROUPS: &[(&str, &[&str])] = &[
+    ("basic", &["tone"]),
+    ("curves", &["curves"]),
+    (
+        "color",
+        &[
+            "blackAndWhite",
+            "whiteBalance",
+            "colorPresence",
+            "hue",
+            "colorGrading",
+            "colorMixer",
+            "colorCalibration",
+        ],
+    ),
+    (
+        "details",
+        &[
+            "presence",
+            "sharpening",
+            "noiseReduction",
+            "aiDenoise",
+            "chromaticAberration",
+        ],
+    ),
+    (
+        "effects",
+        &[
+            "glow",
+            "halation",
+            "lightFlares",
+            "lensBlur",
+            "relight",
+            "fog",
+            "lut",
+            "gaussianBlur",
+            "motionBlur",
+            "vignette",
+            "grain",
+        ],
+    ),
+];
+
+/// Whether a tool group's eye is on: its own key, else the old section eye that covered it,
+/// else shown. Panels outside the Adjustments sections (`zoneTint`) have only their own key.
+pub fn is_group_visible(adjustments: &serde_json::Value, group: &str) -> bool {
+    let Some(visibility) = adjustments.get("sectionVisibility") else {
+        return true;
+    };
+    let eye = |key: &str| visibility.get(key).and_then(serde_json::Value::as_bool);
+    eye(group)
+        .or_else(|| {
+            LEGACY_VISIBILITY_GROUPS
+                .iter()
+                .find(|(_, groups)| groups.contains(&group))
+                .and_then(|(legacy, _)| eye(legacy))
+        })
         .unwrap_or(true)
 }
 
-/// Whether a toggled feature is on and its adjustment section is visible.
-pub fn is_section_feature_enabled(
-    adjustments: &serde_json::Value,
-    section: &str,
-    enabled_key: &str,
-) -> bool {
-    is_section_visible(adjustments, section) && adjustments[enabled_key].as_bool().unwrap_or(false)
-}
-
-pub fn is_effect_enabled(adjustments: &serde_json::Value, enabled_key: &str) -> bool {
-    is_section_feature_enabled(adjustments, "effects", enabled_key)
+/// Whether a toggled tool is on and its eye is on.
+pub fn is_tool_enabled(adjustments: &serde_json::Value, group: &str, enabled_key: &str) -> bool {
+    is_group_visible(adjustments, group) && adjustments[enabled_key].as_bool().unwrap_or(false)
 }
 
 /// Applies the CPU effects that operate on the geometry-warped image before
@@ -160,4 +207,54 @@ pub fn apply_all_transformations<'a, I: IntoCowImage<'a>>(
     log::info!("apply_all_transformations took {:.2?}", total_duration);
 
     transformed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn a_group_eye_wins_over_the_old_section_eye_it_replaces() {
+        let old = json!({ "sectionVisibility": { "color": false, "effects": true } });
+        assert!(!is_group_visible(&old, "colorGrading"));
+        assert!(!is_group_visible(&old, "whiteBalance"));
+        assert!(is_group_visible(&old, "lut"));
+        assert!(is_group_visible(&old, "tone"));
+
+        let new =
+            json!({ "sectionVisibility": { "color": false, "colorGrading": true, "lut": false } });
+        assert!(is_group_visible(&new, "colorGrading"));
+        assert!(!is_group_visible(&new, "whiteBalance"));
+        assert!(!is_group_visible(&new, "lut"));
+
+        assert!(is_group_visible(&json!({}), "relight"));
+        assert!(!is_group_visible(
+            &json!({ "sectionVisibility": { "zoneTint": false } }),
+            "zoneTint"
+        ));
+        assert!(is_tool_enabled(
+            &json!({ "fogEnabled": true }),
+            "fog",
+            "fogEnabled"
+        ));
+        assert!(!is_tool_enabled(
+            &json!({ "fogEnabled": true, "sectionVisibility": { "effects": false } }),
+            "fog",
+            "fogEnabled"
+        ));
+    }
+
+    #[test]
+    fn every_tool_group_has_exactly_one_old_section_eye() {
+        let mut groups: Vec<&str> = LEGACY_VISIBILITY_GROUPS
+            .iter()
+            .flat_map(|(_, groups)| groups.iter().copied())
+            .collect();
+        let count = groups.len();
+        groups.sort_unstable();
+        groups.dedup();
+        assert_eq!(groups.len(), count);
+        assert_eq!(count, 25);
+    }
 }

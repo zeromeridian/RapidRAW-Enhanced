@@ -466,12 +466,15 @@
         "resetSectionSettings": "Réinitialiser les paramètres de la section {{section}}"
       },
       "sections": {
-        "basic": "Basique",
         "blendPad": "Blend Pad",
+        "blur": "Flou",
         "color": "Couleur",
         "curves": "Courbes",
-        "details": "Détails",
-        "effects": "Effets",
+        "detail": "Détail",
+        "finish": "Finition",
+        "light": "Lumière",
+        "lightAtmosphere": "Lumière et atmosphère",
+        "look": "Rendu",
         "zoneTint": "Colorimétrie par zones"
       },
       "title": "Ajustements",
@@ -2284,6 +2287,7 @@
     },
     "collapsibleSection": {
       "disableSection": "Désactiver la section",
+      "enablePartlyHiddenSection": "Certains outils de cette section sont désactivés. Cliquez pour tous les activer.",
       "enableSection": "Activer la section"
     },
     "colorWheel": {

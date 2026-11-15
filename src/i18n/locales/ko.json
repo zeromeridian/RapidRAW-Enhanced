@@ -447,12 +447,15 @@
         "resetSectionSettings": "{{section}} 설정 초기화"
       },
       "sections": {
-        "basic": "기본",
         "blendPad": "블렌드 패드",
+        "blur": "흐림",
         "color": "색상",
         "curves": "커브",
-        "details": "디테일",
-        "effects": "효과",
+        "detail": "디테일",
+        "finish": "마무리",
+        "light": "빛",
+        "lightAtmosphere": "빛과 분위기",
+        "look": "룩",
         "zoneTint": "존 컬러 그레이딩"
       },
       "title": "조정",
@@ -2234,6 +2237,7 @@
     },
     "collapsibleSection": {
       "disableSection": "섹션 비활성화",
+      "enablePartlyHiddenSection": "일부 도구가 꺼져 있습니다. 클릭하면 모두 켜집니다.",
       "enableSection": "섹션 활성화"
     },
     "colorWheel": {

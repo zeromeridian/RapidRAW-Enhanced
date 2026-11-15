@@ -447,12 +447,15 @@
         "resetSectionSettings": "重置 {{section}} 設定"
       },
       "sections": {
-        "basic": "基礎",
         "blendPad": "混合板",
+        "blur": "模糊",
         "color": "顏色",
         "curves": "曲線",
-        "details": "細節",
-        "effects": "效果",
+        "detail": "細節",
+        "finish": "收尾",
+        "light": "光線",
+        "lightAtmosphere": "光線與氛圍",
+        "look": "風格",
         "zoneTint": "區域顏色分級"
       },
       "title": "調整",
@@ -2234,6 +2237,7 @@
     },
     "collapsibleSection": {
       "disableSection": "停用部分",
+      "enablePartlyHiddenSection": "此處部分工具已關閉。點擊即可全部開啟。",
       "enableSection": "啟用部分"
     },
     "colorWheel": {

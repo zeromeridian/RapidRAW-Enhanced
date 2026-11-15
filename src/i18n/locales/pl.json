@@ -485,12 +485,15 @@
         "resetSectionSettings": "Resetuj ustawienia sekcji {{section}}"
       },
       "sections": {
-        "basic": "Podstawowe",
         "blendPad": "Blend Pad",
+        "blur": "Rozmycie",
         "color": "Kolor",
         "curves": "Krzywe",
-        "details": "Detale",
-        "effects": "Efekty",
+        "detail": "Detale",
+        "finish": "Wykończenie",
+        "light": "Światło",
+        "lightAtmosphere": "Światło i atmosfera",
+        "look": "Styl",
         "zoneTint": "Gradacja kolorów stref"
       },
       "title": "Ustawienia",
@@ -2332,6 +2335,7 @@
     },
     "collapsibleSection": {
       "disableSection": "Wyłącz sekcję",
+      "enablePartlyHiddenSection": "Niektóre narzędzia tutaj są wyłączone. Kliknij, aby włączyć wszystkie.",
       "enableSection": "Włącz sekcję"
     },
     "colorWheel": {

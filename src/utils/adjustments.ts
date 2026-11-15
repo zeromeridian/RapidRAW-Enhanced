@@ -754,21 +754,25 @@ export enum MaskBlendMode {
 
 export interface Sections {
   [index: string]: Array<string>;
-  basic: Array<string>;
+  light: Array<string>;
   curves: Array<string>;
   color: Array<string>;
-  details: Array<string>;
-  effects: Array<string>;
+  look: Array<string>;
+  lightAtmosphere: Array<string>;
+  blur: Array<string>;
+  detail: Array<string>;
+  finish: Array<string>;
 }
 
+/**
+ * The eyes of the edit: one per tool group (the `ADJUSTMENT_SECTION_TOOLS` ids, `tone` and
+ * `curves`), absent meaning shown, plus Zone Color Grading's panel eye. Edits from before
+ * `1.66.0` hold the old section eyes instead (`LEGACY_VISIBILITY_GROUPS`); read them with
+ * `isGroupVisible`.
+ */
 export interface SectionVisibility {
-  [index: string]: boolean;
-  basic: boolean;
-  curves: boolean;
-  color: boolean;
-  details: boolean;
-  effects: boolean;
-  /** Zone Tint's own panel, not an Adjustments section; Rust checks it as `is_visible("zoneTint")`. */
+  [group: string]: boolean | undefined;
+  /** Zone Color Grading's own panel, not an Adjustments section; Rust checks it as `is_visible("zoneTint")`. */
   zoneTint: boolean;
 }
 
@@ -877,14 +881,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   motionBlurAmount: 0,
   motionBlurAngle: 0,
   saturation: 0,
-  sectionVisibility: {
-    basic: true,
-    curves: true,
-    color: true,
-    details: true,
-    effects: true,
-    zoneTint: true,
-  },
+  sectionVisibility: { zoneTint: true },
   shadows: 0,
   sharpness: 0,
   sharpnessThreshold: 15,
@@ -1011,14 +1008,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   relightSoftness: 25,
   rotation: 0,
   saturation: 0,
-  sectionVisibility: {
-    basic: true,
-    curves: true,
-    color: true,
-    details: true,
-    effects: true,
-    zoneTint: true,
-  },
+  sectionVisibility: { zoneTint: true },
   shadows: 0,
   sharpness: 0,
   sharpnessThreshold: 15,
@@ -1271,12 +1261,15 @@ export interface AdjustmentGroup {
   keys: string[];
 }
 
+/** The Copy & Paste Settings checkboxes, under the Adjustments sections they belong to. */
 export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
-  basic: [
+  light: [
+    { label: 'adjustments.color.blackAndWhite', keys: [ColorAdjustment.Monochrome] },
     {
       label: 'modals.copyPaste.groups.exposureToneMapper',
       keys: [BasicAdjustment.Exposure, 'toneMapper'],
     },
+    { label: 'modals.copyPaste.groups.whiteBalance', keys: [ColorAdjustment.Temperature, ColorAdjustment.Tint] },
     {
       label: 'modals.copyPaste.groups.tone',
       keys: [
@@ -1289,27 +1282,6 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
       ],
     },
     {
-      label: 'modals.copyPaste.groups.curves',
-      keys: ['curves', 'pointCurves', 'parametricCurve', 'curveMode'],
-    },
-  ],
-  color: [
-    { label: 'modals.copyPaste.groups.whiteBalance', keys: [ColorAdjustment.Temperature, ColorAdjustment.Tint] },
-    {
-      label: 'modals.copyPaste.groups.presence',
-      keys: [ColorAdjustment.Monochrome, ColorAdjustment.Saturation, ColorAdjustment.Vibrance],
-    },
-    {
-      label: 'modals.copyPaste.groups.hueShift',
-      keys: [ColorAdjustment.Hue],
-    },
-    { label: 'modals.copyPaste.groups.colorGrading', keys: [ColorAdjustment.ColorGrading] },
-    { label: 'modals.copyPaste.groups.colorMixer', keys: [ColorAdjustment.Hsl] },
-    { label: 'modals.copyPaste.groups.pointColor', keys: [ColorAdjustment.PointColors] },
-    { label: 'modals.copyPaste.groups.colorCalibration', keys: ['colorCalibration'] },
-  ],
-  details: [
-    {
       label: 'modals.copyPaste.groups.clarityDehaze',
       keys: [
         DetailsAdjustment.Clarity,
@@ -1318,6 +1290,62 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         DetailsAdjustment.Centré,
       ],
     },
+  ],
+  curves: [
+    {
+      label: 'modals.copyPaste.groups.curves',
+      keys: ['curves', 'pointCurves', 'parametricCurve', 'curveMode'],
+    },
+  ],
+  color: [
+    {
+      label: 'modals.copyPaste.groups.presence',
+      keys: [ColorAdjustment.Saturation, ColorAdjustment.Vibrance],
+    },
+    {
+      label: 'modals.copyPaste.groups.hueShift',
+      keys: [ColorAdjustment.Hue],
+    },
+    { label: 'modals.copyPaste.groups.colorMixer', keys: [ColorAdjustment.Hsl] },
+    { label: 'modals.copyPaste.groups.pointColor', keys: [ColorAdjustment.PointColors] },
+    { label: 'modals.copyPaste.groups.colorCalibration', keys: ['colorCalibration'] },
+  ],
+  look: [
+    { label: 'modals.copyPaste.groups.colorGrading', keys: [ColorAdjustment.ColorGrading] },
+    {
+      label: 'modals.copyPaste.groups.lut',
+      keys: [Effect.LutIntensity, Effect.LutName, Effect.LutPath, Effect.LutSize, Effect.LutData],
+    },
+  ],
+  lightAtmosphere: [
+    {
+      label: 'modals.copyPaste.groups.halationGlow',
+      keys: [
+        CreativeAdjustment.GlowAmount,
+        CreativeAdjustment.GlowHue,
+        CreativeAdjustment.GlowSaturation,
+        CreativeAdjustment.HalationAmount,
+        CreativeAdjustment.HalationHue,
+        CreativeAdjustment.FlareAmount,
+      ],
+    },
+  ],
+  blur: [
+    {
+      label: 'modals.copyPaste.groups.motionBlur',
+      keys: [
+        Effect.MotionBlurAmount,
+        Effect.MotionBlurAngle,
+        Effect.MotionBlurType,
+        Effect.MotionBlurLayer,
+        Effect.MotionBlurHighlights,
+        Effect.MotionBlurDepthEnabled,
+        Effect.MotionBlurDepth,
+      ],
+    },
+    { label: 'adjustments.effects.gaussianBlur', keys: [Effect.GaussianBlurAmount] },
+  ],
+  detail: [
     {
       label: 'modals.copyPaste.groups.sharpness',
       keys: [DetailsAdjustment.Sharpness, DetailsAdjustment.SharpnessThreshold],
@@ -1337,40 +1365,12 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
       keys: [DetailsAdjustment.ChromaticAberrationRedCyan, DetailsAdjustment.ChromaticAberrationBlueYellow],
     },
   ],
-  effects: [
+  finish: [
     {
       label: 'modals.copyPaste.groups.vignette',
       keys: [Effect.VignetteAmount, Effect.VignetteFeather, Effect.VignetteMidpoint, Effect.VignetteRoundness],
     },
     { label: 'modals.copyPaste.groups.grain', keys: [Effect.GrainAmount, Effect.GrainRoughness, Effect.GrainSize] },
-    { label: 'adjustments.effects.gaussianBlur', keys: [Effect.GaussianBlurAmount] },
-    {
-      label: 'modals.copyPaste.groups.halationGlow',
-      keys: [
-        CreativeAdjustment.GlowAmount,
-        CreativeAdjustment.GlowHue,
-        CreativeAdjustment.GlowSaturation,
-        CreativeAdjustment.HalationAmount,
-        CreativeAdjustment.HalationHue,
-        CreativeAdjustment.FlareAmount,
-      ],
-    },
-    {
-      label: 'modals.copyPaste.groups.motionBlur',
-      keys: [
-        Effect.MotionBlurAmount,
-        Effect.MotionBlurAngle,
-        Effect.MotionBlurType,
-        Effect.MotionBlurLayer,
-        Effect.MotionBlurHighlights,
-        Effect.MotionBlurDepthEnabled,
-        Effect.MotionBlurDepth,
-      ],
-    },
-    {
-      label: 'modals.copyPaste.groups.lut',
-      keys: [Effect.LutIntensity, Effect.LutName, Effect.LutPath, Effect.LutSize, Effect.LutData],
-    },
   ],
   geometry: [
     { label: 'modals.copyPaste.groups.cropAspectRatio', keys: ['crop', 'aspectRatio'] },
@@ -1577,79 +1577,36 @@ export const getAdjustmentChanges = (
     : null;
 };
 
+/** The adjustment keys of each Adjustments section (section copy, paste and reset). */
 export const ADJUSTMENT_SECTIONS: Sections = {
-  basic: [
-    BasicAdjustment.Brightness,
+  light: [
+    ColorAdjustment.Monochrome,
+    'toneMapper',
+    ColorAdjustment.Temperature,
+    ColorAdjustment.Tint,
+    BasicAdjustment.Exposure,
     BasicAdjustment.Contrast,
     BasicAdjustment.Highlights,
     BasicAdjustment.Shadows,
     BasicAdjustment.Whites,
     BasicAdjustment.Blacks,
-    BasicAdjustment.Exposure,
-    'toneMapper',
-  ],
-  curves: ['curves', 'pointCurves', 'parametricCurve', 'curveMode'],
-  color: [
-    ColorAdjustment.Monochrome,
-    ColorAdjustment.Saturation,
-    ColorAdjustment.Temperature,
-    ColorAdjustment.Tint,
-    ColorAdjustment.Vibrance,
-    ColorAdjustment.Hsl,
-    ColorAdjustment.PointColors,
-    ColorAdjustment.ColorGrading,
-    'colorCalibration',
-    ColorAdjustment.Hue,
-  ],
-  details: [
+    BasicAdjustment.Brightness,
     DetailsAdjustment.Clarity,
     DetailsAdjustment.Dehaze,
     DetailsAdjustment.Structure,
     DetailsAdjustment.Centré,
-    DetailsAdjustment.Sharpness,
-    DetailsAdjustment.SharpnessThreshold,
-    DetailsAdjustment.LumaNoiseReduction,
-    DetailsAdjustment.ColorNoiseReduction,
-    DetailsAdjustment.AiDenoiseEnabled,
-    DetailsAdjustment.AiDenoiseAmount,
-    DetailsAdjustment.AiDenoiseDetail,
-    DetailsAdjustment.ChromaticAberrationRedCyan,
-    DetailsAdjustment.ChromaticAberrationBlueYellow,
   ],
-  effects: [
-    CreativeAdjustment.GlowAmount,
-    CreativeAdjustment.GlowHue,
-    CreativeAdjustment.GlowSaturation,
-    CreativeAdjustment.HalationAmount,
-    CreativeAdjustment.HalationHue,
-    CreativeAdjustment.FlareAmount,
-    Effect.MotionBlurAmount,
-    Effect.MotionBlurAngle,
-    Effect.MotionBlurType,
-    Effect.MotionBlurLayer,
-    Effect.MotionBlurHighlights,
-    Effect.MotionBlurDepthEnabled,
-    Effect.MotionBlurDepth,
-    Effect.GaussianBlurAmount,
-    Effect.GrainAmount,
-    Effect.GrainRoughness,
-    Effect.GrainSize,
-    Effect.LutIntensity,
-    Effect.LutName,
-    Effect.LutPath,
-    Effect.LutSize,
-    Effect.VignetteAmount,
-    Effect.VignetteFeather,
-    Effect.VignetteMidpoint,
-    Effect.VignetteRoundness,
-    Effect.LensBlurEnabled,
-    Effect.LensBlurAmount,
-    Effect.lensBlurDiffusion,
-    Effect.LensBlurShape,
-    Effect.LensBlurMinDepth,
-    Effect.LensBlurMaxDepth,
-    Effect.LensBlurMinFade,
-    Effect.LensBlurMaxFade,
+  curves: ['curves', 'pointCurves', 'parametricCurve', 'curveMode'],
+  color: [
+    ColorAdjustment.Saturation,
+    ColorAdjustment.Vibrance,
+    ColorAdjustment.Hue,
+    ColorAdjustment.Hsl,
+    ColorAdjustment.PointColors,
+    'colorCalibration',
+  ],
+  look: [ColorAdjustment.ColorGrading, Effect.LutIntensity, Effect.LutName, Effect.LutPath, Effect.LutSize],
+  lightAtmosphere: [
     Effect.RelightEnabled,
     Effect.RelightLights,
     Effect.RelightAmbient,
@@ -1667,6 +1624,50 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     Effect.FogGlow,
     Effect.FogTemperature,
     Effect.FogTint,
+    CreativeAdjustment.GlowAmount,
+    CreativeAdjustment.GlowHue,
+    CreativeAdjustment.GlowSaturation,
+    CreativeAdjustment.HalationAmount,
+    CreativeAdjustment.HalationHue,
+    CreativeAdjustment.FlareAmount,
+  ],
+  blur: [
+    Effect.LensBlurEnabled,
+    Effect.LensBlurAmount,
+    Effect.lensBlurDiffusion,
+    Effect.LensBlurShape,
+    Effect.LensBlurMinDepth,
+    Effect.LensBlurMaxDepth,
+    Effect.LensBlurMinFade,
+    Effect.LensBlurMaxFade,
+    Effect.MotionBlurAmount,
+    Effect.MotionBlurAngle,
+    Effect.MotionBlurType,
+    Effect.MotionBlurLayer,
+    Effect.MotionBlurHighlights,
+    Effect.MotionBlurDepthEnabled,
+    Effect.MotionBlurDepth,
+    Effect.GaussianBlurAmount,
+  ],
+  detail: [
+    DetailsAdjustment.Sharpness,
+    DetailsAdjustment.SharpnessThreshold,
+    DetailsAdjustment.LumaNoiseReduction,
+    DetailsAdjustment.ColorNoiseReduction,
+    DetailsAdjustment.AiDenoiseEnabled,
+    DetailsAdjustment.AiDenoiseAmount,
+    DetailsAdjustment.AiDenoiseDetail,
+    DetailsAdjustment.ChromaticAberrationRedCyan,
+    DetailsAdjustment.ChromaticAberrationBlueYellow,
+  ],
+  finish: [
+    Effect.VignetteAmount,
+    Effect.VignetteFeather,
+    Effect.VignetteMidpoint,
+    Effect.VignetteRoundness,
+    Effect.GrainAmount,
+    Effect.GrainRoughness,
+    Effect.GrainSize,
   ],
 };
 
@@ -1689,38 +1690,117 @@ export interface AdjustmentSectionTool {
   label: string;
 }
 
-/** The blocks inside each section, in their default order; Basic and Curves are single blocks. */
+/** The tone mapper block: in Light, but under no eye (the Basic eye never hid it either). */
+export const TONE_MAPPER_TOOL = 'toneMapper';
+
+/** The blocks inside each section, in their default order; Curves is a single block. */
 export const ADJUSTMENT_SECTION_TOOLS: Record<string, Array<AdjustmentSectionTool>> = {
-  color: [
+  light: [
     { id: 'blackAndWhite', label: 'adjustments.color.blackAndWhite' },
+    { id: TONE_MAPPER_TOOL, label: 'adjustments.basic.toneMapper' },
     { id: 'whiteBalance', label: 'adjustments.color.whiteBalance' },
+    { id: 'tone', label: 'modals.copyPaste.groups.tone' },
+    { id: 'presence', label: 'adjustments.details.presence' },
+  ],
+  color: [
     { id: 'colorPresence', label: 'adjustments.color.presence' },
     { id: 'hue', label: 'adjustments.color.hue' },
-    { id: 'colorGrading', label: 'adjustments.color.colorGrading' },
     { id: 'colorMixer', label: 'adjustments.color.colorMixer' },
     { id: 'colorCalibration', label: 'adjustments.color.calibration.title' },
   ],
-  details: [
+  look: [
+    { id: 'colorGrading', label: 'adjustments.color.colorGrading' },
+    { id: 'lut', label: 'adjustments.effects.lut' },
+  ],
+  lightAtmosphere: [
+    { id: 'relight', label: 'adjustments.effects.relight' },
+    { id: 'fog', label: 'adjustments.effects.fog' },
+    { id: 'glow', label: 'adjustments.effects.glow' },
+    { id: 'halation', label: 'adjustments.effects.halation' },
+    { id: 'lightFlares', label: 'adjustments.effects.lightFlares' },
+  ],
+  blur: [
+    { id: 'lensBlur', label: 'adjustments.effects.lensBlur' },
+    { id: 'motionBlur', label: 'adjustments.effects.motionBlur' },
+    { id: 'gaussianBlur', label: 'adjustments.effects.gaussianBlur' },
+  ],
+  detail: [
     { id: 'sharpening', label: 'adjustments.details.sharpening' },
-    { id: 'presence', label: 'adjustments.details.presence' },
     { id: 'noiseReduction', label: 'adjustments.details.noiseReduction' },
     { id: 'aiDenoise', label: 'adjustments.details.aiDenoise' },
     { id: 'chromaticAberration', label: 'adjustments.details.chromaticAberration' },
   ],
-  effects: [
-    { id: 'glow', label: 'adjustments.effects.glow' },
-    { id: 'halation', label: 'adjustments.effects.halation' },
-    { id: 'lightFlares', label: 'adjustments.effects.lightFlares' },
-    { id: 'lensBlur', label: 'adjustments.effects.lensBlur' },
-    { id: 'relight', label: 'adjustments.effects.relight' },
-    { id: 'fog', label: 'adjustments.effects.fog' },
-    { id: 'lut', label: 'adjustments.effects.lut' },
-    { id: 'gaussianBlur', label: 'adjustments.effects.gaussianBlur' },
-    { id: 'motionBlur', label: 'adjustments.effects.motionBlur' },
+  finish: [
     { id: 'vignette', label: 'adjustments.effects.vignette' },
     { id: 'grain', label: 'adjustments.effects.grain' },
   ],
 };
+
+/**
+ * The section eyes saved before `1.66.0` and the tool groups each one hid; a group without its
+ * own key follows its old eye. Mirrors `LEGACY_VISIBILITY_GROUPS` in `adjustment_utils.rs`, which
+ * the render reads.
+ */
+const LEGACY_VISIBILITY_GROUPS: Record<string, Array<string>> = {
+  basic: ['tone'],
+  curves: ['curves'],
+  color: ['blackAndWhite', 'whiteBalance', 'colorPresence', 'hue', 'colorGrading', 'colorMixer', 'colorCalibration'],
+  details: ['presence', 'sharpening', 'noiseReduction', 'aiDenoise', 'chromaticAberration'],
+  effects: [
+    'glow',
+    'halation',
+    'lightFlares',
+    'lensBlur',
+    'relight',
+    'fog',
+    'lut',
+    'gaussianBlur',
+    'motionBlur',
+    'vignette',
+    'grain',
+  ],
+};
+
+const LEGACY_EYE_OF_GROUP: Record<string, string> = Object.fromEntries(
+  Object.entries(LEGACY_VISIBILITY_GROUPS).flatMap(([legacy, groups]) => groups.map((group) => [group, legacy])),
+);
+
+/** Whether a tool group's eye is on: its own key, else the old section eye that covered it, else shown. */
+export const isGroupVisible = (visibility: SectionVisibility | undefined, group: string): boolean =>
+  visibility?.[group] ?? visibility?.[LEGACY_EYE_OF_GROUP[group]] ?? true;
+
+/** The tool groups a section's eye switches (Curves is one group; the tone mapper is under no eye). */
+export const getSectionGroups = (section: string): Array<string> =>
+  ADJUSTMENT_SECTION_TOOLS[section]
+    ? ADJUSTMENT_SECTION_TOOLS[section].map((tool) => tool.id).filter((id) => id !== TONE_MAPPER_TOOL)
+    : [section];
+
+export type SectionEye = 'on' | 'off' | 'partial';
+
+/** A section's eye: on or off when its groups agree, partial when they differ (only from an older edit). */
+export const getSectionEye = (visibility: SectionVisibility | undefined, section: string): SectionEye => {
+  const shown = getSectionGroups(section).map((group) => isGroupVisible(visibility, group));
+  if (shown.every(Boolean)) return 'on';
+  return shown.some(Boolean) ? 'partial' : 'off';
+};
+
+/** The tool groups of a section whose eye is off, while the section's eye is partial. */
+export const getHiddenSectionGroups = (visibility: SectionVisibility | undefined, section: string): Array<string> =>
+  getSectionGroups(section).filter((group) => !isGroupVisible(visibility, group));
+
+/** Switches every tool group of a section on or off. */
+export const withSectionVisible = (
+  visibility: SectionVisibility,
+  section: string,
+  isVisible: boolean,
+): SectionVisibility => ({
+  ...visibility,
+  ...Object.fromEntries(getSectionGroups(section).map((group) => [group, isVisible])),
+});
+
+/** The eye click: an on section goes off; an off or partly off one turns all its tools on. */
+export const withSectionEyeToggled = (visibility: SectionVisibility, section: string): SectionVisibility =>
+  withSectionVisible(visibility, section, getSectionEye(visibility, section) !== 'on');
 
 export const ADJUSTMENT_TOOLS_BY_ID: Record<string, AdjustmentSectionTool & { section: string }> = Object.fromEntries(
   Object.entries(ADJUSTMENT_SECTION_TOOLS).flatMap(([section, tools]) =>

@@ -46,7 +46,7 @@ pub fn initialize_cache_dir(cache_dir: PathBuf) {
 }
 
 pub fn is_enabled(adjustments: &serde_json::Value) -> bool {
-    crate::adjustment_utils::is_section_feature_enabled(adjustments, "details", "aiDenoiseEnabled")
+    crate::adjustment_utils::is_tool_enabled(adjustments, "aiDenoise", "aiDenoiseEnabled")
 }
 
 pub fn cache_epoch() -> u64 {

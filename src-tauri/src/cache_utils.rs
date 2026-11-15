@@ -1,5 +1,5 @@
 use crate::AppState;
-use crate::adjustment_utils::is_effect_enabled;
+use crate::adjustment_utils::is_tool_enabled;
 use crate::app_settings::AppSettings;
 use crate::fog::FOG_KEYS;
 use crate::lens_blur::LENS_BLUR_KEYS;
@@ -60,19 +60,19 @@ fn hash_effect_keys(adjustments: &serde_json::Value, keys: &[&str], hasher: &mut
 pub fn calculate_effects_hash(adjustments: &serde_json::Value) -> u64 {
     let mut hasher = DefaultHasher::new();
 
-    for (enabled_key, keys) in [
-        ("relightEnabled", RELIGHT_KEYS),
-        ("fogEnabled", FOG_KEYS),
-        ("lensBlurEnabled", LENS_BLUR_KEYS),
+    for (group, enabled_key, keys) in [
+        ("relight", "relightEnabled", RELIGHT_KEYS),
+        ("fog", "fogEnabled", FOG_KEYS),
+        ("lensBlur", "lensBlurEnabled", LENS_BLUR_KEYS),
     ] {
-        let enabled = is_effect_enabled(adjustments, enabled_key);
+        let enabled = is_tool_enabled(adjustments, group, enabled_key);
         enabled.hash(&mut hasher);
         if enabled {
             hash_effect_keys(adjustments, keys, &mut hasher);
         }
     }
 
-    if is_effect_enabled(adjustments, "fogEnabled") {
+    if is_tool_enabled(adjustments, "fog", "fogEnabled") {
         adjustments["orientationSteps"].as_u64().hash(&mut hasher);
         adjustments["flipHorizontal"].as_bool().hash(&mut hasher);
         adjustments["flipVertical"].as_bool().hash(&mut hasher);

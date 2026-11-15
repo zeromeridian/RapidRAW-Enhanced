@@ -105,7 +105,7 @@ pub fn apply_fog<'a>(
     image: Cow<'a, DynamicImage>,
     adjustments: &serde_json::Value,
 ) -> Cow<'a, DynamicImage> {
-    if !crate::adjustment_utils::is_effect_enabled(adjustments, "fogEnabled") {
+    if !crate::adjustment_utils::is_tool_enabled(adjustments, "fog", "fogEnabled") {
         return image;
     }
 

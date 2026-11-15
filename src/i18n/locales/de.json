@@ -447,12 +447,15 @@
         "resetSectionSettings": "{{section}}-Einstellungen zurücksetzen"
       },
       "sections": {
-        "basic": "Basis",
         "blendPad": "Blend-Pad",
+        "blur": "Unschärfe",
         "color": "Farbe",
         "curves": "Kurven",
-        "details": "Details",
-        "effects": "Effekte",
+        "detail": "Details",
+        "finish": "Abschluss",
+        "light": "Licht",
+        "lightAtmosphere": "Licht & Atmosphäre",
+        "look": "Look",
         "zoneTint": "Zonen-Color-Grading"
       },
       "title": "Anpassungen",
@@ -2236,6 +2239,7 @@
     },
     "collapsibleSection": {
       "disableSection": "Bereich deaktivieren",
+      "enablePartlyHiddenSection": "Einige Werkzeuge hier sind aus. Klicken, um alle einzuschalten.",
       "enableSection": "Bereich aktivieren"
     },
     "colorWheel": {

@@ -262,7 +262,16 @@ export const useUIStore = create<UIState>((set, get) => ({
   renderedRightPanel: Panel.Adjustments,
   lastEditingPanel: Panel.Adjustments,
   slideDirection: 1,
-  collapsibleSectionsState: { basic: true, color: false, curves: true, details: false, effects: false },
+  collapsibleSectionsState: {
+    light: true,
+    curves: true,
+    color: false,
+    look: false,
+    lightAtmosphere: false,
+    blur: false,
+    detail: false,
+    finish: false,
+  },
 
   isCreateFolderModalOpen: false,
   isRenameFolderModalOpen: false,

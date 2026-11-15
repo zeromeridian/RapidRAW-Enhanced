@@ -173,7 +173,18 @@ details are in `RELEASE_NOTES.MD`.
 
 ## Develop
 
-- **Natural** tone mapper (Basic → Tone Mapper, next to Basic and AgX), the
+- **Adjustments sections in workflow order**: Light (Black & White, tone
+  mapper, White Balance, tone sliders, Presence), Curves, Color (Color
+  Presence, Hue, Color Mixer and Point Color, Calibration), Look (Color
+  Grading, LUT), Light & Atmosphere (Relight, Fog, Glow, Halation, Light
+  Flares), Blur (Lens, Motion, Gaussian), Detail (Sharpening, Noise
+  Reduction, AI Denoise, Chromatic Aberration), Finish (Vignette, Grain),
+  in the photo's and the masks' panels and the Copy & Paste dialog. Each
+  section's eye switches its own tools (one stored eye per tool); older
+  edits with an old section eye off render unchanged, and a section only
+  partly off shows a highlighted eye and dimmed tools. Saved layouts, open
+  sections and favourites convert once to the new sections.
+- **Natural** tone mapper (Light → Tone Mapper, next to Basic and AgX), the
   default for RAW photos without edits: a Lightroom Classic Adobe
   Standard-like rendering for every camera, with open shadows and highlights
   that roll off into white instead of clipping early, keeping hue. It adds
@@ -231,7 +242,7 @@ details are in `RELEASE_NOTES.MD`.
   Each tool's label shows its current value and its value at the dot;
   a per-tool Reverse switch; the selected tool's line shows both ends.
   Full behaviour with examples: `docs/ORBIT_BLEND_PAD_GUIDE.md`.
-- **Gaussian Blur** for the whole photo in Effects (masks had it before).
+- **Gaussian Blur** for the whole photo in Blur (masks had it before).
 - **Customize Panels** (Adjustments header button or section right-click
   menu): drag the adjustment sections and the tools inside each into a new
   order, shared by the photo's and the masks' adjustments, with Reset to
@@ -396,7 +407,7 @@ details are in `RELEASE_NOTES.MD`.
   range); a click on the photo sets the range around that tone. Luminance
   masks made before `1.42.0` keep their Tolerance selection until a tone is
   picked again.
-- **Motion Blur** in Effects (engine from RapidRAW): linear, zoom and spin
+- **Motion Blur** in Blur (engine from RapidRAW): linear, zoom and spin
   blurs, plus smooth in masks, with Highlights (bright lights keep their
   energy in the streak) and the image's grain restored over blurred areas.
   In AI-subject masks the Motion setting separates subject and background
@@ -414,7 +425,7 @@ details are in `RELEASE_NOTES.MD`.
 - Lightroom-style **clipping indicators** in the histogram's top corners:
   grey when nothing clips, white when every channel clips, and the clipped
   channels' colour otherwise; clicking one toggles the clipping warning.
-- Effects has separate **Glow**, **Halation**, and **Light Flares** sections.
+- Light & Atmosphere has separate **Glow**, **Halation**, and **Light Flares** tools.
   Glow has a colour (Hue and Saturation) and Halation a Hue. Masks have the
   same colour sliders; a mask follows the photo's colours until one is
   moved (double-click follows the photo again), and overlapping glows
@@ -432,7 +443,7 @@ details are in `RELEASE_NOTES.MD`.
   persist with the complete editable state in XMP.
 - Clear green enabled styling and dimmed neutral styling for shared toggle
   switches throughout the application.
-- **Relight** in Effects adds point, spot, and directional lights to a photo
+- **Relight** in Light & Atmosphere adds point, spot, and directional lights to a photo
   using an AI-generated surface normal map, with ambient, softness, shine,
   optional cast shadows, and per-light color, temperature, tint, intensity,
   depth, falloff, angle, elevation, cone, and feather. Lights are placed,
@@ -441,10 +452,10 @@ details are in `RELEASE_NOTES.MD`.
   −50 so the lights stand out. Light settings travel in
   XMP; the image-derived normal map stays local and can be regenerated on
   another device.
-- **Fog** in Effects adds depth-aware atmospheric haze from an AI depth map,
+- **Fog** in Light & Atmosphere adds depth-aware atmospheric haze from an AI depth map,
   with amount, start, feather (a soft fade-in at the start distance), density,
   ground fog, variation, glow, temperature, and tint.
-- Non-destructive **AI Denoise** in Details, with Amount and Detail. Each
+- Non-destructive **AI Denoise** in Detail, with Amount and Detail. Each
   image is denoised once in the background, and the result is cached on disk
   (4 GB limit, clearable in Settings). Exports always include it, and
   thumbnails refresh when it finishes. Settings sync through XMP and

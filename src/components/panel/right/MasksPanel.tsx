@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import type { TFunction } from 'i18next';
+import type { ParseKeys, TFunction } from 'i18next';
 import {
   DndContext,
   DragOverlay,
@@ -72,6 +72,9 @@ import {
   MaskBlendMode,
   ADJUSTMENT_SECTIONS,
   getAdjustmentSectionOrder,
+  getSectionEye,
+  withSectionEyeToggled,
+  withSectionVisible,
   AI_DEPTH_MASK_RANGE_DEFAULTS,
   LUMINANCE_MASK_RANGE_DEFAULTS,
 } from '../../../utils/adjustments';
@@ -322,11 +325,14 @@ export default function MasksPanel() {
   const [tempName, setTempName] = useState('');
   const [copiedSubMask, setCopiedSubMask] = useState<SubMask | null>(null);
   const [collapsibleState, setCollapsibleState] = useState<any>({
-    basic: true,
+    light: true,
     curves: false,
     color: false,
-    details: false,
-    effects: false,
+    look: false,
+    lightAtmosphere: false,
+    blur: false,
+    detail: false,
+    finish: false,
   });
   const [copiedSectionAdjustments, setCopiedSectionAdjustments] = useState<any | null>(null);
   const [isSettingsSectionOpen, setSettingsSectionOpen] = useState(true);
@@ -1711,7 +1717,7 @@ function SettingsPanel({
     const cur = container.adjustments;
     const vis = cur.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility;
     updateContainer(container.id, {
-      adjustments: { ...cur, sectionVisibility: { ...vis, [sectionName]: !vis[sectionName] } },
+      adjustments: { ...cur, sectionVisibility: withSectionEyeToggled(vis, sectionName) },
     });
   };
 
@@ -1739,10 +1745,11 @@ function SettingsPanel({
       setMaskContainerAdjustments((prev: any) => ({
         ...prev,
         ...copiedSectionAdjustments.values,
-        sectionVisibility: {
-          ...(prev.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility),
-          [sectionName]: true,
-        },
+        sectionVisibility: withSectionVisible(
+          prev.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility,
+          sectionName,
+          true,
+        ),
       }));
     };
 
@@ -1756,15 +1763,16 @@ function SettingsPanel({
       setMaskContainerAdjustments((prev: any) => ({
         ...prev,
         ...resetValues,
-        sectionVisibility: {
-          ...(prev.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility),
-          [sectionName]: true,
-        },
+        sectionVisibility: withSectionVisible(
+          prev.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility,
+          sectionName,
+          true,
+        ),
       }));
     };
 
     const isPasteAllowed = copiedSectionAdjustments && copiedSectionAdjustments.section === sectionName;
-    const sectionTitle = sectionName.charAt(0).toUpperCase() + sectionName.slice(1);
+    const sectionTitle = t(`editor.adjustments.sections.${sectionName}` as ParseKeys);
 
     const pasteLabel = copiedSectionAdjustments
       ? t('editor.masks.settings.pasteSectionSettings', { section: sectionTitle })
@@ -1788,8 +1796,7 @@ function SettingsPanel({
     ]);
   };
 
-  const sectionVisibility =
-    displayContainer.adjustments.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility;
+  const sectionVisibility = displayContainer.adjustments.sectionVisibility;
 
   return (
     <div
@@ -2021,13 +2028,14 @@ function SettingsPanel({
       >
         {getAdjustmentSectionOrder(appSettings?.adjustmentLayout?.sectionOrder).map((sectionName) => {
           const SectionComponent = ADJUSTMENT_SECTION_COMPONENTS[sectionName];
-          const title = sectionName.charAt(0).toUpperCase() + sectionName.slice(1);
+          const eye = getSectionEye(sectionVisibility, sectionName);
           return (
             <CollapsibleSection
               key={sectionName}
-              title={title}
+              title={t(`editor.adjustments.sections.${sectionName}` as ParseKeys)}
               isOpen={collapsibleState[sectionName]}
-              isContentVisible={sectionVisibility[sectionName]}
+              isContentVisible={eye !== 'off'}
+              isPartlyVisible={eye === 'partial'}
               onToggle={() => handleToggleSection(sectionName)}
               onToggleVisibility={() => handleToggleVisibility(sectionName)}
               onContextMenu={(e: any) => handleSectionContextMenu(e, sectionName)}

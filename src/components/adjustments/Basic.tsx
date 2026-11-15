@@ -1,10 +1,17 @@
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
-import { Adjustments, BasicAdjustment, ToneMapper, getDefaultToneMapper } from '../../utils/adjustments';
+import {
+  Adjustments,
+  BasicAdjustment,
+  TONE_MAPPER_TOOL,
+  ToneMapper,
+  getDefaultToneMapper,
+} from '../../utils/adjustments';
 import { useEditorStore } from '../../store/useEditorStore';
-import { ReactNode, useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import AdjustmentSlider from './AdjustmentSlider';
+import AdjustmentTool from './AdjustmentTool';
 
 interface BasicAdjustmentsProps {
   adjustments: Adjustments;
@@ -18,18 +25,9 @@ interface ToneMapperSwitchProps {
   selectedMapper: ToneMapper;
   defaultMapper: ToneMapper;
   onMapperChange: (mapper: ToneMapper) => void;
-  onExposureReset(): void;
-  /** The Exposure slider, shown under the mapper buttons. */
-  children: ReactNode;
 }
 
-const ToneMapperSwitch = ({
-  selectedMapper,
-  defaultMapper,
-  onMapperChange,
-  onExposureReset,
-  children,
-}: ToneMapperSwitchProps) => {
+const ToneMapperSwitch = ({ selectedMapper, defaultMapper, onMapperChange }: ToneMapperSwitchProps) => {
   const { t } = useTranslation();
   const [bubbleStyle, setBubbleStyle] = useState({});
   const isInitialAnimation = useRef(true);
@@ -56,10 +54,7 @@ const ToneMapperSwitch = ({
     [t],
   );
 
-  const handleReset = () => {
-    onMapperChange(defaultMapper);
-    onExposureReset();
-  };
+  const handleReset = () => onMapperChange(defaultMapper);
 
   useEffect(() => {
     const selectedIndex = toneMapperOptions.findIndex((m) => m.id === selectedMapper);
@@ -86,7 +81,7 @@ const ToneMapperSwitch = ({
   }, [selectedMapper, toneMapperOptions]);
 
   return (
-    <div className="group mb-3 compact:mb-1.5">
+    <div className="group">
       <div className="flex justify-between items-center mb-2 compact:mb-1">
         <div
           className="grid cursor-pointer"
@@ -113,7 +108,7 @@ const ToneMapperSwitch = ({
           </span>
         </div>
       </div>
-      <div className="w-full p-2 pb-1 compact:p-1 compact:pb-0.5 bg-card-active rounded-md">
+      <div className="w-full p-2 compact:p-1 bg-card-active rounded-md">
         <div className="relative flex w-full">
           <motion.div
             className="absolute top-0 bottom-0 z-0 bg-accent"
@@ -139,7 +134,6 @@ const ToneMapperSwitch = ({
             </button>
           ))}
         </div>
-        <div className="mt-2.5 compact:mt-1 px-1">{children}</div>
       </div>
     </div>
   );
@@ -164,27 +158,25 @@ export default function BasicAdjustments({
   const sliderProps = { adjustments, setAdjustments, isForMask, onDragStateChange };
 
   return (
-    <div>
-      {hideTonemapper ? (
-        <AdjustmentSlider control={BasicAdjustment.Exposure} {...sliderProps} />
-      ) : (
-        <ToneMapperSwitch
-          selectedMapper={adjustments.toneMapper || 'basic'}
-          defaultMapper={getDefaultToneMapper(isRaw)}
-          onMapperChange={handleToneMapperChange}
-          onExposureReset={() =>
-            setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [BasicAdjustment.Exposure]: 0 }))
-          }
-        >
-          <AdjustmentSlider control={BasicAdjustment.Exposure} trackClassName="bg-surface" {...sliderProps} />
-        </ToneMapperSwitch>
+    <div className="contents">
+      {!hideTonemapper && (
+        <AdjustmentTool id={TONE_MAPPER_TOOL} isUntitled>
+          <ToneMapperSwitch
+            selectedMapper={adjustments.toneMapper || 'basic'}
+            defaultMapper={getDefaultToneMapper(isRaw)}
+            onMapperChange={handleToneMapperChange}
+          />
+        </AdjustmentTool>
       )}
-      <AdjustmentSlider control={BasicAdjustment.Contrast} {...sliderProps} />
-      <AdjustmentSlider control={BasicAdjustment.Highlights} {...sliderProps} />
-      <AdjustmentSlider control={BasicAdjustment.Shadows} {...sliderProps} />
-      <AdjustmentSlider control={BasicAdjustment.Whites} {...sliderProps} />
-      <AdjustmentSlider control={BasicAdjustment.Blacks} {...sliderProps} />
-      <AdjustmentSlider control={BasicAdjustment.Brightness} {...sliderProps} />
+      <AdjustmentTool id="tone">
+        <AdjustmentSlider control={BasicAdjustment.Exposure} {...sliderProps} />
+        <AdjustmentSlider control={BasicAdjustment.Contrast} {...sliderProps} />
+        <AdjustmentSlider control={BasicAdjustment.Highlights} {...sliderProps} />
+        <AdjustmentSlider control={BasicAdjustment.Shadows} {...sliderProps} />
+        <AdjustmentSlider control={BasicAdjustment.Whites} {...sliderProps} />
+        <AdjustmentSlider control={BasicAdjustment.Blacks} {...sliderProps} />
+        <AdjustmentSlider control={BasicAdjustment.Brightness} {...sliderProps} />
+      </AdjustmentTool>
     </div>
   );
 }

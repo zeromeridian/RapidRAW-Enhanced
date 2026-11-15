@@ -36,7 +36,7 @@ export default function DetailsPanel({
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
 
   return (
-    <div className="flex flex-col gap-4 compact:gap-2">
+    <div className="contents">
       {adjustmentVisibility.sharpening !== false && (
         <AdjustmentTool id="sharpening">
           <AdjustmentSlider control={DetailsAdjustment.Sharpness} {...sliderProps} />

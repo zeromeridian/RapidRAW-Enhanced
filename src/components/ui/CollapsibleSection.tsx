@@ -9,6 +9,8 @@ interface CollapsibleSectionProps {
   canToggleVisibility?: boolean;
   children: any;
   isContentVisible: boolean;
+  /** Only some of the content is switched off (its own blocks show that); the eye turns it all on. */
+  isPartlyVisible?: boolean;
   isOpen: boolean;
   onContextMenu?: any;
   onToggle: any;
@@ -22,6 +24,7 @@ export default function CollapsibleSection({
   canToggleVisibility = true,
   children,
   isContentVisible,
+  isPartlyVisible = false,
   isOpen,
   onContextMenu,
   onToggle,
@@ -102,14 +105,17 @@ export default function CollapsibleSection({
             <div className="w-6 h-6 compact:w-5 compact:h-5 flex items-center justify-center">
               <button
                 className={clsx(
-                  'p-1 rounded-full text-text-secondary hover:bg-bg-primary z-10 transition-opacity duration-300',
-                  isHovering || !isContentVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
+                  'p-1 rounded-full hover:bg-bg-primary z-10 transition-opacity duration-300',
+                  isPartlyVisible ? 'text-accent' : 'text-text-secondary',
+                  isHovering || !isContentVisible || isPartlyVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
                 )}
                 onClick={handleVisibilityClick}
                 data-tooltip={
-                  isContentVisible
-                    ? t('ui.collapsibleSection.disableSection')
-                    : t('ui.collapsibleSection.enableSection')
+                  isPartlyVisible
+                    ? t('ui.collapsibleSection.enablePartlyHiddenSection')
+                    : isContentVisible
+                      ? t('ui.collapsibleSection.disableSection')
+                      : t('ui.collapsibleSection.enableSection')
                 }
               >
                 {isContentVisible ? (

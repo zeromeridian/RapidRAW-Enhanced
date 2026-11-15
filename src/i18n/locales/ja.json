@@ -447,12 +447,15 @@
         "resetSectionSettings": "{{section}}設定をリセット"
       },
       "sections": {
-        "basic": "基本",
         "blendPad": "ブレンドパッド",
+        "blur": "ぼかし",
         "color": "カラー",
         "curves": "トーンカーブ",
-        "details": "ディテール",
-        "effects": "効果",
+        "detail": "ディテール",
+        "finish": "仕上げ",
+        "light": "ライト",
+        "lightAtmosphere": "光と雰囲気",
+        "look": "ルック",
         "zoneTint": "ゾーンカラーグレーディング"
       },
       "title": "補正",
@@ -2234,6 +2237,7 @@
     },
     "collapsibleSection": {
       "disableSection": "セクションを無効化",
+      "enablePartlyHiddenSection": "一部のツールがオフになっています。クリックするとすべてオンになります。",
       "enableSection": "セクションを有効化"
     },
     "colorWheel": {
