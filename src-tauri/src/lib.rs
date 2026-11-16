@@ -6,10 +6,12 @@ use mimalloc::MiMalloc;
 static GLOBAL: MiMalloc = MiMalloc;
 
 mod adjustment_utils;
+mod ai_base_cache;
 mod ai_commands;
 mod ai_connector;
 mod ai_denoise;
 mod ai_processing;
+mod ai_upscale;
 mod android_integration;
 mod app_settings;
 mod app_state;
@@ -100,7 +102,7 @@ use crate::cache_utils::{
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
 use crate::hdr_deghosting::{align_hdr_frames, assert_uniform_dimensions, load_hdr_frames};
-use crate::image_loader::{load_and_composite, prepare_base_image};
+use crate::image_loader::{BaseSize, load_and_composite, prepare_base_image};
 use crate::image_processing::{
     Crop, GeometryParams, RenderRequest, apply_coarse_rotation, apply_flip, apply_geometry_warp,
     apply_linear_to_srgb, build_full_source_image, downscale_f32_image,
@@ -271,11 +273,14 @@ fn compute_transformed_preview(
     })?;
 
     let (warped_w, warped_h) = warped.dimensions();
+    // The crop and the returned scale are in decoded-photo pixels; the warped
+    // base is `base_scale` times larger with Super Resolution.
+    let base_scale = warped_w as f64 / loaded_image.image.width().max(1) as f64;
     let orientation_steps = adjustments["orientationSteps"].as_u64().unwrap_or(0);
     let (oriented_w, oriented_h) = if orientation_steps % 2 == 1 {
-        (warped_h as f64, warped_w as f64)
+        (warped_h as f64 / base_scale, warped_w as f64 / base_scale)
     } else {
-        (warped_w as f64, warped_h as f64)
+        (warped_w as f64 / base_scale, warped_h as f64 / base_scale)
     };
 
     let crop: Option<Crop> = serde::Deserialize::deserialize(&adjustments["crop"]).ok();
@@ -289,7 +294,7 @@ fn compute_transformed_preview(
         })
         .unwrap_or((oriented_w, oriented_h));
 
-    let target_scale = (preview_dim as f64 / full_w.max(full_h)).min(1.0);
+    let target_scale = (preview_dim as f64 / (full_w.max(full_h) * base_scale)).min(1.0);
 
     let working = if target_scale < 1.0 {
         let working_w = ((warped_w as f64 * target_scale).round() as u32).max(1);
@@ -306,7 +311,7 @@ fn compute_transformed_preview(
         Arc::clone(&warped)
     };
 
-    let working_scale = working.width() as f64 / warped_w.max(1) as f64;
+    let working_scale = working.width() as f64 / warped_w.max(1) as f64 * base_scale;
 
     let mut hasher = DefaultHasher::new();
     warped_key.hash(&mut hasher);
@@ -355,8 +360,13 @@ fn compute_patched_and_warped(
     loaded_image: &LoadedImage,
     adjustments: &serde_json::Value,
 ) -> Result<Arc<DynamicImage>, String> {
-    let prepared = prepare_base_image(&loaded_image.image, &loaded_image.path, adjustments)
-        .map_err(|e| format!("Failed to prepare base image: {}", e))?;
+    let prepared = prepare_base_image(
+        &loaded_image.image,
+        &loaded_image.path,
+        adjustments,
+        BaseSize::Upscaled,
+    )
+    .map_err(|e| format!("Failed to prepare base image: {}", e))?;
     let patched = into_stage_image(prepared, &loaded_image.image);
 
     let warped = apply_geometry_warp(Cow::Borrowed(patched.as_ref()), adjustments);
@@ -690,6 +700,7 @@ fn process_preview_job(
     drop(loaded_image_guard);
 
     crate::ai_denoise::ensure_generated(app_handle, &loaded_image, &adjustments_clone);
+    crate::ai_upscale::ensure_generated(app_handle, &loaded_image, &adjustments_clone);
 
     let new_transform_hash = calculate_transform_hash(&adjustments_clone);
     let settings = app_settings::settings_snapshot(app_handle).unwrap_or_default();
@@ -1097,12 +1108,16 @@ fn render_uncropped_preview(app_handle: &tauri::AppHandle, job: UncroppedPreview
     let path = loaded_image.path.clone();
     let is_raw = loaded_image.is_raw;
     let unique_hash = calculate_full_job_hash(&path, &adjustments_clone);
-    let patched_image =
-        prepare_base_image(&loaded_image.image, &loaded_image.path, &adjustments_clone)
-            .unwrap_or_else(|e| {
-                eprintln!("Failed to prepare base image for uncropped preview: {}", e);
-                Cow::Borrowed(loaded_image.image.as_ref())
-            });
+    let patched_image = prepare_base_image(
+        &loaded_image.image,
+        &loaded_image.path,
+        &adjustments_clone,
+        BaseSize::Original,
+    )
+    .unwrap_or_else(|e| {
+        eprintln!("Failed to prepare base image for uncropped preview: {}", e);
+        Cow::Borrowed(loaded_image.image.as_ref())
+    });
 
     let warped_image = apply_geometry_warp(patched_image, &adjustments_clone);
     let blurred_image =
@@ -1659,36 +1674,17 @@ async fn generate_all_community_previews(
         let preset_hash = preset_hasher.finish();
 
         for (i, (base_image, is_raw, base_scale)) in base_thumbnails.iter().enumerate() {
-            let mut scaled_adjustments = js_adjustments.clone();
-            if let Some(crop_val) = scaled_adjustments.get_mut("crop")
-                && let Ok(c) = serde_json::from_value::<Crop>(crop_val.clone())
-            {
-                *crop_val = serde_json::to_value(Crop {
-                    x: c.x * (*base_scale as f64),
-                    y: c.y * (*base_scale as f64),
-                    width: c.width * (*base_scale as f64),
-                    height: c.height * (*base_scale as f64),
-                })
-                .unwrap_or(serde_json::Value::Null);
-            }
+            let scaled_adjustments =
+                crate::image_processing::with_crop_scaled(js_adjustments, *base_scale);
 
-            let (transformed_image, _scaled_crop_offset) =
+            let (transformed_image, actual_scaled_crop_offset) =
                 crate::apply_all_transformations(Cow::Borrowed(base_image), &scaled_adjustments);
             let (img_w, img_h) = transformed_image.dimensions();
 
             let mask_definitions: Vec<MaskDefinition> = scaled_adjustments
                 .get("masks")
                 .and_then(|m| serde::Deserialize::deserialize(m).ok())
-                .unwrap_or_else(Vec::new);
-
-            let unscaled_crop_offset = js_adjustments
-                .get("crop")
-                .and_then(|c| serde_json::from_value::<Crop>(c.clone()).ok())
-                .map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
-            let actual_scaled_crop_offset = (
-                unscaled_crop_offset.0 * base_scale,
-                unscaled_crop_offset.1 * base_scale,
-            );
+                .unwrap_or_default();
 
             let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
                 .iter()
@@ -2425,7 +2421,8 @@ pub fn run() {
             let app_handle = app.handle().clone();
 
             if let Ok(cache_dir) = app_handle.path().app_cache_dir() {
-                crate::ai_denoise::initialize_cache_dir(cache_dir);
+                crate::ai_denoise::initialize_cache_dir(&cache_dir);
+                crate::ai_upscale::initialize_cache_dir(&cache_dir);
             }
 
             {
@@ -2805,6 +2802,8 @@ pub fn run() {
             generate_zone_tint_overlay,
             ai_denoise::get_ai_denoise_cache_size,
             ai_denoise::clear_ai_denoise_cache,
+            ai_upscale::get_ai_upscale_cache_size,
+            ai_upscale::clear_ai_upscale_cache,
             inpainting::invoke_generative_replace_with_mask_def,
             inpainting::generate_manual_cleanup_patch,
             denoising::apply_denoising,

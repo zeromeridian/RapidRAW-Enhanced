@@ -1193,6 +1193,15 @@ export default function SettingsPanel({
       success: t('settings.data.statuses.aiDenoiseSuccess'),
     },
   );
+  const aiUpscaleCache = useClearableCache(
+    Invokes.GetAiUpscaleCacheSize,
+    Invokes.ClearAiUpscaleCache,
+    activeCategory === 'processing',
+    {
+      clearing: t('settings.data.statuses.clearingAiUpscale'),
+      success: t('settings.data.statuses.aiUpscaleSuccess'),
+    },
+  );
   const externalEditCache = useClearableCache(
     Invokes.GetEditorRoundTripCacheSize,
     Invokes.ClearEditorRoundTrips,
@@ -1210,6 +1219,17 @@ export default function SettingsPanel({
       isOpen: true,
       message: t('settings.data.modals.aiDenoiseMessage'),
       onConfirm: aiDenoiseCache.clearCache,
+      title: t('settings.data.modals.confirmCacheTitle'),
+    });
+  };
+
+  const handleClearAiUpscaleCache = () => {
+    setConfirmModalState({
+      confirmText: t('settings.data.modals.confirmClearCache'),
+      confirmVariant: 'destructive',
+      isOpen: true,
+      message: t('settings.data.modals.aiUpscaleMessage'),
+      onConfirm: aiUpscaleCache.clearCache,
       title: t('settings.data.modals.confirmCacheTitle'),
     });
   };
@@ -2180,6 +2200,17 @@ export default function SettingsPanel({
                       </li>
                       <li>
                         <a
+                          href="https://github.com/Phhofm/models/releases/tag/2xBHI_small_span_pretrain"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-accent hover:underline"
+                        >
+                          {'2xBHI_small_span_pretrain'}
+                        </a>
+                        : {t('settings.thanks.list.span')}
+                      </li>
+                      <li>
+                        <a
                           href="https://github.com/darktable-org/darktable"
                           target="_blank"
                           rel="noopener noreferrer"
@@ -2887,6 +2918,19 @@ export default function SettingsPanel({
                         isProcessing={aiDenoiseCache.isClearing}
                         message={aiDenoiseCache.message}
                         title={t('settings.data.clearAiDenoise')}
+                      />
+
+                      <DataActionItem
+                        buttonAction={handleClearAiUpscaleCache}
+                        buttonText={t('settings.data.clearAiUpscaleButton')}
+                        description={t('settings.data.clearAiUpscaleDesc', {
+                          size: aiUpscaleCache.size === null ? '…' : formatBytes(aiUpscaleCache.size, t),
+                        })}
+                        disabled={!aiUpscaleCache.size}
+                        icon={<Trash2 size={16} className="mr-2" />}
+                        isProcessing={aiUpscaleCache.isClearing}
+                        message={aiUpscaleCache.message}
+                        title={t('settings.data.clearAiUpscale')}
                       />
 
                       <DataActionItem

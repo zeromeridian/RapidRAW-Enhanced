@@ -1,52 +1,31 @@
+use crate::ai_base_cache::{BaseCache, CachedBase, base_fingerprint, entry_key, source_string};
 use crate::app_state::{AppState, LoadedImage};
-use crate::cache_codec;
-use crate::file_management::parse_virtual_path;
 use crate::relight::RelightTap;
-use half::f16;
 use image::{DynamicImage, GenericImageView, Rgb32FImage, imageops};
 use rayon::prelude::*;
 use std::borrow::Cow;
-use std::collections::HashSet;
-use std::fs::{self, File};
-use std::io::{BufReader, BufWriter, Read, Write};
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{Emitter, Manager};
+use std::path::Path;
+use std::sync::{Arc, Mutex};
+use tauri::Manager;
 
 const MODEL_TAG: &str = "nind-v3";
-/// Entries compressed with `cache_codec`.
-const FILE_MAGIC: &[u8; 8] = b"RRDN0003";
-/// Uncompressed f16 entries written before `1.71.0`; still read.
-const LEGACY_FILE_MAGIC: &[u8; 8] = b"RRDN0002";
 const DISK_CACHE_LIMIT_BYTES: u64 = 4 * 1024 * 1024 * 1024;
-const MEMORY_CACHE_CAPACITY: usize = 2;
 
-struct DenoisedBase {
-    key: String,
-    source: String,
-    fingerprint: u64,
-    image: Arc<Rgb32FImage>,
-}
+static CACHE: BaseCache = BaseCache::new(
+    "ai_denoise",
+    "rrdn",
+    // Entries compressed with `cache_codec`.
+    b"RRDN0003",
+    // Uncompressed f16 entries written before `1.71.0`.
+    Some(b"RRDN0002"),
+    DISK_CACHE_LIMIT_BYTES,
+    2,
+    "ai-denoise",
+    "AI denoise",
+);
 
-#[derive(Default)]
-struct DenoiseCache {
-    dir: Option<PathBuf>,
-    entries: Vec<Arc<DenoisedBase>>,
-    pending: HashSet<String>,
-    epoch: u64,
-}
-
-static CACHE: LazyLock<Mutex<DenoiseCache>> = LazyLock::new(Default::default);
-
-fn cache() -> std::sync::MutexGuard<'static, DenoiseCache> {
-    CACHE.lock().unwrap_or_else(|e| e.into_inner())
-}
-
-pub fn initialize_cache_dir(cache_dir: PathBuf) {
-    let dir = cache_dir.join("ai_denoise");
-    let _ = fs::create_dir_all(&dir);
-    cache().dir = Some(dir);
+pub fn initialize_cache_dir(cache_dir: &Path) {
+    CACHE.initialize_dir(cache_dir);
 }
 
 pub fn is_enabled(adjustments: &serde_json::Value) -> bool {
@@ -54,235 +33,67 @@ pub fn is_enabled(adjustments: &serde_json::Value) -> bool {
 }
 
 pub fn cache_epoch() -> u64 {
-    cache().epoch
+    CACHE.epoch()
 }
 
-impl DenoiseCache {
-    fn get(&mut self, key: &str) -> Option<Arc<DenoisedBase>> {
-        let pos = self.entries.iter().position(|e| e.key == key)?;
-        let entry = self.entries.remove(pos);
-        self.entries.push(Arc::clone(&entry));
-        Some(entry)
-    }
+fn key_for(source: &str) -> String {
+    entry_key(MODEL_TAG, source)
+}
 
-    fn insert(&mut self, entry: Arc<DenoisedBase>) {
-        self.entries.retain(|e| e.key != entry.key);
-        if self.entries.len() >= MEMORY_CACHE_CAPACITY {
-            self.entries.remove(0);
+/// How much of the original's luma and chroma noise an edit keeps: the
+/// Amount and Detail sliders.
+#[derive(Clone, Copy)]
+pub struct DenoiseBlend {
+    luma_keep: f32,
+    chroma_keep: f32,
+}
+
+impl DenoiseBlend {
+    /// The edit's blend, or `None` when AI Denoise is off or at amount 0.
+    pub fn from_adjustments(adjustments: &serde_json::Value) -> Option<Self> {
+        if !is_enabled(adjustments) {
+            return None;
         }
-        self.entries.push(entry);
-    }
-}
-
-fn source_string(path: &str) -> String {
-    parse_virtual_path(path).0.to_string_lossy().to_string()
-}
-
-fn entry_key(source: &str) -> String {
-    let mut hasher = blake3::Hasher::new();
-    hasher.update(MODEL_TAG.as_bytes());
-    hasher.update(source.as_bytes());
-    if let Ok(meta) = fs::metadata(source) {
-        hasher.update(&meta.len().to_le_bytes());
-        let modified = meta
-            .modified()
-            .ok()
-            .and_then(|m| m.duration_since(UNIX_EPOCH).ok())
-            .unwrap_or_default();
-        hasher.update(&modified.as_nanos().to_le_bytes());
-    }
-    hasher.finalize().to_hex()[..32].to_string()
-}
-
-fn base_fingerprint(base: &DynamicImage) -> u64 {
-    let mut hasher = blake3::Hasher::new();
-    let (w, h) = base.dimensions();
-    hasher.update(&w.to_le_bytes());
-    hasher.update(&h.to_le_bytes());
-    if let Some(buf) = base.as_rgb32f() {
-        let raw = buf.as_raw();
-        for value in raw.iter().step_by((raw.len() / 4096).max(1)) {
-            hasher.update(&value.to_bits().to_le_bytes());
-        }
-    }
-    let bytes = hasher.finalize();
-    u64::from_le_bytes(bytes.as_bytes()[..8].try_into().unwrap_or_default())
-}
-
-fn entry_path(key: &str) -> Option<PathBuf> {
-    cache()
-        .dir
-        .as_ref()
-        .map(|dir| dir.join(format!("{key}.rrdn")))
-}
-
-struct EntryHeader {
-    source: String,
-    fingerprint: u64,
-    width: u32,
-    height: u32,
-    compressed: bool,
-}
-
-fn read_header(reader: &mut impl Read) -> Option<EntryHeader> {
-    let mut magic = [0u8; 8];
-    reader.read_exact(&mut magic).ok()?;
-    let compressed = match &magic {
-        m if m == FILE_MAGIC => true,
-        m if m == LEGACY_FILE_MAGIC => false,
-        _ => return None,
-    };
-    let mut u32_buf = [0u8; 4];
-    let mut u64_buf = [0u8; 8];
-    reader.read_exact(&mut u32_buf).ok()?;
-    let mut source = vec![0u8; u32::from_le_bytes(u32_buf) as usize];
-    reader.read_exact(&mut source).ok()?;
-    reader.read_exact(&mut u64_buf).ok()?;
-    let fingerprint = u64::from_le_bytes(u64_buf);
-    reader.read_exact(&mut u32_buf).ok()?;
-    let width = u32::from_le_bytes(u32_buf);
-    reader.read_exact(&mut u32_buf).ok()?;
-    let height = u32::from_le_bytes(u32_buf);
-    Some(EntryHeader {
-        source: String::from_utf8(source).ok()?,
-        fingerprint,
-        width,
-        height,
-        compressed,
-    })
-}
-
-fn read_disk_header(key: &str) -> Option<EntryHeader> {
-    let file = File::open(entry_path(key)?).ok()?;
-    read_header(&mut BufReader::new(file))
-}
-
-fn read_from_disk(key: &str, source: &str) -> Option<DenoisedBase> {
-    read_entry(&entry_path(key)?, key, source)
-}
-
-/// Reads a compressed or legacy entry; an entry whose pixels cannot be read
-/// is deleted, so it is denoised again instead of failing on every load.
-fn read_entry(path: &Path, key: &str, source: &str) -> Option<DenoisedBase> {
-    let mut reader = BufReader::new(File::open(path).ok()?);
-    let header = read_header(&mut reader)?;
-    if header.source != source {
-        return None;
-    }
-
-    let len = header.width as usize * header.height as usize * 3;
-    let halves = if header.compressed {
-        let mut payload = Vec::new();
-        reader
-            .read_to_end(&mut payload)
-            .ok()
-            .and_then(|_| cache_codec::decode_rgb_f16(&payload, header.width as usize, len))
-    } else {
-        let mut halves = vec![f16::ZERO; len];
-        reader
-            .read_exact(bytemuck::cast_slice_mut(&mut halves))
-            .ok()
-            .map(|_| halves)
-    };
-    drop(reader);
-    let Some(halves) = halves else {
-        let _ = fs::remove_file(path);
-        return None;
-    };
-    let data: Vec<f32> = halves.par_iter().map(|v| v.to_f32()).collect();
-    drop(halves);
-    let image = Rgb32FImage::from_raw(header.width, header.height, data)?;
-
-    if let Ok(file) = File::options().write(true).open(path) {
-        let _ = file.set_modified(SystemTime::now());
-    }
-
-    Some(DenoisedBase {
-        key: key.to_string(),
-        source: header.source,
-        fingerprint: header.fingerprint,
-        image: Arc::new(image),
-    })
-}
-
-fn write_to_disk(entry: &DenoisedBase) -> Result<(), String> {
-    let path = entry_path(&entry.key).ok_or("AI denoise cache directory is not initialized")?;
-    write_entry(&path, entry)?;
-    evict_disk_cache(&path);
-    Ok(())
-}
-
-fn write_entry(path: &Path, entry: &DenoisedBase) -> Result<(), String> {
-    let tmp_path = path.with_extension("tmp");
-
-    let halves: Vec<f16> = entry
-        .image
-        .as_raw()
-        .par_iter()
-        .map(|v| f16::from_f32(*v))
-        .collect();
-    let payload = cache_codec::encode_rgb_f16(&halves, entry.image.width() as usize)
-        .map_err(|e| e.to_string())?;
-    drop(halves);
-
-    let mut file = BufWriter::new(File::create(&tmp_path).map_err(|e| e.to_string())?);
-    let source = entry.source.as_bytes();
-    file.write_all(FILE_MAGIC)
-        .and_then(|_| file.write_all(&(source.len() as u32).to_le_bytes()))
-        .and_then(|_| file.write_all(source))
-        .and_then(|_| file.write_all(&entry.fingerprint.to_le_bytes()))
-        .and_then(|_| file.write_all(&entry.image.width().to_le_bytes()))
-        .and_then(|_| file.write_all(&entry.image.height().to_le_bytes()))
-        .and_then(|_| file.write_all(&payload))
-        .and_then(|_| file.flush())
-        .map_err(|e| e.to_string())?;
-    drop(file);
-
-    fs::rename(&tmp_path, path).map_err(|e| e.to_string())
-}
-
-fn evict_disk_cache(keep: &Path) {
-    let Some(read_dir) = keep.parent().and_then(|dir| fs::read_dir(dir).ok()) else {
-        return;
-    };
-
-    let mut entries: Vec<(PathBuf, u64, SystemTime)> = read_dir
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().is_some_and(|ext| ext == "rrdn"))
-        .filter_map(|e| {
-            let meta = e.metadata().ok()?;
-            Some((e.path(), meta.len(), meta.modified().unwrap_or(UNIX_EPOCH)))
+        let amount = (adjustments["aiDenoiseAmount"].as_f64().unwrap_or(100.0) as f32 / 100.0)
+            .clamp(0.0, 1.0);
+        let detail =
+            (adjustments["aiDenoiseDetail"].as_f64().unwrap_or(0.0) as f32 / 100.0).clamp(0.0, 1.0);
+        (amount > 0.0).then_some(Self {
+            luma_keep: 1.0 - amount * (1.0 - detail),
+            chroma_keep: 1.0 - amount,
         })
-        .collect();
+    }
 
-    let mut total: u64 = entries.iter().map(|(_, len, _)| len).sum();
-    entries.sort_by_key(|(_, _, modified)| *modified);
+    /// Whether the result is the denoised image unchanged.
+    pub fn is_full_strength(self) -> bool {
+        self.luma_keep <= 0.0 && self.chroma_keep <= 0.0
+    }
 
-    for (path, len, _) in entries {
-        if total <= DISK_CACHE_LIMIT_BYTES {
-            break;
-        }
-        if path != keep && fs::remove_file(&path).is_ok() {
-            total = total.saturating_sub(len);
-        }
+    /// Mixes `denoised` into `out`, which holds the original pixels.
+    pub fn blend_into(self, out: &mut Rgb32FImage, denoised: &Rgb32FImage) {
+        out.par_chunks_exact_mut(3)
+            .zip(denoised.as_raw().par_chunks_exact(3))
+            .for_each(|(px, dn)| {
+                let r = [px[0] - dn[0], px[1] - dn[1], px[2] - dn[2]];
+                let r_luma = 0.2126 * r[0] + 0.7152 * r[1] + 0.0722 * r[2];
+                for c in 0..3 {
+                    px[c] = dn[c] + self.chroma_keep * (r[c] - r_luma) + self.luma_keep * r_luma;
+                }
+            });
     }
 }
 
-fn load_entry(key: &str, source: &str) -> Option<Arc<DenoisedBase>> {
-    if let Some(entry) = cache().get(key) {
-        return (entry.source == source).then_some(entry);
-    }
-
-    let entry = Arc::new(read_from_disk(key, source)?);
-    cache().insert(Arc::clone(&entry));
-    Some(entry)
+/// The cached, fully denoised base of `path`, if it exists.
+pub fn full_strength(path: &str) -> Option<Arc<CachedBase>> {
+    let source = source_string(path);
+    CACHE.load(&key_for(&source), &source)
 }
 
-fn is_ready(key: &str, source: &str, fingerprint: u64) -> bool {
-    if let Some(entry) = cache().get(key) {
-        return entry.source == source && entry.fingerprint == fingerprint;
-    }
-    read_disk_header(key).is_some_and(|h| h.source == source && h.fingerprint == fingerprint)
+/// Whether the denoised base made from exactly `base` is cached, without
+/// reading its pixels.
+pub fn is_ready(path: &str, base: &DynamicImage) -> bool {
+    let source = source_string(path);
+    CACHE.is_ready(&key_for(&source), &source, base_fingerprint(base))
 }
 
 pub fn apply_ai_denoise<'a>(
@@ -290,20 +101,10 @@ pub fn apply_ai_denoise<'a>(
     path: &str,
     adjustments: &serde_json::Value,
 ) -> Cow<'a, DynamicImage> {
-    if !is_enabled(adjustments) {
+    let Some(blend) = DenoiseBlend::from_adjustments(adjustments) else {
         return Cow::Borrowed(base);
-    }
-
-    let amount =
-        (adjustments["aiDenoiseAmount"].as_f64().unwrap_or(100.0) as f32 / 100.0).clamp(0.0, 1.0);
-    let detail =
-        (adjustments["aiDenoiseDetail"].as_f64().unwrap_or(0.0) as f32 / 100.0).clamp(0.0, 1.0);
-    if amount <= 0.0 {
-        return Cow::Borrowed(base);
-    }
-
-    let source = source_string(path);
-    let Some(entry) = load_entry(&entry_key(&source), &source) else {
+    };
+    let Some(entry) = full_strength(path) else {
         return Cow::Borrowed(base);
     };
 
@@ -319,20 +120,8 @@ pub fn apply_ai_denoise<'a>(
         ))
     };
 
-    let luma_keep = 1.0 - amount * (1.0 - detail);
-    let chroma_keep = 1.0 - amount;
-
     let mut out = base.to_rgb32f();
-    out.par_chunks_exact_mut(3)
-        .zip(denoised.as_raw().par_chunks_exact(3))
-        .for_each(|(px, dn)| {
-            let r = [px[0] - dn[0], px[1] - dn[1], px[2] - dn[2]];
-            let r_luma = 0.2126 * r[0] + 0.7152 * r[1] + 0.0722 * r[2];
-            for c in 0..3 {
-                px[c] = dn[c] + chroma_keep * (r[c] - r_luma) + luma_keep * r_luma;
-            }
-        });
-
+    blend.blend_into(&mut out, &denoised);
     Cow::Owned(DynamicImage::ImageRgb32F(out))
 }
 
@@ -415,50 +204,26 @@ fn generate_entry(
 ) -> Result<(), String> {
     let fingerprint = base_fingerprint(base);
     let image = run_model(base, session, on_progress)?;
-
-    let entry = Arc::new(DenoisedBase {
+    CACHE.store(CachedBase {
         key,
         source,
         fingerprint,
         image: Arc::new(image),
     });
-    if let Err(e) = write_to_disk(&entry) {
-        log::warn!("Failed to persist AI denoise cache: {}", e);
-    }
-
-    let mut cache = cache();
-    cache.insert(entry);
-    cache.epoch += 1;
     Ok(())
 }
 
-async fn generate(
+async fn load_session(
     app_handle: &tauri::AppHandle,
-    loaded_image: LoadedImage,
-    key: String,
-    source: String,
-) -> Result<(), String> {
+) -> Result<Arc<Mutex<ort::session::Session>>, String> {
     let state = app_handle.state::<AppState>();
-    let session = crate::ai_processing::get_or_init_denoise_model(
+    crate::ai_processing::get_or_init_denoise_model(
         app_handle,
         &state.ai_state,
         &state.ai_init_lock,
     )
     .await
-    .map_err(|e| e.to_string())?;
-
-    let progress_handle = app_handle.clone();
-    let path = loaded_image.path.clone();
-    tokio::task::spawn_blocking(move || {
-        generate_entry(&loaded_image.image, key, source, &session, &|progress| {
-            let _ = progress_handle.emit(
-                "ai-denoise-progress",
-                serde_json::json!({ "path": path, "progress": progress }),
-            );
-        })
-    })
-    .await
-    .map_err(|e| format!("AI denoise task failed: {}", e))?
+    .map_err(|e| e.to_string())
 }
 
 /// Generates the denoised base synchronously when it is missing. Exports call
@@ -474,19 +239,12 @@ pub fn ensure_ready_blocking(
     }
 
     let source = source_string(path);
-    let key = entry_key(&source);
-    if load_entry(&key, &source).is_some() {
+    let key = key_for(&source);
+    if CACHE.load(&key, &source).is_some() {
         return Ok(());
     }
 
-    let state = app_handle.state::<AppState>();
-    let session = tauri::async_runtime::block_on(crate::ai_processing::get_or_init_denoise_model(
-        app_handle,
-        &state.ai_state,
-        &state.ai_init_lock,
-    ))
-    .map_err(|e| e.to_string())?;
-
+    let session = tauri::async_runtime::block_on(load_session(app_handle))?;
     generate_entry(base, key, source, &session, &|_| {})
 }
 
@@ -500,172 +258,50 @@ pub fn ensure_generated(
     }
 
     let source = source_string(&loaded_image.path);
-    let key = entry_key(&source);
-    if cache().pending.contains(&key)
-        || is_ready(&key, &source, base_fingerprint(&loaded_image.image))
-        || !cache().pending.insert(key.clone())
+    let key = key_for(&source);
+    if CACHE.is_pending(&key)
+        || CACHE.is_ready(&key, &source, base_fingerprint(&loaded_image.image))
     {
         return;
     }
 
-    let app_handle = app_handle.clone();
+    let task_handle = app_handle.clone();
     let loaded_image = loaded_image.clone();
     let path = loaded_image.path.clone();
-    let _ = app_handle.emit(
-        "ai-denoise-progress",
-        serde_json::json!({ "path": path, "progress": 0.0 }),
-    );
-
-    tauri::async_runtime::spawn(async move {
-        let result = generate(&app_handle, loaded_image, key.clone(), source).await;
-        cache().pending.remove(&key);
-        match result {
-            Ok(()) => {
-                let _ = app_handle.emit("ai-denoise-ready", &path);
-                // The thumbnail cache is keyed on the adjustment bytes, which do
-                // not change when the denoised base appears, so force a render.
-                if let Err(error) =
-                    crate::file_management::regenerate_thumbnails(vec![path.clone()], app_handle)
-                        .await
-                {
-                    log::warn!("Failed to refresh thumbnail after AI denoise: {}", error);
-                }
-            }
-            Err(error) => {
-                log::error!("AI denoise failed for {}: {}", path, error);
-                let _ = app_handle.emit(
-                    "ai-denoise-error",
-                    serde_json::json!({ "path": path, "error": error }),
-                );
-            }
-        }
-    });
-}
-
-fn cache_files() -> Vec<(PathBuf, u64)> {
-    let Some(read_dir) = cache().dir.clone().and_then(|dir| fs::read_dir(dir).ok()) else {
-        return Vec::new();
-    };
-    read_dir
-        .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path()
-                .extension()
-                .is_some_and(|ext| ext == "rrdn" || ext == "tmp")
+    let task_key = key.clone();
+    CACHE.spawn(app_handle, path.clone(), key, async move {
+        let session = load_session(&task_handle).await?;
+        tokio::task::spawn_blocking(move || {
+            generate_entry(
+                &loaded_image.image,
+                task_key,
+                source,
+                &session,
+                &|progress| {
+                    CACHE.emit_progress(&task_handle, &path, progress);
+                },
+            )
         })
-        .filter_map(|e| Some((e.path(), e.metadata().ok()?.len())))
-        .collect()
+        .await
+        .map_err(|e| format!("AI denoise task failed: {}", e))?
+    });
 }
 
 #[tauri::command]
 pub fn get_ai_denoise_cache_size() -> u64 {
-    cache_files().iter().map(|(_, len)| len).sum()
+    CACHE.size()
 }
 
 #[tauri::command]
 pub fn clear_ai_denoise_cache() -> Result<(), String> {
-    for (path, _) in cache_files() {
-        fs::remove_file(&path)
-            .map_err(|e| format!("Failed to remove {}: {}", path.display(), e))?;
-    }
-    let mut cache = cache();
-    cache.entries.clear();
-    cache.epoch += 1;
-    Ok(())
+    CACHE.clear()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        DenoisedBase, FILE_MAGIC, LEGACY_FILE_MAGIC, apply_ai_denoise, is_enabled, read_entry,
-        write_entry,
-    };
-    use half::f16;
+    use super::{DenoiseBlend, apply_ai_denoise, is_enabled};
     use image::{DynamicImage, Rgb32FImage};
     use std::borrow::Cow;
-    use std::fs;
-    use std::sync::Arc;
-
-    const SOURCE: &str = "/photos/IMG_0001.CR3";
-
-    fn sample_entry() -> DenoisedBase {
-        let (width, height) = (23, 19);
-        let data = (0..width * height * 3)
-            .map(|i| f16::from_f32(i as f32 * 0.37 - 40.0).to_f32())
-            .collect();
-        DenoisedBase {
-            key: "key".to_string(),
-            source: SOURCE.to_string(),
-            fingerprint: 0x1234_5678_9ABC_DEF0,
-            image: Arc::new(Rgb32FImage::from_raw(width, height, data).expect("image")),
-        }
-    }
-
-    fn header(magic: &[u8; 8], entry: &DenoisedBase) -> Vec<u8> {
-        let mut bytes = magic.to_vec();
-        bytes.extend_from_slice(&(entry.source.len() as u32).to_le_bytes());
-        bytes.extend_from_slice(entry.source.as_bytes());
-        bytes.extend_from_slice(&entry.fingerprint.to_le_bytes());
-        bytes.extend_from_slice(&entry.image.width().to_le_bytes());
-        bytes.extend_from_slice(&entry.image.height().to_le_bytes());
-        bytes
-    }
-
-    fn assert_same_entry(read: &DenoisedBase, written: &DenoisedBase) {
-        assert_eq!(read.source, written.source);
-        assert_eq!(read.fingerprint, written.fingerprint);
-        assert_eq!(read.image.dimensions(), written.image.dimensions());
-        assert_eq!(read.image.as_raw(), written.image.as_raw());
-    }
-
-    #[test]
-    fn cache_entries_are_compressed_and_read_back_exactly() {
-        let dir = tempfile::tempdir().expect("temp dir");
-        let path = dir.path().join("entry.rrdn");
-        let entry = sample_entry();
-        write_entry(&path, &entry).expect("writes");
-
-        let bytes = fs::read(&path).expect("file");
-        assert!(bytes.starts_with(FILE_MAGIC));
-        assert!(bytes.len() < header(FILE_MAGIC, &entry).len() + entry.image.as_raw().len() * 2);
-        assert_same_entry(&read_entry(&path, "key", SOURCE).expect("reads"), &entry);
-        assert!(read_entry(&path, "key", "/photos/other.CR3").is_none());
-        assert!(path.exists());
-    }
-
-    #[test]
-    fn uncompressed_entries_from_older_builds_are_still_read() {
-        let dir = tempfile::tempdir().expect("temp dir");
-        let path = dir.path().join("legacy.rrdn");
-        let entry = sample_entry();
-        let mut bytes = header(LEGACY_FILE_MAGIC, &entry);
-        for value in entry.image.as_raw() {
-            bytes.extend_from_slice(&f16::from_f32(*value).to_le_bytes());
-        }
-        fs::write(&path, bytes).expect("writes");
-
-        assert_same_entry(&read_entry(&path, "key", SOURCE).expect("reads"), &entry);
-    }
-
-    #[test]
-    fn unreadable_cache_entries_are_deleted() {
-        let dir = tempfile::tempdir().expect("temp dir");
-        let entry = sample_entry();
-
-        let compressed = dir.path().join("compressed.rrdn");
-        write_entry(&compressed, &entry).expect("writes");
-        let bytes = fs::read(&compressed).expect("file");
-        fs::write(&compressed, &bytes[..bytes.len() - 5]).expect("truncates");
-        assert!(read_entry(&compressed, "key", SOURCE).is_none());
-        assert!(!compressed.exists());
-
-        let legacy = dir.path().join("legacy.rrdn");
-        let mut bytes = header(LEGACY_FILE_MAGIC, &entry);
-        bytes.extend_from_slice(&[0u8; 10]);
-        fs::write(&legacy, bytes).expect("writes");
-        assert!(read_entry(&legacy, "key", SOURCE).is_none());
-        assert!(!legacy.exists());
-    }
 
     #[test]
     fn ai_denoise_respects_details_section_visibility() {
@@ -693,5 +329,36 @@ mod tests {
             apply_ai_denoise(&base, "/missing/image.raw", &uncached),
             Cow::Borrowed(_)
         ));
+    }
+
+    #[test]
+    fn denoise_blend_follows_amount_and_detail() {
+        let blend = |json| DenoiseBlend::from_adjustments(&json);
+        assert!(blend(serde_json::json!({ "aiDenoiseEnabled": false })).is_none());
+        assert!(
+            blend(serde_json::json!({ "aiDenoiseEnabled": true, "aiDenoiseAmount": 0 })).is_none()
+        );
+        let full = blend(serde_json::json!({ "aiDenoiseEnabled": true })).expect("full");
+        assert!(full.is_full_strength());
+
+        let original = Rgb32FImage::from_raw(1, 1, vec![0.6, 0.4, 0.2]).expect("image");
+        let denoised = Rgb32FImage::from_raw(1, 1, vec![0.5, 0.5, 0.5]).expect("image");
+        let mut out = original.clone();
+        full.blend_into(&mut out, &denoised);
+        assert_eq!(out.as_raw(), denoised.as_raw());
+
+        let half = blend(serde_json::json!({ "aiDenoiseEnabled": true, "aiDenoiseAmount": 50 }))
+            .expect("half");
+        assert!(!half.is_full_strength());
+        let mut out = original.clone();
+        half.blend_into(&mut out, &denoised);
+        for ((o, a), b) in out
+            .as_raw()
+            .iter()
+            .zip(original.as_raw())
+            .zip(denoised.as_raw())
+        {
+            assert!((o - (a + b) / 2.0).abs() < 1e-6);
+        }
     }
 }

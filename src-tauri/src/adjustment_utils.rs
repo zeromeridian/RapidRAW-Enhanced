@@ -116,6 +116,7 @@ pub const LEGACY_VISIBILITY_GROUPS: &[(&str, &[&str])] = &[
             "sharpening",
             "noiseReduction",
             "aiDenoise",
+            "superResolution",
             "chromaticAberration",
         ],
     ),
@@ -255,6 +256,6 @@ mod tests {
         groups.sort_unstable();
         groups.dedup();
         assert_eq!(groups.len(), count);
-        assert_eq!(count, 25);
+        assert_eq!(count, 26);
     }
 }

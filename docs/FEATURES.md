@@ -476,7 +476,25 @@ details are in `RELEASE_NOTES.MD`.
   losslessly compressed (4 GB limit, clearable in Settings). Exports always include it, and
   thumbnails refresh when it finishes. Settings sync through XMP and
   copy/paste; the denoised result is regenerated per device.
-- On macOS, AI Denoise and the depth maps for Fog, Lens Blur, and depth masks
+- **AI Super Resolution (2x)** in Detail, after AI Denoise (ported from
+  RapidRAW's RapidRes): doubles the photo's width and height with an AI
+  model, with a noise-aware **Detail** slider. Crops, masks, brush strokes
+  and AI patches keep their place; the editor zooms into the extra detail
+  and exports come out at twice the size (shrunk to the GPU's limit,
+  16,384 px on Apple GPUs, when larger). With AI Denoise on, both versions
+  are upscaled, so the Denoise sliders still work at 2×. Results are cached
+  losslessly on disk (20 GB limit, clearable in Settings); only the switch
+  and Detail travel in the edit (XMP, copy/paste, presets). Thumbnails and
+  small previews stay at the original size. While it is on, Develop's
+  toolbar shows the doubled size and a **2×** tag, and zoom percentages
+  count the upscaled pixels (100 % = one upscaled pixel per screen pixel);
+  Library thumbnails show its icon beside the edited mark.
+- AI Denoise and Super Resolution can be switched on or off from the photo's
+  and the thumbnails' right-click menus (Productivity), also for a
+  selection.
+- Full-size renders larger than the GPU's texture limit (for example big
+  panoramas) are shrunk to fit instead of failing.
+- On macOS, AI Denoise, Super Resolution and the depth maps for Fog, Lens Blur, and depth masks
   run on the GPU and Neural Engine through CoreML, with an
   automatic CPU fallback and a **GPU Acceleration** switch in Settings →
   Processing. AI models load only when first needed.

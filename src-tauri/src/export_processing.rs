@@ -29,7 +29,7 @@ use crate::file_management::{
     read_file_mapped, sanitize_filename_suffix, unique_output_path_avoiding,
 };
 use crate::formats::is_raw_file;
-use crate::image_loader::{load_base_image_from_bytes, prepare_base_image};
+use crate::image_loader::{BaseSize, load_base_image_from_bytes, prepare_base_image};
 use crate::image_processing::{
     AllAdjustments, Crop, GpuContext, RenderOutputPrecision, RenderRequest, downscale_f32_image,
     get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
@@ -1028,10 +1028,57 @@ impl Drop for ExportTaskGuard {
     }
 }
 
+/// A prepared base shrunk to the GPU limit and transformed by the edit, with
+/// the scale from decoded-photo pixels (crop, masks) onto it.
+struct ExportFrame<'a> {
+    image: Cow<'a, DynamicImage>,
+    crop_offset: (f32, f32),
+    scale: f32,
+    render_extent: f32,
+}
+
+/// `base_scale` is the prepared base's size over the decoded photo's: 2 with
+/// Super Resolution, else 1.
+fn transform_for_export<'a>(
+    base_image: &'a DynamicImage,
+    base_scale: f32,
+    js_adjustments: &Value,
+    context: &GpuContext,
+) -> ExportFrame<'a> {
+    let (fitted, fit_scale) = crate::gpu_processing::fit_to_gpu(context, base_image);
+    let scale = base_scale * fit_scale;
+    let render_extent = crate::motion_blur::render_extent(&fitted, 1.0);
+    let adjustments = crate::image_processing::with_crop_scaled(js_adjustments, scale);
+    let (image, crop_offset) = apply_all_transformations(fitted, &adjustments);
+    ExportFrame {
+        image,
+        crop_offset,
+        scale,
+        render_extent,
+    }
+}
+
+/// The exported size of a render that is `size` in decoded-photo pixels:
+/// enlarged by Super Resolution, then shrunk like `transform_for_export`
+/// when the prepared base (`base_size` decoded) exceeds the GPU limit.
+fn scale_to_export_pixels(
+    (width, height): (u32, u32),
+    (base_w, base_h): (u32, u32),
+    adjustments: &Value,
+    context: &GpuContext,
+) -> (u32, u32) {
+    let factor = crate::ai_upscale::factor(adjustments);
+    let scale = factor as f32
+        * crate::gpu_processing::gpu_fit_scale(context, base_w * factor, base_h * factor);
+    let scaled = |v: u32| ((v as f32 * scale).round() as u32).max(1);
+    (scaled(width), scaled(height))
+}
+
 #[allow(clippy::too_many_arguments)]
 fn process_image_for_export_pipeline(
     path: &str,
     base_image: &DynamicImage,
+    base_scale: f32,
     js_adjustments: &Value,
     context: &GpuContext,
     state: &tauri::State<AppState>,
@@ -1040,9 +1087,8 @@ fn process_image_for_export_pipeline(
     app_handle: &tauri::AppHandle,
     output_precision: RenderOutputPrecision,
 ) -> Result<DynamicImage, String> {
-    let (transformed_image, unscaled_crop_offset) =
-        apply_all_transformations(Cow::Borrowed(base_image), js_adjustments);
-    let (img_w, img_h) = transformed_image.dimensions();
+    let frame = transform_for_export(base_image, base_scale, js_adjustments, context);
+    let (img_w, img_h) = frame.image.dimensions();
 
     let mask_definitions: Vec<MaskDefinition> = js_adjustments
         .get("masks")
@@ -1057,8 +1103,8 @@ fn process_image_for_export_pipeline(
                 def,
                 img_w,
                 img_h,
-                1.0,
-                unscaled_crop_offset,
+                frame.scale,
+                frame.crop_offset,
                 warped_image.as_deref(),
             )
         })
@@ -1077,7 +1123,7 @@ fn process_image_for_export_pipeline(
     process_and_get_dynamic_image_with_precision(
         context,
         state,
-        transformed_image.as_ref(),
+        frame.image.as_ref(),
         unique_hash,
         RenderRequest {
             adjustments: all_adjustments,
@@ -1088,8 +1134,8 @@ fn process_image_for_export_pipeline(
             motion_blur: crate::motion_blur::MotionBlurs::new(
                 js_adjustments,
                 (img_w, img_h),
-                unscaled_crop_offset,
-                crate::motion_blur::render_extent(base_image, 1.0),
+                frame.crop_offset,
+                frame.render_extent,
             ),
         },
         debug_tag,
@@ -1194,6 +1240,7 @@ pub fn mime_type_for_extension(extension: &str) -> &'static str {
 fn process_image_for_export(
     path: &str,
     base_image: &DynamicImage,
+    base_scale: f32,
     js_adjustments: &Value,
     export_settings: &ExportSettings,
     context: &GpuContext,
@@ -1205,6 +1252,7 @@ fn process_image_for_export(
     let processed_image = process_image_for_export_pipeline(
         path,
         base_image,
+        base_scale,
         js_adjustments,
         context,
         state,
@@ -1384,6 +1432,7 @@ fn insert_png_phys_chunk(image_bytes: &mut Vec<u8>, dpi: u16) {
 #[allow(clippy::too_many_arguments)]
 fn export_masks_for_image(
     base_image: &DynamicImage,
+    base_scale: f32,
     js_adjustments: &Value,
     export_settings: &ExportSettings,
     output_path_obj: &std::path::Path,
@@ -1395,8 +1444,8 @@ fn export_masks_for_image(
     cancellation_token: &AtomicBool,
 ) -> Result<(), String> {
     ensure_export_not_cancelled(cancellation_token)?;
-    let (transformed_image, unscaled_crop_offset) =
-        apply_all_transformations(Cow::Borrowed(base_image), js_adjustments);
+    let frame = transform_for_export(base_image, base_scale, js_adjustments, context);
+    let transformed_image = &frame.image;
     ensure_export_not_cancelled(cancellation_token)?;
     let (img_w, img_h) = transformed_image.dimensions();
     let mask_definitions: Vec<MaskDefinition> = js_adjustments
@@ -1412,8 +1461,8 @@ fn export_masks_for_image(
             definition,
             img_w,
             img_h,
-            1.0,
-            unscaled_crop_offset,
+            frame.scale,
+            frame.crop_offset,
             warped_image.as_deref(),
         ) {
             mask_bitmaps.push(bitmap);
@@ -2030,10 +2079,23 @@ pub(crate) async fn export_images_impl(
                         &source_path_str,
                         &js_adjustments,
                     )?;
-                    let base_image =
-                        prepare_base_image(&decoded_base, &source_path_str, &js_adjustments)
-                            .map_err(|e| format!("Failed to prepare base image: {}", e))?
-                            .into_owned();
+                    ensure_export_not_cancelled(&cancellation_token_clone)?;
+                    crate::ai_upscale::ensure_ready_blocking(
+                        &app_handle_clone,
+                        &decoded_base,
+                        &source_path_str,
+                        &js_adjustments,
+                    )?;
+                    let base_image = prepare_base_image(
+                        &decoded_base,
+                        &source_path_str,
+                        &js_adjustments,
+                        BaseSize::Upscaled,
+                    )
+                    .map_err(|e| format!("Failed to prepare base image: {}", e))?
+                    .into_owned();
+                    let base_scale = crate::ai_upscale::scale_between(&decoded_base, &base_image);
+                    drop(decoded_base);
                     ensure_export_not_cancelled(&cancellation_token_clone)?;
 
                     let mut main_export_adjustments = js_adjustments.clone();
@@ -2051,6 +2113,7 @@ pub(crate) async fn export_images_impl(
                     let final_image = process_image_for_export(
                         &source_path_str,
                         &base_image,
+                        base_scale,
                         &main_export_adjustments,
                         &export_settings,
                         &context_clone,
@@ -2076,6 +2139,7 @@ pub(crate) async fn export_images_impl(
                     if export_settings.export_masks {
                         export_masks_for_image(
                             &base_image,
+                            base_scale,
                             &js_adjustments,
                             &export_settings,
                             &output_path,
@@ -2487,7 +2551,12 @@ pub async fn estimate_export_sizes(
 
         let (transformed_full_res, _) =
             apply_all_transformations(&loaded_image.image, &adjustments_clone);
-        let (full_w, full_h) = transformed_full_res.dimensions();
+        let (full_w, full_h) = scale_to_export_pixels(
+            transformed_full_res.dimensions(),
+            loaded_image.image.dimensions(),
+            &adjustments_clone,
+            &context,
+        );
 
         let (final_full_w, final_full_h) =
             compute_export_output_size(full_w, full_h, &export_settings);
@@ -2626,8 +2695,16 @@ pub async fn estimate_export_sizes(
             encode_image_to_bytes(&processed_preview, &output_format, &export_settings, None)?;
         let single_image_estimated_size = preview_bytes.len();
 
-        let full_w = (shrunk_w as f32 / raw_scale_factor).round() as u32;
-        let full_h = (shrunk_h as f32 / raw_scale_factor).round() as u32;
+        let full_size = |w: u32| (w as f32 / raw_scale_factor).round() as u32;
+        let (full_w, full_h) = scale_to_export_pixels(
+            (full_size(shrunk_w), full_size(shrunk_h)),
+            (
+                full_size(original_image.width()),
+                full_size(original_image.height()),
+            ),
+            &js_adjustments,
+            &context,
+        );
 
         let (final_full_w, final_full_h) =
             compute_export_output_size(full_w, full_h, &export_settings);

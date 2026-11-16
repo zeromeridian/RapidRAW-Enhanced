@@ -21,6 +21,8 @@ const KEY_NAMES: Record<string, string> = {
   aiDenoiseEnabled: 'AI Denoise',
   aiDenoiseAmount: 'AI Denoise Amount',
   aiDenoiseDetail: 'AI Denoise Detail',
+  aiUpscaleEnabled: 'AI Super Resolution',
+  aiUpscaleDetail: 'Super Resolution Detail',
   lensCorrectionMode: 'Lens Correction',
   lensMaker: 'Lens Maker',
   lensModel: 'Lens Model',

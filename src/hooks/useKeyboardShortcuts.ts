@@ -3,7 +3,7 @@ import { toast } from 'react-toastify';
 import { ImageFile, Panel, ExifOverlay, LibraryDisplayMode, stepBrushSize } from '../components/ui/AppProperties';
 import i18n from 'i18next';
 import { KEYBIND_DEFINITIONS, getEffectiveCombo, isTextEntryTarget, normalizeCombo } from '../utils/keyboardUtils';
-import { canUndoEdit, useEditorStore } from '../store/useEditorStore';
+import { EditorState, canUndoEdit, getZoomPixelSize, useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { isModalOpen, useUIStore } from '../store/useUIStore';
@@ -21,6 +21,13 @@ import { KEYWORD_SET_SIZE, getActiveKeywordSet, getKeywordSets } from '../utils/
 
 /** While Speed Edit is on, Q and E step to the previous and next photo. */
 const SPEED_EDIT_IMAGE_DIRECTIONS: Record<string, number> = { KeyQ: -1, KeyE: 1 };
+
+/** The current zoom, 1 = 100 % (one rendered pixel per screen pixel). */
+const currentZoomPercent = (s: { editor: EditorState }): number => {
+  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+  const zoomWidth = getZoomPixelSize(s.editor).width;
+  return zoomWidth > 0 && s.editor.displaySize?.width > 0 ? (s.editor.displaySize.width * dpr) / zoomWidth : 1.0;
+};
 
 interface KeyboardShortcutsProps {
   sortedImageList: Array<ImageFile>;
@@ -284,24 +291,14 @@ export const useKeyboardShortcuts = ({
         shouldFire: (s: any) => !!s.editor.selectedImage,
         execute: (e: any, s: any) => {
           e.preventDefault();
-          const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-          const currentPercent =
-            s.editor.originalSize?.width > 0 && s.editor.displaySize?.width > 0
-              ? (s.editor.displaySize.width * dpr) / s.editor.originalSize.width
-              : 1.0;
-          handleZoomChange(Math.min(currentPercent + 0.1, 2.0));
+          handleZoomChange(Math.min(currentZoomPercent(s) + 0.1, 2.0));
         },
       },
       zoom_out_step: {
         shouldFire: (s: any) => !!s.editor.selectedImage,
         execute: (e: any, s: any) => {
           e.preventDefault();
-          const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-          const currentPercent =
-            s.editor.originalSize?.width > 0 && s.editor.displaySize?.width > 0
-              ? (s.editor.displaySize.width * dpr) / s.editor.originalSize.width
-              : 1.0;
-          handleZoomChange(Math.max(currentPercent - 0.1, 0.1));
+          handleZoomChange(Math.max(currentZoomPercent(s) - 0.1, 0.1));
         },
       },
       cycle_zoom: {
@@ -309,11 +306,9 @@ export const useKeyboardShortcuts = ({
         execute: (e: any, s: any) => {
           e.preventDefault();
           const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-          const { originalSize, displaySize, baseRenderSize } = s.editor;
-          const currentPercent =
-            originalSize?.width > 0 && displaySize?.width > 0
-              ? Math.round(((displaySize.width * dpr) / originalSize.width) * 100)
-              : 100;
+          const { baseRenderSize } = s.editor;
+          const originalSize = getZoomPixelSize(s.editor);
+          const currentPercent = Math.round(currentZoomPercent(s) * 100);
           let fitPercent = 100;
 
           if (originalSize?.width > 0 && baseRenderSize?.width > 0) {
@@ -339,24 +334,14 @@ export const useKeyboardShortcuts = ({
         shouldFire: (s: any) => !!s.editor.selectedImage,
         execute: (e: any, s: any) => {
           e.preventDefault();
-          const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-          const currentPercent =
-            s.editor.originalSize?.width > 0 && s.editor.displaySize?.width > 0
-              ? (s.editor.displaySize.width * dpr) / s.editor.originalSize.width
-              : 1.0;
-          handleZoomChange(Math.min(currentPercent * 1.2, 2.0));
+          handleZoomChange(Math.min(currentZoomPercent(s) * 1.2, 2.0));
         },
       },
       zoom_out: {
         shouldFire: (s: any) => !!s.editor.selectedImage,
         execute: (e: any, s: any) => {
           e.preventDefault();
-          const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-          const currentPercent =
-            s.editor.originalSize?.width > 0 && s.editor.displaySize?.width > 0
-              ? (s.editor.displaySize.width * dpr) / s.editor.originalSize.width
-              : 1.0;
-          handleZoomChange(Math.max(currentPercent / 1.2, 0.1));
+          handleZoomChange(Math.max(currentZoomPercent(s) / 1.2, 0.1));
         },
       },
       zoom_fit: {

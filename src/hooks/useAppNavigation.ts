@@ -97,6 +97,7 @@ const mergeKnownImageState = (files: ImageFile[], known: ImageFile[]) => {
       exif,
       rating: previous.rating,
       is_edited: previous.is_edited,
+      is_upscaled: previous.is_upscaled,
       tags: previous.tags,
       xmpStack: previous.xmpStack,
       metadataPending: previous.metadataPending,

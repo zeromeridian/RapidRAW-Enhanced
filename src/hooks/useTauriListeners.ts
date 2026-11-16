@@ -4,7 +4,7 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { invoke } from '@tauri-apps/api/core';
 import { Status } from '../components/ui/ExportImportProperties';
 import { Invokes, LibraryViewMode } from '../components/ui/AppProperties';
-import type { ImageFile, XmpStackMetadata } from '../components/ui/AppProperties';
+import type { ImageEditState, ImageFile, XmpStackMetadata } from '../components/ui/AppProperties';
 import { useProcessStore } from '../store/useProcessStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
@@ -79,9 +79,9 @@ export function useTauriListeners({
 
   const thumbnailBuffer = useRef<Record<string, string>>({});
   const ratingBuffer = useRef<Record<string, number>>({});
-  const editStatusBuffer = useRef<Record<string, boolean>>({});
+  const editStatusBuffer = useRef<Record<string, ImageEditState>>({});
   const metadataBuffer = useRef<
-    Record<string, { rating: number; is_edited: boolean; tags: string[] | null; xmpStack: XmpStackMetadata | null }>
+    Record<string, ImageEditState & { rating: number; tags: string[] | null; xmpStack: XmpStackMetadata | null }>
   >({});
   const flushHandle = useRef<number | null>(null);
 
@@ -113,7 +113,7 @@ export function useTauriListeners({
       Object.entries(pendingRatings).forEach(([path, rating]) => {
         if (!activePaths.has(path)) delete pendingRatings[path];
       });
-      Object.entries(pendingEdits).forEach(([path, is_edited]) => {
+      Object.keys(pendingEdits).forEach((path) => {
         if (!activePaths.has(path)) delete pendingEdits[path];
       });
       metadataPaths.forEach((path) => {
@@ -128,9 +128,11 @@ export function useTauriListeners({
             const metadata = pendingMetadata[img.path];
             const thumbnailEdit = pendingEdits[img.path];
             if (!metadata && thumbnailEdit === undefined) return img;
+            const edit = metadata ?? thumbnailEdit;
             return {
               ...img,
-              is_edited: metadata?.is_edited ?? thumbnailEdit ?? img.is_edited,
+              is_edited: edit.is_edited,
+              is_upscaled: edit.is_upscaled,
               tags: metadata?.tags ?? img.tags,
               rating: metadata?.rating ?? img.rating,
               xmpStack: metadata ? metadata.xmpStack : img.xmpStack,
@@ -160,38 +162,49 @@ export function useTauriListeners({
       flushHandle.current = window.setTimeout(flushThumbnailBatch, EVENT_BATCH_INTERVAL_MS);
     };
 
-    const listeners = [
-      listen<{ path: string; progress: number }>('ai-denoise-progress', (event) => {
+    /** The progress, ready and error events of an AI result that replaces the base image. */
+    const listenToAiBaseStage = (
+      eventPrefix: string,
+      progressKey: 'aiDenoiseProgress' | 'aiUpscaleProgress',
+      enabledKey: 'aiDenoiseEnabled' | 'aiUpscaleEnabled',
+      failureLabel: string,
+    ) => [
+      listen<{ path: string; progress: number }>(`${eventPrefix}-progress`, (event) => {
         if (!isEffectActive) return;
         const { path, progress } = event.payload;
         useEditorStore
           .getState()
-          .setEditor((state) => ({ aiDenoiseProgress: { ...state.aiDenoiseProgress, [path]: progress } }));
+          .setEditor((state) => ({ [progressKey]: { ...state[progressKey], [path]: progress } }));
       }),
-      listen<string>('ai-denoise-ready', (event) => {
+      listen<string>(`${eventPrefix}-ready`, (event) => {
         if (!isEffectActive) return;
         useEditorStore.getState().setEditor((state) => {
-          const { [event.payload]: _, ...aiDenoiseProgress } = state.aiDenoiseProgress;
+          const { [event.payload]: _, ...progress } = state[progressKey];
           return {
-            aiDenoiseProgress,
+            [progressKey]: progress,
             ...(state.selectedImage?.path === event.payload ? { adjustments: { ...state.adjustments } } : {}),
           };
         });
       }),
-      listen<{ path: string; error: string }>('ai-denoise-error', (event) => {
+      listen<{ path: string; error: string }>(`${eventPrefix}-error`, (event) => {
         if (!isEffectActive) return;
         const { path, error } = event.payload;
-        toast.error(`AI denoise failed: ${error}`);
+        toast.error(`${failureLabel} failed: ${error}`);
         useEditorStore.getState().setEditor((state) => {
-          const { [path]: _, ...aiDenoiseProgress } = state.aiDenoiseProgress;
+          const { [path]: _, ...progress } = state[progressKey];
           return {
-            aiDenoiseProgress,
+            [progressKey]: progress,
             ...(state.selectedImage?.path === path
-              ? { adjustments: { ...state.adjustments, aiDenoiseEnabled: false } }
+              ? { adjustments: { ...state.adjustments, [enabledKey]: false } }
               : {}),
           };
         });
       }),
+    ];
+
+    const listeners = [
+      ...listenToAiBaseStage('ai-denoise', 'aiDenoiseProgress', 'aiDenoiseEnabled', 'AI denoise'),
+      ...listenToAiBaseStage('ai-upscale', 'aiUpscaleProgress', 'aiUpscaleEnabled', 'AI super resolution'),
       listen('preview-update-uncropped', (event: any) => {
         if (isEffectActive) useEditorStore.getState().setEditor({ uncroppedAdjustedPreviewUrl: event.payload });
       }),
@@ -220,7 +233,7 @@ export function useTauriListeners({
       }),
       listen('thumbnail-generated', (event: any) => {
         if (!isEffectActive) return;
-        const { path, thumbnailPath, rating, is_edited, data } = event.payload;
+        const { path, thumbnailPath, rating, is_edited, is_upscaled, data } = event.payload;
 
         if (thumbnailPath) {
           thumbnailBuffer.current[path] = convertFileSrc(thumbnailPath.replace(/\\/g, '/'));
@@ -233,7 +246,7 @@ export function useTauriListeners({
           ratingBuffer.current[path] = rating;
         }
         if (is_edited !== undefined) {
-          editStatusBuffer.current[path] = is_edited;
+          editStatusBuffer.current[path] = { is_edited, is_upscaled };
         }
         if (thumbnailPath || data || rating !== undefined || is_edited !== undefined) {
           scheduleFlush();
@@ -246,8 +259,8 @@ export function useTauriListeners({
       }),
       listen('image-metadata-loaded', (event: any) => {
         if (!isEffectActive) return;
-        const { path, rating, is_edited, tags, xmpStack } = event.payload;
-        metadataBuffer.current[path] = { rating, is_edited, tags, xmpStack };
+        const { path, rating, is_edited, is_upscaled, tags, xmpStack } = event.payload;
+        metadataBuffer.current[path] = { rating, is_edited, is_upscaled, tags, xmpStack };
         scheduleFlush();
       }),
       listen('ai-model-download-start', (event: any) => {

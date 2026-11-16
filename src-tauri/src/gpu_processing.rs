@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -2099,6 +2100,42 @@ pub fn process_and_get_dynamic_image_with_analytics(
         output_to_display,
         analytics_config,
     )
+}
+
+/// How much `fit_to_gpu` shrinks an image of this size: 1 when it fits.
+pub fn gpu_fit_scale(context: &GpuContext, width: u32, height: u32) -> f32 {
+    let max_dim = context.limits.max_texture_dimension_2d;
+    let largest = width.max(height);
+    if largest <= max_dim {
+        1.0
+    } else {
+        max_dim as f32 / largest as f32
+    }
+}
+
+/// `image` shrunk to the GPU's texture limit when it is larger, and the scale
+/// applied (1 when it already fits). Full-size renders call this first, so a
+/// Super Resolution base or a large panorama renders instead of failing.
+pub fn fit_to_gpu<'a>(
+    context: &GpuContext,
+    image: &'a DynamicImage,
+) -> (Cow<'a, DynamicImage>, f32) {
+    let max_dim = context.limits.max_texture_dimension_2d;
+    let (width, height) = image.dimensions();
+    if gpu_fit_scale(context, width, height) >= 1.0 {
+        return (Cow::Borrowed(image), 1.0);
+    }
+    let fitted = crate::image_processing::downscale_f32_image(image, max_dim, max_dim);
+    let scale = fitted.width() as f32 / width.max(1) as f32;
+    log::info!(
+        "Shrinking {}x{} to {}x{} to fit the GPU texture limit ({})",
+        width,
+        height,
+        fitted.width(),
+        fitted.height(),
+        max_dim
+    );
+    (Cow::Owned(fitted), scale)
 }
 
 #[allow(clippy::too_many_arguments)]

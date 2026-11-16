@@ -6,7 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'react-toastify';
 
 import { ImageDimensions, RenderSize, useImageRenderSize } from '../../hooks/useImageRenderSize';
-import { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
+import { Adjustments, AiPatch, MaskContainer, getUpscaleFactor } from '../../utils/adjustments';
 import {
   calculateCenteredCrop,
   fitCropTowards,
@@ -137,6 +137,10 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   const isMaskShapeDragging = useEditorStore((s) => s.isSliderDragging && s.isMaskShapeDragging);
   const targetZoom = useEditorStore((s) => s.zoom);
   const originalSize = useEditorStore((s) => s.originalSize);
+  // Zoom levels count Super Resolution's pixels (`getZoomPixelSize`); the canvas keeps photo pixels.
+  const upscaleFactor = useEditorStore((s) => getUpscaleFactor(s.adjustments));
+  const upscaleFactorRef = useRef(upscaleFactor);
+  upscaleFactorRef.current = upscaleFactor;
   const isRotationActive = useEditorStore((s) => s.isRotationActive);
   const overlayMode = useEditorStore((s) => s.overlayMode);
   const overlayRotation = useEditorStore((s) => s.overlayRotation);
@@ -369,7 +373,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     }
 
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    const scaleFor100Percent = 1 / imageRenderSize.scale;
+    const scaleFor100Percent = upscaleFactor / imageRenderSize.scale;
 
     const minScale = (0.1 / dpr) * scaleFor100Percent;
     const maxScale = (2.0 / dpr) * scaleFor100Percent;
@@ -378,7 +382,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
       minScale: Math.max(0.1, minScale),
       maxScale: Math.max(20, maxScale),
     };
-  }, [selectedImage, imageRenderSize.scale, originalSize]);
+  }, [selectedImage, imageRenderSize.scale, originalSize, upscaleFactor]);
 
   const minScaleRef = useRef(transformConfig.minScale);
   const maxScaleRef = useRef(transformConfig.maxScale);
@@ -1084,7 +1088,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
 
         let zoomTarget = Math.min(currentScale * 2, maxScaleRef.current);
         if (appSettings?.zoomPhotoToPixelClick ?? false) {
-          const scaleFor100Percent = imageRenderSizeRef.current.scale ? 1 / imageRenderSizeRef.current.scale : 1;
+          const scaleFor100Percent = imageRenderSizeRef.current.scale
+            ? upscaleFactorRef.current / imageRenderSizeRef.current.scale
+            : 1;
           zoomTarget = Math.min(scaleFor100Percent, maxScaleRef.current);
         } else {
           zoomTarget = savedZoomState.current ? savedZoomState.current.scale : zoomTarget;

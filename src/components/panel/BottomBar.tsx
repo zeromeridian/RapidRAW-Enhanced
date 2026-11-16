@@ -43,7 +43,7 @@ import {
   ThumbnailAspectRatio,
 } from '../ui/AppProperties';
 import Text from '../ui/Text';
-import { useEditorStore } from '../../store/useEditorStore';
+import { getZoomPixelSize, useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useUIStore } from '../../store/useUIStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -205,10 +205,10 @@ export default function BottomBar({
   groupBadgeInfo,
 }: BottomBarProps) {
   const { t } = useTranslation();
-  const { displaySize, originalSize } = useEditorStore(
+  const { displaySize, zoomPixelWidth } = useEditorStore(
     useShallow((state) => ({
       displaySize: state.displaySize,
-      originalSize: state.originalSize,
+      zoomPixelWidth: getZoomPixelSize(state).width,
     })),
   );
 
@@ -219,10 +219,10 @@ export default function BottomBar({
 
   const percentInputRef = useRef<HTMLInputElement>(null);
   const [isZoomLabelHovered, setIsZoomLabelHovered] = useState(false);
-  const isZoomReady = !isLoading && originalSize && originalSize.width > 0 && displaySize && displaySize.width > 0;
+  const isZoomReady = !isLoading && zoomPixelWidth > 0 && displaySize && displaySize.width > 0;
 
   const currentOriginalPercent = isZoomReady
-    ? (displaySize.width * (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)) / originalSize.width
+    ? (displaySize.width * (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)) / zoomPixelWidth
     : 1.0;
 
   const [latchedSliderValue, setLatchedSliderValue] = useState(1.0);

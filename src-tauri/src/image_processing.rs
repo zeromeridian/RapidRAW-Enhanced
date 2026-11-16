@@ -99,6 +99,32 @@ pub struct Crop {
     pub height: f64,
 }
 
+impl Crop {
+    pub fn scaled(self, scale: f64) -> Self {
+        Self {
+            x: self.x * scale,
+            y: self.y * scale,
+            width: self.width * scale,
+            height: self.height * scale,
+        }
+    }
+}
+
+/// The edit with its crop, stored in pixels of the decoded photo, moved onto
+/// a base image `scale` times as large (a downscaled working copy, or the 2×
+/// Super Resolution base). Masks then use `scale` and the scaled crop offset.
+pub fn with_crop_scaled(adjustments: &Value, scale: f32) -> Cow<'_, Value> {
+    if scale == 1.0 {
+        return Cow::Borrowed(adjustments);
+    }
+    let Ok(crop) = serde_json::from_value::<Crop>(adjustments["crop"].clone()) else {
+        return Cow::Borrowed(adjustments);
+    };
+    let mut scaled = adjustments.clone();
+    scaled["crop"] = serde_json::to_value(crop.scaled(f64::from(scale))).unwrap_or(Value::Null);
+    Cow::Owned(scaled)
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct GeometryParams {
     pub distortion: f32,
@@ -2342,8 +2368,12 @@ pub fn is_image_edited(
     {
         return true;
     }
-    // Motion blur runs before the main shader, so the uniform comparison below cannot see it.
-    if crate::motion_blur::is_active(adj) {
+    // Motion blur and the AI base stages run before the main shader, so the uniform comparison
+    // below cannot see them.
+    if crate::motion_blur::is_active(adj)
+        || crate::ai_denoise::is_enabled(adj)
+        || crate::ai_upscale::is_enabled(adj)
+    {
         return true;
     }
 
@@ -3995,11 +4025,46 @@ mod tests {
         MaskAdjustments, build_transform_matrix, calculate_histogram_from_image,
         compute_transform_constrain_scale, get_global_adjustments_from_json,
         get_mask_adjustments_from_json, is_image_edited, transform_covers_output, transform_point,
-        warp_image_geometry,
+        warp_image_geometry, with_crop_scaled,
     };
     use image::{DynamicImage, Rgb, Rgb32FImage};
     use serde_json::json;
+    use std::borrow::Cow;
     use std::mem::size_of;
+
+    #[test]
+    fn crops_move_onto_a_larger_base_and_nothing_else_changes() {
+        let edit = json!({
+            "crop": { "x": 10.0, "y": 20.0, "width": 300.0, "height": 200.0 },
+            "exposure": 0.5,
+        });
+        assert!(matches!(with_crop_scaled(&edit, 1.0), Cow::Borrowed(_)));
+        let scaled = with_crop_scaled(&edit, 2.0);
+        assert_eq!(
+            scaled["crop"],
+            json!({ "x": 20.0, "y": 40.0, "width": 600.0, "height": 400.0 })
+        );
+        assert_eq!(scaled["exposure"], 0.5);
+        let uncropped = json!({ "crop": null });
+        assert!(matches!(
+            with_crop_scaled(&uncropped, 2.0),
+            Cow::Borrowed(_)
+        ));
+    }
+
+    #[test]
+    fn ai_base_stages_count_as_edits() {
+        assert!(is_image_edited(
+            &json!({ "aiUpscaleEnabled": true }),
+            false,
+            None
+        ));
+        assert!(is_image_edited(
+            &json!({ "aiDenoiseEnabled": true }),
+            false,
+            None
+        ));
+    }
 
     #[test]
     fn monochrome_defaults_to_disabled() {

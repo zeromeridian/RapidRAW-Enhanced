@@ -26,6 +26,9 @@ export default function DetailsPanel({
   const aiDenoiseProgress = useEditorStore((state) =>
     state.selectedImage ? state.aiDenoiseProgress[state.selectedImage.path] : undefined,
   );
+  const aiUpscaleProgress = useEditorStore((state) =>
+    state.selectedImage ? state.aiUpscaleProgress[state.selectedImage.path] : undefined,
+  );
 
   const handleAdjustmentChange = (key: string, value: string) => {
     const numericValue = parseInt(value, 10);
@@ -95,6 +98,34 @@ export default function DetailsPanel({
             step={1}
             value={adjustments.aiDenoiseDetail ?? 0}
             onDragStateChange={onDragStateChange}
+          />
+        </AiEffectSection>
+      )}
+
+      {!isForMask && (
+        <AiEffectSection
+          toolId="superResolution"
+          title={t('adjustments.details.aiUpscale')}
+          enabled={!!adjustments.aiUpscaleEnabled}
+          onEnabledChange={(enabled: boolean) =>
+            setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, aiUpscaleEnabled: enabled }))
+          }
+          isGenerating={aiUpscaleProgress !== undefined}
+          generatingLabel={t('editor.ai.upscaling')}
+          generationProgress={aiUpscaleProgress}
+        >
+          <Slider
+            label={t('adjustments.details.aiUpscaleDetail')}
+            max={100}
+            min={0}
+            defaultValue={30}
+            onChange={(e: SliderChangeEvent) =>
+              handleAdjustmentChange(DetailsAdjustment.AiUpscaleDetail, String(e.target.value))
+            }
+            step={1}
+            value={adjustments.aiUpscaleDetail ?? 30}
+            onDragStateChange={onDragStateChange}
+            fillOrigin="min"
           />
         </AiEffectSection>
       )}

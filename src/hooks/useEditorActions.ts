@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import debounce from 'lodash.debounce';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
-import { useEditorStore, debouncedSetHistory } from '../store/useEditorStore';
+import { useEditorStore, debouncedSetHistory, getZoomPixelSize } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useUIStore } from '../store/useUIStore';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -360,15 +360,33 @@ export function useEditorActions() {
     [setAdjustments, setEditor, t],
   );
 
+  /** Writes `changes` into the saved edits of `paths`; the photo open in Develop gets them as one undo step. */
+  const applyAdjustmentsToPaths = useCallback(
+    (paths: string[], changes: Partial<Adjustments>, label: string) => {
+      if (paths.length === 0) return;
+      const { selectedImage } = useEditorStore.getState();
+      paths.forEach((p) => globalImageCache.delete(p));
+      if (selectedImage && paths.includes(selectedImage.path)) {
+        setAdjustments((prev: Adjustments) => ({ ...prev, ...changes }), label);
+      }
+      invoke(Invokes.ApplyAdjustmentsToPaths, { paths, adjustments: changes }).catch((err) =>
+        toast.error(`Failed to apply adjustments: ${err}`),
+      );
+    },
+    [setAdjustments],
+  );
+
   const handleZoomChange = useCallback((zoomValue: number, fitToWindow: boolean = false) => {
-    const { originalSize, baseRenderSize, adjustments } = useEditorStore.getState();
+    const editorState = useEditorStore.getState();
+    const { baseRenderSize, adjustments } = editorState;
+    const zoomSize = getZoomPixelSize(editorState);
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
     let targetZoomPercent: number;
 
     const orientationSteps = adjustments.orientationSteps || 0;
     const isSwapped = orientationSteps === 1 || orientationSteps === 3;
-    const effectiveOriginalWidth = isSwapped ? originalSize.height : originalSize.width;
-    const effectiveOriginalHeight = isSwapped ? originalSize.width : originalSize.height;
+    const effectiveOriginalWidth = isSwapped ? zoomSize.height : zoomSize.width;
+    const effectiveOriginalHeight = isSwapped ? zoomSize.width : zoomSize.height;
 
     if (fitToWindow) {
       if (
@@ -419,6 +437,7 @@ export function useEditorActions() {
     handleResetAdjustments,
     handleCopyAdjustments,
     handlePasteAdjustments,
+    applyAdjustmentsToPaths,
     handleZoomChange,
   };
 }

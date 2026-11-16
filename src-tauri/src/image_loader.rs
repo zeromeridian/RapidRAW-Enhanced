@@ -78,15 +78,27 @@ pub fn load_and_composite(
 ) -> Result<DynamicImage> {
     let base_image =
         load_base_image_from_bytes(base_image, path, use_fast_raw_dev, settings, cancel_token)?;
-    prepare_base_image(&base_image, path, adjustments).map(Cow::into_owned)
+    prepare_base_image(&base_image, path, adjustments, BaseSize::Original).map(Cow::into_owned)
+}
+
+/// Whether a prepared base may be the 2× AI Super Resolution result. Only the
+/// editor preview and exports use it; thumbnails and small previews stay at
+/// the decoded size, where the upscale would not show.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum BaseSize {
+    Original,
+    Upscaled,
 }
 
 /// Applies the non-destructive base-image stages that precede geometry: the
-/// cached AI denoise result, then AI patches.
+/// cached AI denoise result, the cached Super Resolution result, then AI
+/// patches. With `BaseSize::Upscaled` the result can be `ai_upscale::FACTOR`
+/// times the decoded size; crops and masks stay in decoded-size pixels.
 pub fn prepare_base_image<'a>(
     base_image: &'a DynamicImage,
     path: &str,
     adjustments: &Value,
+    size: BaseSize,
 ) -> Result<Cow<'a, DynamicImage>> {
     let has_patches = adjustments
         .get("aiPatches")
@@ -94,11 +106,18 @@ pub fn prepare_base_image<'a>(
         .is_some_and(|a| !a.is_empty());
 
     let denoised = crate::ai_denoise::apply_ai_denoise(base_image, path, adjustments);
+    let prepared = match size {
+        BaseSize::Original => denoised,
+        BaseSize::Upscaled => {
+            crate::ai_upscale::apply_ai_upscale(base_image, denoised, path, adjustments)
+        }
+    };
     if !has_patches {
-        return Ok(denoised);
+        return Ok(prepared);
     }
     Ok(Cow::Owned(composite_patches_on_image(
-        &denoised,
+        &prepared,
+        base_image.dimensions(),
         adjustments,
     )?))
 }
@@ -422,8 +441,12 @@ pub fn load_image_with_orientation(
     Ok(DynamicImage::ImageRgb32F(oriented_image.to_rgb32f()))
 }
 
+/// Composites the visible AI patches. They are stored for the decoded photo
+/// (`canon_w` × `canon_h`); on a larger base (Super Resolution) they are
+/// enlarged by the whole-number ratio.
 pub fn composite_patches_on_image(
     base_image: &DynamicImage,
+    (canon_w, canon_h): (u32, u32),
     current_adjustments: &Value,
 ) -> Result<DynamicImage> {
     let patches_val = match current_adjustments.get("aiPatches") {
@@ -459,6 +482,7 @@ pub fn composite_patches_on_image(
     }
 
     let (base_w, base_h) = base_image.dimensions();
+    let scale = (base_w / canon_w.max(1)).max(1);
 
     struct DecodedPatch {
         offset_x: Option<u32>,
@@ -494,8 +518,8 @@ pub fn composite_patches_on_image(
             {
                 let mask_bytes = general_purpose::STANDARD.decode(mask_b64)?;
                 let mask_img = image::load_from_memory(&mask_bytes)?.to_luma8();
-                if !is_cropped && (mask_img.width() != base_w || mask_img.height() != base_h) {
-                    imageops::resize(&mask_img, base_w, base_h, imageops::FilterType::Lanczos3)
+                if !is_cropped && (mask_img.width() != canon_w || mask_img.height() != canon_h) {
+                    imageops::resize(&mask_img, canon_w, canon_h, imageops::FilterType::Lanczos3)
                 } else {
                     mask_img
                 }
@@ -519,9 +543,9 @@ pub fn composite_patches_on_image(
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0) as u8;
                 let (trans_w, trans_h) = if orientation_steps % 2 == 1 {
-                    (base_h, base_w)
+                    (canon_h, canon_w)
                 } else {
-                    (base_w, base_h)
+                    (canon_w, canon_h)
                 };
 
                 let mut gen_mask =
@@ -536,14 +560,14 @@ pub fn composite_patches_on_image(
                         .get("width")
                         .and_then(|v| v.as_u64())
                         .map(|v| v as u32)
-                        .unwrap_or(base_w);
+                        .unwrap_or(canon_w);
                     let h = patch_data
                         .get("height")
                         .and_then(|v| v.as_u64())
                         .map(|v| v as u32)
-                        .unwrap_or(base_h);
-                    let crop_w = w.min(base_w.saturating_sub(ox));
-                    let crop_h = h.min(base_h.saturating_sub(oy));
+                        .unwrap_or(canon_h);
+                    let crop_w = w.min(canon_w.saturating_sub(ox));
+                    let crop_h = h.min(canon_h.saturating_sub(oy));
                     gen_mask = imageops::crop_imm(&gen_mask, ox, oy, crop_w, crop_h).to_image();
                 }
                 gen_mask
@@ -557,20 +581,31 @@ pub fn composite_patches_on_image(
             let color_image_u8 = image::load_from_memory(&color_bytes)?.to_rgb8();
 
             let (patch_w, patch_h) = color_image_u8.dimensions();
-            let final_color = if !is_cropped && (base_w != patch_w || base_h != patch_h) {
+            let final_color = if !is_cropped && (canon_w != patch_w || canon_h != patch_h) {
                 imageops::resize(
                     &color_image_u8,
-                    base_w,
-                    base_h,
+                    canon_w,
+                    canon_h,
                     imageops::FilterType::Lanczos3,
                 )
             } else {
                 color_image_u8
             };
 
+            let (mask_bitmap, final_color) = if scale == 1 {
+                (mask_bitmap, final_color)
+            } else {
+                let (w, h) = mask_bitmap.dimensions();
+                let (sw, sh) = (w * scale, h * scale);
+                (
+                    imageops::resize(&mask_bitmap, sw, sh, imageops::FilterType::Triangle),
+                    imageops::resize(&final_color, sw, sh, imageops::FilterType::CatmullRom),
+                )
+            };
+
             Ok(DecodedPatch {
-                offset_x,
-                offset_y,
+                offset_x: offset_x.map(|v| v * scale),
+                offset_y: offset_y.map(|v| v * scale),
                 mask: mask_bitmap,
                 color: final_color,
                 is_srgb_encoded,

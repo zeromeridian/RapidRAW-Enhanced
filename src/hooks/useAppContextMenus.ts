@@ -47,8 +47,11 @@ import {
   SwatchBook,
   FileSearch,
   ExternalLink,
+  Maximize2,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'react-toastify';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { useContextMenu } from '../context/ContextMenuContext';
 import { canUndoEdit, useEditorStore } from '../store/useEditorStore';
@@ -100,12 +103,34 @@ export interface UseAppContextMenusProps {
   handleTogglePinFolder: (path: string) => Promise<void>;
 }
 
+/** The AI tools a menu switches on or off for whole photos: AI Denoise and Super Resolution. */
+const aiBaseTools = (t: TFunction) =>
+  [
+    {
+      key: 'aiDenoiseEnabled',
+      icon: Sparkles,
+      label: t('adjustments.details.aiDenoise'),
+      removeLabel: t('contextMenus.editor.removeAiDenoise'),
+    },
+    {
+      key: 'aiUpscaleEnabled',
+      icon: Maximize2,
+      label: t('contextMenus.editor.superResolution'),
+      removeLabel: t('contextMenus.editor.removeSuperResolution'),
+    },
+  ] as const;
+
 export function useAppContextMenus(props: UseAppContextMenusProps) {
   const { t } = useTranslation();
   const { showContextMenu } = useContextMenu();
 
-  const { handleAutoAdjustments, handleResetAdjustments, handleCopyAdjustments, handlePasteAdjustments } =
-    useEditorActions();
+  const {
+    handleAutoAdjustments,
+    handleResetAdjustments,
+    handleCopyAdjustments,
+    handlePasteAdjustments,
+    applyAdjustmentsToPaths,
+  } = useEditorActions();
 
   const applyAutoLensCorrection = (paths: string[]) =>
     applyBatchEditToPaths(Invokes.ApplyAutoLensCorrectionToPaths, paths).catch((err) => {
@@ -379,6 +404,16 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                 });
               },
             },
+            ...aiBaseTools(t).map(({ key, icon, label, removeLabel }) => {
+              const enabled = !!editorState.adjustments[key];
+              return {
+                label: enabled ? removeLabel : label,
+                icon,
+                onClick: () =>
+                  applyAdjustmentsToPaths([selectedImage.path], { [key]: !enabled }, enabled ? removeLabel : label),
+                disabled: !selectedImage?.isReady,
+              };
+            }),
             {
               label: t('contextMenus.editor.convertNegative'),
               icon: Film,
@@ -472,6 +507,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       handleCopyAdjustments,
       handlePasteAdjustments,
       handleAutoAdjustments,
+      applyAdjustmentsToPaths,
       handleRate,
       handleSetColorLabel,
       handleTagsChanged,
@@ -767,6 +803,23 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                 });
               },
             },
+            ...aiBaseTools(t).map(({ key, icon, label, removeLabel }) => ({
+              label,
+              icon,
+              disabled: finalSelection.length === 0,
+              submenu: [
+                {
+                  label: t('contextMenus.thumbnail.enable'),
+                  icon: Check,
+                  onClick: () => applyAdjustmentsToPaths(finalSelection, { [key]: true }, label),
+                },
+                {
+                  label: t('contextMenus.thumbnail.remove'),
+                  icon: X,
+                  onClick: () => applyAdjustmentsToPaths(finalSelection, { [key]: false }, removeLabel),
+                },
+              ],
+            })),
             {
               label: conversionLabel,
               icon: Film,
@@ -1013,6 +1066,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       buildAddToAlbumMenu,
       handleCopyAdjustments,
       handlePasteAdjustments,
+      applyAdjustmentsToPaths,
       handleRate,
       handleSetColorLabel,
       handleTagsChanged,

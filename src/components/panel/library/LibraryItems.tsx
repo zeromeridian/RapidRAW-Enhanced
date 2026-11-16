@@ -5,6 +5,7 @@ import {
   FolderOpen,
   Star as StarIcon,
   SlidersHorizontal,
+  Maximize2,
   CloudOff,
   Layers,
 } from 'lucide-react';
@@ -90,6 +91,7 @@ const ThumbnailComponent = ({
   tags,
   aspectRatio: thumbnailAspectRatio,
   isEdited,
+  isUpscaled,
   exif,
   isCloudPlaceholder,
   groupBadgeLabel,
@@ -220,10 +222,11 @@ const ThumbnailComponent = ({
   const showFileTypeBadge = exifOverlay !== ExifOverlay.Off;
 
   const hasEditIcon = !!showEditIcon;
+  const hasUpscaleIcon = !!isUpscaled;
   const hasColorLabel = !!colorLabel;
   const hasRating = rating > 0;
   const hasGroupBadge = !!groupBadgeLabel;
-  const hasAnyOverlay = hasEditIcon || hasColorLabel || hasRating || hasGroupBadge;
+  const hasAnyOverlay = hasEditIcon || hasUpscaleIcon || hasColorLabel || hasRating || hasGroupBadge;
 
   return (
     <div
@@ -359,9 +362,20 @@ const ThumbnailComponent = ({
 
           <div
             className={clsx(
+              'text-white flex items-center transition-all duration-200 ease-out overflow-hidden',
+              hasUpscaleIcon ? 'max-w-3 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
+              hasUpscaleIcon && hasEditIcon ? 'ml-1.5' : 'ml-0',
+            )}
+            data-tooltip={hasUpscaleIcon ? t('adjustments.details.aiUpscale') : undefined}
+          >
+            <Maximize2 size={12} />
+          </div>
+
+          <div
+            className={clsx(
               'flex items-center justify-center shrink-0 transition-all duration-200 ease-out overflow-hidden',
               hasColorLabel ? 'max-w-3 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
-              hasColorLabel && hasEditIcon ? 'ml-1.5' : 'ml-0',
+              hasColorLabel && (hasEditIcon || hasUpscaleIcon) ? 'ml-1.5' : 'ml-0',
             )}
           >
             <div
@@ -374,7 +388,7 @@ const ThumbnailComponent = ({
             className={clsx(
               'flex items-center gap-0.5 shrink-0 transition-all duration-200 ease-out overflow-hidden',
               hasRating ? 'max-w-7 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
-              hasRating && (hasEditIcon || hasColorLabel) ? 'ml-1.5' : 'ml-0',
+              hasRating && (hasEditIcon || hasUpscaleIcon || hasColorLabel) ? 'ml-1.5' : 'ml-0',
             )}
           >
             <Text variant={TextVariants.small} color={TextColors.white}>
@@ -387,7 +401,7 @@ const ThumbnailComponent = ({
             className={clsx(
               'flex items-center shrink-0 transition-all duration-200 ease-out overflow-hidden rounded-sm',
               hasGroupBadge ? 'max-w-10 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
-              hasGroupBadge && (hasEditIcon || hasColorLabel || hasRating) ? 'ml-1.5' : 'ml-0',
+              hasGroupBadge && (hasEditIcon || hasUpscaleIcon || hasColorLabel || hasRating) ? 'ml-1.5' : 'ml-0',
               groupBadgeCount &&
                 'cursor-pointer hover:bg-white/20 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-white',
             )}
@@ -1277,6 +1291,7 @@ const RowComponent = ({
                 tags={imageFile.tags}
                 exif={imageFile.exif}
                 isEdited={imageFile.is_edited}
+                isUpscaled={imageFile.is_upscaled}
                 aspectRatio={thumbnailAspectRatio}
                 isCloudPlaceholder={imageFile.is_cloud_placeholder}
                 isRaw={imageFile.is_raw}

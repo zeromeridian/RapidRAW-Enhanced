@@ -5,7 +5,7 @@ import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useLibraryStore } from '../store/useLibraryStore';
-import { Adjustments, COPYABLE_ADJUSTMENT_KEYS, getAdjustmentChanges } from '../utils/adjustments';
+import { Adjustments, COPYABLE_ADJUSTMENT_KEYS, getAdjustmentChanges, getUpscaleFactor } from '../utils/adjustments';
 import { Invokes, Panel } from '../components/ui/AppProperties';
 import { debouncedSave } from './useEditorActions';
 import { globalImageCache } from '../utils/ImageLRUCache';
@@ -335,6 +335,7 @@ export function useImageProcessing(
     [selectedImage?.isReady],
   );
 
+  const upscaleFactor = getUpscaleFactor(adjustments);
   const calculateTargetRes = useCallback(() => {
     const baseTargetRes = appSettings?.editorPreviewResolution || 1920;
     if (!(appSettings?.enableZoomHifi ?? true) || displaySize.width === 0) {
@@ -349,20 +350,22 @@ export function useImageProcessing(
     let targetRes = Math.max(displaySize.width, displaySize.height) * effectiveDpr * sharpnessFactor * zoomMultiplier;
     targetRes = Math.max(targetRes, 512);
 
-    if (originalSize && originalSize.width > 0 && originalSize.height > 0) {
-      const origMax = Math.max(originalSize.width, originalSize.height);
+    // Super Resolution renders from a base twice the photo's size, so zooming in can use it.
+    const origMax = originalSize ? Math.max(originalSize.width, originalSize.height) * upscaleFactor : 0;
+    if (origMax > 0) {
       targetRes = Math.min(targetRes, origMax);
       if (targetRes >= origMax * 0.8) {
         targetRes = origMax;
       }
     }
 
-    if (originalSize && targetRes !== Math.max(originalSize.width, originalSize.height)) {
+    if (originalSize && targetRes !== origMax) {
       targetRes = Math.ceil(targetRes / 256) * 256;
     }
 
     return Math.round(targetRes);
   }, [
+    upscaleFactor,
     appSettings?.enableZoomHifi,
     appSettings?.editorPreviewResolution,
     appSettings?.highResZoomMultiplier,

@@ -50,6 +50,7 @@ export enum Invokes {
   ClearAiTags = 'clear_ai_tags',
   ClearAllTags = 'clear_all_tags',
   ClearAiDenoiseCache = 'clear_ai_denoise_cache',
+  ClearAiUpscaleCache = 'clear_ai_upscale_cache',
   ClearEditorRoundTrips = 'clear_editor_round_trips',
   ClearThumbnailCache = 'clear_thumbnail_cache',
   CopyFiles = 'copy_files',
@@ -67,6 +68,7 @@ export enum Invokes {
   GetGuidedPerspectiveFrame = 'get_guided_perspective_frame',
   DetectExternalEditors = 'detect_external_editors',
   GetAiDenoiseCacheSize = 'get_ai_denoise_cache_size',
+  GetAiUpscaleCacheSize = 'get_ai_upscale_cache_size',
   GetEditorRoundTripCacheSize = 'get_editor_round_trip_cache_size',
   GetDepthPreview = 'get_depth_preview',
   SampleAdjustmentProbe = 'sample_adjustment_probe',
@@ -459,8 +461,13 @@ export interface Folder {
   imageCount?: number;
 }
 
-export interface ImageFile {
+/** What the Library shows about a photo's edit (Rust `EditState`); `is_upscaled` is absent when off. */
+export interface ImageEditState {
   is_edited: boolean;
+  is_upscaled?: boolean;
+}
+
+export interface ImageFile extends ImageEditState {
   modified: number;
   path: string;
   rating: number;

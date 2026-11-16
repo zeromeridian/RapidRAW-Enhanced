@@ -5,6 +5,48 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.72.2-dev-rapidres — 2026-11-16
+
+### Library
+
+- Thumbnails of photos with Super Resolution on show its icon next to the
+  edited mark.
+
+## 1.72.1-dev-rapidres — 2026-11-16
+
+### Develop
+
+- With Super Resolution on, the size next to the photo's name shows the
+  doubled size, and a **2×** tag marks the photo.
+- Zoom now counts Super Resolution's pixels: 100 % shows one upscaled
+  pixel per screen pixel, so zooming in shows the added detail, up to
+  200 % of the upscaled photo.
+
+## 1.72.0-dev-rapidres — 2026-11-16
+
+### Develop
+
+- New **AI Super Resolution (2x)** in the Detail section: doubles the
+  photo's resolution with an AI model, with a **Detail** slider that
+  brings out fine texture without boosting noise. Crops, masks and
+  retouching stay where they are, zooming in shows the extra detail, and
+  exports come out at twice the size. Works together with AI Denoise.
+  Based on RapidRAW's RapidRes; the model is downloaded once when first
+  used.
+- AI Denoise and Super Resolution can now be switched on or off from the
+  right-click menu (Productivity), for the open photo or a whole
+  selection of thumbnails.
+- Photos with only AI Denoise or Super Resolution now count as edited.
+
+### Export
+
+- Exports larger than the graphics card can process (such as very large
+  panoramas) are now scaled down to fit instead of failing.
+
+### Settings
+
+- Settings → Data Management can clear the Super Resolution cache.
+
 ## 1.71.0-dev-compressed-ai-cache — 2026-11-16
 
 ### Develop

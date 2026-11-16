@@ -66,6 +66,8 @@ export enum DetailsAdjustment {
   AiDenoiseAmount = 'aiDenoiseAmount',
   AiDenoiseDetail = 'aiDenoiseDetail',
   AiDenoiseEnabled = 'aiDenoiseEnabled',
+  AiUpscaleDetail = 'aiUpscaleDetail',
+  AiUpscaleEnabled = 'aiUpscaleEnabled',
   Clarity = 'clarity',
   Dehaze = 'dehaze',
   Structure = 'structure',
@@ -257,6 +259,8 @@ export interface Adjustments {
   aiDenoiseDetail: number;
   aiDenoiseEnabled: boolean;
   aiPatches: Array<AiPatch>;
+  aiUpscaleDetail: number;
+  aiUpscaleEnabled: boolean;
   aspectRatio: number | null;
   blacks: number;
   blendPad: BlendPad | null;
@@ -911,6 +915,8 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   aiDenoiseDetail: 0,
   aiDenoiseEnabled: false,
   aiPatches: [],
+  aiUpscaleDetail: 30,
+  aiUpscaleEnabled: false,
   aspectRatio: null,
   blacks: 0,
   blendPad: null,
@@ -1248,6 +1254,8 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     aiDenoiseDetail: loadedAdjustments.aiDenoiseDetail ?? INITIAL_ADJUSTMENTS.aiDenoiseDetail,
     aiDenoiseEnabled: loadedAdjustments.aiDenoiseEnabled ?? INITIAL_ADJUSTMENTS.aiDenoiseEnabled,
     aiPatches: normalizedAiPatches,
+    aiUpscaleDetail: loadedAdjustments.aiUpscaleDetail ?? INITIAL_ADJUSTMENTS.aiUpscaleDetail,
+    aiUpscaleEnabled: loadedAdjustments.aiUpscaleEnabled ?? INITIAL_ADJUSTMENTS.aiUpscaleEnabled,
     sectionVisibility: {
       ...INITIAL_ADJUSTMENTS.sectionVisibility,
       ...(loadedAdjustments.sectionVisibility || {}),
@@ -1359,6 +1367,10 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         DetailsAdjustment.AiDenoiseAmount,
         DetailsAdjustment.AiDenoiseDetail,
       ],
+    },
+    {
+      label: 'modals.copyPaste.groups.aiUpscale',
+      keys: [DetailsAdjustment.AiUpscaleEnabled, DetailsAdjustment.AiUpscaleDetail],
     },
   ],
   finish: [
@@ -1657,6 +1669,8 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     DetailsAdjustment.AiDenoiseEnabled,
     DetailsAdjustment.AiDenoiseAmount,
     DetailsAdjustment.AiDenoiseDetail,
+    DetailsAdjustment.AiUpscaleEnabled,
+    DetailsAdjustment.AiUpscaleDetail,
   ],
   finish: [
     Effect.VignetteAmount,
@@ -1726,6 +1740,7 @@ export const ADJUSTMENT_SECTION_TOOLS: Record<string, Array<AdjustmentSectionToo
     { id: 'sharpening', label: 'adjustments.details.sharpening' },
     { id: 'noiseReduction', label: 'adjustments.details.noiseReduction' },
     { id: 'aiDenoise', label: 'adjustments.details.aiDenoise' },
+    { id: 'superResolution', label: 'adjustments.details.superResolution' },
   ],
   finish: [
     { id: 'vignette', label: 'adjustments.effects.vignette' },
@@ -1751,7 +1766,7 @@ const LEGACY_VISIBILITY_GROUPS: Record<string, Array<string>> = {
   basic: ['tone'],
   curves: ['curves'],
   color: ['blackAndWhite', 'whiteBalance', 'colorPresence', 'hue', 'colorGrading', 'colorMixer', 'colorCalibration'],
-  details: ['presence', 'sharpening', 'noiseReduction', 'aiDenoise', 'chromaticAberration'],
+  details: ['presence', 'sharpening', 'noiseReduction', 'aiDenoise', 'superResolution', 'chromaticAberration'],
   effects: [
     'glow',
     'halation',
@@ -1774,6 +1789,10 @@ const LEGACY_EYE_OF_GROUP: Record<string, string> = Object.fromEntries(
 /** Whether a tool group's eye is on: its own key, else the old section eye that covered it, else shown. */
 export const isGroupVisible = (visibility: SectionVisibility | undefined, group: string): boolean =>
   visibility?.[group] ?? visibility?.[LEGACY_EYE_OF_GROUP[group]] ?? true;
+
+/** How much larger than the photo an edit renders: 2 with Super Resolution on. Mirrors `ai_upscale::factor`. */
+export const getUpscaleFactor = (adjustments: Adjustments): number =>
+  adjustments.aiUpscaleEnabled && isGroupVisible(adjustments.sectionVisibility, 'superResolution') ? 2 : 1;
 
 /** The tool groups a section's eye switches (Curves is one group; the tone mapper is under no eye). */
 export const getSectionGroups = (section: string): Array<string> =>

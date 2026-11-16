@@ -7,6 +7,7 @@ import {
   MaskContainer,
   AiPatch,
   CropGeometry,
+  getUpscaleFactor,
   pickCropGeometry,
 } from '../utils/adjustments';
 import { SelectedImage, WaveformData, BrushSettings } from '../components/ui/AppProperties';
@@ -38,7 +39,7 @@ interface BaseRenderSize extends ImageDimensions {
   offsetY: number;
 }
 
-interface EditorState {
+export interface EditorState {
   // Core Image & Adjustments
   selectedImage: SelectedImage | null;
   adjustments: Adjustments;
@@ -112,6 +113,7 @@ interface EditorState {
   isGeneratingAiMask: boolean;
   isGeneratingAi: boolean;
   aiDenoiseProgress: Record<string, number>;
+  aiUpscaleProgress: Record<string, number>;
   isAIConnectorConnected: boolean;
   hasRenderedFirstFrame: boolean;
   photoSwapPhase: PhotoSwapPhase;
@@ -202,6 +204,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   isAIConnectorConnected: false,
   isGeneratingAi: false,
   aiDenoiseProgress: {},
+  aiUpscaleProgress: {},
   isMaskControlHovered: false,
   hasRenderedFirstFrame: false,
   photoSwapPhase: 'idle',
@@ -281,5 +284,14 @@ export const debouncedSetHistory = debounce((newAdj: Adjustments, label?: string
 }, 500);
 
 /** Whether undo has something to restore: an earlier entry, or an edit not yet recorded. */
+/**
+ * The size zoom percentages count in: the photo's, doubled while Super Resolution is on, so 100 %
+ * shows one rendered pixel per screen pixel. Crops, masks and `imageRenderSize` stay in photo pixels.
+ */
+export const getZoomPixelSize = (state: Pick<EditorState, 'adjustments' | 'originalSize'>): ImageDimensions => {
+  const factor = getUpscaleFactor(state.adjustments);
+  return { width: state.originalSize.width * factor, height: state.originalSize.height * factor };
+};
+
 export const canUndoEdit = (state: Pick<EditorState, 'adjustments' | 'history' | 'historyIndex'>) =>
   state.historyIndex > 0 || state.adjustments !== state.history[state.historyIndex];

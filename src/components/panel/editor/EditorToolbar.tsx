@@ -1,5 +1,5 @@
 import { memo, useState, useEffect, useRef, useMemo } from 'react';
-import { Eye, EyeOff, ArrowLeft, Maximize, Loader2, Undo, Redo, Settings } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, Maximize, Maximize2, Loader2, Undo, Redo, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -12,6 +12,8 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { findGroupVariants, getVariantLabel } from '../../../utils/imageGrouping';
 import { getDisplayFilename } from '../../../utils/outputNaming';
 import { useUIStore } from '../../../store/useUIStore';
+import { useEditorStore } from '../../../store/useEditorStore';
+import { getUpscaleFactor } from '../../../utils/adjustments';
 
 /**
  * The photo's toolbar row: its height and side insets. Develop's tool bar above the right sidebar
@@ -70,6 +72,8 @@ const EditorToolbar = memo(
 
     const showResolution = !isAndroid && selectedImage.width > 0 && selectedImage.height > 0;
     const [displayedResolution, setDisplayedResolution] = useState('');
+    // The size the photo is edited and exported at: doubled while Super Resolution is on.
+    const upscaleFactor = useEditorStore((state) => getUpscaleFactor(state.adjustments));
 
     const imageList = useLibraryStore((s) => s.imageList);
     const groupingMode: GroupingMode = useSettingsStore((s) => s.appSettings?.grouping) ?? 'off';
@@ -136,9 +140,9 @@ const EditorToolbar = memo(
 
     useEffect(() => {
       if (showResolution) {
-        setDisplayedResolution(` - ${selectedImage.width} × ${selectedImage.height}`);
+        setDisplayedResolution(` - ${selectedImage.width * upscaleFactor} × ${selectedImage.height * upscaleFactor}`);
       }
-    }, [showResolution, selectedImage.width, selectedImage.height]);
+    }, [showResolution, selectedImage.width, selectedImage.height, upscaleFactor]);
 
     useEffect(() => {
       const wasLoadingResolution = prevIsLoadingRef.current && !isLoading;
@@ -300,6 +304,20 @@ const EditorToolbar = memo(
                   >
                     <span>-{vcId}</span>
                   </div>
+                </Text>
+              )}
+
+              {upscaleFactor > 1 && (
+                <Text
+                  as="div"
+                  variant={TextVariants.small}
+                  color={TextColors.accent}
+                  weight={TextWeights.bold}
+                  className="ml-2 shrink-0 bg-accent/20 px-2 py-0.5 rounded-full flex items-center gap-1 cursor-default"
+                  data-tooltip={t('adjustments.details.aiUpscale')}
+                >
+                  <Maximize2 size={12} />
+                  <span>{`${upscaleFactor}×`}</span>
                 </Text>
               )}
 

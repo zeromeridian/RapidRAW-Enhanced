@@ -8,7 +8,7 @@ use crate::ai_connector;
 use crate::ai_processing;
 use crate::app_settings::load_settings;
 use crate::app_state::AppState;
-use crate::image_loader::prepare_base_image;
+use crate::image_loader::{BaseSize, prepare_base_image};
 use crate::image_processing::apply_linear_to_srgb;
 use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bitmap};
 use crate::resolve_warped_image_for_masks;
@@ -34,10 +34,13 @@ fn prepare_source_image(
         .clone()
         .ok_or("No original image loaded")?;
 
+    // Patches are stored for the decoded photo, so they sample its size even
+    // when Super Resolution is on.
     let composited = prepare_base_image(
         &loaded_image.image,
         &loaded_image.path,
         &source_image_adjustments,
+        BaseSize::Original,
     )
     .map_err(|e| format!("Failed to prepare source image: {}", e))?
     .into_owned();
