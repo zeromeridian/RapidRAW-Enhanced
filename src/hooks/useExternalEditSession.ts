@@ -12,23 +12,33 @@ import { debouncedSave } from './useEditorActions';
  * Handles files handed to the app from outside (OS "open with" and the
  * external editor protocol: this-is-raw --edit <file> --output <file>).
  * Opens the requested image in the editor and, for edit sessions, exports
- * the result to the caller-provided output path and exits the app.
+ * the result to the caller-provided output path and exits the app. A file
+ * opened from the OS also fills the filmstrip with its folder; an edit
+ * session shows only its photo.
  */
-export function useExternalEditSession(handleImageSelect: (path: string) => void) {
+export function useExternalEditSession(
+  handleImageSelect: (path: string) => void,
+  handleOpenContainingFolder: (path: string) => Promise<void>,
+) {
   const initialFileToOpen = useProcessStore((state) => state.initialFileToOpen);
   const externalEditSession = useProcessStore((state) => state.externalEditSession);
   const exportStatus = useProcessStore((state) => state.exportState.status);
   const [isFinishing, setIsFinishing] = useState(false);
 
   const handleImageSelectRef = useRef(handleImageSelect);
+  const handleOpenContainingFolderRef = useRef(handleOpenContainingFolder);
   useEffect(() => {
     handleImageSelectRef.current = handleImageSelect;
+    handleOpenContainingFolderRef.current = handleOpenContainingFolder;
   });
 
   useEffect(() => {
     if (!initialFileToOpen) return;
     useProcessStore.getState().setProcess({ initialFileToOpen: null });
     handleImageSelectRef.current(initialFileToOpen);
+    handleOpenContainingFolderRef
+      .current(initialFileToOpen)
+      .catch((e) => console.error("Failed to show the opened photo's folder:", e));
   }, [initialFileToOpen]);
 
   useEffect(() => {

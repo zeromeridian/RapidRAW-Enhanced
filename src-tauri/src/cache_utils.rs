@@ -282,11 +282,19 @@ impl DecodeFingerprint {
     }
 }
 
+/// A source file decoded at full size for Develop.
+#[derive(Clone)]
+pub struct DecodedImage {
+    pub image: Arc<DynamicImage>,
+    pub exif: HashMap<String, String>,
+    /// The RAW could not be decoded, so this is the camera's embedded JPEG preview.
+    pub is_embedded_preview: bool,
+}
+
 struct DecodedEntry {
     path: String,
     fingerprint: DecodeFingerprint,
-    image: Arc<DynamicImage>,
-    exif: HashMap<String, String>,
+    decoded: DecodedImage,
 }
 
 pub struct DecodedImageCache {
@@ -319,17 +327,13 @@ impl DecodedImageCache {
             .any(|e| e.path == path && e.fingerprint == *fingerprint)
     }
 
-    pub fn get(
-        &mut self,
-        path: &str,
-        fingerprint: &DecodeFingerprint,
-    ) -> Option<(Arc<DynamicImage>, HashMap<String, String>)> {
+    pub fn get(&mut self, path: &str, fingerprint: &DecodeFingerprint) -> Option<DecodedImage> {
         let pos = self.items.iter().position(|e| e.path == path)?;
         let entry = self.items.remove(pos);
         if entry.fingerprint != *fingerprint {
             return None;
         }
-        let result = (Arc::clone(&entry.image), entry.exif.clone());
+        let result = entry.decoded.clone();
         self.items.push(entry);
         Some(result)
     }
@@ -338,13 +342,7 @@ impl DecodedImageCache {
         self.items.clear();
     }
 
-    pub fn insert(
-        &mut self,
-        path: String,
-        fingerprint: DecodeFingerprint,
-        image: Arc<DynamicImage>,
-        exif: HashMap<String, String>,
-    ) {
+    pub fn insert(&mut self, path: String, fingerprint: DecodeFingerprint, decoded: DecodedImage) {
         if let Some(pos) = self.items.iter().position(|e| e.path == path) {
             self.items.remove(pos);
         } else if self.items.len() >= self.capacity {
@@ -353,8 +351,7 @@ impl DecodedImageCache {
         self.items.push(DecodedEntry {
             path,
             fingerprint,
-            image,
-            exif,
+            decoded,
         });
     }
 }
@@ -433,12 +430,19 @@ mod tests {
         cache.insert(
             "a.raf".to_string(),
             fingerprint(1),
-            Arc::new(DynamicImage::new_rgb8(1, 1)),
-            HashMap::new(),
+            DecodedImage {
+                image: Arc::new(DynamicImage::new_rgb8(1, 1)),
+                exif: HashMap::new(),
+                is_embedded_preview: true,
+            },
         );
 
         assert!(cache.contains("a.raf", &fingerprint(1)));
-        assert!(cache.get("a.raf", &fingerprint(1)).is_some());
+        assert!(
+            cache
+                .get("a.raf", &fingerprint(1))
+                .is_some_and(|decoded| decoded.is_embedded_preview)
+        );
         assert!(!cache.contains("a.raf", &fingerprint(2)));
         assert!(cache.get("a.raf", &fingerprint(2)).is_none());
         assert!(!cache.contains("a.raf", &fingerprint(1)));

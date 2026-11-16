@@ -876,6 +876,7 @@
         "focalLength": "焦距",
         "iso": "ISO",
         "lens": "镜头",
+        "model": "型号",
         "shutterSpeed": "快门速度",
         "title": "相机详情"
       },
@@ -977,6 +978,9 @@
         "masks": "蒙版",
         "presets": "预设"
       }
+    },
+    "toasts": {
+      "embeddedPreview": "ThisIsRAW 无法解码此 RAW 文件，因此您看到和编辑的是相机内嵌的 JPEG 预览。画质会低于真正的 RAW，可调整的空间也更小。"
     },
     "toolbar": {
       "switchToVariant": "Switch to {{label}}",

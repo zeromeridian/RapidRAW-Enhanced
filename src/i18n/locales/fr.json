@@ -903,6 +903,7 @@
         "focalLength": "Longueur focale",
         "iso": "ISO",
         "lens": "Objectif",
+        "model": "Modèle",
         "shutterSpeed": "Vitesse d'obturation",
         "title": "Détails de l'appareil"
       },
@@ -1004,6 +1005,9 @@
         "masks": "Masques",
         "presets": "Paramètres prédéfinis"
       }
+    },
+    "toasts": {
+      "embeddedPreview": "ThisIsRAW n'a pas pu décoder ce fichier RAW : vous voyez et modifiez l'aperçu JPEG intégré de l'appareil. Attendez-vous à une qualité inférieure et à moins de latitude d'édition qu'avec un vrai RAW."
     },
     "toolbar": {
       "switchToVariant": "Switch to {{label}}",

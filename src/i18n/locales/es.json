@@ -903,6 +903,7 @@
         "focalLength": "Distancia focal",
         "iso": "ISO",
         "lens": "Lente",
+        "model": "Modelo",
         "shutterSpeed": "Velocidad de obturación",
         "title": "Detalles de la cámara"
       },
@@ -1004,6 +1005,9 @@
         "masks": "Máscaras",
         "presets": "Ajustes preestablecidos"
       }
+    },
+    "toasts": {
+      "embeddedPreview": "ThisIsRAW no pudo decodificar este archivo RAW, así que estás viendo y editando la vista previa JPEG incrustada de la cámara. Espera menor calidad y menos margen de edición que con un RAW real."
     },
     "toolbar": {
       "switchToVariant": "Switch to {{label}}",

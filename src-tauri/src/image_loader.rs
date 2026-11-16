@@ -1,7 +1,7 @@
 use crate::Cursor;
 use crate::app_settings::{AppSettings, load_settings};
 use crate::app_state::{AppState, LoadedImage};
-use crate::cache_utils::DecodeFingerprint;
+use crate::cache_utils::{DecodeFingerprint, DecodedImage};
 use crate::exif_processing;
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
@@ -38,6 +38,7 @@ pub struct LoadImageResult {
     pub metadata: ImageMetadata,
     pub exif: HashMap<String, String>,
     pub is_raw: bool,
+    pub is_embedded_preview: bool,
 }
 
 #[derive(Deserialize)]
@@ -109,6 +110,25 @@ pub fn load_base_image_from_bytes(
     settings: &AppSettings,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<DynamicImage> {
+    decode_base_image(
+        bytes,
+        path_for_ext_check,
+        use_fast_raw_dev,
+        settings,
+        cancel_token,
+    )
+    .map(|(image, _)| image)
+}
+
+/// Like `load_base_image_from_bytes`, and also says whether a RAW that could not be decoded
+/// was replaced by its embedded preview.
+fn decode_base_image(
+    bytes: &[u8],
+    path_for_ext_check: &str,
+    use_fast_raw_dev: bool,
+    settings: &AppSettings,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+) -> Result<(DynamicImage, bool)> {
     let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
     let linear_mode = settings.linear_raw_mode.clone();
     let color_nr_setting = settings.raw_preprocessing_color_nr.unwrap_or(0.5);
@@ -152,7 +172,7 @@ pub fn load_base_image_from_bytes(
                         duration
                     );
                 }
-                Ok(image)
+                Ok((image, false))
             }
             Ok(Err(e)) => {
                 let classified = classify_raw_develop_error(path_for_ext_check, e);
@@ -166,34 +186,15 @@ pub fn load_base_image_from_bytes(
                     path_for_ext_check,
                     classified
                 );
-                if let Some(preview) = safe_embedded_preview_fallback(bytes, path_for_ext_check) {
-                    log::warn!(
-                        "Using embedded preview fallback for '{}' ({}x{})",
-                        path_for_ext_check,
-                        preview.width(),
-                        preview.height()
-                    );
-
-                    return Ok(linearize_embedded_preview(preview));
-                }
-                Err(classified)
+                embedded_preview_instead(bytes, path_for_ext_check)
+                    .map(|preview| (preview, true))
+                    .ok_or(classified)
             }
             Err(_) => {
                 log::error!("Panic while processing RAW file: {}", path_for_ext_check);
-                if let Some(preview) = safe_embedded_preview_fallback(bytes, path_for_ext_check) {
-                    log::warn!(
-                        "Using embedded preview fallback for '{}' after RAW decoder panic ({}x{})",
-                        path_for_ext_check,
-                        preview.width(),
-                        preview.height()
-                    );
-
-                    return Ok(linearize_embedded_preview(preview));
-                }
-                Err(anyhow!(
-                    "Failed to process RAW file: {}",
-                    path_for_ext_check
-                ))
+                embedded_preview_instead(bytes, path_for_ext_check)
+                    .map(|preview| (preview, true))
+                    .ok_or_else(|| anyhow!("Failed to process RAW file: {}", path_for_ext_check))
             }
         }
     } else {
@@ -213,7 +214,7 @@ pub fn load_base_image_from_bytes(
             );
         }
 
-        Ok(image)
+        Ok((image, false))
     }
 }
 
@@ -359,6 +360,18 @@ fn safe_embedded_preview_fallback(bytes: &[u8], path: &str) -> Option<DynamicIma
             None
         }
     }
+}
+
+/// The embedded preview, ready for the pipeline, for a RAW that could not be decoded.
+fn embedded_preview_instead(bytes: &[u8], path: &str) -> Option<DynamicImage> {
+    let preview = safe_embedded_preview_fallback(bytes, path)?;
+    log::warn!(
+        "Using embedded preview fallback for '{}' ({}x{})",
+        path,
+        preview.width(),
+        preview.height()
+    );
+    Some(linearize_embedded_preview(preview))
 }
 
 fn linearize_embedded_preview(preview: DynamicImage) -> DynamicImage {
@@ -776,7 +789,7 @@ pub fn decode_pristine(
     path: &str,
     settings: &AppSettings,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
-) -> Result<(DynamicImage, HashMap<String, String>), String> {
+) -> Result<DecodedImage, String> {
     if is_cancelled(&cancel_token) {
         return Err("Load cancelled".to_string());
     }
@@ -784,9 +797,14 @@ pub fn decode_pristine(
         if is_cancelled(&cancel_token) {
             return Err("Load cancelled".to_string());
         }
-        let img = load_base_image_from_bytes(bytes, path, false, settings, cancel_token.clone())
-            .map_err(|e| e.to_string())?;
-        Ok((img, exif_processing::read_exif_data(path, bytes)))
+        let (image, is_embedded_preview) =
+            decode_base_image(bytes, path, false, settings, cancel_token.clone())
+                .map_err(|e| e.to_string())?;
+        Ok(DecodedImage {
+            image: Arc::new(image),
+            exif: exif_processing::read_exif_data(path, bytes),
+            is_embedded_preview,
+        })
     };
     match read_file_mapped(Path::new(path)) {
         Ok(mmap) => decode(&mmap),
@@ -864,8 +882,8 @@ pub async fn load_image(
             .get(&source_path_str, fp)
     });
 
-    let (pristine_arc, exif_data) = if let Some((cached_img, cached_exif)) = cached_data {
-        (cached_img, cached_exif)
+    let decoded = if let Some(cached) = cached_data {
+        cached
     } else {
         if crate::file_management::is_cloud_placeholder(&source_path) {
             return Err(format!(
@@ -874,24 +892,21 @@ pub async fn load_image(
             ));
         }
 
-        let (pristine_img, exif_data_loaded) = tokio::task::spawn_blocking(move || {
+        let decoded = tokio::task::spawn_blocking(move || {
             decode_pristine(&path_clone, &settings, cancel_token)
         })
         .await
         .map_err(|e| e.to_string())??;
 
-        let arc_img = Arc::new(pristine_img);
-
         if let Some(fp) = fingerprint {
             state.decoded_image_cache.lock().unwrap().insert(
                 source_path_str.clone(),
                 fp,
-                arc_img.clone(),
-                exif_data_loaded.clone(),
+                decoded.clone(),
             );
         }
 
-        (arc_img, exif_data_loaded)
+        decoded
     };
 
     if state.load_image_generation.load(Ordering::SeqCst) != my_generation {
@@ -904,11 +919,11 @@ pub async fn load_image(
         return Err("Load cancelled".to_string());
     }
 
-    let (orig_width, orig_height) = pristine_arc.dimensions();
+    let (orig_width, orig_height) = decoded.image.dimensions();
 
     *state.original_image.lock().unwrap() = Some(LoadedImage {
         path,
-        image: pristine_arc,
+        image: decoded.image,
         is_raw,
     });
 
@@ -916,7 +931,8 @@ pub async fn load_image(
         width: orig_width,
         height: orig_height,
         metadata,
-        exif: exif_data,
+        exif: decoded.exif,
         is_raw,
+        is_embedded_preview: decoded.is_embedded_preview,
     })
 }

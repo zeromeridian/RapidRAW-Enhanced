@@ -928,6 +928,7 @@
         "focalLength": "Ogniskowa",
         "iso": "ISO",
         "lens": "Obiektyw",
+        "model": "Model",
         "shutterSpeed": "Czas otwarcia migawki",
         "title": "Szczegóły aparatu"
       },
@@ -1029,6 +1030,9 @@
         "masks": "Maski",
         "presets": "Presety"
       }
+    },
+    "toasts": {
+      "embeddedPreview": "ThisIsRAW nie mógł zdekodować tego pliku RAW, więc widzisz i edytujesz osadzony podgląd JPEG z aparatu. Spodziewaj się niższej jakości i mniejszego zapasu do edycji niż w prawdziwym pliku RAW."
     },
     "toolbar": {
       "switchToVariant": "Switch to {{label}}",

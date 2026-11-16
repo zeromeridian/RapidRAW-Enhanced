@@ -929,6 +929,7 @@
         "focalLength": "Focal Length",
         "iso": "ISO",
         "lens": "Lens",
+        "model": "Model",
         "shutterSpeed": "Shutter Speed",
         "title": "Camera Details"
       },
@@ -1097,6 +1098,9 @@
       "title": "Tagging",
       "updateFailed": "Could not update keywords: {{error}}",
       "updatingKeywordList": "Updating the keyword list…"
+    },
+    "toasts": {
+      "embeddedPreview": "ThisIsRAW couldn't decode this RAW file, so you're seeing and editing the camera's embedded JPEG preview. Expect lower quality and less editing headroom than a real RAW."
     },
     "toolbar": {
       "switchToVariant": "Switch to {{label}}",

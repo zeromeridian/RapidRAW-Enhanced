@@ -203,7 +203,7 @@ fn preload(app_handle: &AppHandle, app_state: &AppState, path: &str, cancel: Arc
     let preloader = &app_state.image_preloader;
     preloader.set_background(true);
     match preloader.in_background(|| decode_pristine(path, &settings, Some((cancel, 0)))) {
-        Ok((image, exif)) => cache().insert(path.to_string(), fingerprint, Arc::new(image), exif),
+        Ok(decoded) => cache().insert(path.to_string(), fingerprint, decoded),
         Err(e) if !e.contains("cancelled") => log::debug!("Preloading '{}' failed: {}", path, e),
         Err(_) => {}
     }

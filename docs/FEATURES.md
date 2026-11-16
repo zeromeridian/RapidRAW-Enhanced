@@ -15,6 +15,11 @@ details are in `RELEASE_NOTES.MD`.
   sidecar files. Drag a folder onto another folder to move its complete tree;
   hold Command on macOS or Ctrl on Windows/Linux to copy a folder tree instead.
   Transfers prevent same-parent, self/descendant, and name-collision drops.
+- A photo opened from Finder or Explorer fills the filmstrip with its own
+  folder (never its subfolders) without adding it to the Library; editor
+  round trips still show only their photo.
+- The Metadata panel shows the camera (make and model, the make not
+  repeated) above the lens.
 - Lightroom-style **Lights Out** in Library and Develop: **L** cycles Normal →
   Lights Dim → Lights Out (**Shift+L** backward, both configurable; Escape
   restores Normal first). One fading layer darkens everything except the
@@ -506,9 +511,12 @@ details are in `RELEASE_NOTES.MD`.
   HALD image LUTs.
 - Consolidated EXIF export controls with optional GPS removal.
 - Complete readable EXIF preservation for JPEG and TIFF (TIFF exports write
-  their EXIF and GPS blocks while encoding, with UTF-8 text), with ThisIsRAW
-  recorded as the exporting software. Denoised, negative-converted, panorama
-  and HDR images embed their source's EXIF too.
+  their EXIF and GPS blocks while encoding, with UTF-8 text), and EXIF in
+  JPEG XL and WebP exports, with ThisIsRAW recorded as the exporting
+  software. Denoised, negative-converted, panorama and HDR images embed
+  their source's EXIF too.
+- A RAW the decoder cannot read opens with its embedded JPEG preview and a
+  notice saying so.
 - XMP synchronization for ratings, color labels, keywords, physical-image
   flags, and physical stack membership, order, cover, and collapsed state.
   Keywords are written and read in Lightroom Classic's format, including the

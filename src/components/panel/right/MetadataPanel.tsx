@@ -9,7 +9,7 @@ import { COLOR_LABELS, Color } from '../../../utils/adjustments';
 import Text from '../../ui/Text';
 import PanelHeader from '../../ui/PanelHeader';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { IconAperture, IconShutter, IconIso, IconFocalLength, IconLens } from '../editor/ExifIcons';
+import { IconAperture, IconShutter, IconIso, IconFocalLength, IconLens, IconCamera } from '../editor/ExifIcons';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
@@ -65,8 +65,50 @@ const CAMERA_ICONS: Record<string, React.FC> = {
   ExposureTime: IconShutter,
   PhotographicSensitivity: IconIso,
   FocalLengthIn35mmFilm: IconFocalLength,
-  LensModel: IconLens,
 };
+
+// The EXIF reader keeps quotes around strings; empty when the tag is missing.
+function exifText(value: unknown) {
+  if (value === undefined || value === null) return '';
+  return String(value).replace(/"/g, '').trim();
+}
+
+// Make and model as one name, without repeating a make the model already starts with
+// ("Canon" + "Canon EOS R5", "NIKON CORPORATION" + "NIKON Z 6").
+function formatCameraName(make: string, model: string) {
+  const makeWord = make.split(/\s+/)[0].toLowerCase();
+  const modelLower = model.toLowerCase();
+  const repeatsMake = makeWord !== '' && (modelLower === makeWord || modelLower.startsWith(`${makeWord} `));
+  return [repeatsMake ? '' : make, model].filter(Boolean).join(' ');
+}
+
+interface CameraDetailRowProps {
+  icon: React.FC;
+  label: string;
+  value: string;
+}
+
+function CameraDetailRow({ icon: Icon, label, value }: CameraDetailRowProps) {
+  return (
+    <div
+      className="flex items-center gap-2 bg-surface border border-surface px-3 py-2 rounded-xl cursor-default"
+      data-tooltip={label}
+    >
+      <span className="text-text-secondary opacity-90 flex items-center justify-center shrink-0">
+        <Icon />
+      </span>
+      <Text
+        as="span"
+        variant={TextVariants.small}
+        weight={TextWeights.medium}
+        color={TextColors.primary}
+        className="truncate"
+      >
+        {value}
+      </Text>
+    </div>
+  );
+}
 
 function MetadataItem({ label, value }: MetaDataItemProps) {
   const { t } = useTranslation();
@@ -277,7 +319,7 @@ export default function MetadataPanel({ onClose }: MetadataPanelProps) {
         ? [selectedImage.path]
         : [];
 
-  const { cameraGridSettings, lensSetting, gpsData, otherExifEntries } = useMemo(() => {
+  const { cameraGridSettings, cameraName, lensSetting, gpsData, otherExifEntries } = useMemo(() => {
     const exif = selectedImage?.exif || {};
 
     const cameraGridKeys = ['ExposureTime', 'FNumber', 'PhotographicSensitivity', 'FocalLengthIn35mmFilm'];
@@ -321,6 +363,8 @@ export default function MetadataPanel({ onClose }: MetadataPanelProps) {
             : '-',
     };
 
+    const cameraName = formatCameraName(exifText(exif.Make), exifText(exif.Model)) || '-';
+
     const latStr = exif.GPSLatitude;
     const latRef = exif.GPSLatitudeRef;
     const lonStr = exif.GPSLongitude;
@@ -336,12 +380,12 @@ export default function MetadataPanel({ onClose }: MetadataPanelProps) {
       }
     }
 
-    const handledKeys = [...cameraGridKeys, 'LensModel', ...EDITABLE_FIELDS.map((f) => f.key)];
+    const handledKeys = [...cameraGridKeys, 'Make', 'Model', 'LensModel', ...EDITABLE_FIELDS.map((f) => f.key)];
     const otherExifEntries = Object.entries(exif)
       .filter(([key]) => !handledKeys.includes(key))
       .sort(([keyA], [keyB]) => keyA.localeCompare(keyB));
 
-    return { cameraGridSettings, lensSetting, gpsData, otherExifEntries };
+    return { cameraGridSettings, cameraName, lensSetting, gpsData, otherExifEntries };
   }, [selectedImage?.exif, t]);
 
   const currentColor = useMemo(() => {
@@ -404,8 +448,6 @@ export default function MetadataPanel({ onClose }: MetadataPanelProps) {
     }
     e.stopPropagation();
   };
-
-  const LensIcon = CAMERA_ICONS['LensModel'];
 
   return (
     <div className="flex flex-col h-full">
@@ -515,25 +557,8 @@ export default function MetadataPanel({ onClose }: MetadataPanelProps) {
                   })}
                 </div>
 
-                <div
-                  className="flex items-center gap-2 bg-surface border border-surface px-3 py-2 rounded-xl cursor-default"
-                  data-tooltip={lensSetting.label}
-                >
-                  {LensIcon && (
-                    <span className="text-text-secondary opacity-90 flex items-center justify-center shrink-0">
-                      <LensIcon />
-                    </span>
-                  )}
-                  <Text
-                    as="span"
-                    variant={TextVariants.small}
-                    weight={TextWeights.medium}
-                    color={TextColors.primary}
-                    className="truncate"
-                  >
-                    {lensSetting.value}
-                  </Text>
-                </div>
+                <CameraDetailRow icon={IconCamera} label={t('editor.metadata.camera.model')} value={cameraName} />
+                <CameraDetailRow icon={IconLens} label={lensSetting.label} value={String(lensSetting.value)} />
               </div>
             </div>
 

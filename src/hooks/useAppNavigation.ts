@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
-import { homeDir } from '@tauri-apps/api/path';
+import { dirname, homeDir } from '@tauri-apps/api/path';
 import { toast } from 'react-toastify';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { canvasToolState, useEditorStore } from '../store/useEditorStore';
@@ -12,6 +12,7 @@ import { Invokes, LibraryViewMode, ImageFile } from '../components/ui/AppPropert
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { debouncedSave, debouncedSetHistory } from './useEditorActions';
+import { notifyEmbeddedPreview } from './useImageLoader';
 import { clearLibrarySelection } from './useLibraryActions';
 import { computeSortedLibrary } from './useSortedLibrary';
 import { mergeXmpImageStacks } from '../utils/imageStacks';
@@ -306,6 +307,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
         invoke(Invokes.LoadImage, { path })
           .then((_result: any) => {
             if (selectedImagePathRef.current !== path) return;
+            notifyEmbeddedPreview(_result);
             isBackendReadyRef.current = true;
             currentResRef.current = 0;
             setEditor({ originalSize: { width: _result.width, height: _result.height } });
@@ -393,6 +395,8 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       expandParents = true,
       preserveEditor = false,
       skipHistory = false,
+      // Lists only the folder itself, even in Recursive view mode.
+      flatOnly = false,
     ) => {
       if (!skipHistory && path) {
         useLibraryStore.getState().pushNavHistory({ type: 'folder', path });
@@ -404,7 +408,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       const { setLibrary, sortCriteria } = useLibraryStore.getState();
       const { setUI } = useUIStore.getState();
       const { selectedImage, resetHistory, setEditor } = useEditorStore.getState();
-      const libraryViewMode = appSettings?.libraryViewMode;
+      const libraryViewMode = flatOnly ? LibraryViewMode.Flat : appSettings?.libraryViewMode;
       const isRecursive = libraryViewMode === LibraryViewMode.Recursive;
       const destination: CommittedListing | null = path
         ? {
@@ -757,6 +761,19 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
   const handleNavBack = useCallback(() => handleNavStep(-1), [handleNavStep]);
   const handleNavForward = useCallback(() => handleNavStep(1), [handleNavStep]);
 
+  /**
+   * Shows the folder of a photo opened from the OS in the filmstrip, keeping the photo open.
+   * Only that folder is listed, and it is not added to the library.
+   */
+  const handleOpenContainingFolder = useCallback(
+    async (filePath: string) => {
+      const folderPath = await dirname(filePath);
+      if (!folderPath || useLibraryStore.getState().currentFolderPath === folderPath) return;
+      await handleSelectSubfolder(folderPath, false, undefined, true, true, false, true);
+    },
+    [handleSelectSubfolder],
+  );
+
   const handleOpenFolder = async () => {
     const { osPlatform, appSettings, handleSettingsChange } = useSettingsStore.getState();
     const { rootPaths, setLibrary } = useLibraryStore.getState();
@@ -960,6 +977,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
     handleSelectAlbum,
     handleSelectKeyword,
     handleOpenFolder,
+    handleOpenContainingFolder,
     handleNavBack,
     handleNavForward,
     handleContinueSession,

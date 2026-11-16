@@ -1286,8 +1286,9 @@ pub fn collect_export_metadata(
     Some(metadata)
 }
 
-/// Adds the export EXIF to an encoded JPEG or PNG. TIFF exports carry theirs from the
-/// encoder (`tiff_metadata::encode_tiff_with_metadata`), so other formats are left as they are.
+/// Adds the export EXIF to an encoded JPEG, PNG, JPEG XL or WebP. TIFF exports carry theirs
+/// from the encoder (`tiff_metadata::encode_tiff_with_metadata`), so other formats are left as
+/// they are.
 pub fn write_image_with_metadata(
     image_bytes: &mut Vec<u8>,
     original_path_str: &str,
@@ -1306,6 +1307,9 @@ pub fn write_image_with_metadata(
         "png" => FileExtension::PNG {
             as_zTXt_chunk: true,
         },
+        // `little_exif` wraps a bare JPEG XL codestream in the container that holds EXIF.
+        "jxl" => FileExtension::JXL,
+        "webp" => FileExtension::WEBP,
         _ => return Ok(()),
     };
 
@@ -1314,6 +1318,10 @@ pub fn write_image_with_metadata(
     else {
         return Ok(());
     };
+
+    if file_type == FileExtension::WEBP {
+        convert_webp_to_extended(image_bytes);
+    }
 
     if let Some(dpi) = dpi {
         let resolution = vec![uR64 {
@@ -1330,6 +1338,39 @@ pub fn write_image_with_metadata(
     }
 
     Ok(())
+}
+
+/// A lossy WebP in the simple format has no room for EXIF and `little_exif` cannot convert it
+/// in memory, so this adds the extended format's `VP8X` header in front of its `VP8 ` frame.
+/// Anything else is left as it is.
+fn convert_webp_to_extended(image_bytes: &mut Vec<u8>) {
+    const VP8_FRAME: usize = 20;
+
+    if image_bytes.len() < VP8_FRAME + 10
+        || &image_bytes[0..4] != b"RIFF"
+        || &image_bytes[12..16] != b"VP8 "
+        || image_bytes[VP8_FRAME + 3..VP8_FRAME + 6] != [0x9D, 0x01, 0x2A]
+    {
+        return;
+    }
+
+    // VP8X stores width and height minus one, in 24 bits each.
+    let dimension = |offset: usize| {
+        u32::from(u16::from_le_bytes([image_bytes[offset], image_bytes[offset + 1]]) & 0x3FFF)
+            .saturating_sub(1)
+    };
+    let width = dimension(VP8_FRAME + 6);
+    let height = dimension(VP8_FRAME + 8);
+
+    let mut vp8x = Vec::with_capacity(18);
+    vp8x.extend_from_slice(b"VP8X");
+    vp8x.extend_from_slice(&10u32.to_le_bytes());
+    vp8x.extend_from_slice(&[0; 4]);
+    vp8x.extend_from_slice(&width.to_le_bytes()[..3]);
+    vp8x.extend_from_slice(&height.to_le_bytes()[..3]);
+    image_bytes.splice(12..12, vp8x);
+    let riff_size = (image_bytes.len() - 8) as u32;
+    image_bytes[4..8].copy_from_slice(&riff_size.to_le_bytes());
 }
 
 pub fn get_primary_sidecar_path(image_path: &Path) -> PathBuf {
@@ -1670,6 +1711,79 @@ mod tests {
                     .any(|tag| matches!(tag, ExifTag::Make(v) if v == "Test Camera Co.")),
                 "{name}"
             );
+        }
+    }
+
+    #[test]
+    fn jxl_and_webp_exports_carry_the_source_exif_and_strip_gps_on_request() {
+        jxl_oxide::integration::register_image_decoding_hook();
+        let folder = tempfile::tempdir().unwrap();
+        let source_path = folder.path().join("source.tiff");
+        let mut source_bytes = encoded_test_tiff();
+        let mut source_metadata =
+            Metadata::new_from_vec(&source_bytes, FileExtension::TIFF).unwrap();
+        source_metadata.set_tag(ExifTag::Make("Test Camera Co.".to_string()));
+        source_metadata.set_tag(ExifTag::GPSLatitude(vec![
+            uR64 {
+                nominator: 40,
+                denominator: 1,
+            };
+            3
+        ]));
+        source_metadata.set_tag(ExifTag::GPSLatitudeRef("N".to_string()));
+        source_metadata
+            .write_to_vec(&mut source_bytes, FileExtension::TIFF)
+            .unwrap();
+        fs::write(&source_path, source_bytes).unwrap();
+
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_fn(17, 9, |x, y| {
+            Rgb([(x * 15) as u8, (y * 28) as u8, 90])
+        }));
+        let rgb = image.to_rgb8();
+        let (width, height) = (image.width(), image.height());
+        let lossless_jxl = jxl_encoder::LosslessConfig::new()
+            .with_tree_learning(false)
+            .encode(rgb.as_raw(), width, height, jxl_encoder::PixelLayout::Rgb8)
+            .unwrap();
+        let lossy_jxl = jxl_encoder::LossyConfig::new(1.0)
+            .encode(rgb.as_raw(), width, height, jxl_encoder::PixelLayout::Rgb8)
+            .unwrap();
+        let webp = webp::Encoder::from_image(&image).unwrap().encode(90.0).to_vec();
+        assert_eq!(&webp[12..16], b"VP8 ", "the export writes simple lossy WebP");
+
+        let outputs = [
+            ("jxl", lossless_jxl, FileExtension::JXL),
+            ("jxl", lossy_jxl, FileExtension::JXL),
+            ("webp", webp, FileExtension::WEBP),
+        ];
+        for (format, encoded, file_type) in outputs {
+            for strip_gps in [false, true] {
+                let mut bytes = encoded.clone();
+                write_image_with_metadata(
+                    &mut bytes,
+                    source_path.to_str().unwrap(),
+                    format,
+                    true,
+                    strip_gps,
+                    true,
+                    None,
+                )
+                .unwrap();
+
+                let decoded = image::load_from_memory(&bytes).unwrap();
+                assert_eq!((decoded.width(), decoded.height()), (width, height), "{format}");
+                let written = Metadata::new_from_vec(&bytes, file_type).unwrap();
+                let has = |wanted: &dyn Fn(&ExifTag) -> bool| written.into_iter().any(wanted);
+                assert!(
+                    has(&|tag| matches!(tag, ExifTag::Make(v) if v == "Test Camera Co.")),
+                    "{format}"
+                );
+                assert_eq!(
+                    has(&|tag| matches!(tag, ExifTag::GPSLatitudeRef(_))),
+                    !strip_gps,
+                    "{format}"
+                );
+            }
         }
     }
 

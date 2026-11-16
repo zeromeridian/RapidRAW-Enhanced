@@ -903,6 +903,7 @@
         "focalLength": "Lunghezza Focale",
         "iso": "ISO",
         "lens": "Obiettivo",
+        "model": "Modello",
         "shutterSpeed": "Tempo di Esposizione",
         "title": "Dettagli Fotocamera"
       },
@@ -1004,6 +1005,9 @@
         "masks": "Maschere",
         "presets": "Predefiniti"
       }
+    },
+    "toasts": {
+      "embeddedPreview": "ThisIsRAW non è riuscito a decodificare questo file RAW, quindi stai vedendo e modificando l'anteprima JPEG incorporata della fotocamera. Aspettati una qualità inferiore e meno margine di modifica rispetto a un vero RAW."
     },
     "toolbar": {
       "switchToVariant": "Switch to {{label}}",

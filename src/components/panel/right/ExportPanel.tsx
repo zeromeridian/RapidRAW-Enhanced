@@ -41,7 +41,8 @@ import { getEnabledExportSuffix } from '../../../utils/outputNaming';
 import { formatBytes } from '../../../utils/formatBytes';
 
 /** Formats whose exports carry the source photo's EXIF (TIFF writes it while encoding). */
-const carriesSourceExif = (format: string) => format === FileFormats.Jpeg || format === FileFormats.Tiff;
+const carriesSourceExif = (format: string) =>
+  [FileFormats.Jpeg, FileFormats.Tiff, FileFormats.Jxl, FileFormats.Webp].includes(format as FileFormats);
 
 interface ExportPanelProps {
   exportState: ExportState;

@@ -876,6 +876,7 @@
         "focalLength": "초점 거리",
         "iso": "ISO",
         "lens": "렌즈",
+        "model": "모델",
         "shutterSpeed": "셔터 속도",
         "title": "카메라 세부 정보"
       },
@@ -977,6 +978,9 @@
         "masks": "마스크",
         "presets": "프리셋"
       }
+    },
+    "toasts": {
+      "embeddedPreview": "ThisIsRAW가 이 RAW 파일을 디코딩하지 못해 카메라에 포함된 JPEG 미리보기를 표시하고 편집하고 있습니다. 실제 RAW보다 화질이 낮고 편집 여유도 적습니다."
     },
     "toolbar": {
       "switchToVariant": "Switch to {{label}}",

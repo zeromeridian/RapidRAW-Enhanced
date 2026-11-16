@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import i18n from 'i18next';
 import { toast } from 'react-toastify';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
@@ -7,6 +8,13 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { Invokes } from '../components/ui/AppProperties';
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import type { AdjustmentsBaseline } from './useImageProcessing';
+
+/** Warns, each time a photo opens in Develop, that a RAW the decoder failed on shows its embedded JPEG. */
+export function notifyEmbeddedPreview(loadImageResult: { is_embedded_preview?: boolean }) {
+  if (loadImageResult?.is_embedded_preview) {
+    toast.warning(i18n.t('editor.toasts.embeddedPreview'), { toastId: 'embedded-preview' });
+  }
+}
 
 /**
  * `prevAdjustmentsRef` gets the loaded edit as its baseline, so Develop saves only changes made after
@@ -64,6 +72,7 @@ export function useImageLoader(
         try {
           const loadImageResult: any = await invoke(Invokes.LoadImage, { path: selectedImage.path });
           if (!isEffectActive) return;
+          notifyEmbeddedPreview(loadImageResult);
 
           const { width, height } = loadImageResult;
           setEditor({ originalSize: { width, height } });

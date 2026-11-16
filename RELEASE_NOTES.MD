@@ -5,6 +5,29 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.70.0-dev-v1-7-0-small-features — 2026-11-16
+
+### Export
+
+- JPEG XL and WebP exports can now carry the photo's EXIF, like JPEG and
+  TIFF: the **Include EXIF metadata** and **Remove GPS** switches are
+  shown for them too.
+
+### Develop
+
+- When ThisIsRAW cannot decode a RAW file and shows the camera's
+  embedded JPEG preview instead, a notice now says so, because that
+  preview has lower quality and less editing headroom.
+- A photo opened from Finder or Explorer now fills the filmstrip with
+  the other photos in its folder, without adding the folder to the
+  Library. Only that folder is listed, even in Recursive view.
+
+### Library
+
+- The metadata panel shows the camera, make and model together, above
+  the lens (for example "FUJIFILM X-T4", or "Canon EOS R5" without the
+  make twice).
+
 ## 1.69.5-fix-v1-7-0-fixes — 2026-11-16
 
 ### Develop
