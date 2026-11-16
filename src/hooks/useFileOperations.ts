@@ -10,6 +10,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { Invokes, LibraryViewMode } from '../components/ui/AppProperties';
 import { Status } from '../components/ui/ExportImportProperties';
 import { isCollectionView, isPathWithin } from '../utils/libraryViews';
+import { debouncedSave } from './useEditorActions';
 
 export function useFileOperations(
   refreshImageList: () => Promise<void>,
@@ -225,6 +226,9 @@ export function useFileOperations(
 
       if (renameTargetPaths.length > 0 && nameTemplate) {
         try {
+          // A pending edit must reach the old name's sidecar before it moves,
+          // or it would write a new sidecar under the old name afterwards.
+          debouncedSave.flush();
           const newPaths: Array<string> = await invoke(Invokes.RenameFiles, {
             nameTemplate,
             paths: renameTargetPaths,

@@ -456,6 +456,37 @@ pub fn rebase_thumbnail_paths(
     transaction.commit().map_err(|error| error.to_string())
 }
 
+/// Moves the thumbnail entries of renamed images and their virtual copies to
+/// the new paths (`renames`: physical old → new paths), so the Library shows
+/// the existing thumbnail until a new one is made.
+pub fn follow_thumbnail_renames(
+    app_handle: &AppHandle,
+    renames: &HashMap<String, String>,
+) -> Result<(), String> {
+    let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+    follow_thumbnail_renames_in_connection(&mut open(app_handle)?, renames)
+}
+
+fn follow_thumbnail_renames_in_connection(
+    connection: &mut Connection,
+    renames: &HashMap<String, String>,
+) -> Result<(), String> {
+    let transaction = connection
+        .transaction()
+        .map_err(|error| error.to_string())?;
+    for (old, new) in renames {
+        transaction
+            .execute(
+                "UPDATE OR REPLACE thumbnail_index
+                 SET image_path = ?2 || substr(image_path, length(?1) + 1)
+                 WHERE image_path = ?1 OR substr(image_path, 1, length(?1) + 4) = ?1 || '?vc='",
+                params![old, new],
+            )
+            .map_err(|error| error.to_string())?;
+    }
+    transaction.commit().map_err(|error| error.to_string())
+}
+
 /// One library image in the keyword index, keyed independently of its virtual-copy display name.
 pub struct KeywordIndexEntry {
     pub key: String,
@@ -646,6 +677,7 @@ fn save_editor_round_trip_to_connection(
                  (id, source_path, staging_dir, destination, saved_file, saved_len, saved_modified, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
              ON CONFLICT(id) DO UPDATE SET
+                 source_path=excluded.source_path,
                  destination=excluded.destination,
                  saved_file=excluded.saved_file,
                  saved_len=excluded.saved_len,
@@ -1064,6 +1096,46 @@ mod tests {
             .unwrap();
         assert_eq!(count, 1);
     }
+
+    #[test]
+    fn renamed_images_keep_their_thumbnails_and_virtual_copies() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut connection = open_at(temporary.path().join("catalog.sqlite3")).unwrap();
+        for (image, thumbnail) in [
+            ("/p/a.jpg", "t1"),
+            ("/p/a.jpg?vc=abc123", "t2"),
+            ("/p/a.jpg2", "t3"),
+            ("/p/b.jpg", "t4"),
+        ] {
+            connection
+                .execute(
+                    "INSERT INTO thumbnail_index(image_path, thumbnail_path, updated_at)
+                     VALUES (?1, ?2, 1)",
+                    params![image, thumbnail],
+                )
+                .unwrap();
+        }
+        // a.jpg → b.jpg: b.jpg's stale row gives way.
+        let renames = HashMap::from([("/p/a.jpg".to_string(), "/p/b.jpg".to_string())]);
+        follow_thumbnail_renames_in_connection(&mut connection, &renames).unwrap();
+
+        let mut statement = connection
+            .prepare("SELECT image_path, thumbnail_path FROM thumbnail_index ORDER BY image_path")
+            .unwrap();
+        let rows: Vec<(String, String)> = statement
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        let expected = [
+            ("/p/a.jpg2", "t3"),
+            ("/p/b.jpg", "t1"),
+            ("/p/b.jpg?vc=abc123", "t2"),
+        ]
+        .map(|(image, thumbnail)| (image.to_string(), thumbnail.to_string()));
+        assert_eq!(rows, expected);
+    }
+
     #[test]
     fn keyword_index_finds_child_keywords_and_replaces_entries() {
         let temporary = tempfile::tempdir().unwrap();

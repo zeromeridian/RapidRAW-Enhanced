@@ -136,6 +136,12 @@ details are in `RELEASE_NOTES.MD`.
   Names use the capture time as the camera recorded it and are cleaned
   for every file system. A warning shows when a multi-file template is not
   unique.
+- Safe rename: all or nothing with rollback, a case-insensitive clash
+  check across the whole batch (including leftover sidecars), case-only
+  renames and name chains; `.tirdata`, virtual-copy sidecars and both XMP
+  naming styles move with the photo. A RAW+JPEG partner left behind keeps
+  the shared stem XMP and the renamed file gets a copy. Albums, keyword
+  index, thumbnails and external-edit sessions follow the new name.
 - Caps Lock auto-advance after applying ratings, color labels, or flags.
 - Main Settings access from both Library and Develop.
 - Optional launch directly into the last library, bypassing the splash screen.

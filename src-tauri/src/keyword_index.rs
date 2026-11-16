@@ -3,7 +3,7 @@
 //! `.tirdata` sidecars and XMP remain authoritative; the index is rebuilt incrementally from
 //! their modification times and only speeds up the Keyword List and keyword views.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -272,6 +272,52 @@ pub fn record_tags(app_handle: &AppHandle, updates: &[PathTags]) {
     }
     if IS_SCANNING.load(Ordering::SeqCst) {
         RESCAN_REQUESTED.store(true, Ordering::SeqCst);
+    }
+    let _ = app_handle.emit(KEYWORD_INDEX_UPDATED_EVENT, ());
+}
+
+/// Moves the entries of renamed images and their virtual copies to the new
+/// paths (`renames`: physical old → new paths), without waiting for a scan.
+pub fn follow_renames(app_handle: &AppHandle, renames: &HashMap<String, String>) {
+    let stored = match library_catalog::load_keyword_index_stamps(app_handle) {
+        Ok(stored) => stored,
+        Err(error) => {
+            log::warn!("Could not update the keyword index after a rename: {error}");
+            return;
+        }
+    };
+    let settings = crate::app_settings::load_settings(app_handle.clone()).unwrap_or_default();
+    let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
+
+    let mut removed = Vec::new();
+    let mut entries = Vec::new();
+    for key in stored.into_keys() {
+        let base = key
+            .split_once("?vc=")
+            .map_or(key.as_str(), |(base, _)| base);
+        let Some(new_base) = renames.get(base) else {
+            continue;
+        };
+        let new_key = format!("{new_base}{}", &key[base.len()..]);
+        let (source_path, sidecar_path) = parse_virtual_path(&new_key);
+        let stamp = index_stamp(&source_path, &sidecar_path, enable_xmp_sync);
+        let is_virtual_copy = new_key.len() > new_base.len();
+        entries.push(read_entry(
+            &source_path,
+            &sidecar_path,
+            new_key,
+            is_virtual_copy,
+            enable_xmp_sync,
+            stamp,
+        ));
+        removed.push(key);
+    }
+    if entries.is_empty() {
+        return;
+    }
+    if let Err(error) = library_catalog::write_keyword_index(app_handle, &entries, &removed) {
+        log::warn!("Could not update the keyword index after a rename: {error}");
+        return;
     }
     let _ = app_handle.emit(KEYWORD_INDEX_UPDATED_EVENT, ());
 }

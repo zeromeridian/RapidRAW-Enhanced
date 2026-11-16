@@ -2336,7 +2336,7 @@ pub fn add_to_album(
     Ok(())
 }
 
-fn sync_album_path_changes(
+pub(crate) fn sync_album_path_changes(
     app_handle: &AppHandle,
     renames: Option<&HashMap<String, String>>,
     deletions: Option<&HashSet<String>>,
@@ -6451,132 +6451,6 @@ pub fn generate_filename_from_template(
         source = source.with_capture_date(date);
     }
     naming::file_stem_from_template(template, &source)
-}
-
-#[tauri::command]
-pub async fn rename_files(
-    paths: Vec<String>,
-    name_template: String,
-    app_handle: AppHandle,
-) -> Result<Vec<String>, String> {
-    let order_handle = app_handle.clone();
-    crate::blocking_command::run_in_file_order(&order_handle, move || {
-        rename_files_blocking(paths, name_template, app_handle)
-    })
-    .await
-}
-
-fn rename_files_blocking(
-    paths: Vec<String>,
-    name_template: String,
-    app_handle: AppHandle,
-) -> Result<Vec<String>, String> {
-    if paths.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    // An image and its virtual copies share one file, so rename each file once.
-    let mut original_paths: Vec<PathBuf> = Vec::new();
-    for path_str in &paths {
-        let (original_path, _) = parse_virtual_path(path_str);
-        if !original_paths.contains(&original_path) {
-            original_paths.push(original_path);
-        }
-    }
-
-    let mut operations: Vec<(PathBuf, PathBuf)> = Vec::new();
-    let mut renames = HashMap::new();
-
-    for (i, original_path) in original_paths.iter().enumerate() {
-        if !original_path.exists() {
-            return Err(format!("File not found: {}", original_path.display()));
-        }
-
-        let parent = original_path
-            .parent()
-            .ok_or("Could not get parent directory")?;
-        let extension = original_path
-            .extension()
-            .and_then(|s| s.to_str())
-            .unwrap_or("");
-
-        let new_stem = generate_filename_from_template(
-            &name_template,
-            &original_path.to_string_lossy(),
-            i + 1,
-            original_paths.len(),
-            None,
-        );
-        let new_filename = format!("{}.{}", new_stem, extension);
-        let new_path = parent.join(new_filename);
-
-        if (new_path.exists() && new_path != *original_path)
-            || operations.iter().any(|(_, planned)| *planned == new_path)
-        {
-            return Err(format!(
-                "A file with the name {} already exists.",
-                new_path.display()
-            ));
-        }
-
-        operations.push((original_path.clone(), new_path));
-    }
-
-    let mut sidecar_operations: Vec<(PathBuf, PathBuf)> = Vec::new();
-    for (original_path, new_path) in &operations {
-        let parent = original_path
-            .parent()
-            .ok_or("Could not get parent directory")?;
-        let original_filename_str = original_path.file_name().unwrap().to_string_lossy();
-        let new_filename_str = new_path.file_name().unwrap().to_string_lossy();
-
-        if let Ok(entries) = fs::read_dir(parent) {
-            for entry in entries.filter_map(Result::ok) {
-                let entry_os_filename = entry.file_name();
-                let entry_filename = entry_os_filename.to_string_lossy();
-
-                if is_sidecar_of(&entry_filename, &original_filename_str) {
-                    let new_sidecar_filename =
-                        entry_filename.replacen(&*original_filename_str, &new_filename_str, 1);
-                    sidecar_operations.push((entry.path(), parent.join(new_sidecar_filename)));
-                }
-            }
-        }
-    }
-    operations.extend(sidecar_operations);
-
-    for (old_path, new_path) in operations {
-        fs::rename(&old_path, &new_path).map_err(|e| {
-            format!(
-                "Failed to rename {} to {}: {}",
-                old_path.display(),
-                new_path.display(),
-                e
-            )
-        })?;
-
-        renames.insert(
-            old_path.to_string_lossy().into_owned(),
-            new_path.to_string_lossy().into_owned(),
-        );
-    }
-
-    sync_album_path_changes(&app_handle, Some(&renames), None, None);
-
-    // One entry per input path, in order, keeping virtual-copy queries; unrenamed files keep their path.
-    let final_new_paths = paths
-        .iter()
-        .map(|path_str| {
-            let (base, copy_query) = match path_str.rsplit_once("?vc=") {
-                Some((base, query)) => (base, format!("?vc={}", query)),
-                None => (path_str.as_str(), String::new()),
-            };
-            let new_base = renames.get(base).map_or(base, String::as_str);
-            format!("{}{}", new_base, copy_query)
-        })
-        .collect();
-
-    Ok(final_new_paths)
 }
 
 #[tauri::command]

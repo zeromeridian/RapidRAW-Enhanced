@@ -189,13 +189,11 @@ pub struct Template {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedTemplate {
     pub template: Template,
-    #[allow(dead_code)] // Shown by the rename preview (Plan item 29, Phases 2–3).
     pub errors: Vec<TemplateError>,
 }
 
 /// A rendered file stem, cleaned for every supported file system.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct RenderedName {
     pub stem: String,
     /// Tokens that had no value for this photo and no fallback, by name.
@@ -471,7 +469,6 @@ impl NamingSource {
     }
 
     /// The value of `{text}`.
-    #[allow(dead_code)] // Set by the rename dialog (Plan item 29, Phase 3).
     pub fn with_text(mut self, text: impl Into<String>) -> Self {
         self.text = Some(text.into());
         self
@@ -575,10 +572,16 @@ impl NamingSource {
 /// template gives an empty one.
 pub fn file_stem_from_template(template: &str, source: &NamingSource) -> String {
     let rendered = Template::parse(template).template.render(source);
+    file_stem_from_rendered(&rendered, source)
+}
+
+/// The stem `rendered` gives the photo of `source`; its original stem when
+/// `rendered` is empty.
+pub fn file_stem_from_rendered(rendered: &RenderedName, source: &NamingSource) -> String {
     if rendered.stem.is_empty() {
         clean_file_stem(source.original_stem())
     } else {
-        rendered.stem
+        rendered.stem.clone()
     }
 }
 

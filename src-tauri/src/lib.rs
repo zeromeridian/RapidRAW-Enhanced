@@ -59,6 +59,7 @@ mod preset_file;
 mod preview_jpeg;
 mod raw_processing;
 mod relight;
+mod rename;
 mod tagging;
 mod tagging_utils;
 mod tiff_metadata;
@@ -2859,7 +2860,8 @@ pub fn run() {
             file_management::move_files,
             file_management::move_folders,
             file_management::rename_folder,
-            file_management::rename_files,
+            rename::preview_rename,
+            rename::rename_files,
             file_management::duplicate_file,
             file_management::show_in_finder,
             file_management::delete_files_from_disk,

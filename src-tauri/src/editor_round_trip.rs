@@ -589,6 +589,33 @@ fn free_destination(source_path: &str, saved_file: &Path) -> PathBuf {
         .expect("an unused file name exists")
 }
 
+/// Keeps external edits of renamed photos going (`renames`: physical old →
+/// new paths): sessions follow their source and the copies their saves
+/// update, and Edit Original keeps watching a renamed original.
+pub fn follow_renames(app_handle: &AppHandle, renames: &HashMap<String, String>) {
+    for session in SESSIONS.lock().unwrap().iter_mut() {
+        let source_path = crate::rename::renamed_path(&session.source_path, renames);
+        let mut changed = source_path != session.source_path;
+        session.source_path = source_path;
+        for file in &mut session.files {
+            if let Some(new) = file.destination.as_ref().and_then(|d| renames.get(d)) {
+                file.destination = Some(new.clone());
+                changed = true;
+            }
+        }
+        if changed && let Err(error) = library_catalog::save_editor_round_trip(app_handle, session)
+        {
+            log::warn!("Could not record a renamed external edit: {error}");
+        }
+    }
+    let mut originals = ORIGINALS.lock().unwrap();
+    for (old, new) in renames {
+        if let Some(stamp) = originals.remove(old) {
+            originals.insert(new.clone(), stamp);
+        }
+    }
+}
+
 /// Copies a settled save beside the source, records it in the session and the
 /// catalog, and tells the Library.
 fn promote(

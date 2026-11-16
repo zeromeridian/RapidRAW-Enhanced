@@ -5,6 +5,30 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.75.0-dev-lightroom-rename — 2026-11-16
+
+### Library
+
+- Renaming photos now takes their XMP sidecars along (both `IMG_1.xmp`
+  and `IMG_1.CR3.xmp`), so edits and metadata stay with the photo in other
+  apps and on other computers. Before, the old XMP stayed behind under the
+  old name.
+- A RAW+JPEG pair shares one `IMG_1.xmp`. Renaming only one of the two
+  gives it its own copy of that XMP and leaves the original with the
+  other; renaming both moves it.
+- A rename now happens completely or not at all: if any file cannot be
+  renamed, every file goes back to its old name.
+- Names are checked for the whole batch before anything changes, the
+  same way macOS and Windows compare names (ignoring upper and lower
+  case). Renaming a photo to a name another photo has, or to the name of
+  a leftover sidecar whose edits it would take over, is refused.
+- Changing only the case of a name (`img_1` → `IMG_1`) and renaming photos
+  onto names that other photos of the same batch give up now work.
+- A just-made edit is saved before the rename, so no sidecar reappears
+  under the old name.
+- Keyword views, thumbnails and running external edits follow a renamed
+  photo right away.
+
 ## 1.74.0-dev-lightroom-rename — 2026-11-16
 
 ### Library
