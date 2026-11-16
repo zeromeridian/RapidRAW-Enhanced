@@ -1755,6 +1755,7 @@
         "existingSidecar": "File collaterali rimasti da un'altra foto usano già il nome {{name}}; la foto ne erediterebbe le modifiche. Non è possibile rinominare nulla."
       },
       "customText": "Testo personalizzato",
+      "customTextNumbered": "Testo personalizzato {{number}}",
       "errors": {
         "emptyToken": "Colonna {{column}}: parentesi graffe vuote {}.",
         "formatNotAllowed": "Colonna {{column}}: questo token non accetta un formato (\"{{text}}\").",

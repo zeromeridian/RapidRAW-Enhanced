@@ -10,9 +10,10 @@ import {
   FILENAME_TOKEN_GROUPS,
   TemplateError,
   createFilenameTemplate,
+  customTextSlots,
   isFilenameTemplateDirty,
+  normalizeCustomTexts,
   sanitizeFilenameTemplates,
-  usesCustomText,
   withTemplate,
 } from '../../utils/filenameTemplates';
 
@@ -20,8 +21,9 @@ interface FilenameTemplateEditorProps {
   label: string;
   template: string;
   onTemplateChange(template: string): void;
-  customText: string;
-  onCustomTextChange(text: string): void;
+  /** One per `{text}`, `{text2}`, `{text3}`. */
+  customTexts: Array<string>;
+  onCustomTextsChange(texts: Array<string>): void;
   /** The template's problems, from a preview. */
   errors?: Array<TemplateError>;
   /** Group labels above their chips, for the narrow Export panel. */
@@ -32,15 +34,15 @@ interface FilenameTemplateEditorProps {
 
 /**
  * The file-name template editor of rename, export and import (Lightroom's Filename Template
- * Editor): saved templates, the template field with its errors, grouped token chips, and the
- * Custom Text when the template uses `{text}`.
+ * Editor): saved templates, the template field with its errors, grouped token chips, and a
+ * Custom Text field for each of `{text}`, `{text2}`, `{text3}` the template uses.
  */
 export default function FilenameTemplateEditor({
   label,
   template,
   onTemplateChange,
-  customText,
-  onCustomTextChange,
+  customTexts,
+  onCustomTextsChange,
   errors,
   isNarrow = false,
   autoFocus = false,
@@ -74,10 +76,10 @@ export default function FilenameTemplateEditor({
   return (
     <div className={clsx('space-y-4', disabled && 'pointer-events-none opacity-60')}>
       <NamedPresetBar
-        create={(name) => createFilenameTemplate(name, trimmed, customText)}
+        create={(name) => createFilenameTemplate(name, trimmed, customTexts)}
         exportCommand={Invokes.ExportFilenameTemplates}
         importCommand={Invokes.ImportFilenameTemplates}
-        isDirty={!!selected && isFilenameTemplateDirty(selected, trimmed, customText)}
+        isDirty={!!selected && isFilenameTemplateDirty(selected, trimmed, customTexts)}
         labels={{
           placeholder: t('modals.renameFile.templates.placeholder'),
           save: t('modals.renameFile.templates.save'),
@@ -92,7 +94,7 @@ export default function FilenameTemplateEditor({
         }}
         onLoad={(loaded) => {
           onTemplateChange(loaded.template);
-          if (loaded.text !== undefined) onCustomTextChange(loaded.text);
+          if (loaded.texts !== undefined) onCustomTextsChange(normalizeCustomTexts(loaded.texts));
           setSelectedId(loaded.id);
         }}
         onPresetsChange={saveTemplates}
@@ -100,7 +102,7 @@ export default function FilenameTemplateEditor({
         presets={templates}
         sanitize={sanitizeFilenameTemplates}
         selected={selected}
-        update={(preset) => withTemplate(preset, trimmed, customText)}
+        update={(preset) => withTemplate(preset, trimmed, customTexts)}
       />
 
       <div>
@@ -148,20 +150,26 @@ export default function FilenameTemplateEditor({
         <Text variant={TextVariants.small}>{t('modals.renameFile.filtersHint')}</Text>
       </div>
 
-      {usesCustomText(trimmed) && (
-        <div>
+      {customTextSlots(trimmed).map((slot) => (
+        <div key={slot}>
           <Text variant={TextVariants.heading} className="block mb-2">
-            {t('modals.renameFile.customText')}
+            {slot === 0
+              ? t('modals.renameFile.customText')
+              : t('modals.renameFile.customTextNumbered', { number: slot + 1 })}
           </Text>
           <input
             className={fieldClass}
             disabled={disabled}
-            onChange={(e) => onCustomTextChange(e.target.value)}
+            onChange={(e) => {
+              const next = normalizeCustomTexts(customTexts);
+              next[slot] = e.target.value;
+              onCustomTextsChange(next);
+            }}
             type="text"
-            value={customText}
+            value={customTexts[slot] ?? ''}
           />
         </div>
-      )}
+      ))}
     </div>
   );
 }

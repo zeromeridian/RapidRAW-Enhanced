@@ -383,8 +383,8 @@ export interface AppSettings {
   zoneTintAdvanced?: boolean;
   /** File-name templates shared by rename, export and import; absent until first changed, which offers the starters. */
   filenameTemplates?: Array<unknown> | null;
-  /** The Custom Text last used in rename, export or import, offered when no saved template brings its own. */
-  filenameCustomText?: string | null;
+  /** The Custom Texts last used in rename, export or import, offered when no saved template brings its own. */
+  filenameCustomTexts?: Array<string> | null;
   /** Whether the Adjustments panel shows the Favorites instead of every section (its All / Favorites switch). */
   showFavoriteAdjustments?: boolean;
   leftPanelWidth?: number;

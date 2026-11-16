@@ -55,15 +55,13 @@ pub struct FilenameTemplatePreview {
 pub async fn preview_filename_template(
     path: Option<String>,
     template: String,
-    text: Option<String>,
+    texts: Option<Vec<String>>,
 ) -> Result<FilenameTemplatePreview, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let parsed = Template::parse(&template);
         let stem = path.map_or_else(String::new, |path| {
-            let mut source = NamingSource::new(&path, 1, 1);
-            if let Some(text) = text {
-                source = source.with_text(text);
-            }
+            let source =
+                NamingSource::new(&path, 1, 1).with_texts(texts.as_deref().unwrap_or_default());
             file_stem_from_rendered(&parsed.template.render(&source), &source)
         });
         FilenameTemplatePreview {
@@ -105,7 +103,8 @@ enum Token {
     Shutter,
     Rating,
     Label,
-    Text,
+    /// A Custom Text, by slot: `{text}`/`{text1}` 0, `{text2}` 1, `{text3}` 2.
+    Text(usize),
 }
 
 impl Token {
@@ -133,7 +132,9 @@ impl Token {
             "shutter" => Self::Shutter,
             "rating" => Self::Rating,
             "label" => Self::Label,
-            "text" => Self::Text,
+            "text" | "text1" => Self::Text(0),
+            "text2" => Self::Text(1),
+            "text3" => Self::Text(2),
             _ => return None,
         })
     }
@@ -494,7 +495,7 @@ pub struct NamingSource {
     sidecar_path: PathBuf,
     sequence: usize,
     total: usize,
-    text: Option<String>,
+    texts: Vec<String>,
     capture: OnceCell<NaiveDateTime>,
     exif: OnceCell<HashMap<String, String>>,
     metadata: OnceCell<ImageMetadata>,
@@ -511,7 +512,7 @@ impl NamingSource {
             sidecar_path,
             sequence,
             total,
-            text: None,
+            texts: Vec::new(),
             capture: OnceCell::new(),
             exif: OnceCell::new(),
             metadata: OnceCell::new(),
@@ -525,9 +526,9 @@ impl NamingSource {
         self
     }
 
-    /// The value of `{text}`.
-    pub fn with_text(mut self, text: impl Into<String>) -> Self {
-        self.text = Some(text.into());
+    /// The Custom Texts: `{text}` (`{text1}`), `{text2}`, `{text3}`, in order.
+    pub fn with_texts(mut self, texts: &[String]) -> Self {
+        self.texts = texts.to_vec();
         self
     }
 
@@ -638,7 +639,7 @@ impl NamingSource {
                 .flatten()
                 .find_map(|tag| tag.strip_prefix(COLOR_TAG_PREFIX))
                 .map(capitalize),
-            Token::Text => self.text.clone(),
+            Token::Text(slot) => self.texts.get(slot).cloned(),
         }
     }
 }
@@ -824,10 +825,32 @@ mod tests {
         let missing = render("{text|upper?Holiday}_{camera}", "/none.jpg", 1, 1);
         assert_eq!(missing.stem, "HOLIDAY_");
         assert_eq!(missing.missing, ["camera"]);
-        let source = NamingSource::new("/none.jpg", 1, 1).with_text("Côte d'Azur 2026!");
+        let source =
+            NamingSource::new("/none.jpg", 1, 1).with_texts(&["Côte d'Azur 2026!".to_string()]);
         let parsed = Template::parse("{text|slug}");
         assert_eq!(parsed.template.render(&source).stem, "côte-d-azur-2026");
         assert_eq!(stem("{date:}"), "20260503");
+    }
+
+    #[test]
+    fn three_custom_texts_fill_their_own_tokens() {
+        let texts = ["Trip".to_string(), "Rome".to_string(), "RAW".to_string()];
+        let source = NamingSource::new("/none.jpg", 1, 1).with_texts(&texts);
+        let parsed = Template::parse("{text}-{text1}-{text2}-{text3|lower}");
+        assert_eq!(parsed.errors, []);
+        assert_eq!(parsed.template.render(&source).stem, "Trip-Trip-Rome-raw");
+
+        // A slot without a text is missing, like any empty token.
+        let source = NamingSource::new("/none.jpg", 1, 1).with_texts(&texts[..1]);
+        let rendered = Template::parse("{text}_{text3?none}_{text2}")
+            .template
+            .render(&source);
+        assert_eq!(rendered.stem, "Trip_none_");
+        assert_eq!(rendered.missing, ["text2"]);
+        assert_eq!(
+            Template::parse("{text4}").errors[0].kind,
+            TemplateErrorKind::UnknownToken
+        );
     }
 
     #[test]

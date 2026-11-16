@@ -220,7 +220,7 @@ export function useFileOperations(
   );
 
   const handleSaveRename = useCallback(
-    async (nameTemplate: string, text: string | null) => {
+    async (nameTemplate: string, texts: Array<string> | null) => {
       const { renameTargetPaths, setUI } = useUIStore.getState();
       const { selectedImage } = useEditorStore.getState();
       const { libraryActivePath, setLibrary } = useLibraryStore.getState();
@@ -233,7 +233,7 @@ export function useFileOperations(
           const newPaths: Array<string> = await invoke(Invokes.RenameFiles, {
             nameTemplate,
             paths: renameTargetPaths,
-            text,
+            texts,
           });
 
           await refreshImageList();

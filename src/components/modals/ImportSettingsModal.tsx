@@ -6,7 +6,7 @@ import { ImportSettings, isUniqueFilenameTemplate } from '../ui/ExportImportProp
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
 import { useFilenameTemplatePreview, useFilenameTemplates } from '../../hooks/useFilenameTemplates';
-import { DEFAULT_IMPORT_TEMPLATE, usesCustomText } from '../../utils/filenameTemplates';
+import { DEFAULT_IMPORT_TEMPLATE, textsForTemplate } from '../../utils/filenameTemplates';
 
 interface ImportSettingsModalProps {
   /** The files to import; the first gives the example name. */
@@ -21,26 +21,26 @@ export default function ImportSettingsModal({ sourcePaths, isOpen, onClose, onSa
   const [isMounted, setIsMounted] = useState(false);
   const [show, setShow] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const { defaultCustomText, rememberCustomText } = useFilenameTemplates();
+  const { defaultCustomTexts, rememberCustomTexts } = useFilenameTemplates();
 
   const [filenameTemplate, setFilenameTemplate] = useState(DEFAULT_IMPORT_TEMPLATE);
-  // Null until typed or loaded: then the template's saved text, else the last one used.
-  const [customText, setCustomText] = useState<string | null>(null);
+  // Null until typed or loaded: then the template's saved texts, else the last ones used.
+  const [customTexts, setCustomTexts] = useState<Array<string> | null>(null);
   const [organizeByDate, setOrganizeByDate] = useState(false);
   const [dateFolderFormat, setDateFolderFormat] = useState('YYYY/MM-DD');
   const [deleteAfterImport, setDeleteAfterImport] = useState(false);
 
   const fileCount = sourcePaths.length;
   const template = filenameTemplate.trim();
-  const shownText = customText ?? defaultCustomText(template);
-  const filenameText = usesCustomText(template) ? shownText : null;
-  const preview = useFilenameTemplatePreview(isOpen ? (sourcePaths[0] ?? null) : null, template, filenameText);
+  const shownTexts = customTexts ?? defaultCustomTexts(template);
+  const filenameTexts = textsForTemplate(template, shownTexts);
+  const preview = useFilenameTemplatePreview(isOpen ? (sourcePaths[0] ?? null) : null, template, filenameTexts);
   const examplePath = sourcePaths[0];
   const exampleExtension = examplePath?.includes('.') ? examplePath.substring(examplePath.lastIndexOf('.')) : '';
 
   useEffect(() => {
     if (isOpen) {
-      setCustomText(null);
+      setCustomTexts(null);
       setIsMounted(true);
       const timer = setTimeout(() => setShow(true), 10);
       return () => clearTimeout(timer);
@@ -55,10 +55,10 @@ export default function ImportSettingsModal({ sourcePaths, isOpen, onClose, onSa
 
   const handleSave = useCallback(() => {
     if (!template) return;
-    rememberCustomText(filenameText);
+    rememberCustomTexts(filenameTexts);
     onSave({
       filenameTemplate: template,
-      filenameText,
+      filenameTexts: filenameTexts ?? [],
       organizeByDate,
       dateFolderFormat,
       deleteAfterImport,
@@ -68,8 +68,8 @@ export default function ImportSettingsModal({ sourcePaths, isOpen, onClose, onSa
     onSave,
     onClose,
     template,
-    filenameText,
-    rememberCustomText,
+    filenameTexts,
+    rememberCustomTexts,
     organizeByDate,
     dateFolderFormat,
     deleteAfterImport,
@@ -117,10 +117,10 @@ export default function ImportSettingsModal({ sourcePaths, isOpen, onClose, onSa
           <div>
             <FilenameTemplateEditor
               autoFocus
-              customText={shownText}
+              customTexts={shownTexts}
               errors={preview?.errors}
               label={t('modals.importSettings.fileNaming')}
-              onCustomTextChange={setCustomText}
+              onCustomTextsChange={setCustomTexts}
               onTemplateChange={setFilenameTemplate}
               template={filenameTemplate}
             />

@@ -1755,6 +1755,7 @@
         "existingSidecar": "Archivos auxiliares sobrantes de otra foto ya usan el nombre {{name}}; la foto heredaría sus ediciones. No se puede renombrar nada."
       },
       "customText": "Texto personalizado",
+      "customTextNumbered": "Texto personalizado {{number}}",
       "errors": {
         "emptyToken": "Columna {{column}}: llaves vacías {}.",
         "formatNotAllowed": "Columna {{column}}: este token no admite formato («{{text}}»).",

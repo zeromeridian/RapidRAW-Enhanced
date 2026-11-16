@@ -3,7 +3,12 @@ import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { Invokes } from '../components/ui/AppProperties';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { FilenameTemplate, TemplateError, filenameTemplatesFromSettings } from '../utils/filenameTemplates';
+import {
+  FilenameTemplate,
+  TemplateError,
+  filenameTemplatesFromSettings,
+  normalizeCustomTexts,
+} from '../utils/filenameTemplates';
 
 /** How long a template check waits after the last keystroke. */
 export const TEMPLATE_PREVIEW_DELAY_MS = 150;
@@ -37,24 +42,26 @@ export function useFilenameTemplates() {
     [appSettings, handleSettingsChange],
   );
 
-  /** The Custom Text for `template` until the user types one: a saved template's own, else the last one used. */
-  const defaultCustomText = useCallback(
+  /** The Custom Texts for `template` until the user types: a saved template's own, else the last ones used. */
+  const defaultCustomTexts = useCallback(
     (template: string) =>
-      templates.find((saved) => saved.template === template.trim())?.text ?? appSettings?.filenameCustomText ?? '',
-    [templates, appSettings?.filenameCustomText],
+      normalizeCustomTexts(
+        templates.find((saved) => saved.template === template.trim())?.texts ?? appSettings?.filenameCustomTexts,
+      ),
+    [templates, appSettings?.filenameCustomTexts],
   );
 
-  /** Keeps the Custom Text just used (rename, export, import) for the next time. */
-  const rememberCustomText = useCallback(
-    (text: string | null) => {
-      if (text !== null && appSettings && text !== appSettings.filenameCustomText) {
-        void handleSettingsChange({ ...appSettings, filenameCustomText: text });
-      }
+  /** Keeps the Custom Texts just used (rename, export, import) for the next time. */
+  const rememberCustomTexts = useCallback(
+    (texts: Array<string> | null) => {
+      if (!texts || !appSettings) return;
+      if (JSON.stringify(texts) === JSON.stringify(normalizeCustomTexts(appSettings.filenameCustomTexts))) return;
+      void handleSettingsChange({ ...appSettings, filenameCustomTexts: texts });
     },
     [appSettings, handleSettingsChange],
   );
 
-  return { templates, saveTemplates, defaultCustomText, rememberCustomText };
+  return { templates, saveTemplates, defaultCustomTexts, rememberCustomTexts };
 }
 
 /** `naming::FilenameTemplatePreview`. */
@@ -64,8 +71,10 @@ export interface FilenameTemplatePreview {
 }
 
 /** The stem `template` gives `path` and the template's problems, checked shortly after typing stops. */
-export function useFilenameTemplatePreview(path: string | null, template: string, text: string | null) {
+export function useFilenameTemplatePreview(path: string | null, template: string, texts: Array<string> | null) {
   const [preview, setPreview] = useState<FilenameTemplatePreview | null>(null);
+  // Compared by value: callers build a new array on every render.
+  const textsKey = JSON.stringify(texts);
   useEffect(() => {
     if (!template.trim()) {
       setPreview(null);
@@ -73,7 +82,11 @@ export function useFilenameTemplatePreview(path: string | null, template: string
     }
     let isCurrent = true;
     const timer = setTimeout(() => {
-      invoke<FilenameTemplatePreview>(Invokes.PreviewFilenameTemplate, { path, template: template.trim(), text })
+      invoke<FilenameTemplatePreview>(Invokes.PreviewFilenameTemplate, {
+        path,
+        template: template.trim(),
+        texts: JSON.parse(textsKey),
+      })
         .then((result) => isCurrent && setPreview(result))
         .catch(() => isCurrent && setPreview(null));
     }, TEMPLATE_PREVIEW_DELAY_MS);
@@ -81,6 +94,6 @@ export function useFilenameTemplatePreview(path: string | null, template: string
       isCurrent = false;
       clearTimeout(timer);
     };
-  }, [path, template, text]);
+  }, [path, template, textsKey]);
   return preview;
 }

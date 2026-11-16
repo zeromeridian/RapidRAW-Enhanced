@@ -1838,6 +1838,7 @@
         "existingSidecar": "Sidecar files left over from another photo already use the name {{name}}; the photo would take over their edits. Nothing can be renamed."
       },
       "customText": "Custom Text",
+      "customTextNumbered": "Custom Text {{number}}",
       "errors": {
         "emptyToken": "Column {{column}}: empty braces {}.",
         "formatNotAllowed": "Column {{column}}: this token takes no format (\"{{text}}\").",

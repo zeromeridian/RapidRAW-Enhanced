@@ -35,7 +35,7 @@ import {
   useFilenameTemplatePreview,
   useFilenameTemplates,
 } from '../../../hooks/useFilenameTemplates';
-import { usesCustomText } from '../../../utils/filenameTemplates';
+import { textsForTemplate } from '../../../utils/filenameTemplates';
 import ExportConflictModal from '../../modals/ExportConflictModal';
 import { useExportSettings } from '../../../hooks/useExportSettings';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
@@ -404,9 +404,9 @@ export default function ExportPanel({
   const [isEstimating, setIsEstimating] = useState<boolean>(false);
   const [watermarkImageAspectRatio, setWatermarkImageAspectRatio] = useState(1);
   const [imageAspectRatio, setImageAspectRatio] = useState(16 / 9);
-  const { defaultCustomText, rememberCustomText } = useFilenameTemplates();
-  // Null until typed or loaded: then the template's saved text, else the last one used.
-  const [customText, setCustomText] = useState<string | null>(null);
+  const { defaultCustomTexts, rememberCustomTexts } = useFilenameTemplates();
+  // Null until typed or loaded: then the template's saved texts, else the last ones used.
+  const [customTexts, setCustomTexts] = useState<Array<string> | null>(null);
   const [conflictPrompt, setConflictPrompt] = useState<{ conflict: ExportConflict; remainingAfter: number } | null>(
     null,
   );
@@ -422,12 +422,12 @@ export default function ExportPanel({
   // Develop exports only the photo being edited; the Library exports its selection.
   const pathsToExport = isLibraryContext ? multiSelectedPaths : selectedImage ? [selectedImage.path] : [];
   const numImages = pathsToExport.length;
-  const shownCustomText = customText ?? defaultCustomText(filenameTemplate);
-  const filenameText = usesCustomText(filenameTemplate) ? shownCustomText : null;
+  const shownCustomTexts = customTexts ?? defaultCustomTexts(filenameTemplate);
+  const filenameTexts = textsForTemplate(filenameTemplate, shownCustomTexts);
   const filenamePreview = useFilenameTemplatePreview(
     isVisible ? (pathsToExport[0] ?? null) : null,
     filenameTemplate,
-    filenameText,
+    filenameTexts,
   );
 
   useEffect(() => {
@@ -623,11 +623,11 @@ export default function ExportPanel({
       finalFilenameTemplate = `${finalFilenameTemplate}_{sequence}`;
       setFilenameTemplate(finalFilenameTemplate);
     }
-    rememberCustomText(filenameText);
+    rememberCustomTexts(filenameTexts);
 
     const exportSettings: ExportSettings = {
       filenameTemplate: finalFilenameTemplate,
-      filenameText,
+      filenameTexts: filenameTexts ?? [],
       filenameSuffix,
       jpegQuality,
       tiffBitDepth,
@@ -669,7 +669,7 @@ export default function ExportPanel({
         const { stem } = await invoke<FilenameTemplatePreview>(Invokes.PreviewFilenameTemplate, {
           path: pathsToExport[0],
           template: finalFilenameTemplate,
-          text: filenameText,
+          texts: filenameTexts,
         });
         // A virtual copy exported on its own is the first copy, as in a batch (Rust `virtual_copy_numbers`).
         const copySuffix = pathsToExport[0].includes('?vc=') ? '_VC01' : '';
@@ -840,12 +840,12 @@ export default function ExportPanel({
 
             <Section title={t('export.sections.fileNaming')}>
               <FilenameTemplateEditor
-                customText={shownCustomText}
+                customTexts={shownCustomTexts}
                 disabled={isExporting}
                 errors={filenamePreview?.errors}
                 isNarrow
                 label={t('modals.renameFile.fileNamingTemplate')}
-                onCustomTextChange={setCustomText}
+                onCustomTextsChange={setCustomTexts}
                 onTemplateChange={setFilenameTemplate}
                 template={filenameTemplate}
               />

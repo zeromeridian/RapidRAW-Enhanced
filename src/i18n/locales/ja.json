@@ -1716,6 +1716,7 @@
         "existingSidecar": "別の写真から残ったサイドカーファイルが既に {{name}} という名前を使っています。写真がその編集を引き継いでしまいます。名前を変更できません。"
       },
       "customText": "カスタムテキスト",
+      "customTextNumbered": "カスタムテキスト {{number}}",
       "errors": {
         "emptyToken": "{{column}} 列目: 空の波かっこ {}。",
         "formatNotAllowed": "{{column}} 列目: このトークンは書式を取りません（「{{text}}」）。",

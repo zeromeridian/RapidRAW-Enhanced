@@ -6,7 +6,7 @@ import { TextVariants } from '../../types/typography';
 import { Invokes } from '../ui/AppProperties';
 import FilenameTemplateEditor from '../ui/FilenameTemplateEditor';
 import { TEMPLATE_PREVIEW_DELAY_MS, useFilenameTemplates } from '../../hooks/useFilenameTemplates';
-import { RenamePreview, usesCustomText } from '../../utils/filenameTemplates';
+import { RenamePreview, textsForTemplate } from '../../utils/filenameTemplates';
 
 const DEFAULT_TEMPLATE = '{filename}';
 
@@ -15,7 +15,7 @@ interface RenameFileModalProps {
   filesToRename: Array<string>;
   isOpen: boolean;
   onClose(): void;
-  onSave(template: string, text: string | null): void;
+  onSave(template: string, texts: Array<string> | null): void;
 }
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
@@ -26,10 +26,10 @@ const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
  */
 export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave }: RenameFileModalProps) {
   const { t } = useTranslation();
-  const { defaultCustomText, rememberCustomText } = useFilenameTemplates();
+  const { defaultCustomTexts, rememberCustomTexts } = useFilenameTemplates();
   const [nameTemplate, setNameTemplate] = useState('');
-  // Null until typed or loaded: then the template's saved text, else the last one used.
-  const [customText, setCustomText] = useState<string | null>(null);
+  // Null until typed or loaded: then the template's saved texts, else the last ones used.
+  const [customTexts, setCustomTexts] = useState<Array<string> | null>(null);
   const [preview, setPreview] = useState<RenamePreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -42,8 +42,10 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
   const fileCount = filesToRename.length;
   const isSingleFile = fileCount === 1;
   const template = nameTemplate.trim();
-  const shownText = customText ?? defaultCustomText(template);
-  const text = usesCustomText(template) ? shownText : null;
+  const shownTexts = customTexts ?? defaultCustomTexts(template);
+  const texts = textsForTemplate(template, shownTexts);
+  // Compared by value: `texts` is a new array on every render.
+  const textsKey = JSON.stringify(texts);
 
   useEffect(() => {
     if (isOpen) {
@@ -54,7 +56,7 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
       } else {
         setNameTemplate(lastBatchTemplateRef.current);
       }
-      setCustomText(null);
+      setCustomTexts(null);
       setIsMounted(true);
       const timer = setTimeout(() => setShow(true), 10);
       return () => clearTimeout(timer);
@@ -78,7 +80,11 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
     let isCurrent = true;
     setIsPreviewing(true);
     const timer = setTimeout(() => {
-      invoke<RenamePreview>(Invokes.PreviewRename, { paths: filesToRename, nameTemplate: template, text })
+      invoke<RenamePreview>(Invokes.PreviewRename, {
+        paths: filesToRename,
+        nameTemplate: template,
+        texts: JSON.parse(textsKey),
+      })
         .then((result) => {
           if (!isCurrent) return;
           setPreview(result);
@@ -95,7 +101,7 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
       isCurrent = false;
       clearTimeout(timer);
     };
-  }, [isOpen, filesToRename, template, text]);
+  }, [isOpen, filesToRename, template, textsKey]);
 
   const hasChanges = !!preview && preview.items.some((item) => !item.unchanged);
   const canRename = !!preview && !isPreviewing && preview.clashCount === 0 && hasChanges;
@@ -103,10 +109,10 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
   const handleSave = useCallback(() => {
     if (!canRename) return;
     if (!isSingleFile) lastBatchTemplateRef.current = template;
-    rememberCustomText(text);
-    onSave(template, text);
+    rememberCustomTexts(texts);
+    onSave(template, texts);
     onClose();
-  }, [canRename, isSingleFile, template, text, rememberCustomText, onSave, onClose]);
+  }, [canRename, isSingleFile, template, texts, rememberCustomTexts, onSave, onClose]);
 
   const handleKeyDown = useCallback(
     (e: any) => {
@@ -159,10 +165,10 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
         <div className="space-y-5 text-sm">
           <FilenameTemplateEditor
             autoFocus
-            customText={shownText}
+            customTexts={shownTexts}
             errors={preview?.errors}
             label={isSingleFile ? t('modals.renameFile.newName') : t('modals.renameFile.fileNamingTemplate')}
-            onCustomTextChange={setCustomText}
+            onCustomTextsChange={setCustomTexts}
             onTemplateChange={setNameTemplate}
             template={nameTemplate}
           />

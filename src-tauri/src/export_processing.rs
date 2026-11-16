@@ -151,9 +151,9 @@ pub struct ExportSettings {
     pub preserve_timestamps: bool,
     pub strip_gps: bool,
     pub filename_template: Option<String>,
-    /// The Custom Text for `{text}`.
+    /// The Custom Texts for `{text}`, `{text2}`, `{text3}`.
     #[serde(default)]
-    pub filename_text: Option<String>,
+    pub filename_texts: Vec<String>,
     #[serde(default)]
     pub filename_suffix: Option<String>,
     pub watermark: Option<WatermarkSettings>,
@@ -1709,7 +1709,7 @@ fn planned_output_paths(paths: &[String], destination: &ExportDestination) -> Ve
         .filename_template
         .as_deref()
         .unwrap_or(DEFAULT_FILENAME_TEMPLATE);
-    let text = settings.filename_text.as_deref();
+    let texts = &settings.filename_texts;
     let copy_numbers = virtual_copy_numbers(paths);
 
     paths
@@ -1718,8 +1718,14 @@ fn planned_output_paths(paths: &[String], destination: &ExportDestination) -> Ve
         .enumerate()
         .map(|(index, (path, copy_number))| {
             let (source_path, _) = parse_virtual_path(path);
-            let mut stem =
-                generate_filename_from_template(template, path, index + 1, total_paths, None, text);
+            let mut stem = generate_filename_from_template(
+                template,
+                path,
+                index + 1,
+                total_paths,
+                None,
+                texts,
+            );
             if let Some(copy_number) = copy_number {
                 stem = format!("{stem}_VC{copy_number:02}");
             }
@@ -2330,7 +2336,7 @@ pub async fn run_headless_export(
         preserve_timestamps: true,
         strip_gps: false,
         filename_template: None,
-        filename_text: None,
+        filename_texts: Vec::new(),
         filename_suffix: None,
         watermark: None,
         export_masks: false,

@@ -509,9 +509,9 @@ fn assign_group_ids(files: &mut [ImageFile], settings: &crate::app_settings::App
 #[serde(rename_all = "camelCase")]
 pub struct ImportSettings {
     pub filename_template: String,
-    /// The Custom Text for `{text}`.
+    /// The Custom Texts for `{text}`, `{text2}`, `{text3}`.
     #[serde(default)]
-    pub filename_text: Option<String>,
+    pub filename_texts: Vec<String>,
     pub organize_by_date: bool,
     pub date_folder_format: String,
     pub delete_after_import: bool,
@@ -1344,7 +1344,7 @@ mod output_naming_tests {
                 1,
                 1,
                 None,
-                None,
+                &[],
             )
         };
         assert_eq!(name("IMG_1234.CR3"), "trip_1234");
@@ -1358,14 +1358,14 @@ mod output_naming_tests {
             .unwrap()
             .and_hms_opt(10, 20, 37);
         let name = generate_filename_from_template(
-            "shot_{ss}_{text}",
+            "shot_{ss}_{text}_{text2}",
             "IMG_1.CR3",
             1,
             1,
             date,
-            Some("RAW"),
+            &["RAW".to_string(), "Rome".to_string()],
         );
-        assert_eq!(name, "shot_37_RAW");
+        assert_eq!(name, "shot_37_RAW_Rome");
     }
 
     #[test]
@@ -1393,7 +1393,7 @@ mod output_naming_tests {
             1,
             1,
             None,
-            None,
+            &[],
         );
         assert_eq!(name, "20260503_003007");
     }
@@ -6347,7 +6347,7 @@ pub async fn import_files(
                         i + 1,
                         total_files,
                         Some(file_date),
-                        settings.filename_text.as_deref(),
+                        &settings.filename_texts,
                     );
                     let extension = source_name_path
                         .extension()
@@ -6402,7 +6402,7 @@ pub async fn import_files(
                     i + 1,
                     total_files,
                     Some(file_date),
-                    settings.filename_text.as_deref(),
+                    &settings.filename_texts,
                 );
                 let extension = source_path
                     .extension()
@@ -6497,21 +6497,18 @@ pub async fn import_files(
 
 /// The file stem `template` gives the image at `image_path` (a virtual copy's
 /// path is fine), number `sequence` of `total`; see `naming`. `capture_date`
-/// overrides the capture time read from the file; `text` is the Custom Text.
+/// overrides the capture time read from the file; `texts` are the Custom Texts.
 pub fn generate_filename_from_template(
     template: &str,
     image_path: &str,
     sequence: usize,
     total: usize,
     capture_date: Option<NaiveDateTime>,
-    text: Option<&str>,
+    texts: &[String],
 ) -> String {
-    let mut source = NamingSource::new(image_path, sequence, total);
+    let mut source = NamingSource::new(image_path, sequence, total).with_texts(texts);
     if let Some(date) = capture_date {
         source = source.with_capture_date(date);
-    }
-    if let Some(text) = text {
-        source = source.with_text(text);
     }
     naming::file_stem_from_template(template, &source)
 }

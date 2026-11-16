@@ -36,8 +36,8 @@ export const MAX_EXPORT_DPI = 65535;
 
 export interface ExportSettings {
   filenameTemplate: string | null;
-  /** The Custom Text for `{text}`. */
-  filenameText?: string | null;
+  /** The Custom Texts for `{text}`, `{text2}`, `{text3}`. */
+  filenameTexts?: Array<string>;
   filenameSuffix?: string | null;
   jpegQuality: number;
   tiffBitDepth: TiffBitDepth;
@@ -123,8 +123,8 @@ export interface FileFormat {
 /** Rust `ImportSettings`. */
 export interface ImportSettings {
   filenameTemplate: string;
-  /** The Custom Text for `{text}`. */
-  filenameText?: string | null;
+  /** The Custom Texts for `{text}`, `{text2}`, `{text3}`. */
+  filenameTexts?: Array<string>;
   organizeByDate: boolean;
   dateFolderFormat: string;
   deleteAfterImport: boolean;

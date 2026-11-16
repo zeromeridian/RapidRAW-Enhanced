@@ -1716,6 +1716,7 @@
         "existingSidecar": "다른 사진에서 남은 사이드카 파일이 이미 {{name}} 이름을 쓰고 있어 사진이 그 편집을 이어받게 됩니다. 이름을 변경할 수 없습니다."
       },
       "customText": "사용자 텍스트",
+      "customTextNumbered": "사용자 텍스트 {{number}}",
       "errors": {
         "emptyToken": "{{column}}열: 빈 중괄호 {}.",
         "formatNotAllowed": "{{column}}열: 이 토큰은 형식을 받지 않습니다(\"{{text}}\").",

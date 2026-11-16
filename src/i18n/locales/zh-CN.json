@@ -1716,6 +1716,7 @@
         "existingSidecar": "另一张照片遗留的附属文件已使用名称 {{name}}；照片会接管其编辑。无法重命名。"
       },
       "customText": "自定义文本",
+      "customTextNumbered": "自定义文本 {{number}}",
       "errors": {
         "emptyToken": "第 {{column}} 列：空的花括号 {}。",
         "formatNotAllowed": "第 {{column}} 列：此标记不接受格式（“{{text}}”）。",

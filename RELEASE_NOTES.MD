@@ -5,6 +5,16 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.78.0-dev-lightroom-rename — 2026-11-16
+
+### Library
+
+- Filename templates can use three Custom Texts: `{text}`, `{text2}` and
+  `{text3}` (`{text1}` works as `{text}`). Each has its own field in
+  Rename, Export and Import, shown only when the template uses it, is
+  saved with a template, and is remembered for next time. Templates
+  saved with one Custom Text keep it.
+
 ## 1.77.0-dev-lightroom-rename — 2026-11-16
 
 ### Export

@@ -166,7 +166,7 @@ fn physical_paths(paths: &[String]) -> Vec<PathBuf> {
         .collect()
 }
 
-fn plan_rename(paths: &[String], template: &str, text: Option<&str>) -> Result<RenamePlan, String> {
+fn plan_rename(paths: &[String], template: &str, texts: &[String]) -> Result<RenamePlan, String> {
     let parsed = Template::parse(template);
     let sources = physical_paths(paths);
     let total = sources.len();
@@ -177,10 +177,8 @@ fn plan_rename(paths: &[String], template: &str, text: Option<&str>) -> Result<R
         if !source.is_file() {
             return Err(format!("File not found: {}", source.display()));
         }
-        let mut naming = NamingSource::new(&source.to_string_lossy(), index + 1, total);
-        if let Some(text) = text {
-            naming = naming.with_text(text);
-        }
+        let naming =
+            NamingSource::new(&source.to_string_lossy(), index + 1, total).with_texts(texts);
         let rendered = parsed.template.render(&naming);
         let stem = file_stem_from_rendered(&rendered, &naming);
         let new_name = match source.extension() {
@@ -451,10 +449,10 @@ fn restore(plan: &RenamePlan, temporaries: &[PathBuf], at_temporary: usize, at_f
 pub async fn preview_rename(
     paths: Vec<String>,
     name_template: String,
-    text: Option<String>,
+    texts: Option<Vec<String>>,
 ) -> Result<RenamePreview, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        plan_rename(&paths, &name_template, text.as_deref()).map(|plan| plan.preview)
+        plan_rename(&paths, &name_template, &texts.unwrap_or_default()).map(|plan| plan.preview)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -466,12 +464,17 @@ pub async fn preview_rename(
 pub async fn rename_files(
     paths: Vec<String>,
     name_template: String,
-    text: Option<String>,
+    texts: Option<Vec<String>>,
     app_handle: AppHandle,
 ) -> Result<Vec<String>, String> {
     let order_handle = app_handle.clone();
     crate::blocking_command::run_in_file_order(&order_handle, move || {
-        rename_files_blocking(&paths, &name_template, text.as_deref(), &app_handle)
+        rename_files_blocking(
+            &paths,
+            &name_template,
+            &texts.unwrap_or_default(),
+            &app_handle,
+        )
     })
     .await
 }
@@ -479,7 +482,7 @@ pub async fn rename_files(
 fn rename_files_blocking(
     paths: &[String],
     template: &str,
-    text: Option<&str>,
+    texts: &[String],
     app_handle: &AppHandle,
 ) -> Result<Vec<String>, String> {
     if paths.is_empty() {
@@ -493,12 +496,12 @@ fn rename_files_blocking(
             )),
             None => Ok(()),
         };
-    let plan = plan_rename(paths, template, text)?;
+    let plan = plan_rename(paths, template, texts)?;
     check_clashes(&plan)?;
     // Remembering an original name may create a `.tirdata`, so plan again with it.
     let settings = crate::app_settings::load_settings(app_handle.clone()).unwrap_or_default();
     preserve_original_names(&plan.renamed, settings.enable_xmp_sync.unwrap_or(false))?;
-    let plan = plan_rename(paths, template, text)?;
+    let plan = plan_rename(paths, template, texts)?;
     check_clashes(&plan)?;
     apply_plan(&plan)?;
 
@@ -584,7 +587,7 @@ mod tests {
 
     fn plan(folder: &tempfile::TempDir, files: &[&str], template: &str) -> RenamePlan {
         let paths: Vec<String> = files.iter().map(|name| path(folder, name)).collect();
-        plan_rename(&paths, template, None).unwrap()
+        plan_rename(&paths, template, &[]).unwrap()
     }
 
     fn rename(folder: &tempfile::TempDir, files: &[&str], template: &str) {
@@ -732,7 +735,7 @@ mod tests {
     fn virtual_copies_rename_their_file_once_and_keep_their_query() {
         let folder = folder_with(&["a.jpg", "a.jpg.abc123.tirdata"]);
         let copy = format!("{}?vc=abc123&name=Warm", path(&folder, "a.jpg"));
-        let plan = plan_rename(&[path(&folder, "a.jpg"), copy.clone()], "b", None).unwrap();
+        let plan = plan_rename(&[path(&folder, "a.jpg"), copy.clone()], "b", &[]).unwrap();
         assert_eq!(plan.preview.items.len(), 1);
         apply_plan(&plan).unwrap();
         assert_eq!(names(&folder), ["b.jpg", "b.jpg.abc123.tirdata"]);

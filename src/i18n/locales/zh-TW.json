@@ -1716,6 +1716,7 @@
         "existingSidecar": "另一張相片遺留的附屬檔案已使用名稱 {{name}}；相片會接管其編輯。無法重新命名。"
       },
       "customText": "自訂文字",
+      "customTextNumbered": "自訂文字 {{number}}",
       "errors": {
         "emptyToken": "第 {{column}} 欄：空的大括號 {}。",
         "formatNotAllowed": "第 {{column}} 欄：此標記不接受格式（「{{text}}」）。",

@@ -37,7 +37,7 @@ export interface AppModalsProps {
   handleSaveDenoisedImage: () => Promise<string>;
   handleCreateFolder: (folderName: string) => Promise<void>;
   handleRenameFolder: (newName: string) => Promise<void>;
-  handleSaveRename: (nameTemplate: string, text: string | null) => Promise<void>;
+  handleSaveRename: (nameTemplate: string, texts: Array<string> | null) => Promise<void>;
   handleStartImport: (settings: any) => Promise<void>;
   handleSetColorLabel: (color: string | null, paths?: string[]) => Promise<void>;
   handleRate: (rating: number, paths?: string[]) => void;

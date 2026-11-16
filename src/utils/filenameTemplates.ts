@@ -14,9 +14,22 @@ export interface FilenameTemplate {
   id: string;
   name: string;
   template: string;
-  /** The Custom Text saved with a template that uses `{text}` (owner 2026-11-16). */
-  text?: string;
+  /**
+   * The Custom Texts saved with a template that uses `{text}`, `{text2}` or `{text3}`
+   * (owner 2026-11-16), one per slot; `CUSTOM_TEXT_SLOTS` long.
+   */
+  texts?: Array<string>;
 }
+
+/** `{text}` (also `{text1}`), `{text2}`, `{text3}` (owner 2026-11-16). */
+export const CUSTOM_TEXT_SLOTS = 3;
+
+/** Exactly `CUSTOM_TEXT_SLOTS` texts from `values`, missing ones empty. */
+export const normalizeCustomTexts = (values: unknown): Array<string> =>
+  Array.from({ length: CUSTOM_TEXT_SLOTS }, (_, slot) => {
+    const value = Array.isArray(values) ? values[slot] : undefined;
+    return typeof value === 'string' ? value : '';
+  });
 
 /** The tokens the template editor offers as chips, by group. */
 export const FILENAME_TOKEN_GROUPS = [
@@ -41,7 +54,7 @@ export const FILENAME_TOKEN_GROUPS = [
   },
   { id: 'camera', tokens: ['{camera}', '{lens}', '{iso}', '{focal}', '{aperture}', '{shutter}'] },
   { id: 'library', tokens: ['{rating}', '{label}'] },
-  { id: 'custom', tokens: ['{text}'] },
+  { id: 'custom', tokens: ['{text}', '{text2}', '{text3}'] },
 ] as const;
 
 export type FilenameTokenGroup = (typeof FILENAME_TOKEN_GROUPS)[number]['id'];
@@ -77,22 +90,43 @@ export interface RenamePreview {
   clashCount: number;
 }
 
-/** Whether `template` uses the custom text (`{text}`, with or without filters or a fallback). */
-export const usesCustomText = (template: string) => /\{text[:|?}]/.test(template);
+/**
+ * The Custom Text slots `template` uses (0 for `{text}`/`{text1}`, 1 for `{text2}`, 2 for
+ * `{text3}`), with or without a format, filters or a fallback; in slot order.
+ */
+export const customTextSlots = (template: string): Array<number> => {
+  const used = new Set<number>();
+  for (const match of template.matchAll(/\{text([123]?)[:|?}]/g)) {
+    used.add(match[1] ? Number(match[1]) - 1 : 0);
+  }
+  return [...used].sort((a, b) => a - b);
+};
 
-/** A template with this id and name holding `template` and, if it uses `{text}`, the Custom Text. */
+/** The texts sent with `template`: all slots when it uses any, else none. */
+export const textsForTemplate = (template: string, texts: Array<string>): Array<string> | null =>
+  customTextSlots(template).length > 0 ? normalizeCustomTexts(texts) : null;
+
+/** A template with this id and name holding `template` and the Custom Texts of the slots it uses. */
 export const withTemplate = (
   { id, name }: { id: string; name: string },
   template: string,
-  text: string,
-): FilenameTemplate => (usesCustomText(template) ? { id, name, template, text } : { id, name, template });
+  texts: Array<string>,
+): FilenameTemplate => {
+  const slots = customTextSlots(template);
+  if (slots.length === 0) return { id, name, template };
+  const kept = normalizeCustomTexts(texts).map((text, slot) => (slots.includes(slot) ? text : ''));
+  return { id, name, template, texts: kept };
+};
 
-export const createFilenameTemplate = (name: string, template: string, text: string): FilenameTemplate =>
-  withTemplate({ id: crypto.randomUUID(), name: name.trim() }, template, text);
+export const createFilenameTemplate = (name: string, template: string, texts: Array<string>): FilenameTemplate =>
+  withTemplate({ id: crypto.randomUUID(), name: name.trim() }, template, texts);
 
-/** Whether the dialog's template and Custom Text differ from `preset`. */
-export const isFilenameTemplateDirty = (preset: FilenameTemplate, template: string, text: string) =>
-  preset.template !== template || (usesCustomText(template) && (preset.text ?? '') !== text);
+/** Whether the dialog's template and the Custom Texts it uses differ from `preset`. */
+export const isFilenameTemplateDirty = (preset: FilenameTemplate, template: string, texts: Array<string>) => {
+  const saved = normalizeCustomTexts(preset.texts);
+  const current = normalizeCustomTexts(texts);
+  return preset.template !== template || customTextSlots(template).some((slot) => saved[slot] !== current[slot]);
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
@@ -106,8 +140,11 @@ export const sanitizeFilenameTemplates = (values: unknown, existing: FilenameTem
   for (const candidate of Array.isArray(values) ? values : []) {
     if (!isRecord(candidate) || typeof candidate.name !== 'string' || !candidate.name.trim()) continue;
     if (typeof candidate.template !== 'string' || !candidate.template.trim()) continue;
-    const text = typeof candidate.text === 'string' ? candidate.text : '';
-    templates.push(withTemplate(identity(candidate.id, candidate.name), candidate.template, text));
+    // Templates saved before there were three texts hold one `text`.
+    const texts = normalizeCustomTexts(
+      Array.isArray(candidate.texts) ? candidate.texts : [typeof candidate.text === 'string' ? candidate.text : ''],
+    );
+    templates.push(withTemplate(identity(candidate.id, candidate.name), candidate.template, texts));
   }
   return templates;
 };

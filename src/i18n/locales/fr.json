@@ -1755,6 +1755,7 @@
         "existingSidecar": "Des fichiers annexes restant d'une autre photo utilisent déjà le nom {{name}} ; la photo reprendrait leurs retouches. Rien ne peut être renommé."
       },
       "customText": "Texte personnalisé",
+      "customTextNumbered": "Texte personnalisé {{number}}",
       "errors": {
         "emptyToken": "Colonne {{column}} : accolades vides {}.",
         "formatNotAllowed": "Colonne {{column}} : ce jeton n'accepte pas de format (« {{text}} »).",

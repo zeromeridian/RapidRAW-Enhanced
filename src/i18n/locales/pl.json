@@ -1792,6 +1792,7 @@
         "existingSidecar": "Pozostałe pliki pomocnicze innego zdjęcia już używają nazwy {{name}}; zdjęcie przejęłoby ich edycje. Nie można niczego przemianować."
       },
       "customText": "Własny tekst",
+      "customTextNumbered": "Własny tekst {{number}}",
       "errors": {
         "emptyToken": "Kolumna {{column}}: puste nawiasy {}.",
         "formatNotAllowed": "Kolumna {{column}}: ten token nie przyjmuje formatu („{{text}}”).",

@@ -134,7 +134,8 @@ details are in `RELEASE_NOTES.MD`.
   kept in the sidecar and XMP `xmpMM:PreservedFileName`), dates (`{date:…}`/`{capture:…}`, `{filedate:…}`,
   `{today:…}`), `{seq:width:start=N}`, EXIF (`{camera}`, `{lens}`,
   `{iso}`, `{focal}`, `{aperture}`, `{shutter}`), library (`{rating}`,
-  `{label}`) and `{text}`; filters `upper`, `lower`, `slug`, `trim:N`.
+  `{label}`) and three Custom Texts `{text}`, `{text2}`, `{text3}`;
+  filters `upper`, `lower`, `slug`, `trim:N`.
   Names use the capture time as the camera recorded it and are cleaned
   for every file system. A warning shows when a multi-file template is not
   unique.
@@ -147,7 +148,8 @@ details are in `RELEASE_NOTES.MD`.
 - Lightroom-style Rename dialog for one or many photos: grouped token
   chips, live preview of the first and last name, inline template errors,
   clash and missing-value warnings (Rename disabled on clashes), a Custom
-  Text field (kept with a saved template, else the last text used), and
+  Text field per `{text}`/`{text2}`/`{text3}` used (kept with a saved
+  template, else the last texts used), and
   sequence numbers in grid order. Saved filename templates
   (save, update, rename, delete, export, import; six starters), stored
   once in the settings for rename, export and import.

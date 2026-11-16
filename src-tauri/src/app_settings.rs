@@ -539,6 +539,23 @@ pub struct ExportPreset {
     pub last_export_path: Option<String>,
 }
 
+/// The Custom Texts as saved: a list, or one text from before there were three (or null).
+fn text_or_texts<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<String>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Saved {
+        Texts(Vec<String>),
+        Text(String),
+    }
+    Ok(match Option::<Saved>::deserialize(deserializer)? {
+        Some(Saved::Texts(texts)) => texts,
+        Some(Saved::Text(text)) => vec![text],
+        None => Vec::new(),
+    })
+}
+
 pub fn default_export_presets() -> Vec<ExportPreset> {
     vec![
         ExportPreset {
@@ -942,10 +959,16 @@ pub struct AppSettings {
     /// starter templates are offered; an empty list means every template was deleted.
     #[serde(default)]
     pub filename_templates: Option<Vec<Value>>,
-    /// The Custom Text (`{text}`) last used in rename, export or import, offered when no saved
-    /// template brings its own. Read from `renameCustomText`, its name in `1.76.3`.
-    #[serde(default, alias = "renameCustomText")]
-    pub filename_custom_text: Option<String>,
+    /// The Custom Texts (`{text}`, `{text2}`, `{text3}`) last used in rename, export or
+    /// import, offered when no saved template brings its own. Also read from the single
+    /// text that `1.76.3` (`renameCustomText`) and `1.77.0` (`filenameCustomText`) kept.
+    #[serde(
+        default,
+        alias = "filenameCustomText",
+        alias = "renameCustomText",
+        deserialize_with = "text_or_texts"
+    )]
+    pub filename_custom_texts: Vec<String>,
     /// Whether the Adjustments panel shows the Favorites instead of every section.
     #[serde(default)]
     pub show_favorite_adjustments: bool,
@@ -1099,7 +1122,7 @@ impl Default for AppSettings {
             zone_tint_presets: None,
             zone_tint_advanced: false,
             filename_templates: None,
-            filename_custom_text: None,
+            filename_custom_texts: Vec::new(),
             show_favorite_adjustments: false,
             left_panel_width: None,
             right_panel_width: None,
@@ -1368,20 +1391,28 @@ mod tests {
             assert_eq!(restored.filename_templates, templates);
         }
 
-        assert_eq!(older.filename_custom_text, None);
+        assert!(older.filename_custom_texts.is_empty());
+        let texts = vec!["RAW".to_string(), String::new(), "Rome".to_string()];
         let settings = AppSettings {
-            filename_custom_text: Some("RAW".to_string()),
+            filename_custom_texts: texts.clone(),
             ..AppSettings::default()
         };
         let serialized = serde_json::to_string(&settings).expect("settings should serialize");
-        assert!(serialized.contains("\"filenameCustomText\":\"RAW\""));
+        assert!(serialized.contains("\"filenameCustomTexts\":[\"RAW\",\"\",\"Rome\"]"));
         let restored: AppSettings =
             serde_json::from_str(&serialized).expect("settings should deserialize");
-        assert_eq!(restored.filename_custom_text.as_deref(), Some("RAW"));
-        // Settings saved by 1.76.3 keep their text.
-        let saved_by_1_76_3: AppSettings =
-            serde_json::from_str(r#"{"renameCustomText":"JPG"}"#).expect("older settings load");
-        assert_eq!(saved_by_1_76_3.filename_custom_text.as_deref(), Some("JPG"));
+        assert_eq!(restored.filename_custom_texts, texts);
+        // The single text that 1.76.3 and 1.77.0 kept becomes the first.
+        for saved in [
+            r#"{"renameCustomText":"JPG"}"#,
+            r#"{"filenameCustomText":"JPG"}"#,
+        ] {
+            let older: AppSettings = serde_json::from_str(saved).expect("older settings load");
+            assert_eq!(older.filename_custom_texts, ["JPG"]);
+        }
+        let unset: AppSettings =
+            serde_json::from_str(r#"{"filenameCustomTexts":null}"#).expect("null loads");
+        assert!(unset.filename_custom_texts.is_empty());
     }
 
     #[test]

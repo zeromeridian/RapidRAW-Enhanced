@@ -1718,6 +1718,7 @@
         "existingSidecar": "Übrig gebliebene Begleitdateien eines anderen Fotos verwenden bereits den Namen {{name}}; das Foto würde deren Bearbeitungen übernehmen. Es kann nichts umbenannt werden."
       },
       "customText": "Eigener Text",
+      "customTextNumbered": "Eigener Text {{number}}",
       "errors": {
         "emptyToken": "Spalte {{column}}: leere Klammern {}.",
         "formatNotAllowed": "Spalte {{column}}: Dieser Platzhalter nimmt kein Format an („{{text}}“).",
