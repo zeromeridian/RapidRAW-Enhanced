@@ -1,4 +1,5 @@
 use crate::app_state::{AppState, LoadedImage};
+use crate::cache_codec;
 use crate::file_management::parse_virtual_path;
 use crate::relight::RelightTap;
 use half::f16;
@@ -14,7 +15,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{Emitter, Manager};
 
 const MODEL_TAG: &str = "nind-v3";
-const FILE_MAGIC: &[u8; 8] = b"RRDN0002";
+/// Entries compressed with `cache_codec`.
+const FILE_MAGIC: &[u8; 8] = b"RRDN0003";
+/// Uncompressed f16 entries written before `1.71.0`; still read.
+const LEGACY_FILE_MAGIC: &[u8; 8] = b"RRDN0002";
 const DISK_CACHE_LIMIT_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 const MEMORY_CACHE_CAPACITY: usize = 2;
 
@@ -117,14 +121,17 @@ struct EntryHeader {
     fingerprint: u64,
     width: u32,
     height: u32,
+    compressed: bool,
 }
 
 fn read_header(reader: &mut impl Read) -> Option<EntryHeader> {
     let mut magic = [0u8; 8];
     reader.read_exact(&mut magic).ok()?;
-    if &magic != FILE_MAGIC {
-        return None;
-    }
+    let compressed = match &magic {
+        m if m == FILE_MAGIC => true,
+        m if m == LEGACY_FILE_MAGIC => false,
+        _ => return None,
+    };
     let mut u32_buf = [0u8; 4];
     let mut u64_buf = [0u8; 8];
     reader.read_exact(&mut u32_buf).ok()?;
@@ -141,6 +148,7 @@ fn read_header(reader: &mut impl Read) -> Option<EntryHeader> {
         fingerprint,
         width,
         height,
+        compressed,
     })
 }
 
@@ -150,20 +158,42 @@ fn read_disk_header(key: &str) -> Option<EntryHeader> {
 }
 
 fn read_from_disk(key: &str, source: &str) -> Option<DenoisedBase> {
-    let path = entry_path(key)?;
-    let mut reader = BufReader::new(File::open(&path).ok()?);
+    read_entry(&entry_path(key)?, key, source)
+}
+
+/// Reads a compressed or legacy entry; an entry whose pixels cannot be read
+/// is deleted, so it is denoised again instead of failing on every load.
+fn read_entry(path: &Path, key: &str, source: &str) -> Option<DenoisedBase> {
+    let mut reader = BufReader::new(File::open(path).ok()?);
     let header = read_header(&mut reader)?;
     if header.source != source {
         return None;
     }
 
-    let mut bytes = vec![0u8; header.width as usize * header.height as usize * 3 * 2];
-    reader.read_exact(&mut bytes).ok()?;
-    let halves: &[f16] = bytemuck::try_cast_slice(&bytes).ok()?;
+    let len = header.width as usize * header.height as usize * 3;
+    let halves = if header.compressed {
+        let mut payload = Vec::new();
+        reader
+            .read_to_end(&mut payload)
+            .ok()
+            .and_then(|_| cache_codec::decode_rgb_f16(&payload, header.width as usize, len))
+    } else {
+        let mut halves = vec![f16::ZERO; len];
+        reader
+            .read_exact(bytemuck::cast_slice_mut(&mut halves))
+            .ok()
+            .map(|_| halves)
+    };
+    drop(reader);
+    let Some(halves) = halves else {
+        let _ = fs::remove_file(path);
+        return None;
+    };
     let data: Vec<f32> = halves.par_iter().map(|v| v.to_f32()).collect();
+    drop(halves);
     let image = Rgb32FImage::from_raw(header.width, header.height, data)?;
 
-    if let Ok(file) = File::options().write(true).open(&path) {
+    if let Ok(file) = File::options().write(true).open(path) {
         let _ = file.set_modified(SystemTime::now());
     }
 
@@ -177,6 +207,12 @@ fn read_from_disk(key: &str, source: &str) -> Option<DenoisedBase> {
 
 fn write_to_disk(entry: &DenoisedBase) -> Result<(), String> {
     let path = entry_path(&entry.key).ok_or("AI denoise cache directory is not initialized")?;
+    write_entry(&path, entry)?;
+    evict_disk_cache(&path);
+    Ok(())
+}
+
+fn write_entry(path: &Path, entry: &DenoisedBase) -> Result<(), String> {
     let tmp_path = path.with_extension("tmp");
 
     let halves: Vec<f16> = entry
@@ -185,6 +221,9 @@ fn write_to_disk(entry: &DenoisedBase) -> Result<(), String> {
         .par_iter()
         .map(|v| f16::from_f32(*v))
         .collect();
+    let payload = cache_codec::encode_rgb_f16(&halves, entry.image.width() as usize)
+        .map_err(|e| e.to_string())?;
+    drop(halves);
 
     let mut file = BufWriter::new(File::create(&tmp_path).map_err(|e| e.to_string())?);
     let source = entry.source.as_bytes();
@@ -194,14 +233,12 @@ fn write_to_disk(entry: &DenoisedBase) -> Result<(), String> {
         .and_then(|_| file.write_all(&entry.fingerprint.to_le_bytes()))
         .and_then(|_| file.write_all(&entry.image.width().to_le_bytes()))
         .and_then(|_| file.write_all(&entry.image.height().to_le_bytes()))
-        .and_then(|_| file.write_all(bytemuck::cast_slice(&halves)))
+        .and_then(|_| file.write_all(&payload))
         .and_then(|_| file.flush())
         .map_err(|e| e.to_string())?;
     drop(file);
 
-    fs::rename(&tmp_path, &path).map_err(|e| e.to_string())?;
-    evict_disk_cache(&path);
-    Ok(())
+    fs::rename(&tmp_path, path).map_err(|e| e.to_string())
 }
 
 fn evict_disk_cache(keep: &Path) {
@@ -539,9 +576,96 @@ pub fn clear_ai_denoise_cache() -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{apply_ai_denoise, is_enabled};
+    use super::{
+        DenoisedBase, FILE_MAGIC, LEGACY_FILE_MAGIC, apply_ai_denoise, is_enabled, read_entry,
+        write_entry,
+    };
+    use half::f16;
     use image::{DynamicImage, Rgb32FImage};
     use std::borrow::Cow;
+    use std::fs;
+    use std::sync::Arc;
+
+    const SOURCE: &str = "/photos/IMG_0001.CR3";
+
+    fn sample_entry() -> DenoisedBase {
+        let (width, height) = (23, 19);
+        let data = (0..width * height * 3)
+            .map(|i| f16::from_f32(i as f32 * 0.37 - 40.0).to_f32())
+            .collect();
+        DenoisedBase {
+            key: "key".to_string(),
+            source: SOURCE.to_string(),
+            fingerprint: 0x1234_5678_9ABC_DEF0,
+            image: Arc::new(Rgb32FImage::from_raw(width, height, data).expect("image")),
+        }
+    }
+
+    fn header(magic: &[u8; 8], entry: &DenoisedBase) -> Vec<u8> {
+        let mut bytes = magic.to_vec();
+        bytes.extend_from_slice(&(entry.source.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(entry.source.as_bytes());
+        bytes.extend_from_slice(&entry.fingerprint.to_le_bytes());
+        bytes.extend_from_slice(&entry.image.width().to_le_bytes());
+        bytes.extend_from_slice(&entry.image.height().to_le_bytes());
+        bytes
+    }
+
+    fn assert_same_entry(read: &DenoisedBase, written: &DenoisedBase) {
+        assert_eq!(read.source, written.source);
+        assert_eq!(read.fingerprint, written.fingerprint);
+        assert_eq!(read.image.dimensions(), written.image.dimensions());
+        assert_eq!(read.image.as_raw(), written.image.as_raw());
+    }
+
+    #[test]
+    fn cache_entries_are_compressed_and_read_back_exactly() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("entry.rrdn");
+        let entry = sample_entry();
+        write_entry(&path, &entry).expect("writes");
+
+        let bytes = fs::read(&path).expect("file");
+        assert!(bytes.starts_with(FILE_MAGIC));
+        assert!(bytes.len() < header(FILE_MAGIC, &entry).len() + entry.image.as_raw().len() * 2);
+        assert_same_entry(&read_entry(&path, "key", SOURCE).expect("reads"), &entry);
+        assert!(read_entry(&path, "key", "/photos/other.CR3").is_none());
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn uncompressed_entries_from_older_builds_are_still_read() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("legacy.rrdn");
+        let entry = sample_entry();
+        let mut bytes = header(LEGACY_FILE_MAGIC, &entry);
+        for value in entry.image.as_raw() {
+            bytes.extend_from_slice(&f16::from_f32(*value).to_le_bytes());
+        }
+        fs::write(&path, bytes).expect("writes");
+
+        assert_same_entry(&read_entry(&path, "key", SOURCE).expect("reads"), &entry);
+    }
+
+    #[test]
+    fn unreadable_cache_entries_are_deleted() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let entry = sample_entry();
+
+        let compressed = dir.path().join("compressed.rrdn");
+        write_entry(&compressed, &entry).expect("writes");
+        let bytes = fs::read(&compressed).expect("file");
+        fs::write(&compressed, &bytes[..bytes.len() - 5]).expect("truncates");
+        assert!(read_entry(&compressed, "key", SOURCE).is_none());
+        assert!(!compressed.exists());
+
+        let legacy = dir.path().join("legacy.rrdn");
+        let mut bytes = header(LEGACY_FILE_MAGIC, &entry);
+        bytes.extend_from_slice(&[0u8; 10]);
+        fs::write(&legacy, bytes).expect("writes");
+        assert!(read_entry(&legacy, "key", SOURCE).is_none());
+        assert!(!legacy.exists());
+    }
 
     #[test]
     fn ai_denoise_respects_details_section_visibility() {

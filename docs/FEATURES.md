@@ -473,7 +473,7 @@ details are in `RELEASE_NOTES.MD`.
   ground fog, variation, glow, temperature, and tint.
 - Non-destructive **AI Denoise** in Detail, with Amount and Detail. Each
   image is denoised once in the background, and the result is cached on disk
-  (4 GB limit, clearable in Settings). Exports always include it, and
+  losslessly compressed (4 GB limit, clearable in Settings). Exports always include it, and
   thumbnails refresh when it finishes. Settings sync through XMP and
   copy/paste; the denoised result is regenerated per device.
 - On macOS, AI Denoise and the depth maps for Fog, Lens Blur, and depth masks

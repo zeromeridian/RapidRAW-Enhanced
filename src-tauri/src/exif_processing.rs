@@ -1748,8 +1748,15 @@ mod tests {
         let lossy_jxl = jxl_encoder::LossyConfig::new(1.0)
             .encode(rgb.as_raw(), width, height, jxl_encoder::PixelLayout::Rgb8)
             .unwrap();
-        let webp = webp::Encoder::from_image(&image).unwrap().encode(90.0).to_vec();
-        assert_eq!(&webp[12..16], b"VP8 ", "the export writes simple lossy WebP");
+        let webp = webp::Encoder::from_image(&image)
+            .unwrap()
+            .encode(90.0)
+            .to_vec();
+        assert_eq!(
+            &webp[12..16],
+            b"VP8 ",
+            "the export writes simple lossy WebP"
+        );
 
         let outputs = [
             ("jxl", lossless_jxl, FileExtension::JXL),
@@ -1771,7 +1778,11 @@ mod tests {
                 .unwrap();
 
                 let decoded = image::load_from_memory(&bytes).unwrap();
-                assert_eq!((decoded.width(), decoded.height()), (width, height), "{format}");
+                assert_eq!(
+                    (decoded.width(), decoded.height()),
+                    (width, height),
+                    "{format}"
+                );
                 let written = Metadata::new_from_vec(&bytes, file_type).unwrap();
                 let has = |wanted: &dyn Fn(&ExifTag) -> bool| written.into_iter().any(wanted);
                 assert!(

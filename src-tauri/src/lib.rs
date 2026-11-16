@@ -16,6 +16,7 @@ mod app_state;
 mod baseline_exposure;
 mod blend_pad;
 mod blocking_command;
+mod cache_codec;
 mod cache_utils;
 mod culling;
 mod denoising;

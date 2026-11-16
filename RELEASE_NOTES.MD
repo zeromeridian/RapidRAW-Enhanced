@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.71.0-dev-compressed-ai-cache — 2026-11-16
+
+### Develop
+
+- AI Denoise results are now stored compressed on disk, without any loss
+  of quality, so more denoised photos fit in the cache before older ones
+  have to be denoised again. Results cached by earlier versions are still
+  used.
+
 ## 1.70.0-dev-v1-7-0-small-features — 2026-11-16
 
 ### Export
