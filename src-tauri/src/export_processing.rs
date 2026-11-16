@@ -1157,7 +1157,8 @@ fn render_output_precision(
 }
 
 fn set_timestamps_from_exif(src: &Path, dst: &Path) {
-    let capture_dt = exif_processing::get_creation_date_from_path(src);
+    let capture_dt =
+        exif_processing::local_instant(exif_processing::get_creation_date_from_path(src));
     let ft = filetime::FileTime::from_unix_time(
         capture_dt.timestamp(),
         capture_dt.timestamp_subsec_nanos(),
@@ -1632,7 +1633,6 @@ fn export_adjustments_as_lut(
 }
 
 const DEFAULT_FILENAME_TEMPLATE: &str = "{original_filename}_edited";
-const DATE_FILENAME_TOKENS: [&str; 6] = ["{YYYY}", "{MM}", "{DD}", "{hh}", "{mm}", "{ss}"];
 
 /// What to do with an export whose file already exists. The Export panel asks
 /// before anything is written; any clash nobody was asked about is renamed.
@@ -1709,9 +1709,6 @@ fn planned_output_paths(paths: &[String], destination: &ExportDestination) -> Ve
     } else {
         template
     };
-    let needs_date = DATE_FILENAME_TOKENS
-        .iter()
-        .any(|token| template.contains(token));
     let copy_numbers = virtual_copy_numbers(paths);
 
     paths
@@ -1720,18 +1717,8 @@ fn planned_output_paths(paths: &[String], destination: &ExportDestination) -> Ve
         .enumerate()
         .map(|(index, (path, copy_number))| {
             let (source_path, _) = parse_virtual_path(path);
-            let file_date = if needs_date {
-                exif_processing::get_creation_date_from_path(&source_path)
-            } else {
-                chrono::Utc::now()
-            };
-            let mut stem = generate_filename_from_template(
-                template,
-                &source_path,
-                index + 1,
-                total_paths,
-                &file_date,
-            );
+            let mut stem =
+                generate_filename_from_template(template, path, index + 1, total_paths, None);
             if let Some(copy_number) = copy_number {
                 stem = format!("{stem}_VC{copy_number:02}");
             }

@@ -50,6 +50,7 @@ mod lut_processing;
 mod mask_generation;
 mod motion_blur;
 mod multi_exposure;
+mod naming;
 mod negative_conversion;
 mod panorama_stitching;
 mod panorama_utils;

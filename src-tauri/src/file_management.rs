@@ -14,7 +14,7 @@ use std::thread;
 
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
-use chrono::{DateTime, Utc};
+use chrono::NaiveDateTime;
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma};
 use rayon::prelude::*;
@@ -42,6 +42,7 @@ use crate::image_processing::{
     get_all_adjustments_from_json, perform_auto_analysis,
 };
 use crate::mask_generation::MaskDefinition;
+use crate::naming::{self, NamingSource};
 use crate::preset_converter;
 use crate::tagging::{
     COLOR_TAG_PREFIX, FLAG_TAG_PREFIX, USER_TAG_PREFIX, XmpKeywordOrigin, XmpKeywords,
@@ -467,7 +468,7 @@ fn assign_group_ids(files: &mut [ImageFile], settings: &crate::app_settings::App
             .filter(|candidates| candidates.len() >= 2)
             .flat_map(|candidates| candidates.iter().map(|c| c.source_path.clone()))
             .collect();
-        let exif_dates: HashMap<PathBuf, Option<chrono::DateTime<chrono::Utc>>> = groupable_paths
+        let exif_dates: HashMap<PathBuf, Option<NaiveDateTime>> = groupable_paths
             .par_iter()
             .map(|p| {
                 (
@@ -1310,15 +1311,8 @@ mod output_naming_tests {
 
     #[test]
     fn filename_number_token_keeps_trailing_digits() {
-        let date = chrono::Utc::now();
         let name = |file: &str| {
-            generate_filename_from_template(
-                "trip_{original_filename_number}",
-                std::path::Path::new(file),
-                1,
-                1,
-                &date,
-            )
+            generate_filename_from_template("trip_{original_filename_number}", file, 1, 1, None)
         };
         assert_eq!(name("IMG_1234.CR3"), "trip_1234");
         assert_eq!(name("DSC01234.ARW"), "trip_01234");
@@ -1327,18 +1321,40 @@ mod output_naming_tests {
 
     #[test]
     fn seconds_token_uses_the_capture_seconds() {
-        use chrono::TimeZone;
-        let date = chrono::Utc
-            .with_ymd_and_hms(2026, 11, 11, 10, 20, 37)
-            .unwrap();
-        let name = generate_filename_from_template(
-            "shot_{ss}",
-            std::path::Path::new("IMG_1.CR3"),
-            1,
-            1,
-            &date,
-        );
+        let date = chrono::NaiveDate::from_ymd_opt(2026, 11, 11)
+            .unwrap()
+            .and_hms_opt(10, 20, 37);
+        let name = generate_filename_from_template("shot_{ss}", "IMG_1.CR3", 1, 1, date);
         assert_eq!(name, "shot_37");
+    }
+
+    #[test]
+    fn capture_dates_name_files_as_the_camera_recorded_them() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("IMG_9.jpg");
+        fs::write(&image, []).unwrap();
+        let exif = std::collections::HashMap::from([(
+            "DateTimeOriginal".to_string(),
+            "2026-05-03 00:30:07".to_string(),
+        )]);
+        let metadata = ImageMetadata {
+            exif: Some(exif),
+            ..ImageMetadata::default()
+        };
+        fs::write(
+            crate::exif_processing::get_primary_sidecar_path(&image),
+            serde_json::to_string(&metadata).unwrap(),
+        )
+        .unwrap();
+        // The same name in every time zone: no shift to the previous day.
+        let name = generate_filename_from_template(
+            "{YYYY}{MM}{DD}_{hh}{mm}{ss}",
+            &image.to_string_lossy(),
+            1,
+            1,
+            None,
+        );
+        assert_eq!(name, "20260503_003007");
     }
 
     #[test]
@@ -6283,10 +6299,10 @@ pub async fn import_files(
 
                     let new_stem = generate_filename_from_template(
                         &settings.filename_template,
-                        source_name_path,
+                        &resolved_name,
                         i + 1,
                         total_files,
-                        &file_date,
+                        Some(file_date),
                     );
                     let extension = source_name_path
                         .extension()
@@ -6337,10 +6353,10 @@ pub async fn import_files(
 
                 let new_stem = generate_filename_from_template(
                     &settings.filename_template,
-                    &source_path,
+                    source_path_str,
                     i + 1,
                     total_files,
-                    &file_date,
+                    Some(file_date),
                 );
                 let extension = source_path
                     .extension()
@@ -6420,38 +6436,21 @@ pub async fn import_files(
     Ok(())
 }
 
+/// The file stem `template` gives the image at `image_path` (a virtual copy's
+/// path is fine), number `sequence` of `total`; see `naming`. `capture_date`
+/// overrides the capture time read from the file.
 pub fn generate_filename_from_template(
     template: &str,
-    original_path: &std::path::Path,
+    image_path: &str,
     sequence: usize,
     total: usize,
-    file_date: &DateTime<Utc>,
+    capture_date: Option<NaiveDateTime>,
 ) -> String {
-    let stem = original_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("image");
-    let sequence_str = format!(
-        "{:0width$}",
-        sequence,
-        width = total.to_string().len().max(1)
-    );
-    let local_date = file_date.with_timezone(&chrono::Local);
-    let stem_prefix = stem.trim_end_matches(|c: char| c.is_ascii_digit());
-    let filename_number = &stem[stem_prefix.len()..];
-
-    let mut result = template.to_string();
-    result = result.replace("{original_filename}", stem);
-    result = result.replace("{original_filename_number}", filename_number);
-    result = result.replace("{sequence}", &sequence_str);
-    result = result.replace("{YYYY}", &local_date.format("%Y").to_string());
-    result = result.replace("{MM}", &local_date.format("%m").to_string());
-    result = result.replace("{DD}", &local_date.format("%d").to_string());
-    result = result.replace("{hh}", &local_date.format("%H").to_string());
-    result = result.replace("{mm}", &local_date.format("%M").to_string());
-    result = result.replace("{ss}", &local_date.format("%S").to_string());
-
-    result
+    let mut source = NamingSource::new(image_path, sequence, total);
+    if let Some(date) = capture_date {
+        source = source.with_capture_date(date);
+    }
+    naming::file_stem_from_template(template, &source)
 }
 
 #[tauri::command]
@@ -6501,14 +6500,12 @@ fn rename_files_blocking(
             .and_then(|s| s.to_str())
             .unwrap_or("");
 
-        let file_date = exif_processing::get_creation_date_from_path(original_path);
-
         let new_stem = generate_filename_from_template(
             &name_template,
-            original_path,
+            &original_path.to_string_lossy(),
             i + 1,
             original_paths.len(),
-            &file_date,
+            None,
         );
         let new_filename = format!("{}.{}", new_stem, extension);
         let new_path = parent.join(new_filename);

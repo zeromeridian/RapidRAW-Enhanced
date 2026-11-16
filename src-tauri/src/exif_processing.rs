@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use crate::formats::is_raw_file;
 use crate::image_processing::ImageMetadata;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use exif::{Exif, In, Value};
 use little_exif::exif_tag::ExifTag;
 use little_exif::filetype::FileExtension;
@@ -132,13 +132,12 @@ fn parse_creation_datetime(s: &str) -> Option<NaiveDateTime> {
     None
 }
 
-fn parse_creation_field(field: &exif::Field) -> Option<DateTime<Utc>> {
+fn parse_creation_field(field: &exif::Field) -> Option<NaiveDateTime> {
     parse_creation_datetime(&field.display_value().to_string())
-        .map(|dt| DateTime::from_naive_utc_and_offset(dt, Utc))
 }
 
-fn parse_raw_creation_date(date_str: Option<&str>) -> Option<DateTime<Utc>> {
-    parse_creation_datetime(date_str?).map(|dt| DateTime::from_naive_utc_and_offset(dt, Utc))
+fn parse_raw_creation_date(date_str: Option<&str>) -> Option<NaiveDateTime> {
+    parse_creation_datetime(date_str?)
 }
 
 fn clean_ascii_value(value: &exif::Value) -> Option<String> {
@@ -821,24 +820,49 @@ fn extract_metadata_fields(file_bytes: &[u8]) -> Option<HashMap<String, String>>
     Some(map)
 }
 
-pub fn get_creation_date_from_path(path: &Path) -> DateTime<Utc> {
-    if let Some(dt) = try_get_exif_creation_date(path) {
-        return dt;
-    }
-
-    fs::metadata(path)
-        .ok()
-        .and_then(|m| m.created().ok())
-        .map(DateTime::<Utc>::from)
-        .unwrap_or_else(Utc::now)
+/// When the photo was taken, as the camera's clock showed it: EXIF capture
+/// times carry no time zone, so they are used as they are and never
+/// converted. A file without one uses its creation (else modification) time
+/// in the computer's time zone, else the current time.
+pub fn get_creation_date_from_path(path: &Path) -> NaiveDateTime {
+    try_get_exif_creation_date(path)
+        .or_else(|| {
+            let metadata = fs::metadata(path).ok()?;
+            let time = metadata.created().or_else(|_| metadata.modified()).ok()?;
+            Some(DateTime::<Local>::from(time).naive_local())
+        })
+        .unwrap_or_else(|| Local::now().naive_local())
 }
 
-pub fn try_get_exif_creation_date(path: &Path) -> Option<DateTime<Utc>> {
+/// A file's modification time in the computer's time zone.
+pub fn file_date(path: &Path) -> Option<NaiveDateTime> {
+    let modified = fs::metadata(path).ok()?.modified().ok()?;
+    Some(DateTime::<Local>::from(modified).naive_local())
+}
+
+/// The moment a capture time names, read in the computer's time zone (for
+/// file timestamps). A time skipped by a daylight-saving change counts as
+/// the hour after it.
+pub fn local_instant(date: NaiveDateTime) -> DateTime<Local> {
+    Local
+        .from_local_datetime(&date)
+        .earliest()
+        .or_else(|| {
+            Local
+                .from_local_datetime(&(date + chrono::TimeDelta::hours(1)))
+                .earliest()
+        })
+        .unwrap_or_else(|| Local.from_utc_datetime(&date))
+}
+
+/// The capture time recorded in the photo's EXIF, as the camera's clock
+/// showed it (see `get_creation_date_from_path`).
+pub fn try_get_exif_creation_date(path: &Path) -> Option<NaiveDateTime> {
     if let Some(map) = read_sidecar_exif(path)
         && let Some(dt_str) = map.get("DateTimeOriginal").or(map.get("CreateDate"))
         && let Some(dt) = parse_creation_datetime(dt_str)
     {
-        return Some(DateTime::from_naive_utc_and_offset(dt, Utc));
+        return Some(dt);
     }
 
     if let Some(exif_obj) = read_exif_from_path(path) {
@@ -866,7 +890,7 @@ pub fn try_get_exif_creation_date(path: &Path) -> Option<DateTime<Utc>> {
 }
 
 #[cfg(target_os = "android")]
-pub fn get_creation_date_from_bytes(path_hint: &str, file_bytes: &[u8]) -> DateTime<Utc> {
+pub fn get_creation_date_from_bytes(path_hint: &str, file_bytes: &[u8]) -> NaiveDateTime {
     if let Some(exif_obj) = read_exif(file_bytes) {
         for tag in [exif::Tag::DateTimeOriginal, exif::Tag::DateTime] {
             if let Some(field) = exif_obj.get_field(tag, exif::In::PRIMARY)
@@ -888,7 +912,7 @@ pub fn get_creation_date_from_bytes(path_hint: &str, file_bytes: &[u8]) -> DateT
         }
     }
 
-    Utc::now()
+    Local::now().naive_local()
 }
 
 /// The EXIF an exported or converted image carries: with `inherit_all_exif` the source's
@@ -1404,6 +1428,11 @@ pub fn exif_for_lens_lookup(
     if let Some(exif) = sidecar_exif {
         return Some(exif.clone());
     }
+    read_exif_without_caching(image_path)
+}
+
+/// The image's cached EXIF, else its file's; nothing is written.
+pub fn read_exif_without_caching(image_path: &Path) -> Option<HashMap<String, String>> {
     if let Some(exif) = read_sidecar_exif(image_path) {
         return Some(exif);
     }

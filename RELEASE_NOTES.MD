@@ -5,6 +5,36 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.74.0-dev-lightroom-rename — 2026-11-16
+
+### Library
+
+- File-name templates for rename, import and export understand many more
+  tokens, written as `{token:format|filter?fallback}`:
+  - Dates: `{date:YYYYMMDD}` (also `{capture:…}`), `{filedate:…}` and
+    `{today:…}`, with `YYYY`, `YY`, `MMMM`, `MMM`, `MM`, `DD`, `hh`, `mm`
+    and `ss`.
+  - Sequence numbers with a width and a start: `{seq:4:start=101}`.
+  - Camera data: `{camera}`, `{lens}`, `{iso}`, `{focal}`, `{aperture}`
+    and `{shutter}`.
+  - Library data: `{rating}` and `{label}`.
+  - Filters `upper`, `lower`, `slug` and `trim:N`, e.g.
+    `{camera|lower}`, and a fallback for missing values, e.g.
+    `{lens?unknown}`.
+  - All existing tokens and saved templates work as before.
+- Names made from a template are always valid file names: characters such
+  as `/` and `:` become `_`, Windows device names (`CON`, `LPT1`, …) are
+  avoided, and overlong names are shortened.
+- Dates in rename, export and import names now use the capture time
+  exactly as the camera recorded it. Before,
+  outside UTC they were shifted by your time zone, so a photo taken
+  shortly after midnight could be named with the previous day.
+
+### Export
+
+- An exported file's date in Finder or Explorer now matches the capture
+  time; before, it was off by your time zone's offset from UTC.
+
 ## 1.73.0-dev-crop-drag-rotate — 2026-11-16
 
 ### Develop

@@ -126,9 +126,16 @@ details are in `RELEASE_NOTES.MD`.
   filters apply before RAW+JPEG grouping.
 - The selection advances when a rating, flag, label, or tag change hides the
   active image under the current filter.
-- `{original_filename_number}` naming token for rename, import, and export,
-  with a warning when a multi-file template is not unique; `{ss}` adds the
-  capture time's seconds.
+- File-name templates for rename, import, and export with the syntax
+  `{token:format|filter?fallback}`: the original tokens
+  (`{original_filename}`, `{original_filename_number}`, `{sequence}`,
+  `{YYYY}`…`{ss}`), dates (`{date:…}`/`{capture:…}`, `{filedate:…}`,
+  `{today:…}`), `{seq:width:start=N}`, EXIF (`{camera}`, `{lens}`,
+  `{iso}`, `{focal}`, `{aperture}`, `{shutter}`), library (`{rating}`,
+  `{label}`) and `{text}`; filters `upper`, `lower`, `slug`, `trim:N`.
+  Names use the capture time as the camera recorded it and are cleaned
+  for every file system. A warning shows when a multi-file template is not
+  unique.
 - Caps Lock auto-advance after applying ratings, color labels, or flags.
 - Main Settings access from both Library and Develop.
 - Optional launch directly into the last library, bypassing the splash screen.
