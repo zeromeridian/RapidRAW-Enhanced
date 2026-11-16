@@ -942,6 +942,10 @@ pub struct AppSettings {
     /// starter templates are offered; an empty list means every template was deleted.
     #[serde(default)]
     pub filename_templates: Option<Vec<Value>>,
+    /// The Custom Text (`{text}`) last used in Rename, offered when no saved template
+    /// brings its own.
+    #[serde(default)]
+    pub rename_custom_text: Option<String>,
     /// Whether the Adjustments panel shows the Favorites instead of every section.
     #[serde(default)]
     pub show_favorite_adjustments: bool,
@@ -1095,6 +1099,7 @@ impl Default for AppSettings {
             zone_tint_presets: None,
             zone_tint_advanced: false,
             filename_templates: None,
+            rename_custom_text: None,
             show_favorite_adjustments: false,
             left_panel_width: None,
             right_panel_width: None,
@@ -1362,6 +1367,17 @@ mod tests {
                 serde_json::from_str(&serialized).expect("settings should deserialize");
             assert_eq!(restored.filename_templates, templates);
         }
+
+        assert_eq!(older.rename_custom_text, None);
+        let settings = AppSettings {
+            rename_custom_text: Some("RAW".to_string()),
+            ..AppSettings::default()
+        };
+        let serialized = serde_json::to_string(&settings).expect("settings should serialize");
+        assert!(serialized.contains("\"renameCustomText\":\"RAW\""));
+        let restored: AppSettings =
+            serde_json::from_str(&serialized).expect("settings should deserialize");
+        assert_eq!(restored.rename_custom_text.as_deref(), Some("RAW"));
     }
 
     #[test]

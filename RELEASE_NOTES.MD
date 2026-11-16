@@ -5,6 +5,24 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.76.3-dev-lightroom-rename — 2026-11-16
+
+### Library
+
+- Rename: a saved filename template that uses `{text}` now keeps its
+  Custom Text. Picking the template fills both fields, and changing the
+  text marks the template as changed so you can update it.
+- The last Custom Text you used is remembered after ThisIsRAW quits and
+  offered when no saved template brings its own.
+
+## 1.76.2-dev-lightroom-rename — 2026-11-16
+
+### Library
+
+- Rename: the template list shows the saved template whose text is in
+  the template field, e.g. when the dialog reopens with the last template
+  used, instead of its placeholder.
+
 ## 1.76.1-dev-lightroom-rename — 2026-11-16
 
 ### Library

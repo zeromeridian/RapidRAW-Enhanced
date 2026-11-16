@@ -9,6 +9,8 @@ export interface FilenameTemplate {
   id: string;
   name: string;
   template: string;
+  /** The Custom Text saved with a template that uses `{text}` (owner 2026-11-16). */
+  text?: string;
 }
 
 /** The tokens the template editor offers as chips, by group. */
@@ -73,11 +75,19 @@ export interface RenamePreview {
 /** Whether `template` uses the custom text (`{text}`, with or without filters or a fallback). */
 export const usesCustomText = (template: string) => /\{text[:|?}]/.test(template);
 
-export const createFilenameTemplate = (name: string, template: string): FilenameTemplate => ({
-  id: crypto.randomUUID(),
-  name: name.trim(),
-  template,
-});
+/** A template with this id and name holding `template` and, if it uses `{text}`, the Custom Text. */
+export const withTemplate = (
+  { id, name }: { id: string; name: string },
+  template: string,
+  text: string,
+): FilenameTemplate => (usesCustomText(template) ? { id, name, template, text } : { id, name, template });
+
+export const createFilenameTemplate = (name: string, template: string, text: string): FilenameTemplate =>
+  withTemplate({ id: crypto.randomUUID(), name: name.trim() }, template, text);
+
+/** Whether the dialog's template and Custom Text differ from `preset`. */
+export const isFilenameTemplateDirty = (preset: FilenameTemplate, template: string, text: string) =>
+  preset.template !== template || (usesCustomText(template) && (preset.text ?? '') !== text);
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
@@ -91,7 +101,8 @@ export const sanitizeFilenameTemplates = (values: unknown, existing: FilenameTem
   for (const candidate of Array.isArray(values) ? values : []) {
     if (!isRecord(candidate) || typeof candidate.name !== 'string' || !candidate.name.trim()) continue;
     if (typeof candidate.template !== 'string' || !candidate.template.trim()) continue;
-    templates.push({ ...identity(candidate.id, candidate.name), template: candidate.template });
+    const text = typeof candidate.text === 'string' ? candidate.text : '';
+    templates.push(withTemplate(identity(candidate.id, candidate.name), candidate.template, text));
   }
   return templates;
 };

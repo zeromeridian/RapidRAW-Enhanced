@@ -147,7 +147,8 @@ details are in `RELEASE_NOTES.MD`.
 - Lightroom-style Rename dialog for one or many photos: grouped token
   chips, live preview of the first and last name, inline template errors,
   clash and missing-value warnings (Rename disabled on clashes), a Custom
-  Text field, and sequence numbers in grid order. Saved filename templates
+  Text field (kept with a saved template, else the last text used), and
+  sequence numbers in grid order. Saved filename templates
   (save, update, rename, delete, export, import; five starters), stored
   once in the settings for rename, export and import.
 - Caps Lock auto-advance after applying ratings, color labels, or flags.

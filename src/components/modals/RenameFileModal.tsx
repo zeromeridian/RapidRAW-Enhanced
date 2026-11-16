@@ -11,8 +11,10 @@ import {
   RenamePreview,
   createFilenameTemplate,
   filenameTemplatesFromSettings,
+  isFilenameTemplateDirty,
   sanitizeFilenameTemplates,
   usesCustomText,
+  withTemplate,
 } from '../../utils/filenameTemplates';
 
 /** How long the preview waits after the last keystroke. */
@@ -62,24 +64,36 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
       }),
     [appSettings?.filenameTemplates, t],
   );
-  const selectedTemplate = templates.find((template) => template.id === selectedTemplateId) ?? null;
-
   const fileCount = filesToRename.length;
   const isSingleFile = fileCount === 1;
   const template = nameTemplate.trim();
+  // The template picked from the bar (shown as changed once edited), else a saved template
+  // whose text the field holds, e.g. the last batch template reopened.
+  const selectedTemplate =
+    templates.find((saved) => saved.id === selectedTemplateId) ??
+    templates.find((saved) => saved.template === template) ??
+    null;
   const needsText = usesCustomText(template);
   const text = needsText ? customText : null;
+  // Read when the dialog opens, without reopening it when they change.
+  const templatesRef = useRef(templates);
+  templatesRef.current = templates;
 
   useEffect(() => {
     if (isOpen) {
+      let initial: string;
       if (isSingleFile && filesToRename[0]) {
         const name = fileName(filesToRename[0]);
         const dot = name.lastIndexOf('.');
-        setNameTemplate(dot > 0 ? name.substring(0, dot) : name);
-        setSelectedTemplateId(null);
+        initial = dot > 0 ? name.substring(0, dot) : name;
       } else {
-        setNameTemplate(lastBatchTemplateRef.current);
+        initial = lastBatchTemplateRef.current;
       }
+      setNameTemplate(initial);
+      setSelectedTemplateId(null);
+      // A saved template's own Custom Text, else the last one used (kept across launches).
+      const saved = templatesRef.current.find((candidate) => candidate.template === initial.trim());
+      setCustomText(saved?.text ?? useSettingsStore.getState().appSettings?.renameCustomText ?? '');
       setIsMounted(true);
       const timer = setTimeout(() => setShow(true), 10);
       return () => clearTimeout(timer);
@@ -128,9 +142,12 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
   const handleSave = useCallback(() => {
     if (!canRename) return;
     if (!isSingleFile) lastBatchTemplateRef.current = template;
+    if (text !== null && appSettings && text !== appSettings.renameCustomText) {
+      void handleSettingsChange({ ...appSettings, renameCustomText: text });
+    }
     onSave(template, text);
     onClose();
-  }, [canRename, isSingleFile, template, text, onSave, onClose]);
+  }, [canRename, isSingleFile, template, text, appSettings, handleSettingsChange, onSave, onClose]);
 
   const handleKeyDown = useCallback(
     (e: any) => {
@@ -199,10 +216,10 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
 
         <div className="space-y-5 text-sm">
           <NamedPresetBar
-            create={(name) => createFilenameTemplate(name, template)}
+            create={(name) => createFilenameTemplate(name, template, customText)}
             exportCommand={Invokes.ExportFilenameTemplates}
             importCommand={Invokes.ImportFilenameTemplates}
-            isDirty={!!selectedTemplate && selectedTemplate.template !== template}
+            isDirty={!!selectedTemplate && isFilenameTemplateDirty(selectedTemplate, template, customText)}
             labels={{
               placeholder: t('modals.renameFile.templates.placeholder'),
               save: t('modals.renameFile.templates.save'),
@@ -217,6 +234,7 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
             }}
             onLoad={(loaded) => {
               setNameTemplate(loaded.template);
+              if (loaded.text !== undefined) setCustomText(loaded.text);
               setSelectedTemplateId(loaded.id);
             }}
             onPresetsChange={(next) => {
@@ -226,7 +244,7 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
             presets={templates}
             sanitize={sanitizeFilenameTemplates}
             selected={selectedTemplate}
-            update={(preset) => ({ ...preset, template })}
+            update={(preset) => withTemplate(preset, template, customText)}
           />
 
           <div>
