@@ -1711,8 +1711,54 @@
       "cancel": "Abbrechen",
       "fileNamingTemplate": "Dateibenennungsvorlage",
       "newName": "Neuer Name",
-      "notUniqueWarning": "Ohne {original_filename}, {original_filename_number} oder {sequence} können Dateien denselben Namen erhalten. Dann wird nichts umbenannt.",
+      "cleaned": "Zeichen, die Dateinamen nicht enthalten dürfen, wurden durch _ ersetzt.",
+      "clash": {
+        "batch": "Mehrere Fotos würden denselben Namen erhalten, z. B. {{name}}. Es kann nichts umbenannt werden.",
+        "existingFile": "Eine Datei namens {{name}} existiert bereits. Es kann nichts umbenannt werden.",
+        "existingSidecar": "Übrig gebliebene Begleitdateien eines anderen Fotos verwenden bereits den Namen {{name}}; das Foto würde deren Bearbeitungen übernehmen. Es kann nichts umbenannt werden."
+      },
+      "customText": "Eigener Text",
+      "errors": {
+        "emptyToken": "Spalte {{column}}: leere Klammern {}.",
+        "formatNotAllowed": "Spalte {{column}}: Dieser Platzhalter nimmt kein Format an („{{text}}“).",
+        "invalidSequenceFormat": "Spalte {{column}}: „{{text}}“ ist kein Folgenformat; verwende eine Breite, start=N oder beides, z. B. {seq:4:start=101}.",
+        "unclosedBrace": "Spalte {{column}}: „{{text}}“ hat keine schließende }.",
+        "unknownFilter": "Spalte {{column}}: unbekannter Filter „{{text}}“.",
+        "unknownToken": "Spalte {{column}}: unbekannter Platzhalter „{{text}}“.",
+        "unmatchedClosingBrace": "Spalte {{column}}: eine } ohne öffnende {."
+      },
+      "filtersHint": "Hinter einem Platzhalter |upper, |lower, |slug oder |trim:N anfügen, und ?Text als Ersatzwert, z. B. {lens|lower?ohneObjektiv}.",
+      "groups": {
+        "camera": "Kamera",
+        "custom": "Eigenes",
+        "date": "Datum",
+        "file": "Datei",
+        "library": "Bibliothek",
+        "sequence": "Folge"
+      },
+      "missing": "Einige Fotos haben keinen Wert für {{tokens}}; er bleibt leer.",
+      "noChanges": "Keine Namensänderungen.",
+      "preview": "Vorschau",
       "save": "Speichern",
+      "templates": {
+        "deleteMessage": "Dateinamenvorlage „{{name}}“ löschen? Dies kann nicht rückgängig gemacht werden.",
+        "deleteTitle": "Dateinamenvorlage löschen",
+        "fileName": "Dateinamenvorlagen",
+        "importNone": "Die Datei enthält keine Dateinamenvorlagen.",
+        "imported": "Dateinamenvorlagen importiert: {{count}}",
+        "nameConflict": "Eine Dateinamenvorlage mit diesem Namen existiert bereits.",
+        "placeholder": "Dateinamenvorlage",
+        "renameTitle": "Dateinamenvorlage umbenennen",
+        "save": "Als Dateinamenvorlage speichern",
+        "saveTitle": "Dateinamenvorlage speichern",
+        "starters": {
+          "customNumber": "Eigener Name – Originaldateinummer",
+          "customSequence": "Eigener Name – Folge",
+          "dateFilename": "Datum – Dateiname",
+          "dateTimeCamera": "Datum – Uhrzeit – Kamera",
+          "filename": "Dateiname"
+        }
+      },
       "titleMultiple": "{{count}} Bilder umbenennen",
       "titleMultiple_one": "{{count}} Bild umbenennen",
       "titleMultiple_other": "{{count}} Bilder umbenennen",

@@ -1709,8 +1709,54 @@
       "cancel": "取消",
       "fileNamingTemplate": "檔案命名模板",
       "newName": "新名稱",
-      "notUniqueWarning": "如果不包含 {original_filename}、{original_filename_number} 或 {sequence}，檔案可能會重名。此時不會重新命名任何檔案。",
+      "cleaned": "檔案名稱中不允許的字元已替換為 _。",
+      "clash": {
+        "batch": "多張相片會得到相同的名稱，例如 {{name}}。無法重新命名。",
+        "existingFile": "名為 {{name}} 的檔案已存在。無法重新命名。",
+        "existingSidecar": "另一張相片遺留的附屬檔案已使用名稱 {{name}}；相片會接管其編輯。無法重新命名。"
+      },
+      "customText": "自訂文字",
+      "errors": {
+        "emptyToken": "第 {{column}} 欄：空的大括號 {}。",
+        "formatNotAllowed": "第 {{column}} 欄：此標記不接受格式（「{{text}}」）。",
+        "invalidSequenceFormat": "第 {{column}} 欄：「{{text}}」不是序號格式；請使用位數、start=N 或兩者，例如 {seq:4:start=101}。",
+        "unclosedBrace": "第 {{column}} 欄：「{{text}}」缺少右大括號 }。",
+        "unknownFilter": "第 {{column}} 欄：未知的篩選器「{{text}}」。",
+        "unknownToken": "第 {{column}} 欄：未知的標記「{{text}}」。",
+        "unmatchedClosingBrace": "第 {{column}} 欄：} 沒有對應的 {。"
+      },
+      "filtersHint": "在標記後加上 |upper、|lower、|slug 或 |trim:N，並以 ?文字 指定備用值，例如 {lens|lower?nolens}。",
+      "groups": {
+        "camera": "相機",
+        "custom": "自訂",
+        "date": "日期",
+        "file": "檔案",
+        "library": "圖庫",
+        "sequence": "序號"
+      },
+      "missing": "部分相片沒有 {{tokens}} 的值；將留空。",
+      "noChanges": "名稱沒有變化。",
+      "preview": "預覽",
       "save": "儲存",
+      "templates": {
+        "deleteMessage": "刪除檔名模板「{{name}}」？此動作無法復原。",
+        "deleteTitle": "刪除檔名模板",
+        "fileName": "檔名模板",
+        "importNone": "檔案中沒有檔名模板。",
+        "imported": "已匯入檔名模板：{{count}}",
+        "nameConflict": "已有同名的檔名模板。",
+        "placeholder": "檔名模板",
+        "renameTitle": "重新命名檔名模板",
+        "save": "另存為檔名模板",
+        "saveTitle": "儲存檔名模板",
+        "starters": {
+          "customNumber": "自訂名稱 - 原始檔案編號",
+          "customSequence": "自訂名稱 - 序號",
+          "dateFilename": "日期 - 檔案名稱",
+          "dateTimeCamera": "日期 - 時間 - 相機",
+          "filename": "檔案名稱"
+        }
+      },
       "titleMultiple": "重新命名 {{count}} 張影像",
       "titleMultiple_one": "重新命名 {{count}} 張影像",
       "titleMultiple_other": "重新命名 {{count}} 張影像",

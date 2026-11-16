@@ -1748,8 +1748,54 @@
       "cancel": "Cancelar",
       "fileNamingTemplate": "Plantilla de nombre de archivo",
       "newName": "Nuevo nombre",
-      "notUniqueWarning": "Sin {original_filename}, {original_filename_number} o {sequence}, varios archivos pueden recibir el mismo nombre. En ese caso no se renombra nada.",
+      "cleaned": "Los caracteres que un nombre de archivo no puede contener se sustituyeron por _.",
+      "clash": {
+        "batch": "Varias fotos recibirían el mismo nombre, p. ej. {{name}}. No se puede renombrar nada.",
+        "existingFile": "Ya existe un archivo llamado {{name}}. No se puede renombrar nada.",
+        "existingSidecar": "Archivos auxiliares sobrantes de otra foto ya usan el nombre {{name}}; la foto heredaría sus ediciones. No se puede renombrar nada."
+      },
+      "customText": "Texto personalizado",
+      "errors": {
+        "emptyToken": "Columna {{column}}: llaves vacías {}.",
+        "formatNotAllowed": "Columna {{column}}: este token no admite formato («{{text}}»).",
+        "invalidSequenceFormat": "Columna {{column}}: «{{text}}» no es un formato de secuencia; usa un ancho, start=N o ambos, p. ej. {seq:4:start=101}.",
+        "unclosedBrace": "Columna {{column}}: «{{text}}» no tiene } de cierre.",
+        "unknownFilter": "Columna {{column}}: filtro desconocido «{{text}}».",
+        "unknownToken": "Columna {{column}}: token desconocido «{{text}}».",
+        "unmatchedClosingBrace": "Columna {{column}}: una } sin { de apertura."
+      },
+      "filtersHint": "Tras un token, añade |upper, |lower, |slug o |trim:N, y ?texto como alternativa, p. ej. {lens|lower?sinobjetivo}.",
+      "groups": {
+        "camera": "Cámara",
+        "custom": "Personalizado",
+        "date": "Fecha",
+        "file": "Archivo",
+        "library": "Biblioteca",
+        "sequence": "Secuencia"
+      },
+      "missing": "Algunas fotos no tienen valor para {{tokens}}; queda vacío.",
+      "noChanges": "Sin cambios de nombre.",
+      "preview": "Vista previa",
       "save": "Guardar",
+      "templates": {
+        "deleteMessage": "¿Eliminar la plantilla de nombre «{{name}}»? No se puede deshacer.",
+        "deleteTitle": "Eliminar plantilla de nombre",
+        "fileName": "Plantillas de nombre de archivo",
+        "importNone": "El archivo no contiene plantillas de nombre de archivo.",
+        "imported": "Plantillas de nombre importadas: {{count}}",
+        "nameConflict": "Ya existe una plantilla de nombre con este nombre.",
+        "placeholder": "Plantilla de nombre",
+        "renameTitle": "Renombrar plantilla de nombre",
+        "save": "Guardar como plantilla de nombre",
+        "saveTitle": "Guardar plantilla de nombre",
+        "starters": {
+          "customNumber": "Nombre personalizado - Número de archivo original",
+          "customSequence": "Nombre personalizado - Secuencia",
+          "dateFilename": "Fecha - Nombre de archivo",
+          "dateTimeCamera": "Fecha - Hora - Cámara",
+          "filename": "Nombre de archivo"
+        }
+      },
       "titleMultiple": "Renombrar {{count}} imágenes",
       "titleMultiple_many": "Renombrar {{count}} imágenes",
       "titleMultiple_one": "Renombrar {{count}} imagen",

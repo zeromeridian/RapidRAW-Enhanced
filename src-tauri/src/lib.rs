@@ -2860,6 +2860,8 @@ pub fn run() {
             file_management::move_files,
             file_management::move_folders,
             file_management::rename_folder,
+            naming::export_filename_templates,
+            naming::import_filename_templates,
             rename::preview_rename,
             rename::rename_files,
             file_management::duplicate_file,

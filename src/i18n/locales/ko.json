@@ -1709,8 +1709,54 @@
       "cancel": "취소",
       "fileNamingTemplate": "파일 이름 템플릿",
       "newName": "새 이름",
-      "notUniqueWarning": "{original_filename}, {original_filename_number}, {sequence} 중 하나도 없으면 파일 이름이 중복될 수 있습니다. 이 경우 아무 파일도 이름이 변경되지 않습니다.",
+      "cleaned": "파일 이름에 쓸 수 없는 문자는 _로 바뀌었습니다.",
+      "clash": {
+        "batch": "여러 사진이 같은 이름이 됩니다(예: {{name}}). 이름을 변경할 수 없습니다.",
+        "existingFile": "{{name}} 파일이 이미 있습니다. 이름을 변경할 수 없습니다.",
+        "existingSidecar": "다른 사진에서 남은 사이드카 파일이 이미 {{name}} 이름을 쓰고 있어 사진이 그 편집을 이어받게 됩니다. 이름을 변경할 수 없습니다."
+      },
+      "customText": "사용자 텍스트",
+      "errors": {
+        "emptyToken": "{{column}}열: 빈 중괄호 {}.",
+        "formatNotAllowed": "{{column}}열: 이 토큰은 형식을 받지 않습니다(\"{{text}}\").",
+        "invalidSequenceFormat": "{{column}}열: \"{{text}}\"는 순번 형식이 아닙니다. 자릿수, start=N 또는 둘 다 사용하세요(예: {seq:4:start=101}).",
+        "unclosedBrace": "{{column}}열: \"{{text}}\"에 닫는 }가 없습니다.",
+        "unknownFilter": "{{column}}열: 알 수 없는 필터 \"{{text}}\".",
+        "unknownToken": "{{column}}열: 알 수 없는 토큰 \"{{text}}\".",
+        "unmatchedClosingBrace": "{{column}}열: 여는 { 없는 }."
+      },
+      "filtersHint": "토큰 뒤에 |upper, |lower, |slug, |trim:N을 붙이고 ?텍스트로 대체 값을 지정할 수 있습니다(예: {lens|lower?nolens}).",
+      "groups": {
+        "camera": "카메라",
+        "custom": "사용자",
+        "date": "날짜",
+        "file": "파일",
+        "library": "라이브러리",
+        "sequence": "순번"
+      },
+      "missing": "일부 사진에는 {{tokens}} 값이 없어 비워 둡니다.",
+      "noChanges": "바뀌는 이름이 없습니다.",
+      "preview": "미리 보기",
       "save": "저장",
+      "templates": {
+        "deleteMessage": "파일 이름 템플릿 \"{{name}}\"을(를) 삭제할까요? 되돌릴 수 없습니다.",
+        "deleteTitle": "파일 이름 템플릿 삭제",
+        "fileName": "파일 이름 템플릿",
+        "importNone": "파일에 파일 이름 템플릿이 없습니다.",
+        "imported": "가져온 파일 이름 템플릿: {{count}}",
+        "nameConflict": "같은 이름의 파일 이름 템플릿이 이미 있습니다.",
+        "placeholder": "파일 이름 템플릿",
+        "renameTitle": "파일 이름 템플릿 이름 변경",
+        "save": "파일 이름 템플릿으로 저장",
+        "saveTitle": "파일 이름 템플릿 저장",
+        "starters": {
+          "customNumber": "사용자 이름 - 원본 파일 번호",
+          "customSequence": "사용자 이름 - 순번",
+          "dateFilename": "날짜 - 파일 이름",
+          "dateTimeCamera": "날짜 - 시간 - 카메라",
+          "filename": "파일 이름"
+        }
+      },
       "titleMultiple": "이미지 {{count}}개 이름 변경",
       "titleMultiple_one": "이미지 {{count}}개 이름 변경",
       "titleMultiple_other": "이미지 {{count}}개 이름 변경",

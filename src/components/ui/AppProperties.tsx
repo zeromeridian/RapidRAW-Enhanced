@@ -97,6 +97,8 @@ export enum Invokes {
   ImportBlendPadPresets = 'import_blend_pad_presets',
   ExportZoneTintPresets = 'export_zone_tint_presets',
   ImportZoneTintPresets = 'import_zone_tint_presets',
+  ExportFilenameTemplates = 'export_filename_templates',
+  ImportFilenameTemplates = 'import_filename_templates',
   HandleExportPresetsToFile = 'handle_export_presets_to_file',
   HandleImportPresetsFromFile = 'handle_import_presets_from_file',
   HandleImportPresetsFromFiles = 'handle_import_presets_from_files',
@@ -123,6 +125,7 @@ export enum Invokes {
   RegenerateThumbnails = 'regenerate_thumbnails',
   RefreshFolderThumbnails = 'refresh_folder_thumbnails',
   RemoveTagForPaths = 'remove_tag_for_paths',
+  PreviewRename = 'preview_rename',
   RenameFiles = 'rename_files',
   RenameFolder = 'rename_folder',
   ResetAdjustmentsForPaths = 'reset_adjustments_for_paths',
@@ -377,6 +380,8 @@ export interface AppSettings {
   zoneTintPresets?: Array<unknown> | null;
   /** Whether Zone Color Grading shows its Advanced controls; a view switch, not part of an edit. */
   zoneTintAdvanced?: boolean;
+  /** File-name templates shared by rename, export and import; absent until first changed, which offers the starters. */
+  filenameTemplates?: Array<unknown> | null;
   /** Whether the Adjustments panel shows the Favorites instead of every section (its All / Favorites switch). */
   showFavoriteAdjustments?: boolean;
   leftPanelWidth?: number;

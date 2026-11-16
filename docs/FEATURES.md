@@ -129,7 +129,9 @@ details are in `RELEASE_NOTES.MD`.
 - File-name templates for rename, import, and export with the syntax
   `{token:format|filter?fallback}`: the original tokens
   (`{original_filename}`, `{original_filename_number}`, `{sequence}`,
-  `{YYYY}`…`{ss}`), dates (`{date:…}`/`{capture:…}`, `{filedate:…}`,
+  `{YYYY}`…`{ss}`), `{YY}`, `{filename}` (current name; the
+  `{original_filename}` tokens use the name from before the first rename,
+  kept in the sidecar and XMP `xmpMM:PreservedFileName`), dates (`{date:…}`/`{capture:…}`, `{filedate:…}`,
   `{today:…}`), `{seq:width:start=N}`, EXIF (`{camera}`, `{lens}`,
   `{iso}`, `{focal}`, `{aperture}`, `{shutter}`), library (`{rating}`,
   `{label}`) and `{text}`; filters `upper`, `lower`, `slug`, `trim:N`.
@@ -142,6 +144,12 @@ details are in `RELEASE_NOTES.MD`.
   naming styles move with the photo. A RAW+JPEG partner left behind keeps
   the shared stem XMP and the renamed file gets a copy. Albums, keyword
   index, thumbnails and external-edit sessions follow the new name.
+- Lightroom-style Rename dialog for one or many photos: grouped token
+  chips, live preview of the first and last name, inline template errors,
+  clash and missing-value warnings (Rename disabled on clashes), a Custom
+  Text field, and sequence numbers in grid order. Saved filename templates
+  (save, update, rename, delete, export, import; five starters), stored
+  once in the settings for rename, export and import.
 - Caps Lock auto-advance after applying ratings, color labels, or flags.
 - Main Settings access from both Library and Develop.
 - Optional launch directly into the last library, bypassing the splash screen.

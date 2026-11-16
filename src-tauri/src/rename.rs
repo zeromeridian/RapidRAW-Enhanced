@@ -20,7 +20,10 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use tauri::AppHandle;
 
-use crate::file_management::{parse_sidecar_filename, parse_virtual_path, sync_album_path_changes};
+use crate::file_management::{
+    add_preserved_file_name_to_xmp_file, extract_xmp_preserved_file_name, parse_sidecar_filename,
+    parse_virtual_path, resolve_xmp_path, sync_album_path_changes, write_metadata_file,
+};
 use crate::formats::is_supported_image_file;
 use crate::naming::{NamingSource, Template, TemplateError, file_stem_from_rendered};
 
@@ -482,13 +485,21 @@ fn rename_files_blocking(
     if paths.is_empty() {
         return Ok(Vec::new());
     }
+    let check_clashes =
+        |plan: &RenamePlan| match plan.preview.items.iter().find(|i| i.clash.is_some()) {
+            Some(item) => Err(format!(
+                "{} of the new names are already taken, e.g. {}.",
+                plan.preview.clash_count, item.new_name
+            )),
+            None => Ok(()),
+        };
     let plan = plan_rename(paths, template, text)?;
-    if let Some(item) = plan.preview.items.iter().find(|item| item.clash.is_some()) {
-        return Err(format!(
-            "{} of the new names are already taken, e.g. {}.",
-            plan.preview.clash_count, item.new_name
-        ));
-    }
+    check_clashes(&plan)?;
+    // Remembering an original name may create a `.tirdata`, so plan again with it.
+    let settings = crate::app_settings::load_settings(app_handle.clone()).unwrap_or_default();
+    preserve_original_names(&plan.renamed, settings.enable_xmp_sync.unwrap_or(false))?;
+    let plan = plan_rename(paths, template, text)?;
+    check_clashes(&plan)?;
     apply_plan(&plan)?;
 
     let renames = path_map(&plan.renamed);
@@ -503,6 +514,37 @@ fn rename_files_blocking(
         .iter()
         .map(|path| renamed_path(path, &renames))
         .collect())
+}
+
+/// Remembers each photo's name from before its first rename, so `{original_filename}` keeps
+/// the camera's name (owner, 2026-11-16): in its `.tirdata` and, with XMP sync on, in an
+/// existing XMP as `xmpMM:PreservedFileName`. A name already recorded, here or by Bridge or
+/// Lightroom in the XMP, is kept. Runs before the moves; it stays if the rename then fails,
+/// which is harmless since it is the photo's true original name.
+fn preserve_original_names(
+    renamed: &[(PathBuf, PathBuf)],
+    enable_xmp_sync: bool,
+) -> Result<(), String> {
+    for (source, _) in renamed {
+        let sidecar = crate::exif_processing::get_primary_sidecar_path(source);
+        let mut metadata = crate::exif_processing::load_sidecar(&sidecar);
+        if metadata.preserved_file_name.is_some() {
+            continue;
+        }
+        let xmp = resolve_xmp_path(source);
+        let name = xmp
+            .as_ref()
+            .and_then(|path| fs::read_to_string(path).ok())
+            .and_then(|content| extract_xmp_preserved_file_name(&content))
+            .unwrap_or_else(|| file_name(source));
+        metadata.preserved_file_name = Some(name.clone());
+        let json = serde_json::to_string_pretty(&metadata).map_err(|error| error.to_string())?;
+        write_metadata_file(&sidecar, &json)?;
+        if enable_xmp_sync && let Some(xmp) = xmp {
+            add_preserved_file_name_to_xmp_file(&xmp, &name);
+        }
+    }
+    Ok(())
 }
 
 fn path_map(renamed: &[(PathBuf, PathBuf)]) -> HashMap<String, String> {
@@ -714,6 +756,58 @@ mod tests {
         assert_eq!(
             renamed_path(&copy, &path_map(&plan.renamed)),
             format!("{}?vc=abc123&name=Warm", path(&folder, "b.jpg"))
+        );
+    }
+
+    #[test]
+    fn the_name_before_the_first_rename_is_remembered_once() {
+        let preserved = |folder: &tempfile::TempDir, name: &str| {
+            crate::exif_processing::load_sidecar(&folder.path().join(format!("{name}.tirdata")))
+                .preserved_file_name
+        };
+        let folder = folder_with(&["IMG_0042.CR3", "IMG_0042.xmp"]);
+        fs::write(
+            folder.path().join("IMG_0042.xmp"),
+            "<rdf:Description>\n</rdf:Description>",
+        )
+        .unwrap();
+
+        let first = plan(&folder, &["IMG_0042.CR3"], "beach");
+        preserve_original_names(&first.renamed, true).unwrap();
+        let first = plan(&folder, &["IMG_0042.CR3"], "beach");
+        apply_plan(&first).unwrap();
+        assert_eq!(
+            preserved(&folder, "beach.CR3").as_deref(),
+            Some("IMG_0042.CR3")
+        );
+        let xmp = content(&folder, "beach.xmp");
+        assert!(xmp.contains("<xmpMM:PreservedFileName"));
+        assert_eq!(
+            extract_xmp_preserved_file_name(&xmp).as_deref(),
+            Some("IMG_0042.CR3")
+        );
+
+        // A second rename keeps the first original, and the token uses it.
+        let second = plan(&folder, &["beach.CR3"], "{original_filename}_again");
+        assert_eq!(second.preview.items[0].new_name, "IMG_0042_again.CR3");
+        preserve_original_names(&second.renamed, true).unwrap();
+        assert_eq!(
+            preserved(&folder, "beach.CR3").as_deref(),
+            Some("IMG_0042.CR3")
+        );
+
+        // A name Bridge or Lightroom recorded in the XMP wins over the current one.
+        let folder = folder_with(&["DSC_7.jpg", "DSC_7.xmp"]);
+        fs::write(
+            folder.path().join("DSC_7.xmp"),
+            "<rdf:Description xmpMM:PreservedFileName=\"P1000123.JPG\">\n</rdf:Description>",
+        )
+        .unwrap();
+        let renamed = plan(&folder, &["DSC_7.jpg"], "x").renamed;
+        preserve_original_names(&renamed, false).unwrap();
+        assert_eq!(
+            preserved(&folder, "DSC_7.jpg").as_deref(),
+            Some("P1000123.JPG")
         );
     }
 

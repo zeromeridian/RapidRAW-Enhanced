@@ -937,6 +937,11 @@ pub struct AppSettings {
     /// Whether Zone Color Grading shows its Advanced controls (a view switch for every photo).
     #[serde(default)]
     pub zone_tint_advanced: bool,
+    /// Named file-name templates shared by rename, export and import (`FilenameTemplate` in
+    /// `utils/filenameTemplates.ts`), cleaned there. `None` until first changed, so the
+    /// starter templates are offered; an empty list means every template was deleted.
+    #[serde(default)]
+    pub filename_templates: Option<Vec<Value>>,
     /// Whether the Adjustments panel shows the Favorites instead of every section.
     #[serde(default)]
     pub show_favorite_adjustments: bool,
@@ -1089,6 +1094,7 @@ impl Default for AppSettings {
             blend_pad_presets: Vec::new(),
             zone_tint_presets: None,
             zone_tint_advanced: false,
+            filename_templates: None,
             show_favorite_adjustments: false,
             left_panel_width: None,
             right_panel_width: None,
@@ -1334,6 +1340,28 @@ mod tests {
         assert_eq!(restored.blend_pad_presets, settings.blend_pad_presets);
         let older: AppSettings = serde_json::from_str("{}").expect("older settings load");
         assert!(older.blend_pad_presets.is_empty());
+    }
+
+    #[test]
+    fn filename_templates_keep_never_set_apart_from_all_deleted() {
+        let older: AppSettings = serde_json::from_str("{}").expect("older settings load");
+        assert_eq!(older.filename_templates, None);
+        for templates in [
+            Some(Vec::new()),
+            Some(vec![
+                json!({ "id": "t", "name": "Trip", "template": "{date}_{seq}" }),
+            ]),
+        ] {
+            let settings = AppSettings {
+                filename_templates: templates.clone(),
+                ..AppSettings::default()
+            };
+            let serialized = serde_json::to_string(&settings).expect("settings should serialize");
+            assert!(serialized.contains("\"filenameTemplates\""));
+            let restored: AppSettings =
+                serde_json::from_str(&serialized).expect("settings should deserialize");
+            assert_eq!(restored.filename_templates, templates);
+        }
     }
 
     #[test]

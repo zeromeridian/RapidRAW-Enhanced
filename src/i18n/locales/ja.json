@@ -1709,8 +1709,54 @@
       "cancel": "キャンセル",
       "fileNamingTemplate": "ファイル命名テンプレート",
       "newName": "新しい名前",
-      "notUniqueWarning": "{original_filename}、{original_filename_number}、{sequence} のいずれも含まれない場合、ファイル名が重複することがあります。その場合、名前は一切変更されません。",
+      "cleaned": "ファイル名に使えない文字は _ に置き換えられました。",
+      "clash": {
+        "batch": "複数の写真が同じ名前になります（例: {{name}}）。名前を変更できません。",
+        "existingFile": "{{name}} という名前のファイルが既にあります。名前を変更できません。",
+        "existingSidecar": "別の写真から残ったサイドカーファイルが既に {{name}} という名前を使っています。写真がその編集を引き継いでしまいます。名前を変更できません。"
+      },
+      "customText": "カスタムテキスト",
+      "errors": {
+        "emptyToken": "{{column}} 列目: 空の波かっこ {}。",
+        "formatNotAllowed": "{{column}} 列目: このトークンは書式を取りません（「{{text}}」）。",
+        "invalidSequenceFormat": "{{column}} 列目: 「{{text}}」は連番の書式ではありません。桁数、start=N、またはその両方を使ってください（例: {seq:4:start=101}）。",
+        "unclosedBrace": "{{column}} 列目: 「{{text}}」に閉じる } がありません。",
+        "unknownFilter": "{{column}} 列目: 不明なフィルター「{{text}}」。",
+        "unknownToken": "{{column}} 列目: 不明なトークン「{{text}}」。",
+        "unmatchedClosingBrace": "{{column}} 列目: 開く { のない }。"
+      },
+      "filtersHint": "トークンの後に |upper、|lower、|slug、|trim:N を付け、?テキスト で代替値を指定できます（例: {lens|lower?nolens}）。",
+      "groups": {
+        "camera": "カメラ",
+        "custom": "カスタム",
+        "date": "日付",
+        "file": "ファイル",
+        "library": "ライブラリ",
+        "sequence": "連番"
+      },
+      "missing": "一部の写真には {{tokens}} の値がありません。空のままになります。",
+      "noChanges": "名前は変わりません。",
+      "preview": "プレビュー",
       "save": "保存",
+      "templates": {
+        "deleteMessage": "ファイル名テンプレート「{{name}}」を削除しますか？元に戻せません。",
+        "deleteTitle": "ファイル名テンプレートを削除",
+        "fileName": "ファイル名テンプレート",
+        "importNone": "ファイルにファイル名テンプレートが含まれていません。",
+        "imported": "読み込んだファイル名テンプレート: {{count}}",
+        "nameConflict": "この名前のファイル名テンプレートは既にあります。",
+        "placeholder": "ファイル名テンプレート",
+        "renameTitle": "ファイル名テンプレートの名前を変更",
+        "save": "ファイル名テンプレートとして保存",
+        "saveTitle": "ファイル名テンプレートを保存",
+        "starters": {
+          "customNumber": "カスタム名 - 元のファイル番号",
+          "customSequence": "カスタム名 - 連番",
+          "dateFilename": "日付 - ファイル名",
+          "dateTimeCamera": "日付 - 時刻 - カメラ",
+          "filename": "ファイル名"
+        }
+      },
       "titleMultiple": "{{count}} 件の画像名を変更",
       "titleMultiple_one": "{{count}} 件の画像名を変更",
       "titleMultiple_other": "{{count}} 件の画像名を変更",

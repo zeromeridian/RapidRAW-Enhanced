@@ -13,7 +13,7 @@
 
 use std::cell::OnceCell;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use chrono::{Local, NaiveDateTime};
 use serde::Serialize;
@@ -30,12 +30,31 @@ pub const MAX_STEM_BYTES: usize = 200;
 
 const DEFAULT_DATE_FORMAT: &str = "YYYYMMDD";
 
+const TEMPLATE_FILE_FORMAT: &str = "ThisIsRAW filename templates";
+
+/// Writes named file-name templates to a file (`preset_file`).
+#[tauri::command]
+pub fn export_filename_templates(
+    presets: Vec<serde_json::Value>,
+    file_path: String,
+) -> Result<(), String> {
+    crate::preset_file::write(TEMPLATE_FILE_FORMAT, presets, &file_path)
+}
+
+/// Reads the templates of a file (`preset_file`); the dialog cleans every one.
+#[tauri::command]
+pub fn import_filename_templates(file_path: String) -> Result<Vec<serde_json::Value>, String> {
+    crate::preset_file::read(&file_path)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Token {
+    Filename,
     OriginalFilename,
     OriginalFilenameNumber,
     Sequence,
     Year,
+    ShortYear,
     Month,
     Day,
     Hour,
@@ -58,10 +77,12 @@ enum Token {
 impl Token {
     fn from_name(name: &str) -> Option<Self> {
         Some(match name {
+            "filename" => Self::Filename,
             "original_filename" => Self::OriginalFilename,
             "original_filename_number" => Self::OriginalFilenameNumber,
             "sequence" | "seq" => Self::Sequence,
             "YYYY" => Self::Year,
+            "YY" => Self::ShortYear,
             "MM" => Self::Month,
             "DD" => Self::Day,
             "hh" => Self::Hour,
@@ -443,6 +464,7 @@ pub struct NamingSource {
     capture: OnceCell<NaiveDateTime>,
     exif: OnceCell<HashMap<String, String>>,
     metadata: OnceCell<ImageMetadata>,
+    preserved: OnceCell<Option<String>>,
 }
 
 impl NamingSource {
@@ -459,6 +481,7 @@ impl NamingSource {
             capture: OnceCell::new(),
             exif: OnceCell::new(),
             metadata: OnceCell::new(),
+            preserved: OnceCell::new(),
         }
     }
 
@@ -474,11 +497,27 @@ impl NamingSource {
         self
     }
 
-    fn original_stem(&self) -> &str {
+    /// The file's current stem (`{filename}`).
+    fn current_stem(&self) -> &str {
         self.image_path
             .file_stem()
             .and_then(|stem| stem.to_str())
             .unwrap_or("image")
+    }
+
+    /// The stem from before the file's first rename, kept in its own
+    /// `.tirdata` (a virtual copy shares it), else the current one.
+    fn original_stem(&self) -> String {
+        let preserved = self
+            .preserved
+            .get_or_init(|| {
+                let primary = exif_processing::get_primary_sidecar_path(&self.image_path);
+                exif_processing::load_sidecar(&primary).preserved_file_name
+            })
+            .as_deref()
+            .and_then(|name| Path::new(name).file_stem())
+            .and_then(|stem| stem.to_str());
+        preserved.unwrap_or_else(|| self.current_stem()).to_string()
     }
 
     fn capture(&self) -> &NaiveDateTime {
@@ -504,7 +543,8 @@ impl NamingSource {
     fn value(&self, field: &Field) -> Option<String> {
         let capture_part = |strftime: &str| Some(self.capture().format(strftime).to_string());
         match field.token {
-            Token::OriginalFilename => Some(self.original_stem().to_string()),
+            Token::Filename => Some(self.current_stem().to_string()),
+            Token::OriginalFilename => Some(self.original_stem()),
             Token::OriginalFilenameNumber => {
                 let stem = self.original_stem();
                 let prefix = stem.trim_end_matches(|c: char| c.is_ascii_digit());
@@ -520,6 +560,7 @@ impl NamingSource {
                 Some(format!("{number:0width$}"))
             }
             Token::Year => capture_part("%Y"),
+            Token::ShortYear => capture_part("%y"),
             Token::Month => capture_part("%m"),
             Token::Day => capture_part("%d"),
             Token::Hour => capture_part("%H"),
@@ -579,7 +620,7 @@ pub fn file_stem_from_template(template: &str, source: &NamingSource) -> String 
 /// `rendered` is empty.
 pub fn file_stem_from_rendered(rendered: &RenderedName, source: &NamingSource) -> String {
     if rendered.stem.is_empty() {
-        clean_file_stem(source.original_stem())
+        clean_file_stem(source.current_stem())
     } else {
         rendered.stem.clone()
     }
@@ -717,6 +758,7 @@ mod tests {
             "IMG_0042_0042_003"
         );
         assert_eq!(stem("{YYYY}-{MM}-{DD}_{hh}{mm}{ss}"), "2026-05-03_003007");
+        assert_eq!(stem("{YY}{MM}{DD}"), "260503");
         assert_eq!(stem("{original_filename}_edited"), "IMG_0042_edited");
     }
 
@@ -813,6 +855,43 @@ mod tests {
         let source = NamingSource::new("/photos/IMG_7.jpg", 1, 1);
         assert_eq!(file_stem_from_template("{label}", &source), "IMG_7");
         assert_eq!(file_stem_from_template("{label}_{seq}", &source), "_1");
+    }
+
+    #[test]
+    fn original_tokens_use_the_name_from_before_the_first_rename() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("beach_sunset.CR3");
+        fs::write(&image, []).unwrap();
+        let path = image.to_string_lossy().into_owned();
+        let template = "{filename}|{original_filename}|{original_filename_number}";
+
+        // Nothing remembered yet: the current name.
+        let source = NamingSource::new(&path, 1, 1);
+        assert_eq!(
+            file_stem_from_template(template, &source),
+            "beach_sunset_beach_sunset_"
+        );
+
+        let metadata = ImageMetadata {
+            preserved_file_name: Some("IMG_0042.CR3".to_string()),
+            ..ImageMetadata::default()
+        };
+        fs::write(
+            exif_processing::get_primary_sidecar_path(&image),
+            serde_json::to_string(&metadata).unwrap(),
+        )
+        .unwrap();
+        let source = NamingSource::new(&path, 1, 1);
+        assert_eq!(
+            file_stem_from_template(template, &source),
+            "beach_sunset_IMG_0042_0042"
+        );
+        // A virtual copy shares its photo's original name.
+        let copy = NamingSource::new(&format!("{path}?vc=abc123"), 1, 1);
+        assert_eq!(
+            file_stem_from_template("{original_filename}", &copy),
+            "IMG_0042"
+        );
     }
 
     #[test]

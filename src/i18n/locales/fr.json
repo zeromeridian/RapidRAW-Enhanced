@@ -1748,8 +1748,54 @@
       "cancel": "Annuler",
       "fileNamingTemplate": "Modèle de nommage de fichier",
       "newName": "Nouveau nom",
-      "notUniqueWarning": "Sans {original_filename}, {original_filename_number} ou {sequence}, plusieurs fichiers peuvent recevoir le même nom. Dans ce cas, rien n'est renommé.",
+      "cleaned": "Les caractères interdits dans les noms de fichier ont été remplacés par _.",
+      "clash": {
+        "batch": "Plusieurs photos recevraient le même nom, p. ex. {{name}}. Rien ne peut être renommé.",
+        "existingFile": "Un fichier nommé {{name}} existe déjà. Rien ne peut être renommé.",
+        "existingSidecar": "Des fichiers annexes restant d'une autre photo utilisent déjà le nom {{name}} ; la photo reprendrait leurs retouches. Rien ne peut être renommé."
+      },
+      "customText": "Texte personnalisé",
+      "errors": {
+        "emptyToken": "Colonne {{column}} : accolades vides {}.",
+        "formatNotAllowed": "Colonne {{column}} : ce jeton n'accepte pas de format (« {{text}} »).",
+        "invalidSequenceFormat": "Colonne {{column}} : « {{text}} » n'est pas un format de séquence ; utilisez une largeur, start=N ou les deux, p. ex. {seq:4:start=101}.",
+        "unclosedBrace": "Colonne {{column}} : « {{text}} » n'a pas de } fermante.",
+        "unknownFilter": "Colonne {{column}} : filtre inconnu « {{text}} ».",
+        "unknownToken": "Colonne {{column}} : jeton inconnu « {{text}} ».",
+        "unmatchedClosingBrace": "Colonne {{column}} : une } sans { ouvrante."
+      },
+      "filtersHint": "Après un jeton, ajoutez |upper, |lower, |slug ou |trim:N, et ?texte comme valeur de repli, p. ex. {lens|lower?sansobjectif}.",
+      "groups": {
+        "camera": "Appareil",
+        "custom": "Personnalisé",
+        "date": "Date",
+        "file": "Fichier",
+        "library": "Bibliothèque",
+        "sequence": "Séquence"
+      },
+      "missing": "Certaines photos n'ont pas de valeur pour {{tokens}} ; elle reste vide.",
+      "noChanges": "Aucun nom ne change.",
+      "preview": "Aperçu",
       "save": "Enregistrer",
+      "templates": {
+        "deleteMessage": "Supprimer le modèle de nom « {{name}} » ? Cette action est irréversible.",
+        "deleteTitle": "Supprimer le modèle de nom",
+        "fileName": "Modèles de nom de fichier",
+        "importNone": "Le fichier ne contient aucun modèle de nom de fichier.",
+        "imported": "Modèles de nom importés : {{count}}",
+        "nameConflict": "Un modèle de nom portant ce nom existe déjà.",
+        "placeholder": "Modèle de nom",
+        "renameTitle": "Renommer le modèle de nom",
+        "save": "Enregistrer comme modèle de nom",
+        "saveTitle": "Enregistrer le modèle de nom",
+        "starters": {
+          "customNumber": "Nom personnalisé - Numéro de fichier d'origine",
+          "customSequence": "Nom personnalisé - Séquence",
+          "dateFilename": "Date - Nom de fichier",
+          "dateTimeCamera": "Date - Heure - Appareil",
+          "filename": "Nom de fichier"
+        }
+      },
       "titleMultiple": "Renommer {{count}} images",
       "titleMultiple_many": "Renommer {{count}} images",
       "titleMultiple_one": "Renommer {{count}} image",

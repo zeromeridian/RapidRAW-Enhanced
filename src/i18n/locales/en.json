@@ -1831,8 +1831,54 @@
       "cancel": "Cancel",
       "fileNamingTemplate": "File Naming Template",
       "newName": "New Name",
-      "notUniqueWarning": "Without {original_filename}, {original_filename_number} or {sequence}, files may get the same name. Then nothing is renamed.",
+      "cleaned": "Characters that file names cannot contain were replaced with _.",
+      "clash": {
+        "batch": "Several photos would get the same name, e.g. {{name}}. Nothing can be renamed.",
+        "existingFile": "A file named {{name}} already exists. Nothing can be renamed.",
+        "existingSidecar": "Sidecar files left over from another photo already use the name {{name}}; the photo would take over their edits. Nothing can be renamed."
+      },
+      "customText": "Custom Text",
+      "errors": {
+        "emptyToken": "Column {{column}}: empty braces {}.",
+        "formatNotAllowed": "Column {{column}}: this token takes no format (\"{{text}}\").",
+        "invalidSequenceFormat": "Column {{column}}: \"{{text}}\" is not a sequence format; use a width, start=N, or both, e.g. {seq:4:start=101}.",
+        "unclosedBrace": "Column {{column}}: \"{{text}}\" has no closing }.",
+        "unknownFilter": "Column {{column}}: unknown filter \"{{text}}\".",
+        "unknownToken": "Column {{column}}: unknown token \"{{text}}\".",
+        "unmatchedClosingBrace": "Column {{column}}: a } without an opening {."
+      },
+      "filtersHint": "After a token, add |upper, |lower, |slug or |trim:N, and ?text for a fallback, e.g. {lens|lower?nolens}.",
+      "groups": {
+        "camera": "Camera",
+        "custom": "Custom",
+        "date": "Date",
+        "file": "File",
+        "library": "Library",
+        "sequence": "Sequence"
+      },
+      "missing": "Some photos have no value for {{tokens}}; it stays empty.",
+      "noChanges": "No name changes.",
+      "preview": "Preview",
       "save": "Save",
+      "templates": {
+        "deleteMessage": "Delete filename template \"{{name}}\"? This cannot be undone.",
+        "deleteTitle": "Delete Filename Template",
+        "fileName": "Filename Templates",
+        "importNone": "The file contains no filename templates.",
+        "imported": "Filename templates imported: {{count}}",
+        "nameConflict": "A filename template with this name already exists.",
+        "placeholder": "Filename template",
+        "renameTitle": "Rename Filename Template",
+        "save": "Save as filename template",
+        "saveTitle": "Save Filename Template",
+        "starters": {
+          "customNumber": "Custom Name - Original File Number",
+          "customSequence": "Custom Name - Sequence",
+          "dateFilename": "Date - Filename",
+          "dateTimeCamera": "Date - Time - Camera",
+          "filename": "Filename"
+        }
+      },
       "titleMultiple": "Rename {{count}} Images",
       "titleMultiple_one": "Rename {{count}} Image",
       "titleMultiple_other": "Rename {{count}} Images",

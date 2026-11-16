@@ -74,6 +74,10 @@ pub struct ImageMetadata {
     /// Modification time of the image when its embedded XMP was last imported.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub embedded_xmp_modified: Option<u64>,
+    /// The image's file name before its first rename (XMP `xmpMM:PreservedFileName`), which
+    /// `{original_filename}` uses; set once, then kept.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preserved_file_name: Option<String>,
 }
 
 impl Default for ImageMetadata {
@@ -87,6 +91,7 @@ impl Default for ImageMetadata {
             copy_name_suffix: None,
             xmp_stack: None,
             embedded_xmp_modified: None,
+            preserved_file_name: None,
         }
     }
 }

@@ -1748,8 +1748,54 @@
       "cancel": "Annulla",
       "fileNamingTemplate": "Modello Nomenclatura File",
       "newName": "Nuovo Nome",
-      "notUniqueWarning": "Senza {original_filename}, {original_filename_number} o {sequence}, più file possono ricevere lo stesso nome. In tal caso non viene rinominato nulla.",
+      "cleaned": "I caratteri non ammessi nei nomi di file sono stati sostituiti con _.",
+      "clash": {
+        "batch": "Più foto riceverebbero lo stesso nome, ad es. {{name}}. Non è possibile rinominare nulla.",
+        "existingFile": "Esiste già un file chiamato {{name}}. Non è possibile rinominare nulla.",
+        "existingSidecar": "File collaterali rimasti da un'altra foto usano già il nome {{name}}; la foto ne erediterebbe le modifiche. Non è possibile rinominare nulla."
+      },
+      "customText": "Testo personalizzato",
+      "errors": {
+        "emptyToken": "Colonna {{column}}: parentesi graffe vuote {}.",
+        "formatNotAllowed": "Colonna {{column}}: questo token non accetta un formato (\"{{text}}\").",
+        "invalidSequenceFormat": "Colonna {{column}}: \"{{text}}\" non è un formato di sequenza; usa una larghezza, start=N o entrambi, ad es. {seq:4:start=101}.",
+        "unclosedBrace": "Colonna {{column}}: \"{{text}}\" non ha la } di chiusura.",
+        "unknownFilter": "Colonna {{column}}: filtro sconosciuto \"{{text}}\".",
+        "unknownToken": "Colonna {{column}}: token sconosciuto \"{{text}}\".",
+        "unmatchedClosingBrace": "Colonna {{column}}: una } senza { di apertura."
+      },
+      "filtersHint": "Dopo un token aggiungi |upper, |lower, |slug o |trim:N, e ?testo come alternativa, ad es. {lens|lower?senzaobiettivo}.",
+      "groups": {
+        "camera": "Fotocamera",
+        "custom": "Personalizzato",
+        "date": "Data",
+        "file": "File",
+        "library": "Libreria",
+        "sequence": "Sequenza"
+      },
+      "missing": "Alcune foto non hanno un valore per {{tokens}}; resta vuoto.",
+      "noChanges": "Nessun nome cambia.",
+      "preview": "Anteprima",
       "save": "Salva",
+      "templates": {
+        "deleteMessage": "Eliminare il modello di nome \"{{name}}\"? L'operazione non può essere annullata.",
+        "deleteTitle": "Elimina modello di nome",
+        "fileName": "Modelli di nome file",
+        "importNone": "Il file non contiene modelli di nome file.",
+        "imported": "Modelli di nome importati: {{count}}",
+        "nameConflict": "Esiste già un modello di nome con questo nome.",
+        "placeholder": "Modello di nome",
+        "renameTitle": "Rinomina modello di nome",
+        "save": "Salva come modello di nome",
+        "saveTitle": "Salva modello di nome",
+        "starters": {
+          "customNumber": "Nome personalizzato - Numero file originale",
+          "customSequence": "Nome personalizzato - Sequenza",
+          "dateFilename": "Data - Nome file",
+          "dateTimeCamera": "Data - Ora - Fotocamera",
+          "filename": "Nome file"
+        }
+      },
       "titleMultiple": "Rinomina {{count}} Immagini",
       "titleMultiple_many": "Rinomina {{count}} Immagini",
       "titleMultiple_one": "Rinomina {{count}} Immagine",

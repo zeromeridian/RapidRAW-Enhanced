@@ -1113,6 +1113,29 @@ mod output_naming_tests {
     }
 
     #[test]
+    fn the_preserved_file_name_travels_through_xmp_and_is_never_replaced() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("beach.CR3");
+        fs::write(&image, []).unwrap();
+        let mut metadata = ImageMetadata {
+            preserved_file_name: Some("IMG_0042.CR3".to_string()),
+            ..ImageMetadata::default()
+        };
+        sync_metadata_to_xmp(&image, &metadata, true);
+        metadata.preserved_file_name = Some("other.CR3".to_string());
+        sync_metadata_to_xmp(&image, &metadata, true);
+
+        let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
+        assert_eq!(xmp.matches("<xmpMM:PreservedFileName").count(), 1, "{xmp}");
+        let mut imported = ImageMetadata::default();
+        assert!(sync_metadata_from_xmp(&image, &mut imported, false));
+        assert_eq!(
+            imported.preserved_file_name.as_deref(),
+            Some("IMG_0042.CR3")
+        );
+    }
+
+    #[test]
     fn automatic_geometry_round_trips_through_xmp() {
         let folder = tempfile::tempdir().unwrap();
         let image = folder.path().join("building.raw");
@@ -6596,17 +6619,57 @@ fn write_image_stacks_to_xmp(
 }
 
 pub fn extract_xmp_label(content: &str) -> Option<String> {
-    if let Some(idx) = content.find("xmp:Label=\"") {
-        let start = idx + 11;
+    extract_xmp_text(content, "xmp:Label")
+}
+
+/// A simple XMP property, written as an attribute or an element (`xmp:Label`), the element
+/// possibly with attributes of its own (an inline namespace).
+fn extract_xmp_text(content: &str, name: &str) -> Option<String> {
+    let attribute = format!("{name}=\"");
+    if let Some(idx) = content.find(&attribute) {
+        let start = idx + attribute.len();
         let end = content[start..].find('"').map(|i| start + i)?;
         return Some(unescape_xmp_text(&content[start..end]));
     }
-    if let Some(idx) = content.find("<xmp:Label>") {
-        let start = idx + 11;
-        let end = content[start..].find('<').map(|i| start + i)?;
-        return Some(unescape_xmp_text(&content[start..end]));
+    let name = regex::escape(name);
+    let element = Regex::new(&format!(r"<{name}(?:\s[^>]*)?>([^<]*)</{name}>")).ok()?;
+    element
+        .captures(content)
+        .map(|captures| unescape_xmp_text(&captures[1]))
+}
+
+const XMP_MM_NAMESPACE: &str = "http://ns.adobe.com/xap/1.0/mm/";
+const PRESERVED_FILE_NAME: &str = "xmpMM:PreservedFileName";
+
+/// The file name an XMP records from before a rename (by ThisIsRAW, Bridge or Lightroom).
+pub(crate) fn extract_xmp_preserved_file_name(content: &str) -> Option<String> {
+    extract_xmp_text(content, PRESERVED_FILE_NAME).filter(|name| !name.trim().is_empty())
+}
+
+/// Adds `xmpMM:PreservedFileName` unless the XMP already records one, which is kept.
+fn add_xmp_preserved_file_name(content: &mut String, name: &str) {
+    if extract_xmp_text(content, PRESERVED_FILE_NAME).is_some() {
+        return;
     }
-    None
+    if let Some(last_index) = content.rfind("</rdf:Description>") {
+        let node = format!(
+            " <{PRESERVED_FILE_NAME} xmlns:xmpMM=\"{XMP_MM_NAMESPACE}\">{}</{PRESERVED_FILE_NAME}>\n",
+            escape_xmp_text(name)
+        );
+        content.insert_str(last_index, &node);
+    }
+}
+
+/// Records `name` as the preserved file name in the XMP at `xmp_path`, unless it already has
+/// one. Only that property is touched.
+pub(crate) fn add_preserved_file_name_to_xmp_file(xmp_path: &Path, name: &str) {
+    if let Ok(mut content) = fs::read_to_string(xmp_path) {
+        let before = content.len();
+        add_xmp_preserved_file_name(&mut content, name);
+        if content.len() != before {
+            let _ = write_metadata_file(xmp_path, &content);
+        }
+    }
 }
 
 const APP_XMP_NAMESPACE: &str = "https://colrbent.com/ns/this-is-raw/1.0/";
@@ -6975,6 +7038,14 @@ fn apply_xmp(content: &str, metadata: &mut ImageMetadata, force: bool) -> bool {
         }
     }
 
+    if let Some(name) = extract_xmp_preserved_file_name(content)
+        && (force || metadata.preserved_file_name.is_none())
+        && metadata.preserved_file_name.as_deref() != Some(name.as_str())
+    {
+        metadata.preserved_file_name = Some(name);
+        changed = true;
+    }
+
     let xmp_stack = extract_xmp_stack(content);
     if metadata.xmp_stack != xmp_stack {
         metadata.xmp_stack = xmp_stack;
@@ -7279,6 +7350,10 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
         );
         let ai_keywords = serde_json::to_string(&keywords.ai).unwrap_or_default();
         set_app_xmp_value(&mut content, "AiKeywords", Some(&ai_keywords));
+
+        if let Some(name) = &metadata.preserved_file_name {
+            add_xmp_preserved_file_name(&mut content, name);
+        }
 
         let _ = write_metadata_file(&xmp_file, &content);
     }

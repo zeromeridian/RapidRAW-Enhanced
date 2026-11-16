@@ -1709,8 +1709,54 @@
       "cancel": "取消",
       "fileNamingTemplate": "文件命名模板",
       "newName": "新名称",
-      "notUniqueWarning": "如果不包含 {original_filename}、{original_filename_number} 或 {sequence}，文件可能会重名。此时不会重命名任何文件。",
+      "cleaned": "文件名中不允许的字符已替换为 _。",
+      "clash": {
+        "batch": "多张照片会得到相同的名称，例如 {{name}}。无法重命名。",
+        "existingFile": "名为 {{name}} 的文件已存在。无法重命名。",
+        "existingSidecar": "另一张照片遗留的附属文件已使用名称 {{name}}；照片会接管其编辑。无法重命名。"
+      },
+      "customText": "自定义文本",
+      "errors": {
+        "emptyToken": "第 {{column}} 列：空的花括号 {}。",
+        "formatNotAllowed": "第 {{column}} 列：此标记不接受格式（“{{text}}”）。",
+        "invalidSequenceFormat": "第 {{column}} 列：“{{text}}”不是序号格式；请使用位数、start=N 或两者，例如 {seq:4:start=101}。",
+        "unclosedBrace": "第 {{column}} 列：“{{text}}”缺少右花括号 }。",
+        "unknownFilter": "第 {{column}} 列：未知过滤器“{{text}}”。",
+        "unknownToken": "第 {{column}} 列：未知标记“{{text}}”。",
+        "unmatchedClosingBrace": "第 {{column}} 列：} 没有对应的 {。"
+      },
+      "filtersHint": "在标记后添加 |upper、|lower、|slug 或 |trim:N，并用 ?文本 指定备用值，例如 {lens|lower?nolens}。",
+      "groups": {
+        "camera": "相机",
+        "custom": "自定义",
+        "date": "日期",
+        "file": "文件",
+        "library": "图库",
+        "sequence": "序号"
+      },
+      "missing": "部分照片没有 {{tokens}} 的值；将留空。",
+      "noChanges": "名称没有变化。",
+      "preview": "预览",
       "save": "保存",
+      "templates": {
+        "deleteMessage": "删除文件名模板“{{name}}”？此操作无法撤销。",
+        "deleteTitle": "删除文件名模板",
+        "fileName": "文件名模板",
+        "importNone": "文件中没有文件名模板。",
+        "imported": "已导入文件名模板：{{count}}",
+        "nameConflict": "已存在同名的文件名模板。",
+        "placeholder": "文件名模板",
+        "renameTitle": "重命名文件名模板",
+        "save": "另存为文件名模板",
+        "saveTitle": "保存文件名模板",
+        "starters": {
+          "customNumber": "自定义名称 - 原始文件编号",
+          "customSequence": "自定义名称 - 序号",
+          "dateFilename": "日期 - 文件名",
+          "dateTimeCamera": "日期 - 时间 - 相机",
+          "filename": "文件名"
+        }
+      },
       "titleMultiple": "重命名 {{count}} 张图像",
       "titleMultiple_one": "重命名 {{count}} 张图像",
       "titleMultiple_other": "重命名 {{count}} 张图像",

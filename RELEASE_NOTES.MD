@@ -5,6 +5,46 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.76.1-dev-lightroom-rename — 2026-11-16
+
+### Library
+
+- ThisIsRAW now remembers a photo's name from before its first rename
+  (in its sidecar and, with XMP sync on, in its XMP as
+  `xmpMM:PreservedFileName`, the field Adobe Bridge and Lightroom use; a
+  name they recorded there is picked up). `{original_filename}` and
+  `{original_filename_number}` use it, so the camera's file name and
+  number survive any number of renames.
+- New token `{filename}` for the current file name. The "Filename"
+  starter template uses it.
+- Note: for a photo renamed in ThisIsRAW, an export template with
+  `{original_filename}` (including the default `…_edited`) now uses the
+  camera's name; use `{filename}` for the current one. Photos renamed
+  before this version have no remembered name and keep using their
+  current one.
+
+## 1.76.0-dev-lightroom-rename — 2026-11-16
+
+### Library
+
+- A new Rename dialog, for one photo or many:
+  - Token chips grouped by File, Sequence, Date, Camera, Library and
+    Custom; click one to insert it.
+  - A live preview of the first and last new name that updates as you
+    type, with mistakes in the template explained inline.
+  - Names that are already taken are shown before you rename, and the
+    Rename button stays off until they are resolved; photos missing a
+    value (for example no lens data) are pointed out.
+  - A Custom Text field for templates that use `{text}`.
+- Saved filename templates, as in Lightroom Classic: save, update,
+  rename, delete, export and import them. Five starter templates are
+  included (Filename; Custom Name - Sequence; Custom Name - Original
+  File Number; Date - Filename; Date - Time - Camera). Export and import
+  will use the same list.
+- Sequence numbers follow the order of the grid, not the order in which
+  the photos were selected.
+- New token `{YY}` for the two-digit year (e.g. `26`).
+
 ## 1.75.0-dev-lightroom-rename — 2026-11-16
 
 ### Library

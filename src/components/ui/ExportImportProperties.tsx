@@ -24,10 +24,12 @@ export const FILE_FORMATS: Array<FileFormat> = [
 ];
 
 export const FILENAME_VARIABLES: Array<string> = [
+  '{filename}',
   '{original_filename}',
   '{original_filename_number}',
   '{sequence}',
   '{YYYY}',
+  '{YY}',
   '{MM}',
   '{DD}',
   '{hh}',
@@ -37,7 +39,7 @@ export const FILENAME_VARIABLES: Array<string> = [
 
 // A token that differs per photo, with or without a format, filters or a
 // fallback (`{seq:4}`, `{original_filename|lower}`; see `naming.rs`).
-const UNIQUE_FILENAME_TOKEN = /\{(?:original_filename|original_filename_number|sequence|seq)[:|?}]/;
+const UNIQUE_FILENAME_TOKEN = /\{(?:filename|original_filename|original_filename_number|sequence|seq)[:|?}]/;
 
 export const isUniqueFilenameTemplate = (template: string): boolean => UNIQUE_FILENAME_TOKEN.test(template);
 

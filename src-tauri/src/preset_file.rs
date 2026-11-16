@@ -1,6 +1,7 @@
-//! Files of named tool presets (the Orbit Blend Pad's and Zone Color Grading's). The panels
-//! build and clean the presets (`utils/blendPad.ts`, `utils/zoneTint.ts`); this only wraps
-//! them with a file's format and version, and reads them back.
+//! Files of named tool presets (the Orbit Blend Pad's, Zone Color Grading's, file-name
+//! templates). The frontend builds and cleans the presets (`utils/blendPad.ts`,
+//! `utils/zoneTint.ts`, `utils/filenameTemplates.ts`); this only wraps them with a file's
+//! format and version, and reads them back.
 
 use serde_json::Value;
 

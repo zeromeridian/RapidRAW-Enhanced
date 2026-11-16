@@ -1785,8 +1785,54 @@
       "cancel": "Anuluj",
       "fileNamingTemplate": "Szablon nazywania plików",
       "newName": "Nowa nazwa",
-      "notUniqueWarning": "Bez {original_filename}, {original_filename_number} lub {sequence} pliki mogą otrzymać tę samą nazwę. Wtedy żaden plik nie zostanie przemianowany.",
+      "cleaned": "Znaki niedozwolone w nazwach plików zastąpiono znakiem _.",
+      "clash": {
+        "batch": "Kilka zdjęć otrzymałoby tę samą nazwę, np. {{name}}. Nie można niczego przemianować.",
+        "existingFile": "Plik o nazwie {{name}} już istnieje. Nie można niczego przemianować.",
+        "existingSidecar": "Pozostałe pliki pomocnicze innego zdjęcia już używają nazwy {{name}}; zdjęcie przejęłoby ich edycje. Nie można niczego przemianować."
+      },
+      "customText": "Własny tekst",
+      "errors": {
+        "emptyToken": "Kolumna {{column}}: puste nawiasy {}.",
+        "formatNotAllowed": "Kolumna {{column}}: ten token nie przyjmuje formatu („{{text}}”).",
+        "invalidSequenceFormat": "Kolumna {{column}}: „{{text}}” nie jest formatem sekwencji; użyj szerokości, start=N lub obu, np. {seq:4:start=101}.",
+        "unclosedBrace": "Kolumna {{column}}: „{{text}}” nie ma zamykającego }.",
+        "unknownFilter": "Kolumna {{column}}: nieznany filtr „{{text}}”.",
+        "unknownToken": "Kolumna {{column}}: nieznany token „{{text}}”.",
+        "unmatchedClosingBrace": "Kolumna {{column}}: } bez otwierającego {."
+      },
+      "filtersHint": "Po tokenie dodaj |upper, |lower, |slug lub |trim:N, a ?tekst jako wartość zastępczą, np. {lens|lower?brakobiektywu}.",
+      "groups": {
+        "camera": "Aparat",
+        "custom": "Własne",
+        "date": "Data",
+        "file": "Plik",
+        "library": "Biblioteka",
+        "sequence": "Sekwencja"
+      },
+      "missing": "Niektóre zdjęcia nie mają wartości dla {{tokens}}; pozostaje pusta.",
+      "noChanges": "Żadna nazwa się nie zmienia.",
+      "preview": "Podgląd",
       "save": "Zapisz",
+      "templates": {
+        "deleteMessage": "Usunąć szablon nazwy „{{name}}”? Tej operacji nie można cofnąć.",
+        "deleteTitle": "Usuń szablon nazwy",
+        "fileName": "Szablony nazw plików",
+        "importNone": "Plik nie zawiera szablonów nazw plików.",
+        "imported": "Zaimportowane szablony nazw: {{count}}",
+        "nameConflict": "Szablon nazwy o tej nazwie już istnieje.",
+        "placeholder": "Szablon nazwy",
+        "renameTitle": "Zmień nazwę szablonu",
+        "save": "Zapisz jako szablon nazwy",
+        "saveTitle": "Zapisz szablon nazwy",
+        "starters": {
+          "customNumber": "Własna nazwa - Numer oryginalnego pliku",
+          "customSequence": "Własna nazwa - Sekwencja",
+          "dateFilename": "Data - Nazwa pliku",
+          "dateTimeCamera": "Data - Godzina - Aparat",
+          "filename": "Nazwa pliku"
+        }
+      },
       "titleMultiple": "Zmień nazwę {{count}} obrazów",
       "titleMultiple_few": "Zmień nazwy {{count}} obrazów",
       "titleMultiple_many": "Zmień nazwy {{count}} obrazów",

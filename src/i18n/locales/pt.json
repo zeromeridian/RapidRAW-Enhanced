@@ -1748,8 +1748,54 @@
       "cancel": "Cancelar",
       "fileNamingTemplate": "Modelo de Nomeação de Arquivo",
       "newName": "Novo Nome",
-      "notUniqueWarning": "Sem {original_filename}, {original_filename_number} ou {sequence}, vários arquivos podem receber o mesmo nome. Nesse caso, nada é renomeado.",
+      "cleaned": "Caracteres que nomes de arquivo não podem conter foram substituídos por _.",
+      "clash": {
+        "batch": "Várias fotos receberiam o mesmo nome, p. ex. {{name}}. Nada pode ser renomeado.",
+        "existingFile": "Já existe um arquivo chamado {{name}}. Nada pode ser renomeado.",
+        "existingSidecar": "Arquivos auxiliares restantes de outra foto já usam o nome {{name}}; a foto herdaria as edições deles. Nada pode ser renomeado."
+      },
+      "customText": "Texto personalizado",
+      "errors": {
+        "emptyToken": "Coluna {{column}}: chaves vazias {}.",
+        "formatNotAllowed": "Coluna {{column}}: este token não aceita formato (\"{{text}}\").",
+        "invalidSequenceFormat": "Coluna {{column}}: \"{{text}}\" não é um formato de sequência; use uma largura, start=N ou ambos, p. ex. {seq:4:start=101}.",
+        "unclosedBrace": "Coluna {{column}}: \"{{text}}\" não tem } de fechamento.",
+        "unknownFilter": "Coluna {{column}}: filtro desconhecido \"{{text}}\".",
+        "unknownToken": "Coluna {{column}}: token desconhecido \"{{text}}\".",
+        "unmatchedClosingBrace": "Coluna {{column}}: uma } sem { de abertura."
+      },
+      "filtersHint": "Depois de um token, adicione |upper, |lower, |slug ou |trim:N, e ?texto como alternativa, p. ex. {lens|lower?semlente}.",
+      "groups": {
+        "camera": "Câmera",
+        "custom": "Personalizado",
+        "date": "Data",
+        "file": "Arquivo",
+        "library": "Biblioteca",
+        "sequence": "Sequência"
+      },
+      "missing": "Algumas fotos não têm valor para {{tokens}}; fica vazio.",
+      "noChanges": "Nenhum nome muda.",
+      "preview": "Pré-visualização",
       "save": "Salvar",
+      "templates": {
+        "deleteMessage": "Excluir o modelo de nome \"{{name}}\"? Isso não pode ser desfeito.",
+        "deleteTitle": "Excluir modelo de nome",
+        "fileName": "Modelos de nome de arquivo",
+        "importNone": "O arquivo não contém modelos de nome de arquivo.",
+        "imported": "Modelos de nome importados: {{count}}",
+        "nameConflict": "Já existe um modelo de nome com este nome.",
+        "placeholder": "Modelo de nome",
+        "renameTitle": "Renomear modelo de nome",
+        "save": "Salvar como modelo de nome",
+        "saveTitle": "Salvar modelo de nome",
+        "starters": {
+          "customNumber": "Nome personalizado - Número do arquivo original",
+          "customSequence": "Nome personalizado - Sequência",
+          "dateFilename": "Data - Nome do arquivo",
+          "dateTimeCamera": "Data - Hora - Câmera",
+          "filename": "Nome do arquivo"
+        }
+      },
       "titleMultiple": "Renomear {{count}} Imagens",
       "titleMultiple_many": "Renomear {{count}} Imagens",
       "titleMultiple_one": "Renomear {{count}} Imagem",

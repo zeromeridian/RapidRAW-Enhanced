@@ -219,7 +219,7 @@ export function useFileOperations(
   );
 
   const handleSaveRename = useCallback(
-    async (nameTemplate: string) => {
+    async (nameTemplate: string, text: string | null) => {
       const { renameTargetPaths, setUI } = useUIStore.getState();
       const { selectedImage } = useEditorStore.getState();
       const { libraryActivePath, setLibrary } = useLibraryStore.getState();
@@ -232,6 +232,7 @@ export function useFileOperations(
           const newPaths: Array<string> = await invoke(Invokes.RenameFiles, {
             nameTemplate,
             paths: renameTargetPaths,
+            text,
           });
 
           await refreshImageList();
@@ -264,11 +265,21 @@ export function useFileOperations(
     [refreshImageList, handleImageSelect, handleBackToLibrary],
   );
 
-  const handleRenameFiles = useCallback((paths: Array<string>) => {
-    if (paths && paths.length > 0) {
-      useUIStore.getState().setUI({ renameTargetPaths: paths, isRenameFileModalOpen: true });
-    }
-  }, []);
+  // Sequence numbers follow the grid's order, as in Lightroom Classic, not the order the
+  // photos were selected in; photos the grid does not show keep their order at the end.
+  const handleRenameFiles = useCallback(
+    (paths: Array<string>) => {
+      if (paths && paths.length > 0) {
+        const gridIndex = new Map(sortedImageList.map((image, index) => [image.path, index]));
+        const ordered = [...paths].sort(
+          (a, b) =>
+            (gridIndex.get(a) ?? Infinity) - (gridIndex.get(b) ?? Infinity) || paths.indexOf(a) - paths.indexOf(b),
+        );
+        useUIStore.getState().setUI({ renameTargetPaths: ordered, isRenameFileModalOpen: true });
+      }
+    },
+    [sortedImageList],
+  );
 
   const startImportFiles = useCallback(async (sourcePaths: string[], destinationFolder: string, settings: any) => {
     if (sourcePaths.length === 0 || !destinationFolder) return;
