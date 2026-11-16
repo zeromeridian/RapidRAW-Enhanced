@@ -11,6 +11,7 @@ import { Invokes, LibraryViewMode } from '../components/ui/AppProperties';
 import { Status } from '../components/ui/ExportImportProperties';
 import { isCollectionView, isPathWithin } from '../utils/libraryViews';
 import { debouncedSave } from './useEditorActions';
+import { DEFAULT_IMPORT_TEMPLATE } from '../utils/filenameTemplates';
 
 export function useFileOperations(
   refreshImageList: () => Promise<void>,
@@ -373,7 +374,7 @@ export function useFileOperations(
 
           if (isAndroid) {
             const DEFAULT_IMPORT_SETTINGS = {
-              filenameTemplate: '{original_filename}',
+              filenameTemplate: DEFAULT_IMPORT_TEMPLATE,
               organizeByDate: false,
               dateFolderFormat: 'YYYY/MM-DD',
               deleteAfterImport: false,

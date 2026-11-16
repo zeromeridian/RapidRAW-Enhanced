@@ -1,30 +1,46 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import Switch from '../ui/Switch';
-import { FILENAME_VARIABLES, isUniqueFilenameTemplate } from '../ui/ExportImportProperties';
+import FilenameTemplateEditor from '../ui/FilenameTemplateEditor';
+import { ImportSettings, isUniqueFilenameTemplate } from '../ui/ExportImportProperties';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
+import { useFilenameTemplatePreview, useFilenameTemplates } from '../../hooks/useFilenameTemplates';
+import { DEFAULT_IMPORT_TEMPLATE, usesCustomText } from '../../utils/filenameTemplates';
 
 interface ImportSettingsModalProps {
-  fileCount: number;
+  /** The files to import; the first gives the example name. */
+  sourcePaths: Array<string>;
   isOpen: boolean;
   onClose(): void;
-  onSave(settings: any): void;
+  onSave(settings: ImportSettings): void;
 }
 
-export default function ImportSettingsModal({ fileCount, isOpen, onClose, onSave }: ImportSettingsModalProps) {
+export default function ImportSettingsModal({ sourcePaths, isOpen, onClose, onSave }: ImportSettingsModalProps) {
   const { t } = useTranslation();
   const [isMounted, setIsMounted] = useState(false);
   const [show, setShow] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const { defaultCustomText, rememberCustomText } = useFilenameTemplates();
 
-  const [filenameTemplate, setFilenameTemplate] = useState('{original_filename}');
+  const [filenameTemplate, setFilenameTemplate] = useState(DEFAULT_IMPORT_TEMPLATE);
+  // Null until typed or loaded: then the template's saved text, else the last one used.
+  const [customText, setCustomText] = useState<string | null>(null);
   const [organizeByDate, setOrganizeByDate] = useState(false);
   const [dateFolderFormat, setDateFolderFormat] = useState('YYYY/MM-DD');
   const [deleteAfterImport, setDeleteAfterImport] = useState(false);
-  const filenameInputRef = useRef<HTMLInputElement>(null);
+
+  const fileCount = sourcePaths.length;
+  const template = filenameTemplate.trim();
+  const shownText = customText ?? defaultCustomText(template);
+  const filenameText = usesCustomText(template) ? shownText : null;
+  const preview = useFilenameTemplatePreview(isOpen ? (sourcePaths[0] ?? null) : null, template, filenameText);
+  const examplePath = sourcePaths[0];
+  const exampleExtension = examplePath?.includes('.') ? examplePath.substring(examplePath.lastIndexOf('.')) : '';
 
   useEffect(() => {
     if (isOpen) {
+      setCustomText(null);
       setIsMounted(true);
       const timer = setTimeout(() => setShow(true), 10);
       return () => clearTimeout(timer);
@@ -38,17 +54,31 @@ export default function ImportSettingsModal({ fileCount, isOpen, onClose, onSave
   }, [isOpen]);
 
   const handleSave = useCallback(() => {
+    if (!template) return;
+    rememberCustomText(filenameText);
     onSave({
-      filenameTemplate,
+      filenameTemplate: template,
+      filenameText,
       organizeByDate,
       dateFolderFormat,
       deleteAfterImport,
     });
     onClose();
-  }, [onSave, onClose, filenameTemplate, organizeByDate, dateFolderFormat, deleteAfterImport]);
+  }, [
+    onSave,
+    onClose,
+    template,
+    filenameText,
+    rememberCustomText,
+    organizeByDate,
+    dateFolderFormat,
+    deleteAfterImport,
+  ]);
 
   const handleKeyDown = useCallback(
     (e: any) => {
+      // The template bar's own dialogs sit inside this one; their keys are theirs.
+      if ((e.target as HTMLElement).closest('[role="dialog"]') !== dialogRef.current) return;
       if (e.key === 'Enter') {
         handleSave();
       } else if (e.key === 'Escape') {
@@ -57,23 +87,6 @@ export default function ImportSettingsModal({ fileCount, isOpen, onClose, onSave
     },
     [handleSave, onClose],
   );
-
-  const handleVariableClick = (variable: string) => {
-    if (!filenameInputRef.current) {
-      return;
-    }
-    const input = filenameInputRef.current;
-    const start = input.selectionStart || 0;
-    const end = input.selectionEnd || 0;
-    const currentValue = input.value;
-    const newValue = currentValue.substring(0, start) + variable + currentValue.substring(end);
-    setFilenameTemplate(newValue);
-    setTimeout(() => {
-      input.focus();
-      const newCursorPos = start + variable.length;
-      input.setSelectionRange(newCursorPos, newCursorPos);
-    }, 0);
-  };
 
   if (!isMounted) {
     return null;
@@ -86,10 +99,11 @@ export default function ImportSettingsModal({ fileCount, isOpen, onClose, onSave
         show ? 'opacity-100' : 'opacity-0'
       }`}
       onClick={onClose}
+      ref={dialogRef}
       role="dialog"
     >
       <div
-        className={`bg-surface rounded-lg shadow-xl p-6 w-full max-w-lg transform transition-all duration-300 ease-out ${
+        className={`bg-surface rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto transform transition-all duration-300 ease-out ${
           show ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 -translate-y-4'
         }`}
         onClick={(e: any) => e.stopPropagation()}
@@ -101,29 +115,21 @@ export default function ImportSettingsModal({ fileCount, isOpen, onClose, onSave
 
         <div className="space-y-8 text-sm">
           <div>
-            <Text variant={TextVariants.heading} className="block mb-2">
-              {t('modals.importSettings.fileNaming')}
-            </Text>
-            <input
+            <FilenameTemplateEditor
               autoFocus
-              className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
-              onChange={(e: any) => setFilenameTemplate(e.target.value)}
-              ref={filenameInputRef}
-              type="text"
-              value={filenameTemplate}
+              customText={shownText}
+              errors={preview?.errors}
+              label={t('modals.importSettings.fileNaming')}
+              onCustomTextChange={setCustomText}
+              onTemplateChange={setFilenameTemplate}
+              template={filenameTemplate}
             />
-            <div className="flex flex-wrap gap-2 mt-2">
-              {FILENAME_VARIABLES.map((variable: string) => (
-                <button
-                  className="px-2 py-1 bg-surface text-text-secondary text-xs rounded-md hover:bg-card-active transition-colors"
-                  key={variable}
-                  onClick={() => handleVariableClick(variable)}
-                >
-                  {variable}
-                </button>
-              ))}
-            </div>
-            {fileCount > 1 && !isUniqueFilenameTemplate(filenameTemplate) && (
+            {preview?.stem && (
+              <Text variant={TextVariants.small} className="mt-2 font-mono">
+                {`${t('modals.renameFile.preview')}: ${preview.stem}${exampleExtension}`}
+              </Text>
+            )}
+            {fileCount > 1 && !isUniqueFilenameTemplate(template) && (
               <Text variant={TextVariants.small} className="mt-2">
                 {t('modals.importSettings.notUniqueWarning')}
               </Text>

@@ -151,6 +151,9 @@ pub struct ExportSettings {
     pub preserve_timestamps: bool,
     pub strip_gps: bool,
     pub filename_template: Option<String>,
+    /// The Custom Text for `{text}`.
+    #[serde(default)]
+    pub filename_text: Option<String>,
     #[serde(default)]
     pub filename_suffix: Option<String>,
     pub watermark: Option<WatermarkSettings>,
@@ -1632,7 +1635,9 @@ fn export_adjustments_as_lut(
     Ok(cube_lut)
 }
 
-const DEFAULT_FILENAME_TEMPLATE: &str = "{original_filename}_edited";
+/// The template when the export settings name none (owner 2026-11-16: no special case for
+/// the Settings suffix; it is simply added after the name).
+const DEFAULT_FILENAME_TEMPLATE: &str = "{filename}_edited";
 
 /// What to do with an export whose file already exists. The Export panel asks
 /// before anything is written; any clash nobody was asked about is renamed.
@@ -1704,11 +1709,7 @@ fn planned_output_paths(paths: &[String], destination: &ExportDestination) -> Ve
         .filename_template
         .as_deref()
         .unwrap_or(DEFAULT_FILENAME_TEMPLATE);
-    let template = if suffix.is_some() && template == DEFAULT_FILENAME_TEMPLATE {
-        "{original_filename}"
-    } else {
-        template
-    };
+    let text = settings.filename_text.as_deref();
     let copy_numbers = virtual_copy_numbers(paths);
 
     paths
@@ -1718,7 +1719,7 @@ fn planned_output_paths(paths: &[String], destination: &ExportDestination) -> Ve
         .map(|(index, (path, copy_number))| {
             let (source_path, _) = parse_virtual_path(path);
             let mut stem =
-                generate_filename_from_template(template, path, index + 1, total_paths, None);
+                generate_filename_from_template(template, path, index + 1, total_paths, None, text);
             if let Some(copy_number) = copy_number {
                 stem = format!("{stem}_VC{copy_number:02}");
             }
@@ -2329,6 +2330,7 @@ pub async fn run_headless_export(
         preserve_timestamps: true,
         strip_gps: false,
         filename_template: None,
+        filename_text: None,
         filename_suffix: None,
         watermark: None,
         export_masks: false,

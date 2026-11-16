@@ -6,6 +6,7 @@ import {
   TiffBitDepth,
   WatermarkAnchor,
 } from '../components/ui/ExportImportProperties';
+import { DEFAULT_EXPORT_TEMPLATE } from '../utils/filenameTemplates';
 
 export function useExportSettings() {
   const [fileFormat, setFileFormat] = useState('jpeg');
@@ -32,7 +33,7 @@ export function useExportSettings() {
   const [preserveFolders, setPreserveFolders] = useState(false);
   const [exportToSourceFolder, setExportToSourceFolder] = useState(false);
   const [subfolder, setSubfolder] = useState('');
-  const [filenameTemplate, setFilenameTemplate] = useState('{original_filename}_edited');
+  const [filenameTemplate, setFilenameTemplate] = useState(DEFAULT_EXPORT_TEMPLATE);
   const [enableWatermark, setEnableWatermark] = useState(false);
   const [watermarkPath, setWatermarkPath] = useState<string | null>(null);
   const [watermarkAnchor, setWatermarkAnchor] = useState<WatermarkAnchor>(WatermarkAnchor.BottomRight);

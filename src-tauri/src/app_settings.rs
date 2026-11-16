@@ -555,7 +555,7 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             keep_metadata: true,
             preserve_timestamps: false,
             strip_gps: false,
-            filename_template: "{original_filename}".to_string(),
+            filename_template: "{filename}".to_string(),
             enable_watermark: false,
             watermark_path: None,
             watermark_anchor: Some("bottomRight".to_string()),
@@ -591,7 +591,7 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             keep_metadata: false,
             preserve_timestamps: false,
             strip_gps: true,
-            filename_template: "{original_filename}_web".to_string(),
+            filename_template: "{filename}_web".to_string(),
             enable_watermark: false,
             watermark_path: None,
             watermark_anchor: Some("bottomRight".to_string()),
@@ -942,10 +942,10 @@ pub struct AppSettings {
     /// starter templates are offered; an empty list means every template was deleted.
     #[serde(default)]
     pub filename_templates: Option<Vec<Value>>,
-    /// The Custom Text (`{text}`) last used in Rename, offered when no saved template
-    /// brings its own.
-    #[serde(default)]
-    pub rename_custom_text: Option<String>,
+    /// The Custom Text (`{text}`) last used in rename, export or import, offered when no saved
+    /// template brings its own. Read from `renameCustomText`, its name in `1.76.3`.
+    #[serde(default, alias = "renameCustomText")]
+    pub filename_custom_text: Option<String>,
     /// Whether the Adjustments panel shows the Favorites instead of every section.
     #[serde(default)]
     pub show_favorite_adjustments: bool,
@@ -1099,7 +1099,7 @@ impl Default for AppSettings {
             zone_tint_presets: None,
             zone_tint_advanced: false,
             filename_templates: None,
-            rename_custom_text: None,
+            filename_custom_text: None,
             show_favorite_adjustments: false,
             left_panel_width: None,
             right_panel_width: None,
@@ -1368,16 +1368,20 @@ mod tests {
             assert_eq!(restored.filename_templates, templates);
         }
 
-        assert_eq!(older.rename_custom_text, None);
+        assert_eq!(older.filename_custom_text, None);
         let settings = AppSettings {
-            rename_custom_text: Some("RAW".to_string()),
+            filename_custom_text: Some("RAW".to_string()),
             ..AppSettings::default()
         };
         let serialized = serde_json::to_string(&settings).expect("settings should serialize");
-        assert!(serialized.contains("\"renameCustomText\":\"RAW\""));
+        assert!(serialized.contains("\"filenameCustomText\":\"RAW\""));
         let restored: AppSettings =
             serde_json::from_str(&serialized).expect("settings should deserialize");
-        assert_eq!(restored.rename_custom_text.as_deref(), Some("RAW"));
+        assert_eq!(restored.filename_custom_text.as_deref(), Some("RAW"));
+        // Settings saved by 1.76.3 keep their text.
+        let saved_by_1_76_3: AppSettings =
+            serde_json::from_str(r#"{"renameCustomText":"JPG"}"#).expect("older settings load");
+        assert_eq!(saved_by_1_76_3.filename_custom_text.as_deref(), Some("JPG"));
     }
 
     #[test]

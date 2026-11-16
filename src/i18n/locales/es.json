@@ -1793,7 +1793,8 @@
           "customSequence": "Nombre personalizado - Secuencia",
           "dateFilename": "Fecha - Nombre de archivo",
           "dateTimeCamera": "Fecha - Hora - Cámara",
-          "filename": "Nombre de archivo"
+          "filename": "Nombre de archivo",
+          "filenameEdited": "Nombre de archivo - Editado"
         }
       },
       "titleMultiple": "Renombrar {{count}} imágenes",

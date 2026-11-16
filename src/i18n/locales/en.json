@@ -1876,7 +1876,8 @@
           "customSequence": "Custom Name - Sequence",
           "dateFilename": "Date - Filename",
           "dateTimeCamera": "Date - Time - Camera",
-          "filename": "Filename"
+          "filename": "Filename",
+          "filenameEdited": "Filename - Edited"
         }
       },
       "titleMultiple": "Rename {{count}} Images",

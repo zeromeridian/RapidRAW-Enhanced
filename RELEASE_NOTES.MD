@@ -5,6 +5,30 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.77.0-dev-lightroom-rename — 2026-11-16
+
+### Export
+
+- File naming in Export now uses the same editor as Rename: the saved
+  filename templates, grouped token chips, Custom Text, mistakes in the
+  template explained inline, and an example name for the first photo.
+  It shows for a single photo too.
+- The default export name is `{filename}_edited` (also a new starter
+  template, "Filename - Edited"). It no longer drops `_edited` by itself
+  when a filename suffix is set in Settings; pick "Filename" for names
+  without it.
+- The name suggested when exporting a single photo now follows the
+  whole template, e.g. dates and camera data, not only the file name.
+- The built-in export presets name files `{filename}` and
+  `{filename}_web`.
+
+### Library
+
+- Import uses the same file naming editor, with Custom Text and an
+  example name.
+- A photo imported under a new name remembers its camera file name, so
+  `{original_filename}` still gives it later.
+
 ## 1.76.3-dev-lightroom-rename — 2026-11-16
 
 ### Library

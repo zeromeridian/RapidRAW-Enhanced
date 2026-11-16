@@ -19,7 +19,6 @@ import {
   ExportSettings,
   FileFormat,
   FILE_FORMATS,
-  FILENAME_VARIABLES,
   isUniqueFilenameTemplate,
   Status,
   ExportState,
@@ -30,6 +29,13 @@ import {
 } from '../../ui/ExportImportProperties';
 import { Invokes, SelectedImage, AppSettings } from '../../ui/AppProperties';
 import ExportPresetsList from '../../ui/ExportPresetsList';
+import FilenameTemplateEditor from '../../ui/FilenameTemplateEditor';
+import {
+  FilenameTemplatePreview,
+  useFilenameTemplatePreview,
+  useFilenameTemplates,
+} from '../../../hooks/useFilenameTemplates';
+import { usesCustomText } from '../../../utils/filenameTemplates';
 import ExportConflictModal from '../../modals/ExportConflictModal';
 import { useExportSettings } from '../../../hooks/useExportSettings';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
@@ -398,7 +404,9 @@ export default function ExportPanel({
   const [isEstimating, setIsEstimating] = useState<boolean>(false);
   const [watermarkImageAspectRatio, setWatermarkImageAspectRatio] = useState(1);
   const [imageAspectRatio, setImageAspectRatio] = useState(16 / 9);
-  const filenameInputRef = useRef<HTMLInputElement>(null);
+  const { defaultCustomText, rememberCustomText } = useFilenameTemplates();
+  // Null until typed or loaded: then the template's saved text, else the last one used.
+  const [customText, setCustomText] = useState<string | null>(null);
   const [conflictPrompt, setConflictPrompt] = useState<{ conflict: ExportConflict; remainingAfter: number } | null>(
     null,
   );
@@ -414,6 +422,13 @@ export default function ExportPanel({
   // Develop exports only the photo being edited; the Library exports its selection.
   const pathsToExport = isLibraryContext ? multiSelectedPaths : selectedImage ? [selectedImage.path] : [];
   const numImages = pathsToExport.length;
+  const shownCustomText = customText ?? defaultCustomText(filenameTemplate);
+  const filenameText = usesCustomText(filenameTemplate) ? shownCustomText : null;
+  const filenamePreview = useFilenameTemplatePreview(
+    isVisible ? (pathsToExport[0] ?? null) : null,
+    filenameTemplate,
+    filenameText,
+  );
 
   useEffect(() => {
     const fetchDims = async () => {
@@ -571,20 +586,6 @@ export default function ExportPanel({
     isLibraryContext,
   ]);
 
-  const handleVariableClick = (variable: string) => {
-    if (!filenameInputRef.current) return;
-    const input: HTMLInputElement = filenameInputRef.current;
-    const start = Number(input.selectionStart);
-    const end = Number(input.selectionEnd);
-    const currentValue = input.value;
-    const newValue = currentValue.substring(0, start) + variable + currentValue.substring(end);
-    setFilenameTemplate(newValue);
-    setTimeout(() => {
-      input.focus();
-      input.setSelectionRange(start + variable.length, start + variable.length);
-    }, 0);
-  };
-
   const answerConflict = (answer: ConflictAnswer | null) => {
     const resolve = conflictAnswerRef.current;
     conflictAnswerRef.current = null;
@@ -617,15 +618,16 @@ export default function ExportPanel({
     if (numImages === 0 || isExporting) return;
 
     const filenameSuffix = getEnabledExportSuffix(appSettings);
-    let finalFilenameTemplate =
-      filenameSuffix && filenameTemplate === '{original_filename}_edited' ? '{original_filename}' : filenameTemplate;
-    if (numImages > 1 && !isUniqueFilenameTemplate(filenameTemplate)) {
-      finalFilenameTemplate = `${filenameTemplate}_{sequence}`;
+    let finalFilenameTemplate = filenameTemplate.trim();
+    if (numImages > 1 && !isUniqueFilenameTemplate(finalFilenameTemplate)) {
+      finalFilenameTemplate = `${finalFilenameTemplate}_{sequence}`;
       setFilenameTemplate(finalFilenameTemplate);
     }
+    rememberCustomText(filenameText);
 
     const exportSettings: ExportSettings = {
       filenameTemplate: finalFilenameTemplate,
+      filenameText,
       filenameSuffix,
       jpegQuality,
       tiffBitDepth,
@@ -663,11 +665,15 @@ export default function ExportPanel({
       if (exportToSourceFolder) {
         outputFolderOrFile = '';
       } else if (shouldChooseOutputFile) {
-        const originalFilename = pathsToExport[0].split(/[\\/]/).pop() || '';
-        const stem = originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename;
+        // The name the template gives the photo, as a batch export would (`naming.rs`).
+        const { stem } = await invoke<FilenameTemplatePreview>(Invokes.PreviewFilenameTemplate, {
+          path: pathsToExport[0],
+          template: finalFilenameTemplate,
+          text: filenameText,
+        });
         // A virtual copy exported on its own is the first copy, as in a batch (Rust `virtual_copy_numbers`).
         const copySuffix = pathsToExport[0].includes('?vc=') ? '_VC01' : '';
-        const suggestedName = `${finalFilenameTemplate.replace('{original_filename}', stem)}${copySuffix}${filenameSuffix || ''}`;
+        const suggestedName = `${stem}${copySuffix}${filenameSuffix || ''}`;
         const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;
 
         outputFolderOrFile = isAndroid
@@ -832,30 +838,25 @@ export default function ExportPanel({
               )}
             </Section>
 
-            {numImages > 1 && (
-              <Section title={t('export.sections.fileNaming')}>
-                <input
-                  className="w-full bg-surface border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
-                  disabled={isExporting}
-                  onChange={(e) => setFilenameTemplate(e.target.value)}
-                  ref={filenameInputRef}
-                  type="text"
-                  value={filenameTemplate}
-                />
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {FILENAME_VARIABLES.map((variable: string) => (
-                    <button
-                      className="px-2 py-1 bg-surface text-text-secondary text-xs rounded-md hover:bg-card-active transition-colors disabled:opacity-50"
-                      disabled={isExporting}
-                      key={variable}
-                      onClick={() => handleVariableClick(variable)}
-                    >
-                      {variable}
-                    </button>
-                  ))}
-                </div>
-              </Section>
-            )}
+            <Section title={t('export.sections.fileNaming')}>
+              <FilenameTemplateEditor
+                customText={shownCustomText}
+                disabled={isExporting}
+                errors={filenamePreview?.errors}
+                isNarrow
+                label={t('modals.renameFile.fileNamingTemplate')}
+                onCustomTextChange={setCustomText}
+                onTemplateChange={setFilenameTemplate}
+                template={filenameTemplate}
+              />
+              {filenamePreview?.stem && (
+                <Text variant={TextVariants.small} className="mt-2 font-mono break-all">
+                  {`${t('modals.renameFile.preview')}: ${filenamePreview.stem}${getEnabledExportSuffix(appSettings) ?? ''}.${
+                    FILE_FORMATS.find((format) => format.id === fileFormat)?.extensions[0] ?? fileFormat
+                  }`}
+                </Text>
+              )}
+            </Section>
 
             {fileFormat !== FileFormats.Cube && (
               <>

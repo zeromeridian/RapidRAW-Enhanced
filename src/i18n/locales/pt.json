@@ -1793,7 +1793,8 @@
           "customSequence": "Nome personalizado - Sequência",
           "dateFilename": "Data - Nome do arquivo",
           "dateTimeCamera": "Data - Hora - Câmera",
-          "filename": "Nome do arquivo"
+          "filename": "Nome do arquivo",
+          "filenameEdited": "Nome do arquivo - Editado"
         }
       },
       "titleMultiple": "Renomear {{count}} Imagens",

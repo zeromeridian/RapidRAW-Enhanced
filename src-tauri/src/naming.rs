@@ -41,6 +41,40 @@ pub fn export_filename_templates(
     crate::preset_file::write(TEMPLATE_FILE_FORMAT, presets, &file_path)
 }
 
+/// A template's problems and the stem it gives one photo, for the export and import editors
+/// and the export save dialog (rename has `rename::preview_rename`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilenameTemplatePreview {
+    /// Empty without a photo.
+    pub stem: String,
+    pub errors: Vec<TemplateError>,
+}
+
+#[tauri::command]
+pub async fn preview_filename_template(
+    path: Option<String>,
+    template: String,
+    text: Option<String>,
+) -> Result<FilenameTemplatePreview, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let parsed = Template::parse(&template);
+        let stem = path.map_or_else(String::new, |path| {
+            let mut source = NamingSource::new(&path, 1, 1);
+            if let Some(text) = text {
+                source = source.with_text(text);
+            }
+            file_stem_from_rendered(&parsed.template.render(&source), &source)
+        });
+        FilenameTemplatePreview {
+            stem,
+            errors: parsed.errors,
+        }
+    })
+    .await
+    .map_err(|error| error.to_string())
+}
+
 /// Reads the templates of a file (`preset_file`); the dialog cleans every one.
 #[tauri::command]
 pub fn import_filename_templates(file_path: String) -> Result<Vec<serde_json::Value>, String> {

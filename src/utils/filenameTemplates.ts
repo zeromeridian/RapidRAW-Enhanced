@@ -5,6 +5,11 @@
  */
 import { presetIdentities } from './namedPresets';
 
+/** The export template until another is chosen; Rust's `DEFAULT_FILENAME_TEMPLATE` is the same. */
+export const DEFAULT_EXPORT_TEMPLATE = '{filename}_edited';
+/** The import template until another is chosen. */
+export const DEFAULT_IMPORT_TEMPLATE = '{filename}';
+
 export interface FilenameTemplate {
   id: string;
   name: string;
@@ -110,6 +115,7 @@ export const sanitizeFilenameTemplates = (values: unknown, existing: FilenameTem
 /** The names of the starter templates, in the app's language. */
 export interface FilenameTemplateStarterNames {
   filename: string;
+  filenameEdited: string;
   customSequence: string;
   customNumber: string;
   dateFilename: string;
@@ -119,6 +125,8 @@ export interface FilenameTemplateStarterNames {
 /** Starter templates after Lightroom Classic's built-in ones; editable and deletable. */
 const starterTemplates = (names: FilenameTemplateStarterNames): FilenameTemplate[] => [
   { id: 'filename-starter-filename', name: names.filename, template: '{filename}' },
+  // Export's default name (owner 2026-11-16).
+  { id: 'filename-starter-filename-edited', name: names.filenameEdited, template: DEFAULT_EXPORT_TEMPLATE },
   { id: 'filename-starter-custom-sequence', name: names.customSequence, template: '{text}-{seq}' },
   {
     id: 'filename-starter-custom-number',

@@ -93,6 +93,7 @@ fn round_trip_export_settings() -> ExportSettings {
         preserve_timestamps: false,
         strip_gps: false,
         filename_template: None,
+        filename_text: None,
         filename_suffix: None,
         watermark: None,
         export_masks: false,

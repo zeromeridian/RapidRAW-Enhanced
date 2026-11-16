@@ -1830,7 +1830,8 @@
           "customSequence": "Своё имя - Нумерация",
           "dateFilename": "Дата - Имя файла",
           "dateTimeCamera": "Дата - Время - Камера",
-          "filename": "Имя файла"
+          "filename": "Имя файла",
+          "filenameEdited": "Имя файла - Обработано"
         }
       },
       "titleMultiple": "Переименовать {{count}} изобр.",

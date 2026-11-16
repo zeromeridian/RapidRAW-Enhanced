@@ -1754,7 +1754,8 @@
           "customSequence": "カスタム名 - 連番",
           "dateFilename": "日付 - ファイル名",
           "dateTimeCamera": "日付 - 時刻 - カメラ",
-          "filename": "ファイル名"
+          "filename": "ファイル名",
+          "filenameEdited": "ファイル名 - 編集済み"
         }
       },
       "titleMultiple": "{{count}} 件の画像名を変更",

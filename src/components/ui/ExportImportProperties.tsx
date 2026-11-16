@@ -23,20 +23,6 @@ export const FILE_FORMATS: Array<FileFormat> = [
   { id: FileFormats.Cube, name: 'CUBE LUT', extensions: ['cube'] },
 ];
 
-export const FILENAME_VARIABLES: Array<string> = [
-  '{filename}',
-  '{original_filename}',
-  '{original_filename_number}',
-  '{sequence}',
-  '{YYYY}',
-  '{YY}',
-  '{MM}',
-  '{DD}',
-  '{hh}',
-  '{mm}',
-  '{ss}',
-];
-
 // A token that differs per photo, with or without a format, filters or a
 // fallback (`{seq:4}`, `{original_filename|lower}`; see `naming.rs`).
 const UNIQUE_FILENAME_TOKEN = /\{(?:filename|original_filename|original_filename_number|sequence|seq)[:|?}]/;
@@ -50,6 +36,8 @@ export const MAX_EXPORT_DPI = 65535;
 
 export interface ExportSettings {
   filenameTemplate: string | null;
+  /** The Custom Text for `{text}`. */
+  filenameText?: string | null;
   filenameSuffix?: string | null;
   jpegQuality: number;
   tiffBitDepth: TiffBitDepth;
@@ -130,6 +118,16 @@ export interface FileFormat {
   extensions: Array<string>;
   id: string;
   name: string;
+}
+
+/** Rust `ImportSettings`. */
+export interface ImportSettings {
+  filenameTemplate: string;
+  /** The Custom Text for `{text}`. */
+  filenameText?: string | null;
+  organizeByDate: boolean;
+  dateFolderFormat: string;
+  deleteAfterImport: boolean;
 }
 
 export interface ImportState {

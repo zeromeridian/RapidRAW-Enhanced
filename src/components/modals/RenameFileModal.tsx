@@ -1,25 +1,14 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
 import { Invokes } from '../ui/AppProperties';
-import NamedPresetBar from '../panel/right/NamedPresetBar';
-import { useSettingsStore } from '../../store/useSettingsStore';
-import {
-  FILENAME_TOKEN_GROUPS,
-  RenamePreview,
-  createFilenameTemplate,
-  filenameTemplatesFromSettings,
-  isFilenameTemplateDirty,
-  sanitizeFilenameTemplates,
-  usesCustomText,
-  withTemplate,
-} from '../../utils/filenameTemplates';
+import FilenameTemplateEditor from '../ui/FilenameTemplateEditor';
+import { TEMPLATE_PREVIEW_DELAY_MS, useFilenameTemplates } from '../../hooks/useFilenameTemplates';
+import { RenamePreview, usesCustomText } from '../../utils/filenameTemplates';
 
-/** How long the preview waits after the last keystroke. */
-const PREVIEW_DELAY_MS = 150;
-const DEFAULT_TEMPLATE = '{original_filename}';
+const DEFAULT_TEMPLATE = '{filename}';
 
 interface RenameFileModalProps {
   /** The photos to rename, in the grid's order (sequence numbers follow it). */
@@ -32,68 +21,40 @@ interface RenameFileModalProps {
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
 /**
- * Lightroom-style rename: a file-name template with grouped token chips, saved templates
- * (shared with export and import), a custom text, and a live preview that shows clashes,
- * missing values and template errors before anything changes.
+ * Lightroom-style rename: the shared file-name template editor and a live preview that shows
+ * clashes, missing values and template errors before anything changes.
  */
 export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave }: RenameFileModalProps) {
   const { t } = useTranslation();
+  const { defaultCustomText, rememberCustomText } = useFilenameTemplates();
   const [nameTemplate, setNameTemplate] = useState('');
-  const [customText, setCustomText] = useState('');
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  // Null until typed or loaded: then the template's saved text, else the last one used.
+  const [customText, setCustomText] = useState<string | null>(null);
   const [preview, setPreview] = useState<RenamePreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [show, setShow] = useState(false);
-  const nameInputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   // The last template used for several photos, offered again next time.
   const lastBatchTemplateRef = useRef(DEFAULT_TEMPLATE);
 
-  const appSettings = useSettingsStore((state) => state.appSettings);
-  const handleSettingsChange = useSettingsStore((state) => state.handleSettingsChange);
-  const templates = useMemo(
-    () =>
-      filenameTemplatesFromSettings(appSettings?.filenameTemplates, {
-        filename: t('modals.renameFile.templates.starters.filename'),
-        customSequence: t('modals.renameFile.templates.starters.customSequence'),
-        customNumber: t('modals.renameFile.templates.starters.customNumber'),
-        dateFilename: t('modals.renameFile.templates.starters.dateFilename'),
-        dateTimeCamera: t('modals.renameFile.templates.starters.dateTimeCamera'),
-      }),
-    [appSettings?.filenameTemplates, t],
-  );
   const fileCount = filesToRename.length;
   const isSingleFile = fileCount === 1;
   const template = nameTemplate.trim();
-  // The template picked from the bar (shown as changed once edited), else a saved template
-  // whose text the field holds, e.g. the last batch template reopened.
-  const selectedTemplate =
-    templates.find((saved) => saved.id === selectedTemplateId) ??
-    templates.find((saved) => saved.template === template) ??
-    null;
-  const needsText = usesCustomText(template);
-  const text = needsText ? customText : null;
-  // Read when the dialog opens, without reopening it when they change.
-  const templatesRef = useRef(templates);
-  templatesRef.current = templates;
+  const shownText = customText ?? defaultCustomText(template);
+  const text = usesCustomText(template) ? shownText : null;
 
   useEffect(() => {
     if (isOpen) {
-      let initial: string;
       if (isSingleFile && filesToRename[0]) {
         const name = fileName(filesToRename[0]);
         const dot = name.lastIndexOf('.');
-        initial = dot > 0 ? name.substring(0, dot) : name;
+        setNameTemplate(dot > 0 ? name.substring(0, dot) : name);
       } else {
-        initial = lastBatchTemplateRef.current;
+        setNameTemplate(lastBatchTemplateRef.current);
       }
-      setNameTemplate(initial);
-      setSelectedTemplateId(null);
-      // A saved template's own Custom Text, else the last one used (kept across launches).
-      const saved = templatesRef.current.find((candidate) => candidate.template === initial.trim());
-      setCustomText(saved?.text ?? useSettingsStore.getState().appSettings?.renameCustomText ?? '');
+      setCustomText(null);
       setIsMounted(true);
       const timer = setTimeout(() => setShow(true), 10);
       return () => clearTimeout(timer);
@@ -129,7 +90,7 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
           setPreviewError(String(error));
         })
         .finally(() => isCurrent && setIsPreviewing(false));
-    }, PREVIEW_DELAY_MS);
+    }, TEMPLATE_PREVIEW_DELAY_MS);
     return () => {
       isCurrent = false;
       clearTimeout(timer);
@@ -142,12 +103,10 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
   const handleSave = useCallback(() => {
     if (!canRename) return;
     if (!isSingleFile) lastBatchTemplateRef.current = template;
-    if (text !== null && appSettings && text !== appSettings.renameCustomText) {
-      void handleSettingsChange({ ...appSettings, renameCustomText: text });
-    }
+    rememberCustomText(text);
     onSave(template, text);
     onClose();
-  }, [canRename, isSingleFile, template, text, appSettings, handleSettingsChange, onSave, onClose]);
+  }, [canRename, isSingleFile, template, text, rememberCustomText, onSave, onClose]);
 
   const handleKeyDown = useCallback(
     (e: any) => {
@@ -162,23 +121,6 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
     },
     [handleSave, onClose],
   );
-
-  const handleVariableClick = (variable: string) => {
-    if (!nameInputRef.current) {
-      return;
-    }
-    const input = nameInputRef.current;
-    const start = input?.selectionStart || 0;
-    const end = input?.selectionEnd || 0;
-    const currentValue = input.value;
-    const newValue = currentValue.substring(0, start) + variable + currentValue.substring(end);
-    setNameTemplate(newValue);
-    setTimeout(() => {
-      input.focus();
-      const newCursorPos = start + variable.length;
-      input.setSelectionRange(newCursorPos, newCursorPos);
-    }, 0);
-  };
 
   if (!isMounted) {
     return null;
@@ -215,94 +157,15 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
         </Text>
 
         <div className="space-y-5 text-sm">
-          <NamedPresetBar
-            create={(name) => createFilenameTemplate(name, template, customText)}
-            exportCommand={Invokes.ExportFilenameTemplates}
-            importCommand={Invokes.ImportFilenameTemplates}
-            isDirty={!!selectedTemplate && isFilenameTemplateDirty(selectedTemplate, template, customText)}
-            labels={{
-              placeholder: t('modals.renameFile.templates.placeholder'),
-              save: t('modals.renameFile.templates.save'),
-              saveTitle: t('modals.renameFile.templates.saveTitle'),
-              renameTitle: t('modals.renameFile.templates.renameTitle'),
-              deleteTitle: t('modals.renameFile.templates.deleteTitle'),
-              deleteMessage: (name) => t('modals.renameFile.templates.deleteMessage', { name }),
-              nameConflict: t('modals.renameFile.templates.nameConflict'),
-              fileName: t('modals.renameFile.templates.fileName'),
-              importNone: t('modals.renameFile.templates.importNone'),
-              imported: (count) => t('modals.renameFile.templates.imported', { count }),
-            }}
-            onLoad={(loaded) => {
-              setNameTemplate(loaded.template);
-              if (loaded.text !== undefined) setCustomText(loaded.text);
-              setSelectedTemplateId(loaded.id);
-            }}
-            onPresetsChange={(next) => {
-              if (appSettings) void handleSettingsChange({ ...appSettings, filenameTemplates: next });
-            }}
-            onSaved={(saved) => setSelectedTemplateId(saved.id)}
-            presets={templates}
-            sanitize={sanitizeFilenameTemplates}
-            selected={selectedTemplate}
-            update={(preset) => withTemplate(preset, template, customText)}
+          <FilenameTemplateEditor
+            autoFocus
+            customText={shownText}
+            errors={preview?.errors}
+            label={isSingleFile ? t('modals.renameFile.newName') : t('modals.renameFile.fileNamingTemplate')}
+            onCustomTextChange={setCustomText}
+            onTemplateChange={setNameTemplate}
+            template={nameTemplate}
           />
-
-          <div>
-            <Text variant={TextVariants.heading} className="block mb-2">
-              {isSingleFile ? t('modals.renameFile.newName') : t('modals.renameFile.fileNamingTemplate')}
-            </Text>
-            <input
-              autoFocus
-              className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary font-mono focus:ring-accent focus:border-accent"
-              onChange={(e: any) => setNameTemplate(e.target.value)}
-              ref={nameInputRef}
-              spellCheck={false}
-              type="text"
-              value={nameTemplate}
-            />
-            {preview?.errors.map((error) => (
-              <Text key={`${error.position}-${error.kind}`} variant={TextVariants.small} className="mt-1 text-red-400">
-                {t(`modals.renameFile.errors.${error.kind}`, { text: error.text, column: error.position + 1 })}
-              </Text>
-            ))}
-          </div>
-
-          <div className="space-y-2">
-            {FILENAME_TOKEN_GROUPS.map((group) => (
-              <div className="flex items-start gap-2" key={group.id}>
-                <Text variant={TextVariants.small} className="w-20 shrink-0 pt-1">
-                  {t(`modals.renameFile.groups.${group.id}`)}
-                </Text>
-                <div className="flex flex-wrap gap-1.5">
-                  {group.tokens.map((variable: string) => (
-                    <button
-                      className="px-2 py-1 bg-bg-primary text-text-secondary text-xs font-mono rounded-md hover:bg-card-active transition-colors"
-                      key={variable}
-                      onClick={() => handleVariableClick(variable)}
-                      type="button"
-                    >
-                      {variable}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-            <Text variant={TextVariants.small}>{t('modals.renameFile.filtersHint')}</Text>
-          </div>
-
-          {needsText && (
-            <div>
-              <Text variant={TextVariants.heading} className="block mb-2">
-                {t('modals.renameFile.customText')}
-              </Text>
-              <input
-                className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
-                onChange={(e: any) => setCustomText(e.target.value)}
-                type="text"
-                value={customText}
-              />
-            </div>
-          )}
 
           <div className="bg-bg-primary rounded-md p-3 space-y-1">
             <Text variant={TextVariants.heading} className="block mb-1">

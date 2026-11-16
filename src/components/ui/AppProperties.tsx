@@ -125,6 +125,7 @@ export enum Invokes {
   RegenerateThumbnails = 'regenerate_thumbnails',
   RefreshFolderThumbnails = 'refresh_folder_thumbnails',
   RemoveTagForPaths = 'remove_tag_for_paths',
+  PreviewFilenameTemplate = 'preview_filename_template',
   PreviewRename = 'preview_rename',
   RenameFiles = 'rename_files',
   RenameFolder = 'rename_folder',
@@ -382,8 +383,8 @@ export interface AppSettings {
   zoneTintAdvanced?: boolean;
   /** File-name templates shared by rename, export and import; absent until first changed, which offers the starters. */
   filenameTemplates?: Array<unknown> | null;
-  /** The Custom Text last used in Rename, offered when no saved template brings its own. */
-  renameCustomText?: string | null;
+  /** The Custom Text last used in rename, export or import, offered when no saved template brings its own. */
+  filenameCustomText?: string | null;
   /** Whether the Adjustments panel shows the Favorites instead of every section (its All / Favorites switch). */
   showFavoriteAdjustments?: boolean;
   leftPanelWidth?: number;

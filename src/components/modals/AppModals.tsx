@@ -315,7 +315,7 @@ export default function AppModals(props: AppModalsProps) {
       />
       <ConfirmModal {...confirmModalState} onClose={closeConfirmModal} />
       <ImportSettingsModal
-        fileCount={importSourcePaths.length}
+        sourcePaths={importSourcePaths}
         isOpen={isImportModalOpen}
         onClose={() => setUI({ isImportModalOpen: false })}
         onSave={props.handleStartImport}

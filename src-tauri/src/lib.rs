@@ -2862,6 +2862,7 @@ pub fn run() {
             file_management::rename_folder,
             naming::export_filename_templates,
             naming::import_filename_templates,
+            naming::preview_filename_template,
             rename::preview_rename,
             rename::rename_files,
             file_management::duplicate_file,

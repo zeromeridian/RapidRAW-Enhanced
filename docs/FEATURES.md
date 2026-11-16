@@ -149,8 +149,12 @@ details are in `RELEASE_NOTES.MD`.
   clash and missing-value warnings (Rename disabled on clashes), a Custom
   Text field (kept with a saved template, else the last text used), and
   sequence numbers in grid order. Saved filename templates
-  (save, update, rename, delete, export, import; five starters), stored
+  (save, update, rename, delete, export, import; six starters), stored
   once in the settings for rename, export and import.
+- Export and Import use the same template editor (saved templates,
+  chips, inline errors, Custom Text, example name); the default export
+  name is `{filename}_edited`; a photo imported under a new name
+  remembers its camera name.
 - Caps Lock auto-advance after applying ratings, color labels, or flags.
 - Main Settings access from both Library and Develop.
 - Optional launch directly into the last library, bypassing the splash screen.

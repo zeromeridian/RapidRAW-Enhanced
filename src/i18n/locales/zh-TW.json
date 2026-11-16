@@ -1754,7 +1754,8 @@
           "customSequence": "自訂名稱 - 序號",
           "dateFilename": "日期 - 檔案名稱",
           "dateTimeCamera": "日期 - 時間 - 相機",
-          "filename": "檔案名稱"
+          "filename": "檔案名稱",
+          "filenameEdited": "檔案名稱 - 已編輯"
         }
       },
       "titleMultiple": "重新命名 {{count}} 張影像",

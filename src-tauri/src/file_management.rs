@@ -509,6 +509,9 @@ fn assign_group_ids(files: &mut [ImageFile], settings: &crate::app_settings::App
 #[serde(rename_all = "camelCase")]
 pub struct ImportSettings {
     pub filename_template: String,
+    /// The Custom Text for `{text}`.
+    #[serde(default)]
+    pub filename_text: Option<String>,
     pub organize_by_date: bool,
     pub date_folder_format: String,
     pub delete_after_import: bool,
@@ -1335,7 +1338,14 @@ mod output_naming_tests {
     #[test]
     fn filename_number_token_keeps_trailing_digits() {
         let name = |file: &str| {
-            generate_filename_from_template("trip_{original_filename_number}", file, 1, 1, None)
+            generate_filename_from_template(
+                "trip_{original_filename_number}",
+                file,
+                1,
+                1,
+                None,
+                None,
+            )
         };
         assert_eq!(name("IMG_1234.CR3"), "trip_1234");
         assert_eq!(name("DSC01234.ARW"), "trip_01234");
@@ -1347,8 +1357,15 @@ mod output_naming_tests {
         let date = chrono::NaiveDate::from_ymd_opt(2026, 11, 11)
             .unwrap()
             .and_hms_opt(10, 20, 37);
-        let name = generate_filename_from_template("shot_{ss}", "IMG_1.CR3", 1, 1, date);
-        assert_eq!(name, "shot_37");
+        let name = generate_filename_from_template(
+            "shot_{ss}_{text}",
+            "IMG_1.CR3",
+            1,
+            1,
+            date,
+            Some("RAW"),
+        );
+        assert_eq!(name, "shot_37_RAW");
     }
 
     #[test]
@@ -1375,6 +1392,7 @@ mod output_naming_tests {
             &image.to_string_lossy(),
             1,
             1,
+            None,
             None,
         );
         assert_eq!(name, "20260503_003007");
@@ -6287,6 +6305,9 @@ pub async fn import_files(
 ) -> Result<(), String> {
     let total_files = source_paths.len();
     let _ = app_handle.emit("import-start", serde_json::json!({ "total": total_files }));
+    let enable_xmp_sync = load_settings(app_handle.clone())
+        .map(|settings| settings.enable_xmp_sync.unwrap_or(false))
+        .unwrap_or(false);
 
     tauri::async_runtime::spawn_blocking(move || {
         for (i, source_path_str) in source_paths.iter().enumerate() {
@@ -6326,6 +6347,7 @@ pub async fn import_files(
                         i + 1,
                         total_files,
                         Some(file_date),
+                        settings.filename_text.as_deref(),
                     );
                     let extension = source_name_path
                         .extension()
@@ -6380,6 +6402,7 @@ pub async fn import_files(
                     i + 1,
                     total_files,
                     Some(file_date),
+                    settings.filename_text.as_deref(),
                 );
                 let extension = source_path
                     .extension()
@@ -6401,6 +6424,19 @@ pub async fn import_files(
                 {
                     let (_, dest_sidecar) = parse_virtual_path(dest_str);
                     fs::copy(&source_sidecar, &dest_sidecar).map_err(|e| e.to_string())?;
+                }
+                // A copy imported under a new name remembers the camera's (owner 2026-11-16).
+                if dest_file_path.file_stem() != source_path.file_stem()
+                    && let Err(error) = remember_original_file_name(
+                        &dest_file_path,
+                        &original_file_name(&source_path),
+                        enable_xmp_sync,
+                    )
+                {
+                    log::warn!(
+                        "Could not record the original name of {}: {error}",
+                        dest_file_path.display()
+                    );
                 }
 
                 if settings.delete_after_import {
@@ -6461,17 +6497,21 @@ pub async fn import_files(
 
 /// The file stem `template` gives the image at `image_path` (a virtual copy's
 /// path is fine), number `sequence` of `total`; see `naming`. `capture_date`
-/// overrides the capture time read from the file.
+/// overrides the capture time read from the file; `text` is the Custom Text.
 pub fn generate_filename_from_template(
     template: &str,
     image_path: &str,
     sequence: usize,
     total: usize,
     capture_date: Option<NaiveDateTime>,
+    text: Option<&str>,
 ) -> String {
     let mut source = NamingSource::new(image_path, sequence, total);
     if let Some(date) = capture_date {
         source = source.with_capture_date(date);
+    }
+    if let Some(text) = text {
+        source = source.with_text(text);
     }
     naming::file_stem_from_template(template, &source)
 }
@@ -6660,9 +6700,50 @@ fn add_xmp_preserved_file_name(content: &mut String, name: &str) {
     }
 }
 
+/// The name `image` had before its first rename, as its `.tirdata` or XMP (ThisIsRAW, Bridge,
+/// Lightroom) records it, else its current name.
+pub(crate) fn original_file_name(image: &Path) -> String {
+    exif_processing::load_sidecar(&exif_processing::get_primary_sidecar_path(image))
+        .preserved_file_name
+        .or_else(|| {
+            let xmp = fs::read_to_string(resolve_xmp_path(image)?).ok()?;
+            extract_xmp_preserved_file_name(&xmp)
+        })
+        .unwrap_or_else(|| {
+            image
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned()
+        })
+}
+
+/// Records `original` as the name `image` had before it was renamed (by a rename or an import;
+/// owner 2026-11-16), so `{original_filename}` keeps the camera's name: in its `.tirdata` and,
+/// with XMP sync on, in an existing XMP as `xmpMM:PreservedFileName`. A name already recorded
+/// is kept.
+pub(crate) fn remember_original_file_name(
+    image: &Path,
+    original: &str,
+    enable_xmp_sync: bool,
+) -> Result<(), String> {
+    let sidecar = exif_processing::get_primary_sidecar_path(image);
+    let mut metadata = exif_processing::load_sidecar(&sidecar);
+    if metadata.preserved_file_name.is_some() {
+        return Ok(());
+    }
+    metadata.preserved_file_name = Some(original.to_string());
+    let json = serde_json::to_string_pretty(&metadata).map_err(|error| error.to_string())?;
+    write_metadata_file(&sidecar, &json)?;
+    if enable_xmp_sync && let Some(xmp) = resolve_xmp_path(image) {
+        add_preserved_file_name_to_xmp_file(&xmp, original);
+    }
+    Ok(())
+}
+
 /// Records `name` as the preserved file name in the XMP at `xmp_path`, unless it already has
 /// one. Only that property is touched.
-pub(crate) fn add_preserved_file_name_to_xmp_file(xmp_path: &Path, name: &str) {
+fn add_preserved_file_name_to_xmp_file(xmp_path: &Path, name: &str) {
     if let Ok(mut content) = fs::read_to_string(xmp_path) {
         let before = content.len();
         add_xmp_preserved_file_name(&mut content, name);

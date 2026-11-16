@@ -1754,7 +1754,8 @@
           "customSequence": "사용자 이름 - 순번",
           "dateFilename": "날짜 - 파일 이름",
           "dateTimeCamera": "날짜 - 시간 - 카메라",
-          "filename": "파일 이름"
+          "filename": "파일 이름",
+          "filenameEdited": "파일 이름 - 편집됨"
         }
       },
       "titleMultiple": "이미지 {{count}}개 이름 변경",

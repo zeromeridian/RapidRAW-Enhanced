@@ -1830,7 +1830,8 @@
           "customSequence": "Własna nazwa - Sekwencja",
           "dateFilename": "Data - Nazwa pliku",
           "dateTimeCamera": "Data - Godzina - Aparat",
-          "filename": "Nazwa pliku"
+          "filename": "Nazwa pliku",
+          "filenameEdited": "Nazwa pliku - Edytowane"
         }
       },
       "titleMultiple": "Zmień nazwę {{count}} obrazów",

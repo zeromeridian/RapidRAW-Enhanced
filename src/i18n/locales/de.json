@@ -1756,7 +1756,8 @@
           "customSequence": "Eigener Name – Folge",
           "dateFilename": "Datum – Dateiname",
           "dateTimeCamera": "Datum – Uhrzeit – Kamera",
-          "filename": "Dateiname"
+          "filename": "Dateiname",
+          "filenameEdited": "Dateiname – Bearbeitet"
         }
       },
       "titleMultiple": "{{count}} Bilder umbenennen",
