@@ -1034,6 +1034,15 @@
       "mb": "MB",
       "tb": "TB"
     },
+    "conflict": {
+      "applyToAll": "ほかの既存ファイルにも同じ操作を適用 ({{count}})",
+      "cancel": "書き出しをキャンセル",
+      "message": "「{{name}}」は {{folder}} に既に存在します。",
+      "overwrite": "上書き",
+      "rename": "名前を変更",
+      "skip": "スキップ",
+      "title": "ファイルは既に存在します"
+    },
     "dialog": {
       "saveEditedImageTitle": "編集した画像を保存",
       "selectFolderTitle": "{{count}} 枚の画像を書き出すフォルダを選択",

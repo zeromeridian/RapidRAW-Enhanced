@@ -1414,7 +1414,10 @@ pub fn read_exif_data(path: &str, file_bytes: &[u8]) -> HashMap<String, String> 
 
     // Cache new EXIF, and RAW dimensions found by the decoder, so the file need not
     // be parsed again on the next listing.
-    if (!has_sidecar_exif || added_dimensions) && has_descriptive_exif(&exif_map) {
+    if (!has_sidecar_exif || added_dimensions)
+        && has_descriptive_exif(&exif_map)
+        && may_cache_exif(source_path)
+    {
         let mut metadata = load_primary_metadata(source_path);
         metadata.exif = Some(exif_map.clone());
         let _ = save_primary_metadata(source_path, &metadata);
@@ -1422,7 +1425,17 @@ pub fn read_exif_data(path: &str, file_bytes: &[u8]) -> HashMap<String, String> 
     exif_map
 }
 
+/// Whether EXIF may be cached in the image's `.tirdata`. A RAW's EXIF is slow to
+/// read, so it always is; any other image is cached only into a sidecar it
+/// already has, so listing or opening a JPEG or an export creates none.
+fn may_cache_exif(image_path: &Path) -> bool {
+    is_raw_file(image_path) || get_primary_sidecar_path(image_path).exists()
+}
+
 pub fn persist_exif_if_missing(source_path: &Path, source_path_str: &str, file_bytes: &[u8]) {
+    if !may_cache_exif(source_path) {
+        return;
+    }
     {
         let metadata = load_primary_metadata(source_path);
         if metadata.exif.is_some() {
@@ -1758,5 +1771,16 @@ mod tests {
         };
         fs::write(&sidecar, serde_json::to_string(&complete).unwrap()).unwrap();
         assert_eq!(load_sidecar(&sidecar).exif, complete.exif);
+    }
+
+    #[test]
+    fn only_raws_get_a_sidecar_just_for_cached_exif() {
+        let folder = tempfile::tempdir().unwrap();
+        let raw = folder.path().join("IMG_1.CR3");
+        let jpeg = folder.path().join("IMG_1_edited.jpg");
+        assert!(may_cache_exif(&raw));
+        assert!(!may_cache_exif(&jpeg));
+        fs::write(get_primary_sidecar_path(&jpeg), "{}").unwrap();
+        assert!(may_cache_exif(&jpeg));
     }
 }

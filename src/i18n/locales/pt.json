@@ -1061,6 +1061,15 @@
       "mb": "MB",
       "tb": "TB"
     },
+    "conflict": {
+      "applyToAll": "Fazer o mesmo com os outros arquivos existentes ({{count}})",
+      "cancel": "Cancelar exportação",
+      "message": "“{{name}}” já existe em {{folder}}.",
+      "overwrite": "Substituir",
+      "rename": "Renomear",
+      "skip": "Ignorar",
+      "title": "O arquivo já existe"
+    },
     "dialog": {
       "saveEditedImageTitle": "Salvar Imagem Editada",
       "selectFolderTitle": "Selecionar Pasta para Exportar {{count}} Imagem(ns)",

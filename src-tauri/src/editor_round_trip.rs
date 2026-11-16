@@ -142,6 +142,7 @@ pub async fn start_editor_round_trip(
                 active_path: current_edit_path,
                 active_adjustments: current_edit_adjustments,
             },
+            Default::default(),
             state,
             app_handle.clone(),
             false,

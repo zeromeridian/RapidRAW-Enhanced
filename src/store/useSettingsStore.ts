@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { platform } from '@tauri-apps/plugin-os';
 import { AppSettings, SupportedTypes, Invokes } from '../components/ui/AppProperties';
 import { DEFAULT_THEME_ID } from '../utils/themes';
-import { getChangedXmpStackPaths } from '../utils/imageStacks';
+import { getChangedXmpStackPaths, toXmpStacks } from '../utils/imageStacks';
 
 interface SettingsState {
   appSettings: AppSettings | null;
@@ -64,7 +64,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       try {
         if (affectedStackPaths.length > 0) {
           await invoke(Invokes.SyncImageStacksToXmp, {
-            stacks: nextStacks,
+            stacks: toXmpStacks(nextStacks),
             affectedPaths: affectedStackPaths,
           });
         }

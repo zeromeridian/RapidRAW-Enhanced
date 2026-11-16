@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
@@ -16,6 +16,7 @@ use jxl_encoder::{
     LosslessConfig, LossyConfig, PixelLayout,
     api::{calibrated_jxl_quality, quality_to_distance},
 };
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::Emitter;
@@ -25,7 +26,7 @@ use crate::AppState;
 use crate::exif_processing;
 use crate::file_management::{
     apply_default_lens_profile, generate_filename_from_template, parse_virtual_path,
-    read_file_mapped, sanitize_filename_suffix,
+    read_file_mapped, sanitize_filename_suffix, unique_output_path_avoiding,
 };
 use crate::formats::is_raw_file;
 use crate::image_loader::{load_base_image_from_bytes, prepare_base_image};
@@ -1581,6 +1582,247 @@ fn export_adjustments_as_lut(
     Ok(cube_lut)
 }
 
+const DEFAULT_FILENAME_TEMPLATE: &str = "{original_filename}_edited";
+const DATE_FILENAME_TOKENS: [&str; 6] = ["{YYYY}", "{MM}", "{DD}", "{hh}", "{mm}", "{ss}"];
+
+/// What to do with an export whose file already exists. The Export panel asks
+/// before anything is written; any clash nobody was asked about is renamed.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportConflictResolution {
+    Overwrite,
+    Skip,
+    Rename,
+}
+
+/// An existing file that a planned export would replace.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportConflict {
+    pub source_path: String,
+    pub output_path: String,
+}
+
+/// Where a batch goes, shared by the clash check and the export so both plan
+/// the same files.
+struct ExportDestination<'a> {
+    output_folder_or_file: &'a Path,
+    is_explicit_file_path: bool,
+    base_origin_folders: &'a [String],
+    export_settings: &'a ExportSettings,
+    output_format: &'a str,
+}
+
+impl ExportDestination<'_> {
+    /// One exact file the user chose (save dialog, Edit In): written as asked.
+    fn is_single_file(&self, total_paths: usize) -> bool {
+        self.is_explicit_file_path
+            && total_paths == 1
+            && !self.export_settings.export_to_source_folder
+    }
+}
+
+/// Virtual copies are numbered per source in export order (`_VC01`, `_VC02`),
+/// so a copy never takes its original's name; their ids are hex, not numbers.
+fn virtual_copy_numbers(paths: &[String]) -> Vec<Option<usize>> {
+    let mut counts: HashMap<PathBuf, usize> = HashMap::new();
+    paths
+        .iter()
+        .map(|path| {
+            path.contains("?vc=").then(|| {
+                let count = counts.entry(parse_virtual_path(path).0).or_default();
+                *count += 1;
+                *count
+            })
+        })
+        .collect()
+}
+
+/// The file each photo would be written to, before clashes are resolved.
+fn planned_output_paths(paths: &[String], destination: &ExportDestination) -> Vec<PathBuf> {
+    let total_paths = paths.len();
+    let output = destination.output_folder_or_file;
+    if destination.is_single_file(total_paths) {
+        return vec![output.to_path_buf()];
+    }
+    let settings = destination.export_settings;
+    let suffix = settings
+        .filename_suffix
+        .as_deref()
+        .map(sanitize_filename_suffix)
+        .filter(|suffix| !suffix.is_empty());
+    let template = settings
+        .filename_template
+        .as_deref()
+        .unwrap_or(DEFAULT_FILENAME_TEMPLATE);
+    let template = if suffix.is_some() && template == DEFAULT_FILENAME_TEMPLATE {
+        "{original_filename}"
+    } else {
+        template
+    };
+    let needs_date = DATE_FILENAME_TOKENS
+        .iter()
+        .any(|token| template.contains(token));
+    let copy_numbers = virtual_copy_numbers(paths);
+
+    paths
+        .par_iter()
+        .zip(copy_numbers)
+        .enumerate()
+        .map(|(index, (path, copy_number))| {
+            let (source_path, _) = parse_virtual_path(path);
+            let file_date = if needs_date {
+                exif_processing::get_creation_date_from_path(&source_path)
+            } else {
+                chrono::Utc::now()
+            };
+            let mut stem = generate_filename_from_template(
+                template,
+                &source_path,
+                index + 1,
+                total_paths,
+                &file_date,
+            );
+            if let Some(copy_number) = copy_number {
+                stem = format!("{stem}_VC{copy_number:02}");
+            }
+            if let Some(suffix) = &suffix {
+                stem.push_str(suffix);
+            }
+            let file_name = format!("{stem}.{}", destination.output_format);
+            let dir = if settings.export_to_source_folder {
+                source_export_dir(&source_path, settings.subfolder.as_deref())
+            } else if settings.preserve_folders {
+                relative_export_dir_for_preserved_folders(
+                    &source_path,
+                    destination.base_origin_folders,
+                )
+                .map_or_else(|| output.to_path_buf(), |rel_dir| output.join(rel_dir))
+            } else {
+                output.to_path_buf()
+            };
+            dir.join(file_name)
+        })
+        .collect()
+}
+
+/// Existing files the batch would replace, once per file. A photo's own
+/// source and a name an earlier photo of the batch already takes are not
+/// asked about: those always get a free name.
+fn find_conflicts(paths: &[String], destination: &ExportDestination) -> Vec<ExportConflict> {
+    if destination.is_single_file(paths.len()) {
+        return Vec::new();
+    }
+    let mut planned_so_far = HashSet::new();
+    paths
+        .iter()
+        .zip(planned_output_paths(paths, destination))
+        .filter(|(path, output_path)| {
+            planned_so_far.insert(output_path.clone())
+                && output_path.exists()
+                && *output_path != parse_virtual_path(path).0
+        })
+        .map(|(path, output_path)| ExportConflict {
+            source_path: path.clone(),
+            output_path: output_path.to_string_lossy().into_owned(),
+        })
+        .collect()
+}
+
+/// The final file of each photo (`None`: skipped). A name goes to the first
+/// photo of the batch that wants it; an existing file follows the user's
+/// choice for it. Every other clash, including a photo's own source and
+/// exports nobody is asked about (the command line), gets the first free
+/// `stem_N` name, so nothing is replaced unless the user chose it.
+fn resolve_output_paths(
+    paths: &[String],
+    planned: Vec<PathBuf>,
+    destination: &ExportDestination,
+    resolutions: &HashMap<String, ExportConflictResolution>,
+) -> Vec<Option<PathBuf>> {
+    if destination.is_single_file(paths.len()) {
+        return planned.into_iter().map(Some).collect();
+    }
+    let mut claimed: HashSet<PathBuf> = HashSet::new();
+    paths
+        .iter()
+        .zip(planned)
+        .map(|(path, output_path)| {
+            let resolution = if claimed.contains(&output_path) {
+                ExportConflictResolution::Rename
+            } else if !output_path.exists() {
+                ExportConflictResolution::Overwrite
+            } else if output_path == parse_virtual_path(path).0 {
+                ExportConflictResolution::Rename
+            } else {
+                resolutions
+                    .get(output_path.to_string_lossy().as_ref())
+                    .copied()
+                    .unwrap_or(ExportConflictResolution::Rename)
+            };
+            let output_path = match resolution {
+                ExportConflictResolution::Skip => return None,
+                ExportConflictResolution::Overwrite => output_path,
+                ExportConflictResolution::Rename => free_output_path(&output_path, &claimed),
+            };
+            claimed.insert(output_path.clone());
+            Some(output_path)
+        })
+        .collect()
+}
+
+fn free_output_path(output_path: &Path, claimed: &HashSet<PathBuf>) -> PathBuf {
+    let dir = output_path.parent().unwrap_or_else(|| Path::new(""));
+    let stem = output_path
+        .file_stem()
+        .map(|stem| stem.to_string_lossy())
+        .unwrap_or_default();
+    let extension = output_path
+        .extension()
+        .map(|extension| extension.to_string_lossy())
+        .unwrap_or_default();
+    unique_output_path_avoiding(dir, &stem, &extension, |path| claimed.contains(path))
+}
+
+/// Counts one more photo as done (exported, failed or skipped).
+fn emit_export_progress(
+    app_handle: &tauri::AppHandle,
+    progress_counter: &AtomicUsize,
+    total_paths: usize,
+    path: &str,
+) {
+    let current = progress_counter.fetch_add(1, Ordering::SeqCst) + 1;
+    let _ = app_handle.emit(
+        "batch-export-progress",
+        serde_json::json!({ "current": current, "total": total_paths, "path": path }),
+    );
+}
+
+#[tauri::command]
+pub async fn find_export_conflicts(
+    paths: Vec<String>,
+    output_folder_or_file: String,
+    is_explicit_file_path: bool,
+    base_origin_folders: Vec<String>,
+    export_settings: ExportSettings,
+    output_format: String,
+) -> Result<Vec<ExportConflict>, String> {
+    tokio::task::spawn_blocking(move || {
+        find_conflicts(
+            &paths,
+            &ExportDestination {
+                output_folder_or_file: Path::new(&output_folder_or_file),
+                is_explicit_file_path,
+                base_origin_folders: &base_origin_folders,
+                export_settings: &export_settings,
+                output_format: &output_format,
+            },
+        )
+    })
+    .await
+    .map_err(|error| format!("Could not check the export files: {error}"))
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn export_images_impl(
     paths: Vec<String>,
@@ -1590,6 +1832,7 @@ pub(crate) async fn export_images_impl(
     export_settings: ExportSettings,
     output_format: String,
     adjustments_mode: ExportAdjustmentsMode,
+    conflict_resolutions: HashMap<String, ExportConflictResolution>,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
     track_created_images: bool,
@@ -1649,44 +1892,29 @@ pub(crate) async fn export_images_impl(
         let total_paths = paths.len();
         let settings = load_settings(app_handle.clone()).unwrap_or_default();
 
-        let mut base_path_counts: HashMap<String, usize> = HashMap::new();
-        let mut export_items = Vec::with_capacity(total_paths);
-
-        for (i, path_str) in paths.into_iter().enumerate() {
-            let (source_path, _) = parse_virtual_path(&path_str);
-            let source_str = source_path.to_string_lossy().to_string();
-            let count = base_path_counts.entry(source_str.clone()).or_insert(0);
-            *count += 1;
-
-            let mut explicit_vc = None;
-            if let Some(idx) = path_str.rfind("vc=") {
-                let id_str = path_str[idx + 3..].split('&').next().unwrap_or("");
-                if let Ok(id) = id_str.parse::<u32>() {
-                    explicit_vc = Some(id);
-                }
-            }
-            if explicit_vc.is_none() {
-                let lower = path_str.to_lowercase();
-                if let Some(idx) = lower.rfind("_vc") {
-                    let id_str: String = lower[idx + 3..]
-                        .chars()
-                        .take_while(|c| c.is_ascii_digit())
-                        .collect();
-                    if let Ok(id) = id_str.parse::<u32>() {
-                        explicit_vc = Some(id);
-                    }
-                }
-            }
-            export_items.push((i, path_str, *count, explicit_vc));
-        }
+        let output_paths = {
+            let destination = ExportDestination {
+                output_folder_or_file: output_folder_path,
+                is_explicit_file_path,
+                base_origin_folders: &base_origin_folders,
+                export_settings: &export_settings,
+                output_format: &output_format,
+            };
+            let planned = planned_output_paths(&paths, &destination);
+            resolve_output_paths(&paths, planned, &destination, &conflict_resolutions)
+        };
 
         let semaphore = Arc::new(tokio::sync::Semaphore::new(num_threads));
         let mut join_handles = Vec::new();
 
-        for (global_index, image_path_str, appearance_count, explicit_vc) in export_items {
+        for (image_path_str, output_path) in paths.into_iter().zip(output_paths) {
             if cancellation_token.load(Ordering::SeqCst) {
                 break;
             }
+            let Some(output_path) = output_path else {
+                emit_export_progress(&app_handle, &progress_counter, total_paths, &image_path_str);
+                continue;
+            };
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             if cancellation_token.load(Ordering::SeqCst) {
                 drop(permit);
@@ -1696,8 +1924,6 @@ pub(crate) async fn export_images_impl(
             let app_handle_clone = app_handle.clone();
             let context_clone = Arc::clone(&context);
             let progress_counter_clone = Arc::clone(&progress_counter);
-            let output_folder_path = output_folder_path.to_path_buf();
-            let base_origin_folders = base_origin_folders.clone();
             let export_settings = export_settings.clone();
             let output_format = output_format.clone();
             let settings = settings.clone();
@@ -1741,82 +1967,21 @@ pub(crate) async fn export_images_impl(
 
                 hydrate_adjustments(&state, &mut js_adjustments);
                 let is_raw = is_raw_file(&source_path_str);
-                let original_path = std::path::Path::new(&source_path_str);
-                let file_date = exif_processing::get_creation_date_from_path(original_path);
 
-                let filename_template = export_settings
-                    .filename_template
-                    .as_deref()
-                    .unwrap_or("{original_filename}_edited");
-                let has_filename_suffix = export_settings
-                    .filename_suffix
-                    .as_deref()
-                    .map(sanitize_filename_suffix)
-                    .is_some_and(|suffix| !suffix.is_empty());
-                let filename_template =
-                    if has_filename_suffix && filename_template == "{original_filename}_edited" {
-                        "{original_filename}"
-                    } else {
-                        filename_template
-                    };
-
-                let mut new_stem = generate_filename_from_template(
-                    filename_template,
-                    original_path,
-                    global_index + 1,
-                    total_paths,
-                    &file_date,
-                );
-
-                if let Some(vc_id) = explicit_vc {
-                    new_stem = format!("{}_VC{:02}", new_stem, vc_id);
-                } else if appearance_count > 1 {
-                    new_stem = format!("{}_VC{:02}", new_stem, appearance_count - 1);
+                if output_path == source_path {
+                    return Err(format!(
+                        "Export would overwrite its source image: {}",
+                        source_path.display()
+                    ));
                 }
-
-                if let Some(suffix) = export_settings
-                    .filename_suffix
-                    .as_deref()
-                    .map(sanitize_filename_suffix)
-                    .filter(|suffix| !suffix.is_empty())
-                {
-                    new_stem.push_str(&suffix);
-                }
-
-                let new_filename = format!("{}.{}", new_stem, output_format);
-                let output_path = if export_settings.export_to_source_folder {
-                    let dir = source_export_dir(&source_path, export_settings.subfolder.as_deref());
-                    std::fs::create_dir_all(&dir).map_err(|e| {
+                if let Some(dir) = output_path.parent() {
+                    std::fs::create_dir_all(dir).map_err(|e| {
                         format!(
                             "Failed to create export subdirectory '{}': {}",
                             dir.display(),
                             e
                         )
                     })?;
-                    dir.join(&new_filename)
-                } else if is_explicit_file_path && total_paths == 1 {
-                    output_folder_path
-                } else if export_settings.preserve_folders {
-                    if let Some(rel_dir) = relative_export_dir_for_preserved_folders(
-                        source_path.as_path(),
-                        &base_origin_folders,
-                    ) {
-                        let full_dir = output_folder_path.join(rel_dir);
-                        if let Err(e) = std::fs::create_dir_all(&full_dir) {
-                            log::warn!("Failed to create export subdirectory: {}", e);
-                        }
-                        full_dir.join(&new_filename)
-                    } else {
-                        output_folder_path.join(&new_filename)
-                    }
-                } else {
-                    output_folder_path.join(&new_filename)
-                };
-                if export_settings.export_to_source_folder && output_path == source_path {
-                    return Err(format!(
-                        "Export would overwrite its source image: {}",
-                        source_path.display()
-                    ));
                 }
 
                 let extension = output_format.to_lowercase();
@@ -1927,15 +2092,11 @@ pub(crate) async fn export_images_impl(
                 })();
 
                 if !cancellation_token_clone.load(Ordering::SeqCst) {
-                    let current_progress =
-                        progress_counter_clone.fetch_add(1, Ordering::SeqCst) + 1;
-                    let _ = app_handle_clone.emit(
-                        "batch-export-progress",
-                        serde_json::json!({
-                            "current": current_progress,
-                            "total": total_paths,
-                            "path": &image_path_str
-                        }),
+                    emit_export_progress(
+                        &app_handle_clone,
+                        &progress_counter_clone,
+                        total_paths,
+                        &image_path_str,
                     );
                 }
 
@@ -2037,6 +2198,7 @@ pub async fn export_images(
     track_created_images: Option<bool>,
     current_edit_path: Option<String>,
     current_edit_adjustments: Option<Value>,
+    conflict_resolutions: Option<HashMap<String, ExportConflictResolution>>,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
@@ -2051,6 +2213,7 @@ pub async fn export_images(
             active_path: current_edit_path,
             active_adjustments: current_edit_adjustments,
         },
+        conflict_resolutions.unwrap_or_default(),
         state,
         app_handle,
         track_created_images.unwrap_or(false),
@@ -2155,6 +2318,7 @@ pub async fn run_headless_export(
         export_settings,
         session.format,
         mode,
+        HashMap::new(),
         state.clone(),
         app_handle.clone(),
         false,
@@ -2569,6 +2733,156 @@ mod tests {
         assert_eq!(
             source_export_dir(&source, Some("/../exports")),
             base.join("exports")
+        );
+    }
+
+    fn export_settings(changes: serde_json::Value) -> ExportSettings {
+        let mut json = legacy_export_settings_json();
+        if let (Some(json), Some(changes)) = (json.as_object_mut(), changes.as_object()) {
+            json.extend(changes.clone());
+        }
+        serde_json::from_value(json).expect("export settings")
+    }
+
+    fn file_names(paths: &[Option<PathBuf>]) -> Vec<Option<String>> {
+        paths
+            .iter()
+            .map(|path| {
+                path.as_ref()
+                    .map(|path| path.file_name().unwrap().to_string_lossy().into_owned())
+            })
+            .collect()
+    }
+
+    #[test]
+    fn virtual_copies_are_numbered_per_source_whatever_their_id() {
+        let paths = [
+            "a.raw",
+            "a.raw?vc=1f3a9c",
+            "b.raw?vc=000123",
+            "a.raw?vc=abcdef",
+        ]
+        .map(String::from);
+        assert_eq!(
+            virtual_copy_numbers(&paths),
+            vec![None, Some(1), Some(1), Some(2)]
+        );
+    }
+
+    #[test]
+    fn export_clashes_follow_the_choice_and_never_overwrite_unasked() {
+        let folder = tempfile::tempdir().expect("temp dir");
+        let output = folder.path().join("out");
+        fs::create_dir_all(&output).unwrap();
+        fs::write(output.join("a_edited.jpg"), b"earlier export").unwrap();
+        let source = |dir: &str| folder.path().join(dir).join("a.raw");
+        let paths = vec![
+            source("one").to_string_lossy().into_owned(),
+            format!("{}?vc=4be2f0", source("one").display()),
+            source("two").to_string_lossy().into_owned(),
+        ];
+        let settings = export_settings(serde_json::json!({}));
+        let destination = ExportDestination {
+            output_folder_or_file: &output,
+            is_explicit_file_path: false,
+            base_origin_folders: &[],
+            export_settings: &settings,
+            output_format: "jpg",
+        };
+        let existing = output.join("a_edited.jpg").to_string_lossy().into_owned();
+
+        let conflicts = find_conflicts(&paths, &destination);
+        assert_eq!(
+            conflicts,
+            vec![ExportConflict {
+                source_path: paths[0].clone(),
+                output_path: existing.clone(),
+            }]
+        );
+
+        let resolve = |choice: Option<ExportConflictResolution>| {
+            let resolutions = choice
+                .map(|choice| HashMap::from([(existing.clone(), choice)]))
+                .unwrap_or_default();
+            let planned = planned_output_paths(&paths, &destination);
+            file_names(&resolve_output_paths(
+                &paths,
+                planned,
+                &destination,
+                &resolutions,
+            ))
+        };
+        let names = |names: [Option<&str>; 3]| names.map(|name| name.map(String::from)).to_vec();
+        assert_eq!(
+            resolve(None),
+            names([
+                Some("a_edited_1.jpg"),
+                Some("a_edited_VC01.jpg"),
+                Some("a_edited_2.jpg")
+            ])
+        );
+        assert_eq!(
+            resolve(Some(ExportConflictResolution::Overwrite)),
+            names([
+                Some("a_edited.jpg"),
+                Some("a_edited_VC01.jpg"),
+                Some("a_edited_1.jpg")
+            ])
+        );
+        assert_eq!(
+            resolve(Some(ExportConflictResolution::Skip)),
+            names([None, Some("a_edited_VC01.jpg"), None])
+        );
+    }
+
+    #[test]
+    fn an_export_beside_its_source_never_takes_the_source_name() {
+        let folder = tempfile::tempdir().expect("temp dir");
+        let source = folder.path().join("photo.jpg");
+        fs::write(&source, b"source").unwrap();
+        let paths = vec![source.to_string_lossy().into_owned()];
+        let settings = export_settings(serde_json::json!({
+            "filenameTemplate": "{original_filename}",
+            "exportToSourceFolder": true
+        }));
+        let destination = ExportDestination {
+            output_folder_or_file: Path::new(""),
+            is_explicit_file_path: false,
+            base_origin_folders: &[],
+            export_settings: &settings,
+            output_format: "jpg",
+        };
+        assert!(find_conflicts(&paths, &destination).is_empty());
+        let resolutions = HashMap::from([(
+            source.to_string_lossy().into_owned(),
+            ExportConflictResolution::Overwrite,
+        )]);
+        let planned = planned_output_paths(&paths, &destination);
+        assert_eq!(
+            resolve_output_paths(&paths, planned, &destination, &resolutions),
+            vec![Some(folder.path().join("photo_1.jpg"))]
+        );
+    }
+
+    #[test]
+    fn a_chosen_file_is_written_as_chosen() {
+        let folder = tempfile::tempdir().expect("temp dir");
+        let chosen = folder.path().join("chosen.tif");
+        fs::write(&chosen, b"earlier").unwrap();
+        let paths = vec![folder.path().join("a.raw").to_string_lossy().into_owned()];
+        let settings = export_settings(serde_json::json!({}));
+        let destination = ExportDestination {
+            output_folder_or_file: &chosen,
+            is_explicit_file_path: true,
+            base_origin_folders: &[],
+            export_settings: &settings,
+            output_format: "tif",
+        };
+        assert!(find_conflicts(&paths, &destination).is_empty());
+        let planned = planned_output_paths(&paths, &destination);
+        assert_eq!(
+            resolve_output_paths(&paths, planned, &destination, &HashMap::new()),
+            vec![Some(chosen)]
         );
     }
 

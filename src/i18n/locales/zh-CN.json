@@ -1034,6 +1034,15 @@
       "mb": "MB",
       "tb": "TB"
     },
+    "conflict": {
+      "applyToAll": "对其他已存在的文件执行相同操作（{{count}}）",
+      "cancel": "取消导出",
+      "message": "“{{name}}”已存在于 {{folder}}。",
+      "overwrite": "覆盖",
+      "rename": "重命名",
+      "skip": "跳过",
+      "title": "文件已存在"
+    },
     "dialog": {
       "saveEditedImageTitle": "保存编辑后的图像",
       "selectFolderTitle": "选择文件夹以导出 {{count}} 张图像",

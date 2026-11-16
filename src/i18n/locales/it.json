@@ -1061,6 +1061,15 @@
       "mb": "MB",
       "tb": "TB"
     },
+    "conflict": {
+      "applyToAll": "Fai lo stesso per gli altri file esistenti ({{count}})",
+      "cancel": "Annulla esportazione",
+      "message": "«{{name}}» esiste già in {{folder}}.",
+      "overwrite": "Sovrascrivi",
+      "rename": "Rinomina",
+      "skip": "Salta",
+      "title": "Il file esiste già"
+    },
     "dialog": {
       "saveEditedImageTitle": "Salva Immagine Modificata",
       "selectFolderTitle": "Seleziona Cartella per Esportare {{count}} Immagine(i)",

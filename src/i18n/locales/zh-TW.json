@@ -1034,6 +1034,15 @@
       "mb": "MB",
       "tb": "TB"
     },
+    "conflict": {
+      "applyToAll": "對其他已存在的檔案執行相同操作（{{count}}）",
+      "cancel": "取消輸出",
+      "message": "「{{name}}」已存在於 {{folder}}。",
+      "overwrite": "覆寫",
+      "rename": "重新命名",
+      "skip": "略過",
+      "title": "檔案已存在"
+    },
     "dialog": {
       "saveEditedImageTitle": "儲存編輯後的影像",
       "selectFolderTitle": "選擇資料夾以匯出 {{count}} 張影像",

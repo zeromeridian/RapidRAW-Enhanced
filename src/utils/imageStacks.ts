@@ -39,14 +39,35 @@ const normalizeExtensions = (extensions: string[]) =>
 
 const createStackId = () => `stack-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+/** `localPaths` limited to the stack's members, left out when none remain. */
+const withLocalPaths = (stack: ImageStack, localPaths: string[] | undefined): ImageStack => {
+  const { localPaths: _previous, ...rest } = stack;
+  const members = (localPaths || []).filter((path) => stack.paths.includes(path));
+  return members.length > 0 ? { ...rest, localPaths: Array.from(new Set(members)) } : rest;
+};
+
 const removePathsFromStacks = (stacks: ImageStack[], paths: Set<string>): ImageStack[] =>
   stacks
-    .map((stack) => ({ ...stack, paths: stack.paths.filter((path) => !paths.has(path)) }))
+    .map((stack) =>
+      withLocalPaths({ ...stack, paths: stack.paths.filter((path) => !paths.has(path)) }, stack.localPaths),
+    )
     .filter((stack) => stack.paths.length >= 2)
     .map((stack) => ({
       ...stack,
       coverPath: stack.paths.includes(stack.coverPath) ? stack.coverPath : stack.paths[0],
     }));
+
+/**
+ * The stacks as XMP records them: without their `localPaths` members, so nothing is written beside
+ * those and no other member's XMP points at them. A stack left with fewer than two members is
+ * dropped from the sync by `getXmpStackStates` and the backend alike.
+ */
+export const toXmpStacks = (stacks: ImageStack[]): ImageStack[] =>
+  stacks.map(({ localPaths, ...stack }) => {
+    if (!localPaths?.length) return stack;
+    const paths = stack.paths.filter((path) => !localPaths.includes(path));
+    return { ...stack, paths, coverPath: paths.includes(stack.coverPath) ? stack.coverPath : (paths[0] ?? '') };
+  });
 
 const selectAutoStackTopPath = (paths: string[], fileTypes: AutoStackFileTypes) => {
   const rawExtensions = normalizeExtensions(fileTypes.raw);
@@ -87,7 +108,7 @@ export const findImageStack = (stacks: ImageStack[], path: string) =>
 // The per-image stack fields that `sync_image_stacks_to_xmp` writes, keyed by physical path.
 const getXmpStackStates = (stacks: ImageStack[]) => {
   const states = new Map<string, string>();
-  for (const stack of stacks) {
+  for (const stack of toXmpStacks(stacks)) {
     const physicalPaths = stack.paths.filter((path) => !path.includes('?vc='));
     if (physicalPaths.length < 2) continue;
     physicalPaths.forEach((path, order) => {
@@ -121,12 +142,24 @@ export function mergeXmpImageStacks(stacks: ImageStack[], images: ImageFile[]): 
     if (members.length < 2) continue;
     members.sort((left, right) => (left.xmpStack?.order ?? 0) - (right.xmpStack?.order ?? 0));
     const cover = members.find((member) => member.xmpStack?.isCover) || members[0];
-    importedStacks.push({
-      id,
-      paths: [cover.path, ...members.filter((member) => member.path !== cover.path).map((member) => member.path)],
-      coverPath: cover.path,
-      collapsed: cover.xmpStack?.collapsed ?? members[0].xmpStack?.collapsed ?? true,
-    });
+    // XMP leaves out the stack's local-only members (exports); keep the ones this install knows.
+    const localPaths = stacks.find((stack) => stack.id === id)?.localPaths || [];
+    const memberPaths = members.map((member) => member.path);
+    importedStacks.push(
+      withLocalPaths(
+        {
+          id,
+          paths: [
+            cover.path,
+            ...memberPaths.filter((path) => path !== cover.path),
+            ...localPaths.filter((path) => !memberPaths.includes(path)),
+          ],
+          coverPath: cover.path,
+          collapsed: cover.xmpStack?.collapsed ?? members[0].xmpStack?.collapsed ?? true,
+        },
+        localPaths,
+      ),
+    );
   }
 
   if (importedStacks.length === 0) return stacks;
@@ -155,12 +188,15 @@ export const createImageStack = (stacks: ImageStack[], paths: string[], coverPat
   const resolvedCoverPath = coverStack?.coverPath ?? (paths.includes(coverPath) ? coverPath : paths[0]);
   return [
     ...stacks.filter((stack) => !touchedStacks.includes(stack)),
-    {
-      id: coverStack?.id ?? createStackId(),
-      paths: [resolvedCoverPath, ...memberPaths.filter((path) => path !== resolvedCoverPath)],
-      coverPath: resolvedCoverPath,
-      collapsed: coverStack?.collapsed ?? true,
-    },
+    withLocalPaths(
+      {
+        id: coverStack?.id ?? createStackId(),
+        paths: [resolvedCoverPath, ...memberPaths.filter((path) => path !== resolvedCoverPath)],
+        coverPath: resolvedCoverPath,
+        collapsed: coverStack?.collapsed ?? true,
+      },
+      touchedStacks.flatMap((stack) => stack.localPaths || []),
+    ),
   ];
 };
 
@@ -235,13 +271,20 @@ export const unstackImagePaths = (stacks: ImageStack[], paths: string[]): ImageS
   return stacks.filter((stack) => !stack.paths.some((path) => selectedPaths.has(path)));
 };
 
+/**
+ * Stacks each output with its source. With `outputsStayLocal` (exports) the outputs join the stack's
+ * `localPaths`, so the XMP stack sync writes no sidecar beside them.
+ */
 export const autoStackImagePairs = (
   stacks: ImageStack[],
   pairs: AutoStackPair[],
   fileTypes: AutoStackFileTypes,
   expandNewStacks = true,
+  outputsStayLocal = false,
 ): ImageStack[] => {
   const supportedExtensions = normalizeExtensions([...fileTypes.raw, ...fileTypes.nonRaw]);
+  const localPathsWith = (stack: ImageStack, outputPath: string) =>
+    outputsStayLocal ? [...(stack.localPaths || []), outputPath] : stack.localPaths;
 
   return pairs.reduce((currentStacks, { sourcePath, outputPath }) => {
     if (
@@ -262,21 +305,24 @@ export const autoStackImagePairs = (
 
     if (retainedSourceStack) {
       return stacksWithoutOutput.map((stack) =>
-        stack.id === retainedSourceStack.id ? { ...stack, paths: [...stack.paths, outputPath] } : stack,
+        stack.id === retainedSourceStack.id
+          ? withLocalPaths({ ...stack, paths: [...stack.paths, outputPath] }, localPathsWith(stack, outputPath))
+          : stack,
       );
     }
 
     const paths = [sourcePath, outputPath];
     const topPath = selectAutoStackTopPath(paths, fileTypes);
     const orderedPaths = topPath === sourcePath ? paths : [outputPath, sourcePath];
+    const newStack: ImageStack = {
+      id: createStackId(),
+      paths: orderedPaths,
+      coverPath: topPath,
+      collapsed: !expandNewStacks,
+    };
     return [
       ...removePathsFromStacks(stacksWithoutOutput, new Set([sourcePath])),
-      {
-        id: createStackId(),
-        paths: orderedPaths,
-        coverPath: topPath,
-        collapsed: !expandNewStacks,
-      },
+      withLocalPaths(newStack, localPathsWith(newStack, outputPath)),
     ];
   }, stacks);
 };

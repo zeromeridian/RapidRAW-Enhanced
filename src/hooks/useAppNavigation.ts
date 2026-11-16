@@ -339,6 +339,8 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       }
 
       isBackendReadyRef.current = true;
+      // No baseline yet: the first render of the loaded edit is not a change (see useImageProcessing).
+      prevAdjustmentsRef.current = null;
 
       const imageFile = useLibraryStore.getState().imageList.find((img) => img.path === path);
       setEditor({

@@ -110,6 +110,19 @@ export interface ExportState {
   status: Status;
 }
 
+/** What to do with an export whose file already exists (Rust `ExportConflictResolution`). */
+export enum ExportConflictResolution {
+  Overwrite = 'overwrite',
+  Skip = 'skip',
+  Rename = 'rename',
+}
+
+/** An existing file a planned export would replace (Rust `ExportConflict`). */
+export interface ExportConflict {
+  sourcePath: string;
+  outputPath: string;
+}
+
 export interface FileFormat {
   extensions: Array<string>;
   id: string;

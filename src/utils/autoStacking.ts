@@ -1,7 +1,8 @@
 import { useSettingsStore } from '../store/useSettingsStore';
 import { AutoStackPair, autoStackImagePairs } from './imageStacks';
 
-export const autoStackCreatedImages = async (pairs: AutoStackPair[]) => {
+/** `outputsStayLocal`: the outputs are exports, which get no sidecar (see `autoStackImagePairs`). */
+export const autoStackCreatedImages = async (pairs: AutoStackPair[], outputsStayLocal = false) => {
   if (pairs.length === 0) return;
 
   const { appSettings, handleSettingsChange, supportedTypes } = useSettingsStore.getState();
@@ -13,6 +14,7 @@ export const autoStackCreatedImages = async (pairs: AutoStackPair[]) => {
     pairs,
     supportedTypes,
     appSettings.expandAutoCreatedStacks !== false,
+    outputsStayLocal,
   );
   if (imageStacks === currentStacks) return;
 

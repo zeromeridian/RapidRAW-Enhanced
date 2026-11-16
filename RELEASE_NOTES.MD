@@ -5,6 +5,60 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.69.5-fix-v1-7-0-fixes — 2026-11-16
+
+### Develop
+
+- Opening a photo in Develop no longer saves it: its `.tirdata` and
+  `.xmp` are written only once you change something. Browsing photos,
+  exports included, leaves their folders untouched.
+
+## 1.69.4-fix-v1-7-0-fixes — 2026-11-16
+
+### Export
+
+- Exported files no longer get `.tirdata` or `.xmp` files beside them.
+  An export is still stacked with its source in the Library, but that
+  stack is kept in ThisIsRAW only and is not written to XMP; the
+  source's own files do not mention the export either.
+
+### Library
+
+- JPEG, TIFF, PNG and other non-RAW photos no longer get a `.tirdata`
+  just because the Library listed or opened them; one appears only
+  once you edit, rate, tag or stack the photo. RAW files keep their
+  cached EXIF as before.
+
+## 1.69.3-fix-v1-7-0-fixes — 2026-11-16
+
+### Export
+
+- Exporting into a folder that already holds a file of the same name now
+  asks first: **Overwrite**, **Skip** or **Rename**, with a switch to do
+  the same for the other existing files. Every file is checked before
+  the first one is written, and **Cancel Export** writes nothing.
+  Rename, and any clash nobody is asked about, such as the command-line
+  export, writes `name_1`, `name_2`, … beside the existing file.
+- Virtual copies are named `_VC01`, `_VC02`, … per photo in the order
+  they are exported. A copy exported without its original no longer
+  takes the original's name, so it can no longer replace the original's
+  earlier export.
+- Two photos of one export that would get the same name no longer
+  replace each other: the later one gets a free name.
+- An export beside its source never replaces the source photo; it gets a
+  free name instead of failing.
+
+### Library
+
+- Albums no longer lose a change when two updates happen at the same
+  time (for example adding photos while a rename updates the album).
+
+### Linux
+
+- AI masks (sky, subject, foreground) work again under languages that
+  write decimals with a comma, such as German. Dates and numbers in the
+  app keep following your language.
+
 ## 1.69.2-dev-develop-regroup — 2026-11-15
 
 ### Develop

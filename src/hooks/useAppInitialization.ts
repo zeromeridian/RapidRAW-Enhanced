@@ -8,6 +8,7 @@ import { useEditorStore } from '../store/useEditorStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { THEMES, DEFAULT_THEME_ID, ThemeProps } from '../utils/themes';
 import { COPYABLE_ADJUSTMENT_KEYS, withAdjustmentLayout } from '../utils/adjustments';
+import { toXmpStacks } from '../utils/imageStacks';
 import {
   DEFAULT_PANEL_DENSITY,
   FilterCriteria,
@@ -166,11 +167,10 @@ export const useAppInitialization = ({
 
         setAppSettings(settings);
         if (settings.imageStacks?.length) {
-          const affectedPaths = Array.from(
-            new Set(settings.imageStacks.flatMap((stack: { paths: string[] }) => stack.paths)),
-          );
+          const xmpStacks = toXmpStacks(settings.imageStacks);
+          const affectedPaths = Array.from(new Set(xmpStacks.flatMap((stack) => stack.paths)));
           void invoke(Invokes.SyncImageStacksToXmp, {
-            stacks: settings.imageStacks,
+            stacks: xmpStacks,
             affectedPaths,
           }).catch((err) => console.error('Failed to backfill image stacks to XMP:', err));
         }

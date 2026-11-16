@@ -1086,6 +1086,15 @@
       "mb": "MB",
       "tb": "TB"
     },
+    "conflict": {
+      "applyToAll": "Zrób to samo z pozostałymi istniejącymi plikami ({{count}})",
+      "cancel": "Anuluj eksport",
+      "message": "„{{name}}” już istnieje w {{folder}}.",
+      "overwrite": "Zastąp",
+      "rename": "Zmień nazwę",
+      "skip": "Pomiń",
+      "title": "Plik już istnieje"
+    },
     "dialog": {
       "saveEditedImageTitle": "Zapisz edytowany obraz",
       "selectFolderTitle": "Wybierz folder do eksportu {{count}} obrazów",

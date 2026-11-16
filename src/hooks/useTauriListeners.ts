@@ -308,7 +308,7 @@ export function useTauriListeners({
         if (isEffectActive) {
           useProcessStore.getState().setExportState({ status: Status.Success });
           const exports = Array.isArray(event.payload?.exports) ? event.payload.exports : [];
-          await autoStackCreatedImages(exports);
+          await autoStackCreatedImages(exports, true);
           // Untracked exports (external-edit renders, `--edit` sessions) add nothing to the Library.
           if (exports.length > 0 && useLibraryStore.getState().currentFolderPath) {
             await refs.current.refreshImageList();

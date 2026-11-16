@@ -1061,6 +1061,15 @@
       "mb": "Mo",
       "tb": "To"
     },
+    "conflict": {
+      "applyToAll": "Faire de même pour les autres fichiers existants ({{count}})",
+      "cancel": "Annuler l’exportation",
+      "message": "« {{name}} » existe déjà dans {{folder}}.",
+      "overwrite": "Remplacer",
+      "rename": "Renommer",
+      "skip": "Ignorer",
+      "title": "Le fichier existe déjà"
+    },
     "dialog": {
       "saveEditedImageTitle": "Enregistrer l'image modifiée",
       "selectFolderTitle": "Sélectionner le dossier pour exporter {{count}} image(s)",

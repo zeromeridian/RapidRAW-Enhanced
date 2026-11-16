@@ -13,6 +13,8 @@ import ImagePicker from '../../ui/ImagePicker';
 import ColorField, { normalizeHexColor, ParsedTextField, useParsedTextField } from '../../ui/ColorField';
 import {
   BorderBasis,
+  ExportConflict,
+  ExportConflictResolution,
   ExportPreset,
   ExportSettings,
   FileFormat,
@@ -28,6 +30,7 @@ import {
 } from '../../ui/ExportImportProperties';
 import { Invokes, SelectedImage, AppSettings } from '../../ui/AppProperties';
 import ExportPresetsList from '../../ui/ExportPresetsList';
+import ExportConflictModal from '../../modals/ExportConflictModal';
 import { useExportSettings } from '../../../hooks/useExportSettings';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
 import Text from '../../ui/Text';
@@ -50,6 +53,11 @@ interface ExportPanelProps {
   rootPaths: string[];
   isVisible?: boolean;
   onClose?: () => void;
+}
+
+interface ConflictAnswer {
+  resolution: ExportConflictResolution;
+  applyToAll: boolean;
 }
 
 const MAX_PAD_RATIO = 1000;
@@ -390,6 +398,10 @@ export default function ExportPanel({
   const [watermarkImageAspectRatio, setWatermarkImageAspectRatio] = useState(1);
   const [imageAspectRatio, setImageAspectRatio] = useState(16 / 9);
   const filenameInputRef = useRef<HTMLInputElement>(null);
+  const [conflictPrompt, setConflictPrompt] = useState<{ conflict: ExportConflict; remainingAfter: number } | null>(
+    null,
+  );
+  const conflictAnswerRef = useRef<((answer: ConflictAnswer | null) => void) | null>(null);
   const osPlatform = useOsPlatform();
   const isAndroid = osPlatform === 'android';
 
@@ -572,6 +584,34 @@ export default function ExportPanel({
     }, 0);
   };
 
+  const answerConflict = (answer: ConflictAnswer | null) => {
+    const resolve = conflictAnswerRef.current;
+    conflictAnswerRef.current = null;
+    resolve?.(answer);
+  };
+
+  /** Asks about each existing file in turn; `null` when the user cancels the export. */
+  const resolveExportConflicts = async (
+    conflicts: ExportConflict[],
+  ): Promise<Record<string, ExportConflictResolution> | null> => {
+    const resolutions: Record<string, ExportConflictResolution> = {};
+    try {
+      for (let index = 0; index < conflicts.length; index++) {
+        const answer = await new Promise<ConflictAnswer | null>((resolve) => {
+          conflictAnswerRef.current = resolve;
+          setConflictPrompt({ conflict: conflicts[index], remainingAfter: conflicts.length - index - 1 });
+        });
+        if (!answer) return null;
+        const decided = answer.applyToAll ? conflicts.slice(index) : [conflicts[index]];
+        decided.forEach((conflict) => (resolutions[conflict.outputPath] = answer.resolution));
+        if (answer.applyToAll) break;
+      }
+      return resolutions;
+    } finally {
+      setConflictPrompt(null);
+    }
+  };
+
   const handleExport = async () => {
     if (numImages === 0 || isExporting) return;
 
@@ -624,7 +664,9 @@ export default function ExportPanel({
       } else if (shouldChooseOutputFile) {
         const originalFilename = pathsToExport[0].split(/[\\/]/).pop() || '';
         const stem = originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename;
-        const suggestedName = `${finalFilenameTemplate.replace('{original_filename}', stem)}${filenameSuffix || ''}`;
+        // A virtual copy exported on its own is the first copy, as in a batch (Rust `virtual_copy_numbers`).
+        const copySuffix = pathsToExport[0].includes('?vc=') ? '_VC01' : '';
+        const suggestedName = `${finalFilenameTemplate.replace('{original_filename}', stem)}${copySuffix}${filenameSuffix || ''}`;
         const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;
 
         outputFolderOrFile = isAndroid
@@ -661,17 +703,28 @@ export default function ExportPanel({
           if (dir) saveLastUsedPreset(dir);
         }
 
-        setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
-        await invoke(Invokes.ExportImages, {
+        const destination = {
           paths: pathsToExport,
           outputFolderOrFile: outputFolderOrFile,
           isExplicitFilePath: shouldChooseOutputFile,
           baseOriginFolders: rootPaths,
           exportSettings,
           outputFormat: selectedFormat.extensions[0],
+        };
+        // The save dialog already asked about a chosen file; a folder export asks here, before writing anything.
+        const conflicts = shouldChooseOutputFile
+          ? []
+          : await invoke<ExportConflict[]>(Invokes.FindExportConflicts, destination);
+        const conflictResolutions = conflicts.length > 0 ? await resolveExportConflicts(conflicts) : {};
+        if (!conflictResolutions) return;
+
+        setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
+        await invoke(Invokes.ExportImages, {
+          ...destination,
           trackCreatedImages: true,
           currentEditPath: selectedImage?.path || null,
           currentEditAdjustments: adjustmentsRef.current || null,
+          conflictResolutions,
         });
       }
     } catch (error) {
@@ -1228,6 +1281,12 @@ export default function ExportPanel({
           )}
         </Button>
       </div>
+      <ExportConflictModal
+        conflict={conflictPrompt?.conflict ?? null}
+        remainingAfter={conflictPrompt?.remainingAfter ?? 0}
+        onCancel={() => answerConflict(null)}
+        onChoose={(resolution, applyToAll) => answerConflict({ resolution, applyToAll })}
+      />
     </div>
   );
 }

@@ -15,6 +15,15 @@ const INTERACTIVE_ANALYTICS_MIN_INTERVAL_MS = 250;
 const INTERACTIVE_ANALYTICS_MAX_INTERVAL_MS = 1000;
 const INTERACTIVE_ANALYTICS_RENDER_COST_MULTIPLIER = 4;
 
+/**
+ * The adjustments last rendered for a photo; seeded with the loaded edit, so only later changes
+ * are saved (`prevAdjustmentsRef`).
+ */
+export interface AdjustmentsBaseline {
+  path: string;
+  adjustments: Adjustments;
+}
+
 /** The unedited photo with the edit's geometry (the Before view), as a JPEG data URL. */
 const fetchOriginalPreview = (adjustments: Adjustments, targetResolution: number): Promise<string> =>
   invoke(Invokes.GenerateOriginalTransformedPreview, { jsAdjustments: adjustments, targetResolution });
@@ -443,12 +452,17 @@ export function useImageProcessing(
 
         if (previewOverride) return;
 
-        debouncedSave(selectedImage.path, storedAdjustments);
+        // Save only what changed while the photo is open: its first render after loading is not a
+        // change, so merely viewing a photo writes no sidecar or XMP.
+        const prev = prevAdjustmentsRef.current;
+        const isSamePhoto = prev?.path === selectedImage.path;
+        if (isSamePhoto && prev.adjustments !== storedAdjustments) {
+          debouncedSave(selectedImage.path, storedAdjustments);
+        }
 
         const otherPaths = multiSelectedPaths.filter((p) => p !== selectedImage.path);
         if (appSettings?.copyPasteSettings?.autoSync && otherPaths.length > 0) {
-          const prev = prevAdjustmentsRef.current;
-          if (prev && prev.path === selectedImage.path) {
+          if (isSamePhoto) {
             const includedKeys = appSettings?.copyPasteSettings?.includedAdjustments || COPYABLE_ADJUSTMENT_KEYS;
             const sync = getAdjustmentChanges(prev.adjustments, storedAdjustments, includedKeys);
             if (sync) {

@@ -61,6 +61,7 @@ export enum Invokes {
   DuplicateFile = 'duplicate_file',
   EstimateExportSizes = 'estimate_export_sizes',
   ExportImages = 'export_images',
+  FindExportConflicts = 'find_export_conflicts',
   StartEditorRoundTrip = 'start_editor_round_trip',
   StartEditingOriginal = 'start_editing_original',
   GetGuidedPerspectiveFrame = 'get_guided_perspective_frame',
@@ -254,6 +255,8 @@ export interface ImageStack {
   paths: string[];
   coverPath: string;
   collapsed: boolean;
+  /** Members kept out of the XMP stack sync, so no sidecar is written beside them (exports). */
+  localPaths?: string[];
 }
 
 export interface XmpStackMetadata {

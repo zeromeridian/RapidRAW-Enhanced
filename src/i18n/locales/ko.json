@@ -1034,6 +1034,15 @@
       "mb": "MB",
       "tb": "TB"
     },
+    "conflict": {
+      "applyToAll": "다른 기존 파일에도 똑같이 적용 ({{count}})",
+      "cancel": "내보내기 취소",
+      "message": "“{{name}}” 파일이 {{folder}}에 이미 있습니다.",
+      "overwrite": "덮어쓰기",
+      "rename": "이름 변경",
+      "skip": "건너뛰기",
+      "title": "파일이 이미 있습니다"
+    },
     "dialog": {
       "saveEditedImageTitle": "편집한 이미지 저장",
       "selectFolderTitle": "이미지 {{count}}개를 내보낼 폴더 선택",

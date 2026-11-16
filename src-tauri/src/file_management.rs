@@ -557,6 +557,17 @@ pub(crate) fn parse_sidecar_filename(file_name: &str) -> Option<(String, Option<
 /// `.tirdata` sidecar (also of a virtual copy), or an XMP, so a new result
 /// neither replaces an earlier one nor inherits its stale edits.
 pub fn unique_output_path(dir: &Path, stem: &str, extension: &str) -> PathBuf {
+    unique_output_path_avoiding(dir, stem, extension, |_| false)
+}
+
+/// [`unique_output_path`] that also passes over every path `is_claimed`
+/// reports, e.g. names an export batch has already given to earlier photos.
+pub fn unique_output_path_avoiding(
+    dir: &Path,
+    stem: &str,
+    extension: &str,
+    is_claimed: impl Fn(&Path) -> bool,
+) -> PathBuf {
     let sidecar_sources: HashSet<String> = fs::read_dir(dir)
         .into_iter()
         .flatten()
@@ -571,6 +582,7 @@ pub fn unique_output_path(dir: &Path, stem: &str, extension: &str) -> PathBuf {
         .map(|name| (dir.join(&name), name))
         .find(|(path, name)| {
             !path.exists()
+                && !is_claimed(path)
                 && !sidecar_sources.contains(&name.to_lowercase())
                 && resolve_xmp_path(path).is_none()
         })
@@ -2191,9 +2203,17 @@ pub fn sort_album_tree(items: &mut [AlbumItem]) {
     }
 }
 
-#[tauri::command]
-pub fn get_albums(app_handle: AppHandle) -> Result<Vec<AlbumItem>, String> {
-    let path = get_albums_path(&app_handle)?;
+/// Serializes every read-modify-write of the album file, so concurrent
+/// updates (adding photos, renames, deletions, the panel saving its tree)
+/// cannot interleave and lose one another. Only the commands below take it;
+/// they share the unlocked `read_albums` and `write_albums`.
+static ALBUMS_LOCK: Mutex<()> = Mutex::new(());
+
+fn lock_albums() -> std::sync::MutexGuard<'static, ()> {
+    ALBUMS_LOCK.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+fn read_albums(path: &Path) -> Result<Vec<AlbumItem>, String> {
     if !path.exists() {
         return Ok(Vec::new());
     }
@@ -2203,12 +2223,24 @@ pub fn get_albums(app_handle: AppHandle) -> Result<Vec<AlbumItem>, String> {
     Ok(items)
 }
 
-#[tauri::command]
-pub fn save_albums(mut tree: Vec<AlbumItem>, app_handle: AppHandle) -> Result<(), String> {
-    let path = get_albums_path(&app_handle)?;
+fn write_albums(path: &Path, mut tree: Vec<AlbumItem>) -> Result<(), String> {
     sort_album_tree(&mut tree);
     let json_string = serde_json::to_string_pretty(&tree).map_err(|e| e.to_string())?;
-    write_file_atomically(&path, json_string.as_bytes())
+    write_file_atomically(path, json_string.as_bytes())
+}
+
+#[tauri::command]
+pub fn get_albums(app_handle: AppHandle) -> Result<Vec<AlbumItem>, String> {
+    let path = get_albums_path(&app_handle)?;
+    let _guard = lock_albums();
+    read_albums(&path)
+}
+
+#[tauri::command]
+pub fn save_albums(tree: Vec<AlbumItem>, app_handle: AppHandle) -> Result<(), String> {
+    let path = get_albums_path(&app_handle)?;
+    let _guard = lock_albums();
+    write_albums(&path, tree)
 }
 
 #[tauri::command]
@@ -2217,7 +2249,9 @@ pub fn add_to_album(
     paths: Vec<String>,
     app_handle: AppHandle,
 ) -> Result<(), String> {
-    let mut tree = get_albums(app_handle.clone())?;
+    let albums_path = get_albums_path(&app_handle)?;
+    let _guard = lock_albums();
+    let mut tree = read_albums(&albums_path)?;
 
     fn add_recursive(items: &mut [AlbumItem], target_id: &str, paths_to_add: &Vec<String>) -> bool {
         for item in items.iter_mut() {
@@ -2243,7 +2277,7 @@ pub fn add_to_album(
     }
 
     if add_recursive(&mut tree, &album_id, &paths) {
-        save_albums(tree, app_handle)?;
+        write_albums(&albums_path, tree)?;
     }
     Ok(())
 }
@@ -2254,7 +2288,11 @@ fn sync_album_path_changes(
     deletions: Option<&HashSet<String>>,
     folder_rename: Option<(&str, &str)>,
 ) {
-    if let Ok(mut tree) = get_albums(app_handle.clone()) {
+    let Ok(albums_path) = get_albums_path(app_handle) else {
+        return;
+    };
+    let _guard = lock_albums();
+    if let Ok(mut tree) = read_albums(&albums_path) {
         let mut changed = false;
 
         fn process_nodes(
@@ -2337,7 +2375,7 @@ fn sync_album_path_changes(
         process_nodes(&mut tree, renames, deletions, folder_rename, &mut changed);
 
         if changed {
-            let _ = save_albums(tree, app_handle.clone());
+            let _ = write_albums(&albums_path, tree);
         }
     }
 }

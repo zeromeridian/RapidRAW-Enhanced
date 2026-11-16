@@ -1146,6 +1146,15 @@
       "mb": "MB",
       "tb": "TB"
     },
+    "conflict": {
+      "applyToAll": "Do the same for the other existing files ({{count}})",
+      "cancel": "Cancel Export",
+      "message": "“{{name}}” already exists in {{folder}}.",
+      "overwrite": "Overwrite",
+      "rename": "Rename",
+      "skip": "Skip",
+      "title": "File Already Exists"
+    },
     "dialog": {
       "saveEditedImageTitle": "Save Edited Image",
       "selectFolderTitle": "Select Folder to Export {{count}} Image(s)",

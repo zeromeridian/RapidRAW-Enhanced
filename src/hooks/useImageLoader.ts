@@ -6,8 +6,16 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { Invokes } from '../components/ui/AppProperties';
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
+import type { AdjustmentsBaseline } from './useImageProcessing';
 
-export function useImageLoader(cachedEditStateRef: React.RefObject<any>) {
+/**
+ * `prevAdjustmentsRef` gets the loaded edit as its baseline, so Develop saves only changes made after
+ * loading (see useImageProcessing).
+ */
+export function useImageLoader(
+  cachedEditStateRef: React.RefObject<any>,
+  prevAdjustmentsRef: React.RefObject<AdjustmentsBaseline | null>,
+) {
   const selectedImage = useEditorStore((s) => s.selectedImage);
   const adjustments = useEditorStore((s) => s.adjustments);
   const histogram = useEditorStore((s) => s.histogram);
@@ -46,6 +54,7 @@ export function useImageLoader(cachedEditStateRef: React.RefObject<any>) {
 
           setEditor({ adjustments: initialAdjusts });
           resetHistory(initialAdjusts);
+          prevAdjustmentsRef.current = { path: selectedImage.path, adjustments: initialAdjusts };
         } catch (err) {
           console.error('Failed to load metadata early:', err);
         }

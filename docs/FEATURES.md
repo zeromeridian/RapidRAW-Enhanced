@@ -74,7 +74,11 @@ details are in `RELEASE_NOTES.MD`.
   current view, with a 5-second to 1-hour gap and a preview of the resulting
   stacks; photos already in a stack are left unchanged.
 - Automatic stacking of physical copies, virtual copies, and exported images,
-  with optional automatic expansion.
+  with optional automatic expansion. An export's stack stays in ThisIsRAW
+  (not in XMP), so nothing is written beside exported files.
+- Only RAW files get a `.tirdata` just to cache EXIF; other images get one
+  once they are edited, rated, tagged or stacked. Viewing a photo in
+  Develop writes nothing until something changes.
 - Configurable external-editor round trip, like Lightroom's Edit In: add
   Photoshop, Pixelmator Pro, or any desktop editor executable in General
   Settings (an installed Photo Craft is found and offered automatically),
@@ -490,6 +494,11 @@ details are in `RELEASE_NOTES.MD`.
   physical and virtual copies.
 - Export directly beside each source image, optionally into a named
   subfolder.
+- Exports never replace a file unasked: before writing, the Export panel
+  asks Overwrite, Skip or Rename for each existing file (or for all);
+  unasked clashes (command line, two photos with one name, the source
+  itself) get a free `name_N`. Virtual copies export as `_VC01`, `_VC02`
+  per photo.
 - True 8-bit or 16-bit TIFF export, a DPI setting for JPEG, PNG, and TIFF, an
   embedded sRGB profile in JPEG and PNG, colored borders, and padding to an
   aspect ratio, all saved in export presets.

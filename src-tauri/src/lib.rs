@@ -2309,8 +2309,28 @@ fn frontend_ready(
     })
 }
 
+/// ONNX Runtime parses its models' numbers with the C library's numeric
+/// locale, so under a decimal-comma locale (e.g. `de_DE.UTF-8`) the AI masks
+/// break. Keep the user's locale for everything else: `LC_ALL` would override
+/// `LC_NUMERIC`, so its value moves to `LANG`.
+#[cfg(target_os = "linux")]
+fn force_c_numeric_locale() {
+    // SAFETY: runs first in `run()`, before any other thread exists, so no
+    // thread can read the environment while it changes.
+    unsafe {
+        if let Some(all) = std::env::var_os("LC_ALL").filter(|value| !value.is_empty()) {
+            std::env::set_var("LANG", all);
+            std::env::remove_var("LC_ALL");
+        }
+        std::env::set_var("LC_NUMERIC", "C");
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "linux")]
+    force_c_numeric_locale();
+
     let _ = rayon::ThreadPoolBuilder::new()
         .stack_size(8 * 1024 * 1024)
         .build_global();
@@ -2795,6 +2815,7 @@ pub fn run() {
             panorama_stitching::stitch_panorama,
             panorama_stitching::save_panorama,
             export_processing::export_images,
+            export_processing::find_export_conflicts,
             export_processing::cancel_export,
             export_processing::estimate_export_sizes,
             editor_round_trip::start_editor_round_trip,

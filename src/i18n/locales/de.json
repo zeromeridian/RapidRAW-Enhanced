@@ -1036,6 +1036,15 @@
       "mb": "MB",
       "tb": "TB"
     },
+    "conflict": {
+      "applyToAll": "Für die anderen vorhandenen Dateien ebenso ({{count}})",
+      "cancel": "Export abbrechen",
+      "message": "„{{name}}“ ist in {{folder}} bereits vorhanden.",
+      "overwrite": "Überschreiben",
+      "rename": "Umbenennen",
+      "skip": "Überspringen",
+      "title": "Datei bereits vorhanden"
+    },
     "dialog": {
       "saveEditedImageTitle": "Bearbeitetes Bild speichern",
       "selectFolderTitle": "Ordner zum Exportieren von {{count}} Bild(ern) auswählen",

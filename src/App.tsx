@@ -779,7 +779,7 @@ function App() {
         latestRenderedJobIdRef={latestRenderedJobIdRef}
         currentResRef={currentResRef}
       />
-      <ImageLoaderManager cachedEditStateRef={cachedEditStateRef} />
+      <ImageLoaderManager cachedEditStateRef={cachedEditStateRef} prevAdjustmentsRef={prevAdjustmentsRef} />
       <div
         className={clsx(
           'relative flex flex-col h-screen font-sans text-text-primary overflow-hidden select-none',
