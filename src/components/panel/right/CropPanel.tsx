@@ -24,7 +24,7 @@ import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../..
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
-import { calculateAreaPreservingCrop, calculateCenteredCrop } from '../../../utils/cropUtils';
+import { calculateAreaPreservingCrop, calculateCenteredCrop, MAX_FINE_ROTATION } from '../../../utils/cropUtils';
 import { Crop } from 'react-image-crop';
 
 const BASE_RATIO = 1.618;
@@ -81,7 +81,8 @@ export default function CropPanel() {
   const [isEditingCustom, setIsEditingCustom] = useState(false);
   const [isCustomMode, setIsCustomMode] = useState(false);
 
-  const [localRotation, setLocalRotation] = useState<number | null>(null);
+  // The live angle while the slider or a crop corner is dragged (shared through the store).
+  const liveRotation = useEditorStore((s) => s.liveRotation);
   const localRotationRef = useRef<number | null>(null);
 
   const PRESETS = useMemo<Array<CropPreset>>(
@@ -153,7 +154,6 @@ export default function CropPanel() {
 
   const updateLocalRotation = useCallback(
     (val: number | null) => {
-      setLocalRotation(val);
       localRotationRef.current = val;
       setEditor({ liveRotation: val });
     },
@@ -460,7 +460,7 @@ export default function CropPanel() {
     return rotation || 0;
   }, [rotation]);
 
-  const displayRotation = localRotation !== null ? localRotation : fineRotation;
+  const displayRotation = liveRotation ?? fineRotation;
 
   const handleFineRotationChange = (e: { target: { value: number | string } }) => {
     const newFineRotation = parseFloat(String(e.target.value));
@@ -722,8 +722,8 @@ export default function CropPanel() {
                       </button>
                     </div>
                   }
-                  min={-45}
-                  max={45}
+                  min={-MAX_FINE_ROTATION}
+                  max={MAX_FINE_ROTATION}
                   step={0.1}
                   value={displayRotation}
                   defaultValue={0}

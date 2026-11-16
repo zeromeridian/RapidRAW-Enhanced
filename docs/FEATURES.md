@@ -219,7 +219,10 @@ details are in `RELEASE_NOTES.MD`.
   flips from when Crop was opened (undoable). In Crop, Ctrl/Cmd on a handle
   resizes from the centre, Ctrl/Cmd+scroll zooms the frame around the
   pointer, and Ctrl/Cmd+drag outside the frame moves it; a **Center**
-  overlay marks the middle.
+  overlay marks the middle. Dragging in a small zone just outside a crop
+  corner rotates the photo (Lightroom style; Shift for fine rotation, the
+  angle beside the pointer); Crop leaves a margin around the photo so every
+  corner has that room.
 - **Speed Edit**: hold W (or tap it to keep it on) and drag anywhere on the
   photo to change the last-used slider; Shift drags finely and a double-click
   resets. A and D switch between the sliders chosen in Settings → Controls,
@@ -269,7 +272,7 @@ details are in `RELEASE_NOTES.MD`.
   capture details); clicking it hides or shows the capture details, and the
   choice persists. Its fine rotation can
   be adjusted either precisely with the existing slider or directly by dragging
-  the rotation handle inside the top of the crop frame.
+  outside a corner of the crop frame.
 - Dedicated **Crop** and **Geometry** modules separate composition from
   perspective work. Geometry includes full **Auto** correction that jointly
   balances rotation and both perspective axes (and remains useful for a

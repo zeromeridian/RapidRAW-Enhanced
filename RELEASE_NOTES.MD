@@ -5,6 +5,19 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.73.0-dev-crop-drag-rotate — 2026-11-16
+
+### Develop
+
+- Crop: rotate the photo Lightroom-style by dragging just outside a corner
+  of the crop frame, where the pointer turns into a curved arrow. Hold
+  Shift to rotate finely. The angle shows beside the pointer while you
+  drag, and the Rotation slider follows along. Ctrl/Cmd+drag outside the
+  frame still moves the crop.
+- Crop leaves a small margin around the photo, so every corner has room
+  to rotate.
+- The round rotate button at the top of the crop frame is gone.
+
 ## 1.72.2-dev-rapidres — 2026-11-16
 
 ### Library

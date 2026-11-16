@@ -1,5 +1,27 @@
 import { Crop } from 'react-image-crop';
 
+/** The fine rotation range in degrees, either way (Crop panel slider and the corner drag). */
+export const MAX_FINE_ROTATION = 45;
+
+/**
+ * Size of the uncropped photo in the crop view: fitted into the viewport with a margin of
+ * 16–40 px (4 % of the shorter side), so there is room to rotate outside every crop corner
+ * (upstream `getCropViewLayout`, `d574e11b`).
+ */
+export function getCropViewSize(
+  viewportWidth: number,
+  viewportHeight: number,
+  imageWidth: number,
+  imageHeight: number,
+): { width: number; height: number } {
+  const margin = Math.round(Math.min(40, Math.max(16, Math.min(viewportWidth, viewportHeight) * 0.04)));
+  const scale = Math.max(
+    0,
+    Math.min((viewportWidth - 2 * margin) / imageWidth, (viewportHeight - 2 * margin) / imageHeight),
+  );
+  return { width: imageWidth * scale, height: imageHeight * scale };
+}
+
 export function getOrientedDimensions(
   imageWidth: number,
   imageHeight: number,

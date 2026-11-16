@@ -505,6 +505,11 @@
   ) !important;
 }
 
+/* Crop corner rotate zones (CropRotateArea): their cursor wins over ReactCrop's crosshair. */
+[data-crop-rotate-zone] .ReactCrop {
+  cursor: inherit;
+}
+
 @layer utilities {
   .text-shadow-shiny {
     text-shadow: 0 0 18px rgba(255, 255, 255, 0.3);
