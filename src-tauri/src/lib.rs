@@ -289,7 +289,7 @@ pub fn prepare_preview_source(
         patched_key.hash(&mut hasher);
         (upload_w, upload_h).hash(&mut hasher);
 
-        get_or_compute_stage(&state.working_cache, hasher.finish(), || {
+        get_or_compute_stage(&state.upload_cache, hasher.finish(), || {
             Ok(Arc::new(downscale_f32_image(&patched, upload_w, upload_h)))
         })?
     } else {
@@ -2695,7 +2695,7 @@ pub fn run() {
             load_image_generation: Arc::new(AtomicUsize::new(0)),
             full_warped_cache: Mutex::new(None),
             patched_cache: Mutex::new(None),
-            working_cache: Mutex::new(None),
+            upload_cache: Mutex::new(None),
             decoded_image_cache: Mutex::new(DecodedImageCache::new(5)),
             image_preloader: Default::default(),
             thumbnail_manager: ThumbnailManager::new(),

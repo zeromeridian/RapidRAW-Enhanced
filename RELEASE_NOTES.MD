@@ -5,6 +5,13 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.84.0-dev-gpu-compute-foundation — 2026-11-17
+
+### Develop
+
+- Behind-the-scenes tidy-up of the graphics-card rendering. Photos look
+  and behave exactly as in 1.83.1.
+
 ## 1.83.1-dev-gpu-compute-foundation — 2026-11-17
 
 ### Develop

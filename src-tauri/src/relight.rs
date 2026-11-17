@@ -1,8 +1,8 @@
 //! Relight: point, spot and directional lights shading a surface (an AI normal map with its
 //! depth, refined by guided filters on the photo), with soft shadows marched over the depth.
 //! `prepare` reads the edit once for both versions: `encode` on the GPU (upstream `15a9ff2e`,
-//! `shaders/relight.wgsl`), `apply_on_cpu` as the fallback, for thumbnails and the Before view,
-//! and as the reference the GPU result is tested against.
+//! `shaders/relight.wgsl`), `apply_on_cpu` for `RenderSource::render_on_cpu` (the fallback and
+//! the Before view), and as the reference the GPU result is tested against.
 
 use image::{DynamicImage, GenericImageView, RgbaImage};
 use rayon::prelude::*;

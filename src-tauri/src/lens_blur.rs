@@ -1,7 +1,8 @@
 //! Lens blur: a depth map turned into a circle of confusion, then near and far layers blurred
 //! with a bokeh kernel. `prepare` reads the edit once for both versions: `encode` on the GPU
-//! (upstream `15a9ff2e`, `shaders/lens_blur.wgsl`), `apply_on_cpu` as the fallback, for
-//! thumbnails, and as the reference the GPU result is tested against.
+//! (upstream `15a9ff2e`, `shaders/lens_blur.wgsl`), `apply_on_cpu` for
+//! `RenderSource::render_on_cpu` (the fallback), and as the reference the GPU result is tested
+//! against.
 
 use image::{DynamicImage, GenericImageView, GrayImage, Rgb32FImage};
 use rayon::prelude::*;

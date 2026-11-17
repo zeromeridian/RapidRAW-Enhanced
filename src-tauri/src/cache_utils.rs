@@ -62,7 +62,7 @@ fn hash_effects(
 }
 
 /// Hashes every input of the spatial effects: relight, fog and lens blur.
-pub fn calculate_effects_hash(adjustments: &serde_json::Value) -> u64 {
+fn calculate_effects_hash(adjustments: &serde_json::Value) -> u64 {
     let mut hasher = DefaultHasher::new();
     hash_effects(
         adjustments,
@@ -393,7 +393,7 @@ pub fn clear_image_caches(state: tauri::State<AppState>) {
 }
 
 pub fn clear_preview_stage_caches(state: &AppState) {
-    for cache in [&state.patched_cache, &state.working_cache] {
+    for cache in [&state.patched_cache, &state.upload_cache] {
         *cache.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
 }

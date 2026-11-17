@@ -288,7 +288,8 @@ pub struct AppState {
     pub full_warped_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
     /// The editor's patched full-resolution base (`lib::prepare_preview_source`).
     pub patched_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
-    pub working_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
+    /// That base shrunk for upload to the GPU (`lib::prepare_preview_source`).
+    pub upload_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
     pub decoded_image_cache: Mutex<DecodedImageCache>,
     pub image_preloader: crate::image_preload::ImagePreloader,
     pub thumbnail_manager: Arc<ThumbnailManager>,

@@ -1,8 +1,9 @@
 //! Fog: a depth map, refined by a guided filter, turned into atmospheric haze tinted by the
 //! scene's far colour, with patches, a height falloff and a glow around bright areas.
 //! `prepare` reads the edit once for both versions: `encode` on the GPU (upstream `15a9ff2e`,
-//! `shaders/fog.wgsl`, plus the fork's Fog Feather), `apply_on_cpu` as the fallback, for
-//! thumbnails, and as the reference the GPU result is tested against.
+//! `shaders/fog.wgsl`, plus the fork's Fog Feather), `apply_on_cpu` for
+//! `RenderSource::render_on_cpu` (the fallback and the Before view), and as the reference the
+//! GPU result is tested against.
 
 use image::{DynamicImage, GenericImageView, GrayImage};
 use rayon::prelude::*;

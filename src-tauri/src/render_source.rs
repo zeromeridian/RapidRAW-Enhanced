@@ -129,8 +129,8 @@ impl Frame {
             && self.crop_rect(size) == (0, 0, size.0, size.1)
     }
 
-    /// The frame applied on the CPU.
-    pub fn apply_on_cpu<'a>(&self, image: Cow<'a, DynamicImage>) -> Cow<'a, DynamicImage> {
+    /// The frame applied on the CPU, for `RenderSource::render_on_cpu`.
+    fn apply_on_cpu<'a>(&self, image: Cow<'a, DynamicImage>) -> Cow<'a, DynamicImage> {
         let oriented = apply_coarse_rotation(image, self.orientation_steps);
         let flipped = apply_flip(oriented, self.flip_horizontal, self.flip_vertical);
         let rotated = apply_rotation(flipped, self.rotation);
@@ -309,9 +309,8 @@ impl Effects {
         blurred.detach()
     }
 
-    /// The effects on the CPU: the fallback, and for the renders that never reach the GPU
-    /// stages (thumbnails, the Before view).
-    pub fn apply_on_cpu<'a>(&self, image: Cow<'a, DynamicImage>) -> Cow<'a, DynamicImage> {
+    /// The effects on the CPU, for `RenderSource::render_on_cpu`.
+    fn apply_on_cpu<'a>(&self, image: Cow<'a, DynamicImage>) -> Cow<'a, DynamicImage> {
         let relit = match &self.relight {
             Some(job) => job.apply_on_cpu(image),
             None => image,
@@ -475,7 +474,8 @@ impl<'a> RenderSource<'a> {
         })
     }
 
-    /// The same stages on the CPU: the fallback when the GPU ones fail.
+    /// The same stages on the CPU: the fallback when the GPU ones fail, and the Before view,
+    /// which is shown without the main shader.
     pub fn render_on_cpu(&self) -> Cow<'a, DynamicImage> {
         let warped = match self.warp {
             Some(geometry) => Cow::Owned(warp_image_geometry(self.image, geometry)),
