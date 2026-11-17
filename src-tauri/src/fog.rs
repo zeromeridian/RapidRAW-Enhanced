@@ -11,7 +11,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use crate::gpu_compute::{
-    Bind, ComputeEncoder, F32X4, Grid, Group, IMAGE_FORMAT, Out, RGB_MODE, Slot,
+    Bind, ComputeEncoder, F32X4, Grid, Group, IMAGE_FORMAT, Out, R32, RGB_MODE, Slot,
 };
 use crate::relight::{RelightTap, build_guided_model, build_relight_guide, relight_luma};
 
@@ -461,14 +461,14 @@ pub fn encode(enc: &mut ComputeEncoder, job: &Fog, src: &Slot, dst: &Slot) {
     };
 
     // The depth refined by the photo (`build_guided_model`).
-    let disparity = enc.cached_map("Fog Disparity", job.map_key, depth_size, || {
+    let disparity = enc.cached_map("Fog Disparity", job.map_key, depth_size, R32, || {
         job.depth_map
             .pixels()
             .map(|p| p[0] as f32 / 255.0)
             .collect()
     });
     let guide = enc.area_down(src, depth_size, 0);
-    let model = enc.guided_model(&guide, &disparity, guide_radius(depth_size), GUIDE_EPS);
+    let model = enc.guided_model(&guide, &disparity, 0, guide_radius(depth_size), GUIDE_EPS);
     drop(guide);
 
     let noise = enc.texture("Fog Noise", depth_size, F32X4);

@@ -5,6 +5,26 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.82.1-dev-gpu-compute-foundation — 2026-11-17
+
+### Develop
+
+- Fixed a very slight darkening on Mac when Relight, Fog, Lens Blur,
+  straightening, the crop or the preview size was applied on the
+  graphics card: each of these steps rounded its result down instead of
+  to the nearest value. The graphics card now rounds the same way as the
+  processor.
+
+## 1.82.0-dev-gpu-compute-foundation — 2026-11-17
+
+### Develop
+
+- Relight now runs on the graphics card in the Develop preview, presets,
+  the uncropped crop view and exports, including its shadows. Photos
+  look the same. If the graphics card cannot do it, the processor takes
+  over as before. Thumbnails and the Before view still apply Relight on
+  the processor for now.
+
 ## 1.81.0-dev-gpu-compute-foundation — 2026-11-17
 
 ### Develop

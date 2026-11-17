@@ -16,6 +16,7 @@ struct Grid {
 @group(0) @binding(3) var t3: texture_2d<f32>;
 @group(0) @binding(4) var t4: texture_2d<f32>;
 @group(0) @binding(5) var t5: texture_2d<f32>;
+@group(0) @binding(6) var layers: texture_2d_array<f32>;
 @group(0) @binding(8) var out_f32: texture_storage_2d<rgba32float, write>;
 @group(0) @binding(9) var out_f16: texture_storage_2d<rgba16float, write>;
 @group(0) @binding(10) var out_r32: texture_storage_2d<r32float, write>;
@@ -32,6 +33,18 @@ struct Tap {
     p00: vec2<i32>,
     p11: vec2<i32>,
     w: vec2<f32>,
+}
+
+// Stores `v` into `out_f16` as the nearest half floats (ties to even), as the CPU's conversion
+// (`gpu_compute::rgba_halves`) rounds. A GPU's own conversion on store may round otherwise
+// (Apple GPUs truncate toward zero, which darkened every stage by about half a step), so the
+// value is rounded here to one a half float holds exactly, which every GPU stores unchanged.
+// Below the half floats' normal range (6.1e-5) the store may still round its last bits.
+fn store_half(id: vec2<u32>, v: vec4<f32>) {
+    let bits = bitcast<vec4<u32>>(v);
+    let odd = (bits >> vec4<u32>(13u)) & vec4<u32>(1u);
+    let rounded = (bits + vec4<u32>(0x0fffu) + odd) & vec4<u32>(0xffffe000u);
+    textureStore(out_f16, id, bitcast<vec4<f32>>(rounded));
 }
 
 fn outside(id: vec3<u32>) -> bool {
@@ -70,6 +83,17 @@ fn tap_sample(t: texture_2d<f32>, tap: Tap) -> vec4<f32> {
     let b = textureLoad(t, vec2<i32>(tap.p11.x, tap.p00.y), 0);
     let c = textureLoad(t, vec2<i32>(tap.p00.x, tap.p11.y), 0);
     let d = textureLoad(t, tap.p11, 0);
+    let top = a + (b - a) * tap.w.x;
+    let bot = c + (d - c) * tap.w.x;
+    return top + (bot - top) * tap.w.y;
+}
+
+// `tap_sample` of layer `layer` of `layers`.
+fn tap_layer(tap: Tap, layer: i32) -> vec4<f32> {
+    let a = textureLoad(layers, tap.p00, layer, 0);
+    let b = textureLoad(layers, vec2<i32>(tap.p11.x, tap.p00.y), layer, 0);
+    let c = textureLoad(layers, vec2<i32>(tap.p00.x, tap.p11.y), layer, 0);
+    let d = textureLoad(layers, tap.p11, layer, 0);
     let top = a + (b - a) * tap.w.x;
     let bot = c + (d - c) * tap.w.x;
     return top + (bot - top) * tap.w.y;

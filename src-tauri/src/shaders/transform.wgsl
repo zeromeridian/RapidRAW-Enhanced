@@ -45,7 +45,7 @@ fn tf_frame(@builtin(global_invocation_id) id: vec3<u32>) {
     if (outside(id)) { return; }
     let p = vec2<f32>(id.xy + params.crop_origin);
     if ((params.grid.flags & FRAME_ROTATE) == 0u) {
-        textureStore(out_f16, id.xy, oriented(vec2<i32>(p)));
+        store_half(id.xy, oriented(vec2<i32>(p)));
         return;
     }
     // imageproc maps the output pixel's integer coordinates through the inverse rotation
@@ -57,7 +57,7 @@ fn tf_frame(@builtin(global_invocation_id) id: vec3<u32>) {
     let w = s - vec2<f32>(f32(left), f32(top));
     let upper = oriented(vec2<i32>(left, top)) * (1.0 - w.x) + oriented(vec2<i32>(left + 1, top)) * w.x;
     let lower = oriented(vec2<i32>(left, top + 1)) * (1.0 - w.x) + oriented(vec2<i32>(left + 1, top + 1)) * w.x;
-    textureStore(out_f16, id.xy, upper * (1.0 - w.y) + lower * w.y);
+    store_half(id.xy, upper * (1.0 - w.y) + lower * w.y);
 }
 
 // Area-weighted root mean square of the source pixels the output pixel covers (negative
@@ -92,7 +92,7 @@ fn tf_downscale(@builtin(global_invocation_id) id: vec3<u32>) {
             }
         }
     }
-    textureStore(out_f16, id.xy, vec4<f32>(sqrt(acc), 1.0));
+    store_half(id.xy, vec4<f32>(sqrt(acc), 1.0));
 }
 
 fn grain_luma(p: vec2<u32>) -> f32 {

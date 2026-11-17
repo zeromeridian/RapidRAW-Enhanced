@@ -70,25 +70,13 @@ fn hash_effects(
     }
 }
 
-/// Hashes every input of the spatial effect still on the CPU, relight
-/// (`adjustment_utils::apply_warp_and_relight`).
-pub fn calculate_relight_hash(adjustments: &serde_json::Value) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    hash_effects(
-        adjustments,
-        &[("relight", "relightEnabled", RELIGHT_KEYS)],
-        &mut hasher,
-    );
-    hasher.finish()
-}
-
 /// Hashes every input of the spatial effects: relight, fog and lens blur.
 pub fn calculate_effects_hash(adjustments: &serde_json::Value) -> u64 {
     let mut hasher = DefaultHasher::new();
-    calculate_relight_hash(adjustments).hash(&mut hasher);
     hash_effects(
         adjustments,
         &[
+            ("relight", "relightEnabled", RELIGHT_KEYS),
             ("fog", "fogEnabled", FOG_KEYS),
             ("lensBlur", "lensBlurEnabled", LENS_BLUR_KEYS),
         ],
@@ -404,11 +392,7 @@ pub fn clear_image_caches(state: tauri::State<AppState>) {
 }
 
 pub fn clear_preview_stage_caches(state: &AppState) {
-    for cache in [
-        &state.patched_warped_cache,
-        &state.working_cache,
-        &state.effects_cache,
-    ] {
+    for cache in [&state.patched_warped_cache, &state.working_cache] {
         *cache.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
 }

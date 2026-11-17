@@ -1198,6 +1198,7 @@ pub fn encode(enc: &mut ComputeEncoder, job: &LensBlur, src: &Slot, dst: &Slot) 
         "Lens Blur Depth",
         job.map_key,
         job.depth_map.dimensions(),
+        R32,
         || job.depth_map.pixels().map(|p| p[0] as f32).collect(),
     );
     let guide = enc.texture("Lens Blur Guide", guide_size, F32X4);

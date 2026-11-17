@@ -31,6 +31,8 @@ pub const RGB_MODE: u32 = 2;
 const WORKGROUP: u32 = 8;
 /// Input textures a stage can read (`t0`–`t5`).
 const INPUTS: usize = 6;
+/// The layered `F32X4` texture a stage can read (`layers`, `ComputeEncoder::layered`).
+const LAYERS_BINDING: u32 = 6;
 /// Pooled textures kept between renders: at most this many bytes ...
 const POOL_KEEP_BYTES: u64 = 768 << 20;
 /// ... used within this many of the latest encodes.
@@ -80,12 +82,19 @@ impl Grid {
 pub enum Group {
     Common,
     Transform,
+    Relight,
     Fog,
     LensBlur,
 }
 
 impl Group {
-    const ALL: [Group; 4] = [Group::Common, Group::Transform, Group::Fog, Group::LensBlur];
+    const ALL: [Group; 5] = [
+        Group::Common,
+        Group::Transform,
+        Group::Relight,
+        Group::Fog,
+        Group::LensBlur,
+    ];
 
     fn source(self) -> (&'static str, &'static [&'static str]) {
         match self {
@@ -96,6 +105,10 @@ impl Group {
             Group::Transform => (
                 include_str!("shaders/transform.wgsl"),
                 &["tf_frame", "tf_downscale", "tf_grain"],
+            ),
+            Group::Relight => (
+                include_str!("shaders/relight.wgsl"),
+                &["rl_merge", "rl_depth", "rl_shadow", "rl_apply"],
             ),
             Group::Fog => (
                 include_str!("shaders/fog.wgsl"),
@@ -129,6 +142,7 @@ pub struct ComputePipelines {
     bgl: wgpu::BindGroupLayout,
     groups: [OnceLock<HashMap<&'static str, wgpu::ComputePipeline>>; Group::ALL.len()],
     dummy_view: wgpu::TextureView,
+    dummy_layers: wgpu::TextureView,
     dummy_f32: wgpu::TextureView,
     dummy_f16: wgpu::TextureView,
     dummy_r32: wgpu::TextureView,
@@ -158,21 +172,17 @@ impl ComputePipelines {
             has_dynamic_offset: false,
             min_binding_size: None,
         };
-        // Binding numbers follow upstream's layout, so later stages slot in unchanged
-        // (binding 6, upstream's layered texture, comes with relight).
+        let sampled = |view_dimension| wgpu::BindingType::Texture {
+            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+            view_dimension,
+            multisampled: false,
+        };
+        // Binding numbers follow upstream's layout, so later stages slot in unchanged.
         let mut entries: Vec<wgpu::BindGroupLayoutEntry> = (0..INPUTS as u32)
-            .map(|binding| {
-                entry(
-                    binding,
-                    wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                )
-            })
+            .map(|binding| entry(binding, sampled(wgpu::TextureViewDimension::D2)))
             .collect();
         entries.extend([
+            entry(LAYERS_BINDING, sampled(wgpu::TextureViewDimension::D2Array)),
             entry(7, buffer(wgpu::BufferBindingType::Uniform)),
             entry(8, storage(F32X4)),
             entry(9, storage(IMAGE_FORMAT)),
@@ -196,24 +206,23 @@ impl ComputePipelines {
             immediate_size: 0,
         });
 
-        let dummy = |format, usage| {
-            device
-                .create_texture(&wgpu::TextureDescriptor {
-                    label: Some("Compute Dummy"),
-                    size: wgpu::Extent3d {
-                        width: 1,
-                        height: 1,
-                        depth_or_array_layers: 1,
-                    },
-                    mip_level_count: 1,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D2,
-                    format,
-                    usage,
-                    view_formats: &[],
-                })
-                .create_view(&Default::default())
+        let dummy_texture = |format, usage| {
+            device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("Compute Dummy"),
+                size: wgpu::Extent3d {
+                    width: 1,
+                    height: 1,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format,
+                usage,
+                view_formats: &[],
+            })
         };
+        let dummy = |format, usage| dummy_texture(format, usage).create_view(&Default::default());
         let dummy_buffer = || {
             device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("Compute Dummy Buffer"),
@@ -229,6 +238,7 @@ impl ComputePipelines {
             bgl,
             groups: Default::default(),
             dummy_view: dummy(F32X4, wgpu::TextureUsages::TEXTURE_BINDING),
+            dummy_layers: layers_view(&dummy_texture(F32X4, wgpu::TextureUsages::TEXTURE_BINDING)),
             dummy_f32: dummy(F32X4, written),
             dummy_f16: dummy(IMAGE_FORMAT, written),
             dummy_r32: dummy(R32, written),
@@ -281,6 +291,14 @@ impl ComputePipelines {
     }
 }
 
+/// A view of every layer of `texture`, even when it has only one.
+fn layers_view(texture: &wgpu::Texture) -> wgpu::TextureView {
+    texture.create_view(&wgpu::TextureViewDescriptor {
+        dimension: Some(wgpu::TextureViewDimension::D2Array),
+        ..Default::default()
+    })
+}
+
 /// A texture read by later stages or, in `IMAGE_FORMAT`, by the main shader.
 #[derive(Clone)]
 pub struct Slot {
@@ -288,17 +306,40 @@ pub struct Slot {
     pub view: wgpu::TextureView,
     pub size: (u32, u32),
     format: wgpu::TextureFormat,
+    /// The layers of a `ComputeEncoder::layered` texture (`view` shows them all).
+    layers: Option<u32>,
     last_encode: u64,
 }
 
 impl Slot {
+    /// A slot for `texture`; `layers` for a `ComputeEncoder::layered` one, whose view shows
+    /// every layer (even when there is only one, as `layers` in WGSL expects).
+    fn new(
+        texture: wgpu::Texture,
+        size: (u32, u32),
+        format: wgpu::TextureFormat,
+        layers: Option<u32>,
+    ) -> Self {
+        Self {
+            view: match layers {
+                Some(_) => layers_view(&texture),
+                None => texture.create_view(&Default::default()),
+            },
+            texture,
+            size,
+            format,
+            layers,
+            last_encode: 0,
+        }
+    }
+
     fn bytes(&self) -> u64 {
         let texel = match self.format {
             F32X4 => 16,
             IMAGE_FORMAT => 8,
             _ => 4,
         };
-        self.size.0 as u64 * self.size.1 as u64 * texel
+        self.size.0 as u64 * self.size.1 as u64 * texel * self.layers.unwrap_or(1) as u64
     }
 }
 
@@ -341,12 +382,13 @@ pub enum Out<'a> {
     None,
 }
 
-/// What else a stage binds: the textures it reads (`t0`, `t1`, … in order), the buffer it
-/// counts or writes results into (`scratch`) and the read-only values it takes (`data`), and
-/// how many workgroups it runs when not one per 8×8 pixels (`groups`).
+/// What else a stage binds: the textures it reads (`t0`, `t1`, … in order), a layered texture
+/// (`layers`), the buffer it counts or writes results into (`scratch`) and the read-only values
+/// it takes (`data`), and how many workgroups it runs when not one per 8×8 pixels (`groups`).
 #[derive(Clone, Copy)]
 pub struct Bind<'a> {
     inputs: &'a [&'a wgpu::TextureView],
+    layers: Option<&'a wgpu::TextureView>,
     scratch: Option<&'a wgpu::Buffer>,
     data: Option<&'a wgpu::Buffer>,
     groups: Option<(u32, u32)>,
@@ -360,9 +402,18 @@ impl<'a> Bind<'a> {
         );
         Self {
             inputs,
+            layers: None,
             scratch: None,
             data: None,
             groups: None,
+        }
+    }
+
+    /// With `layers`, a `ComputeEncoder::layered` texture, when there is one.
+    pub fn with_layers(self, layers: Option<&'a Slot>) -> Self {
+        Self {
+            layers: layers.map(|slot| &slot.view),
+            ..self
         }
     }
 
@@ -507,14 +558,7 @@ pub fn upload_image(context: &GpuContext, image: &DynamicImage) -> Slot {
         wgpu::util::TextureDataOrder::MipMajor,
         bytemuck::cast_slice(&rgba_halves(image)),
     );
-    let view = texture.create_view(&Default::default());
-    Slot {
-        texture,
-        view,
-        size,
-        format: IMAGE_FORMAT,
-        last_encode: 0,
-    }
+    Slot::new(texture, size, IMAGE_FORMAT, None)
 }
 
 impl<'a> ComputeEncoder<'a> {
@@ -526,10 +570,28 @@ impl<'a> ComputeEncoder<'a> {
         size: (u32, u32),
         format: wgpu::TextureFormat,
     ) -> Tex {
+        self.pooled(label, size, format, None)
+    }
+
+    /// An `F32X4` texture of `layers` layers of `size`, which stages read as `layers`
+    /// (`Bind::with_layers`) and which are filled by copying textures into them.
+    pub fn layered(&self, label: &'static str, size: (u32, u32), layers: u32) -> Tex {
+        self.pooled(label, size, F32X4, Some(layers.max(1)))
+    }
+
+    fn pooled(
+        &self,
+        label: &'static str,
+        size: (u32, u32),
+        format: wgpu::TextureFormat,
+        layers: Option<u32>,
+    ) -> Tex {
         let reused = {
             let mut free = self.free.borrow_mut();
             free.iter()
-                .rposition(|slot| slot.size == size && slot.format == format)
+                .rposition(|slot| {
+                    slot.size == size && slot.format == format && slot.layers == layers
+                })
                 .map(|index| free.swap_remove(index))
         };
         let mut slot = reused.unwrap_or_else(|| {
@@ -538,7 +600,7 @@ impl<'a> ComputeEncoder<'a> {
                 size: wgpu::Extent3d {
                     width: size.0,
                     height: size.1,
-                    depth_or_array_layers: 1,
+                    depth_or_array_layers: layers.unwrap_or(1),
                 },
                 mip_level_count: 1,
                 sample_count: 1,
@@ -546,17 +608,11 @@ impl<'a> ComputeEncoder<'a> {
                 format,
                 usage: wgpu::TextureUsages::TEXTURE_BINDING
                     | wgpu::TextureUsages::STORAGE_BINDING
-                    | wgpu::TextureUsages::COPY_SRC,
+                    | wgpu::TextureUsages::COPY_SRC
+                    | wgpu::TextureUsages::COPY_DST,
                 view_formats: &[],
             });
-            let view = texture.create_view(&Default::default());
-            Slot {
-                texture,
-                view,
-                size,
-                format,
-                last_encode: 0,
-            }
+            Slot::new(texture, size, format, layers)
         });
         slot.last_encode = self.encode_index;
         Tex {
@@ -565,18 +621,43 @@ impl<'a> ComputeEncoder<'a> {
         }
     }
 
-    /// An effect map uploaded as one `R32` channel, kept between renders by `name` and
-    /// `map_key` (`effect_maps::effect_map_key`), so moving a slider does not upload it again.
+    /// Copies `src` into layer `layer` of `layers` (`layered`, the same size and format).
+    pub fn copy_to_layer(&mut self, src: &Slot, layers: &Slot, layer: u32) {
+        debug_assert!(src.size == layers.size && src.format == layers.format);
+        self.encoder.copy_texture_to_texture(
+            src.texture.as_image_copy(),
+            wgpu::TexelCopyTextureInfo {
+                texture: &layers.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d {
+                    x: 0,
+                    y: 0,
+                    z: layer,
+                },
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::Extent3d {
+                width: src.size.0,
+                height: src.size.1,
+                depth_or_array_layers: 1,
+            },
+        );
+    }
+
+    /// An effect map uploaded as `format` (`R32`, or `F32X4` with four values per texel), kept
+    /// between renders by `name` and `map_key` (`effect_maps::effect_map_key`), so moving a
+    /// slider does not upload it again.
     pub fn cached_map(
         &self,
         name: &'static str,
         map_key: u64,
         size: (u32, u32),
+        format: wgpu::TextureFormat,
         values: impl FnOnce() -> Vec<f32>,
     ) -> Slot {
         let key = {
             let mut hasher = DefaultHasher::new();
-            (name, map_key, size).hash(&mut hasher);
+            (name, map_key, size, format).hash(&mut hasher);
             hasher.finish()
         };
         let mut maps = self
@@ -602,21 +683,14 @@ impl<'a> ComputeEncoder<'a> {
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
-                format: R32,
+                format,
                 usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                 view_formats: &[],
             },
             wgpu::util::TextureDataOrder::MipMajor,
             bytemuck::cast_slice(&values()),
         );
-        let view = texture.create_view(&Default::default());
-        let slot = Slot {
-            texture,
-            view,
-            size,
-            format: R32,
-            last_encode: 0,
-        };
+        let slot = Slot::new(texture, size, format, None);
         let mut bytes: u64 = maps.iter().map(|(_, map)| map.bytes()).sum();
         while !maps.is_empty()
             && (maps.len() >= MAP_CACHE_ENTRIES || bytes + slot.bytes() > MAP_CACHE_BYTES)
@@ -675,6 +749,7 @@ impl<'a> ComputeEncoder<'a> {
             })
             .collect();
         entries.extend([
+            view(LAYERS_BINDING, bind.layers.unwrap_or(&pipes.dummy_layers)),
             wgpu::BindGroupEntry {
                 binding: 7,
                 resource: uniform.as_entire_binding(),
@@ -761,12 +836,20 @@ impl<'a> ComputeEncoder<'a> {
         out
     }
 
-    /// A guided filter of `p`'s first channel by `guide`'s (the same size): its slope and
-    /// offset per texel, which `guided` in WGSL applies. The CPU counterpart is
+    /// A guided filter of channel `channel` of `p` by `guide`'s first (the same size): its
+    /// slope and offset per texel, which `guided` in WGSL applies. The CPU counterpart is
     /// `relight::build_guided_model`.
-    pub fn guided_model(&mut self, guide: &Slot, p: &Slot, radius: u32, eps: f32) -> Tex {
+    pub fn guided_model(
+        &mut self,
+        guide: &Slot,
+        p: &Slot,
+        channel: u32,
+        radius: u32,
+        eps: f32,
+    ) -> Tex {
         let size = guide.size;
         let grid = Grid {
+            channel,
             eps,
             ..Grid::new(size)
         };
@@ -838,6 +921,39 @@ mod tests {
                     "{name} missing"
                 );
             }
+        }
+    }
+
+    /// `store_half` in `compute_common.wgsl` rounds to the half float the CPU's conversion
+    /// gives (ties to even), as a value a half float holds exactly: its arithmetic here.
+    #[test]
+    fn store_half_rounds_like_the_cpu_conversion() {
+        let store_half = |v: f32| {
+            let bits = v.to_bits();
+            f32::from_bits((bits + 0x0fff + ((bits >> 13) & 1)) & 0xffff_e000)
+        };
+        let step = f16::EPSILON.to_f32();
+        let mut values = vec![
+            0.0f32,
+            1.0,
+            1.0 + step / 2.0,
+            1.0 + step * 1.5,
+            2.0 - step / 4.0,
+        ];
+        values.extend(
+            (0..20_000)
+                .map(|i| 6.2e-5 * 1.0011f32.powi(i))
+                .take_while(|v| *v < 6.0e4),
+        );
+        for v in values.iter().flat_map(|v| [*v, -*v]) {
+            let rounded = store_half(v);
+            let expected = f16::from_f32(v).to_f32();
+            assert_eq!(rounded, expected, "{v}");
+            assert_eq!(
+                f16::from_f32(rounded).to_f32(),
+                rounded,
+                "{v} is a half float"
+            );
         }
     }
 

@@ -407,7 +407,7 @@ fn lb_final(@builtin(global_invocation_id) id: vec3<u32>) {
     if (outside(id)) { return; }
     let pixel = textureLoad(t0, id.xy, 0);
     if (atomicLoad(&scratch[0]) < params.threshold && params.diffusion <= 0.0) {
-        textureStore(out_f16, id.xy, vec4<f32>(pixel.rgb, 1.0));
+        store_half(id.xy, vec4<f32>(pixel.rgb, 1.0));
         return;
     }
     let tap = tap_from((vec2<f32>(id.xy) + 0.5) * params.scale - 0.5, params.small_size);
@@ -419,12 +419,12 @@ fn lb_final(@builtin(global_invocation_id) id: vec3<u32>) {
     let mid = pixel.rgb * fa + fs.rgb * (1.0 - fa);
     let base = ns.rgb + mid * inv_na;
     if (params.diffusion_on == 0u) {
-        textureStore(out_f16, id.xy, vec4<f32>(max(base, vec3<f32>(0.0)), 1.0));
+        store_half(id.xy, vec4<f32>(max(base, vec3<f32>(0.0)), 1.0));
         return;
     }
     let bloom = tap_sample(t4, tap);
     let mask = smooth_step(0.0, 1.0, clamp(bloom.w, 0.0, 1.0));
     let veil = params.veil * mask;
     let keep = 1.0 - (0.55 * params.diffusion * mask);
-    textureStore(out_f16, id.xy, vec4<f32>(max(base * keep + bloom.rgb * veil, vec3<f32>(0.0)), 1.0));
+    store_half(id.xy, vec4<f32>(max(base * keep + bloom.rgb * veil, vec3<f32>(0.0)), 1.0));
 }

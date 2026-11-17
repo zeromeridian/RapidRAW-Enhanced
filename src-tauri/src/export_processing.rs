@@ -32,7 +32,7 @@ use crate::file_management::{
 use crate::formats::is_raw_file;
 use crate::image_loader::{BaseSize, load_base_image_from_bytes, prepare_base_image};
 use crate::image_processing::{
-    AllAdjustments, Crop, GpuContext, RenderOutputPrecision, RenderRequest,
+    AllAdjustments, Crop, GpuContext, RenderOutputPrecision, RenderRequest, apply_geometry_warp,
     get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
     process_and_get_dynamic_image_with_precision, resolve_tonemapper_override_from_handle,
 };
@@ -45,8 +45,8 @@ use crate::tiff_metadata::{TiffSamples, encode_tiff_with_metadata};
 use crate::cache_utils::{calculate_full_job_hash, calculate_transform_hash};
 use crate::render_source::{Effects, Frame, RenderSource};
 use crate::{
-    apply_warp_and_relight, get_cached_or_generate_mask, hydrate_adjustments, load_settings,
-    prepare_preview_source, resolve_warped_image_for_masks,
+    get_cached_or_generate_mask, hydrate_adjustments, load_settings, prepare_preview_source,
+    resolve_warped_image_for_masks,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -1033,9 +1033,9 @@ impl Drop for ExportTaskGuard {
     }
 }
 
-/// A prepared base shrunk to the GPU limit, warped, relit and fogged, plus
-/// the edit's GPU effects and frame scaled onto it, with the scale from
-/// decoded-photo pixels (crop, masks) onto it.
+/// A prepared base shrunk to the GPU limit and warped, plus the edit's GPU
+/// effects and frame scaled onto it, with the scale from decoded-photo
+/// pixels (crop, masks) onto it.
 struct ExportFrame<'a> {
     image: Cow<'a, DynamicImage>,
     effects: Effects,
@@ -1063,7 +1063,7 @@ fn transform_for_export<'a>(
     let scale = base_scale * fit_scale;
     let render_extent = crate::motion_blur::render_extent(&fitted, 1.0);
     let adjustments = crate::image_processing::with_crop_scaled(js_adjustments, scale);
-    let image = apply_warp_and_relight(fitted, &adjustments);
+    let image = apply_geometry_warp(fitted, &adjustments);
     ExportFrame {
         effects: Effects::prepare(&adjustments, image.dimensions()),
         image,
@@ -2606,7 +2606,7 @@ pub async fn estimate_export_sizes(
             .unwrap_or(serde_json::Value::Null);
         }
 
-        let effected_image = apply_warp_and_relight(&original_image, &js_adjustments);
+        let effected_image = apply_geometry_warp(&original_image, &js_adjustments);
         let source = RenderSource::edited(
             &effected_image,
             calculate_full_job_hash(&source_path_str, &js_adjustments).wrapping_add(1),

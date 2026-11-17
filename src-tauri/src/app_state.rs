@@ -271,7 +271,6 @@ pub struct AppState {
     pub full_warped_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
     pub patched_warped_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
     pub working_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
-    pub effects_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
     pub decoded_image_cache: Mutex<DecodedImageCache>,
     pub image_preloader: crate::image_preload::ImagePreloader,
     pub thumbnail_manager: Arc<ThumbnailManager>,

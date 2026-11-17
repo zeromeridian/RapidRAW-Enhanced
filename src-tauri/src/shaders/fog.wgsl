@@ -166,7 +166,7 @@ fn fog_apply(@builtin(global_invocation_id) id: vec3<u32>) {
     let optical = params.density * t * exp(-params.height * up) * patches;
     let fog = clamp(params.amount * (1.0 - exp(-optical)) / params.norm, 0.0, 1.0);
     if (fog <= 0.0) {
-        textureStore(out_f16, id.xy, vec4<f32>(pixel.rgb, 1.0));
+        store_half(id.xy, vec4<f32>(pixel.rgb, 1.0));
         return;
     }
 
@@ -181,5 +181,5 @@ fn fog_apply(@builtin(global_invocation_id) id: vec3<u32>) {
     if (params.glow > 0.0) {
         halo = tap_sample(t4, low_tap).rgb * params.glow;
     }
-    textureStore(out_f16, id.xy, vec4<f32>(pixel.rgb * (1.0 - fog) + (scattered + halo) * fog, 1.0));
+    store_half(id.xy, vec4<f32>(pixel.rgb * (1.0 - fog) + (scattered + halo) * fog, 1.0));
 }

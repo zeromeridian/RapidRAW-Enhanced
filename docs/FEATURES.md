@@ -526,8 +526,8 @@ details are in `RELEASE_NOTES.MD`.
 - Full-size renders larger than the GPU's texture limit (for example big
   panoramas) are shrunk to fit instead of failing.
 - Orientation, flips, straightening, crop and preview downscaling run on
-  the GPU for every render, Fog and Lens Blur for every render except
-  thumbnails (from RapidRAW, in steps; Fog keeps TIR's feather), and fall
+  the GPU for every render, Relight, Fog and Lens Blur for every render
+  except thumbnails (from RapidRAW, in steps; Fog keeps TIR's feather), and fall
   back to the CPU when the GPU stage fails.
 - On macOS, AI Denoise, Super Resolution and the depth maps for Fog, Lens Blur, and depth masks
   run on the GPU and Neural Engine through CoreML, with an

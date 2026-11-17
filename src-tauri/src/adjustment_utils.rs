@@ -1,9 +1,6 @@
-use image::DynamicImage;
-use std::borrow::Cow;
 use std::collections::HashMap;
 
 use crate::app_state::AppState;
-use crate::image_processing::{IntoCowImage, apply_geometry_warp};
 
 pub fn hydrate_sub_masks(
     sub_masks: &mut Vec<serde_json::Value>,
@@ -155,20 +152,6 @@ pub fn is_group_visible(adjustments: &serde_json::Value, group: &str) -> bool {
 /// Whether a toggled tool is on and its eye is on.
 pub fn is_tool_enabled(adjustments: &serde_json::Value, group: &str, enabled_key: &str) -> bool {
     is_group_visible(adjustments, group) && adjustments[enabled_key].as_bool().unwrap_or(false)
-}
-
-/// The CPU stages before the GPU ones: geometry warp and relight. Fog, lens blur,
-/// orientation, flips, rotation and crop follow on the GPU
-/// (`render_source::RenderSource::edited`).
-pub fn apply_warp_and_relight<'a, I: IntoCowImage<'a>>(
-    image: I,
-    adjustments: &serde_json::Value,
-) -> Cow<'a, DynamicImage> {
-    let start_time = std::time::Instant::now();
-    let warped_image = apply_geometry_warp(image.into_cow(), adjustments);
-    let relit_image = crate::relight::apply_relight(warped_image, adjustments);
-    log::info!("apply_warp_and_relight took {:.2?}", start_time.elapsed());
-    relit_image
 }
 
 #[cfg(test)]

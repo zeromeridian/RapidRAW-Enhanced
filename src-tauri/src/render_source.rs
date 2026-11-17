@@ -1,9 +1,9 @@
 //! What a render starts from: an image prepared on the CPU plus the stages that turn it into
 //! the main shader's input on the GPU (upstream `15a9ff2e`; `docs/GPU_COMPUTE_PLAN.md`).
-//! The GPU runs fog and lens blur, then the frame (orientation, flips, rotation, crop) and the
-//! output downscale; the geometry warp and relight still run on the CPU before
-//! (`adjustment_utils::apply_warp_and_relight`). The same stages run on the CPU when the
-//! GPU ones fail (`render_on_cpu`), and are the reference the GPU stages are tested against.
+//! The GPU runs relight, fog and lens blur, then the frame (orientation, flips, rotation, crop)
+//! and the output downscale; the geometry warp still runs on the CPU before
+//! (`image_processing::apply_geometry_warp`). The same stages run on the CPU when the GPU ones
+//! fail (`render_on_cpu`), and are the reference the GPU stages are tested against.
 
 use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
@@ -14,12 +14,13 @@ use image::{DynamicImage, GenericImageView};
 use serde_json::Value;
 
 use crate::fog::Fog;
-use crate::gpu_compute::{Bind, Grid, Group, IMAGE_FORMAT, Out, Slot, Tex};
+use crate::gpu_compute::{Bind, Grid, Group, IMAGE_FORMAT, Out, Slot};
 use crate::image_processing::{
     Crop, GpuContext, apply_coarse_rotation, apply_flip, apply_rotation, crop_rect,
     downscale_f32_image, fitted_size,
 };
 use crate::lens_blur::LensBlur;
+use crate::relight::Relight;
 
 const FRAME_ROTATE: u32 = 1;
 
@@ -167,10 +168,11 @@ fn downscale(enc: &mut crate::gpu_compute::ComputeEncoder, src: &Slot, dst: &Slo
     );
 }
 
-/// The spatial effects the GPU runs before the frame, fog then lens blur, read from an edit
-/// for an image of one size (the effects scale with it).
+/// The spatial effects the GPU runs before the frame, relight, fog, then lens blur, read from
+/// an edit for an image of one size (the effects scale with it).
 #[derive(Clone, Default)]
 pub struct Effects {
+    relight: Option<Arc<Relight>>,
     fog: Option<Arc<Fog>>,
     lens_blur: Option<Arc<LensBlur>>,
 }
@@ -178,12 +180,17 @@ pub struct Effects {
 impl Effects {
     pub fn prepare(adjustments: &Value, size: (u32, u32)) -> Self {
         Self {
+            relight: crate::relight::prepare(adjustments, size).map(Arc::new),
             fog: crate::fog::prepare(adjustments, size).map(Arc::new),
             lens_blur: crate::lens_blur::prepare(adjustments, size).map(Arc::new),
         }
     }
 
     fn hash_into(&self, hasher: &mut impl Hasher) {
+        self.relight.is_some().hash(hasher);
+        if let Some(job) = &self.relight {
+            job.hash_into(hasher);
+        }
         self.fog.is_some().hash(hasher);
         if let Some(job) = &self.fog {
             job.hash_into(hasher);
@@ -195,27 +202,42 @@ impl Effects {
     }
 
     fn encode(&self, enc: &mut crate::gpu_compute::ComputeEncoder, src: Slot) -> Slot {
+        let relit = self.relight.as_ref().map(|job| {
+            let relit = enc.texture("Relight Output", src.size, IMAGE_FORMAT);
+            crate::relight::encode(enc, job, &src, &relit);
+            relit
+        });
+        let input = relit.as_deref().unwrap_or(&src);
         let fogged = self.fog.as_ref().map(|job| {
             let fogged = enc.texture("Fog Output", src.size, IMAGE_FORMAT);
-            crate::fog::encode(enc, job, &src, &fogged);
+            crate::fog::encode(enc, job, input, &fogged);
             fogged
         });
         let Some(job) = &self.lens_blur else {
-            return fogged.map_or(src, Tex::detach);
+            // The relight output returns to the pool when fog follows it.
+            return match (fogged, relit) {
+                (Some(fogged), _) => fogged.detach(),
+                (None, Some(relit)) => relit.detach(),
+                (None, None) => src,
+            };
         };
-        let input = fogged.as_deref().unwrap_or(&src);
+        let input = fogged.as_deref().or(relit.as_deref()).unwrap_or(&src);
         let blurred = enc.texture("Lens Blur Output", src.size, IMAGE_FORMAT);
         crate::lens_blur::encode(enc, job, input, &blurred);
-        // The fog output returns to the pool here.
+        // The relight and fog outputs return to the pool here.
         blurred.detach()
     }
 
     /// The effects on the CPU: the fallback, and for the renders that never reach the GPU
     /// stages (thumbnails, the Before view).
     pub fn apply_on_cpu<'a>(&self, image: Cow<'a, DynamicImage>) -> Cow<'a, DynamicImage> {
-        let fogged = match &self.fog {
+        let relit = match &self.relight {
             Some(job) => job.apply_on_cpu(image),
             None => image,
+        };
+        let fogged = match &self.fog {
+            Some(job) => job.apply_on_cpu(relit),
+            None => relit,
         };
         match &self.lens_blur {
             Some(job) => job.apply_on_cpu(fogged),
@@ -224,7 +246,7 @@ impl Effects {
     }
 }
 
-/// An image for the main shader: `image` (already warped and relit), then `effects`,
+/// An image for the main shader: `image` (already warped), then `effects`,
 /// then `frame`, then shrunk to fit `output_fit` when that is smaller.
 pub struct RenderSource<'a> {
     pub image: &'a DynamicImage,
@@ -350,12 +372,14 @@ mod tests {
     }
 
     #[test]
-    fn the_cpu_render_runs_fog_then_lens_blur_before_the_frame() {
+    fn the_cpu_render_runs_relight_fog_then_lens_blur_before_the_frame() {
         let image = scene(120, 90);
-        let adjustments = fog(lens_blur(json!({ "orientationSteps": 1 })));
+        let adjustments = relight(fog(lens_blur(json!({ "orientationSteps": 1 }))));
         let source = RenderSource::edited(&image, 0, &adjustments);
+        let relight = crate::relight::prepare(&adjustments, image.dimensions()).expect("relit");
+        let relit = relight.apply_on_cpu(Cow::Borrowed(&image));
         let fog = crate::fog::prepare(&adjustments, image.dimensions()).expect("fog on");
-        let fogged = fog.apply_on_cpu(Cow::Borrowed(&image));
+        let fogged = fog.apply_on_cpu(relit);
         let blur = crate::lens_blur::prepare(&adjustments, image.dimensions()).expect("blur on");
         let blurred = blur.apply_on_cpu(fogged);
         assert!(
@@ -366,14 +390,16 @@ mod tests {
         let rendered = source.render_on_cpu().to_rgb32f();
         let expected = expected.to_rgb32f();
         assert_eq!(rendered.dimensions(), expected.dimensions());
-        // Fog's colour is a parallel sum, whose order (and last bits) varies between runs.
+        // Fog's colour is a parallel sum, whose order (and last bits) varies between runs;
+        // relight's brightening and lens blur's highlight weighting magnify them (seen up to
+        // 1.24e-5 relative). Effects in another order differ by far more than this limit.
         let worst = rendered
             .as_raw()
             .iter()
             .zip(expected.as_raw())
-            .map(|(a, b)| (a - b).abs())
+            .map(|(a, b)| (a - b).abs() / b.abs().max(1.0))
             .fold(0.0f32, f32::max);
-        assert!(worst <= 1e-5, "worst {worst}");
+        assert!(worst <= 1e-4, "worst {worst}");
     }
 
     fn ramp(width: u32, height: u32) -> DynamicImage {
@@ -459,6 +485,23 @@ mod tests {
                 "{change}"
             );
         }
+
+        let relit = relight(json!({}));
+        let key = RenderSource::edited(&image, 1, &relit).key();
+        assert_ne!(key, RenderSource::plain(&image, 1).key());
+        assert_eq!(RenderSource::edited(&image, 1, &relit).key(), key);
+        for change in [
+            json!({ "relightAmbient": -20 }),
+            json!({ "relightShadows": true }),
+            json!({ "relightLights": [light(json!({ "x": 0.7 }))] }),
+            json!({ "relightLights": [light(json!({ "visible": false }))], "relightAmbient": 10 }),
+        ] {
+            assert_ne!(
+                RenderSource::edited(&image, 1, &relight(change.clone())).key(),
+                key,
+                "{change}"
+            );
+        }
     }
 
     /// A depth map as the AI depth tool stores it: far on the left, near on the right, and a
@@ -478,6 +521,75 @@ mod tests {
             "data:image/png;base64,{}",
             base64::engine::general_purpose::STANDARD.encode(png.get_ref())
         )
+    }
+
+    /// A normal map as the AI relight tool stores it (RGB the normal, alpha the depth): a flat
+    /// far background, a dome, and a near block standing in front that casts shadows.
+    fn normal_map_url(width: u32, height: u32) -> String {
+        use base64::Engine as _;
+        let map = image::RgbaImage::from_fn(width, height, |x, y| {
+            let (u, v) = (x as f32 / width as f32, y as f32 / height as f32);
+            let (dx, dy) = ((u - 0.6) / 0.25, (v - 0.55) / 0.3);
+            let r2 = dx * dx + dy * dy;
+            let block = (0.15..0.35).contains(&u) && (0.3..0.6).contains(&v);
+            let (normal, depth) = if block {
+                ([0.0, 0.0, -1.0], 0.85)
+            } else if r2 < 1.0 {
+                (
+                    [dx * 0.8, dy * 0.8, -(1.0 - r2 * 0.64).sqrt()],
+                    0.35 + 0.3 * (1.0 - r2),
+                )
+            } else {
+                ([0.1 * u, -0.1 * v, -1.0], 0.2 * v)
+            };
+            let channel = |c: f32| (c.clamp(0.0, 1.0) * 255.0).round() as u8;
+            image::Rgba([
+                channel((normal[0] + 1.0) / 2.0),
+                channel((1.0 - normal[1]) / 2.0),
+                channel((1.0 - normal[2]) / 2.0),
+                channel(depth),
+            ])
+        });
+        let mut png = std::io::Cursor::new(Vec::new());
+        DynamicImage::ImageRgba8(map)
+            .write_to(&mut png, image::ImageFormat::Png)
+            .expect("encode the normal map");
+        format!(
+            "data:image/png;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(png.get_ref())
+        )
+    }
+
+    /// A warm point light, with `overrides`.
+    fn light(overrides: Value) -> Value {
+        let mut light = json!({
+            "type": "point",
+            "x": 0.35,
+            "y": 0.3,
+            "depth": 70,
+            "intensity": 60,
+            "radius": 40,
+            "color": "#ffd9a0",
+        });
+        for (key, value) in overrides.as_object().expect("an object") {
+            light[key] = value.clone();
+        }
+        light
+    }
+
+    /// Relight on with one `light`, with `overrides` (an edit, so it can be combined).
+    fn relight(overrides: Value) -> Value {
+        let mut adjustments = json!({
+            "relightEnabled": true,
+            "relightNormalMap": normal_map_url(128, 96),
+            "relightLights": [light(json!({}))],
+            "relightAmbient": -30,
+            "relightSoftness": 25,
+        });
+        for (key, value) in overrides.as_object().expect("an object") {
+            adjustments[key] = value.clone();
+        }
+        adjustments
     }
 
     /// Lens blur on, with `overrides`.
@@ -535,9 +647,16 @@ mod tests {
             .collect()
     }
 
-    /// The largest and the mean difference between the GPU and the CPU render of `source`,
-    /// relative to the value where it is above 1.
-    fn gpu_cpu_difference(context: &GpuContext, source: &RenderSource) -> (f32, f32) {
+    /// How the GPU render of a source differs from the CPU one, per value and relative to it
+    /// where it is above 1: the largest difference, the mean one, and the mean signed one
+    /// (`bias`, negative when the GPU comes out lower).
+    struct Difference {
+        worst: f32,
+        mean: f32,
+        bias: f32,
+    }
+
+    fn gpu_cpu_difference(context: &GpuContext, source: &RenderSource) -> Difference {
         let gpu = read_back(context, &source.render(context).expect("GPU stages"));
         let cpu = crate::gpu_compute::rgba_halves(&source.render_on_cpu());
         assert_eq!(gpu.len(), cpu.len());
@@ -547,12 +666,31 @@ mod tests {
             .flat_map(|(g, c)| {
                 (0..3).map(move |i| {
                     let c = c[i].to_f32();
-                    (g[i] - c).abs() / c.abs().max(1.0)
+                    (g[i] - c) / c.abs().max(1.0)
                 })
             })
             .collect();
-        let worst = errors.iter().copied().fold(0.0f32, f32::max);
-        (worst, errors.iter().sum::<f32>() / errors.len() as f32)
+        let count = errors.len() as f32;
+        Difference {
+            worst: errors.iter().map(|e| e.abs()).fold(0.0f32, f32::max),
+            mean: errors.iter().map(|e| e.abs()).sum::<f32>() / count,
+            bias: errors.iter().sum::<f32>() / count,
+        }
+    }
+
+    /// Compares `source` on the GPU and the CPU, prints the numbers under `name`, and records
+    /// a failure when they pass the limits, so a run reports every case.
+    fn compare(
+        context: &GpuContext,
+        name: &str,
+        source: &RenderSource,
+        failures: &mut Vec<String>,
+    ) {
+        let Difference { worst, mean, bias } = gpu_cpu_difference(context, source);
+        eprintln!("{name}: worst {worst:.2e}, mean {mean:.2e}, bias {bias:+.2e}");
+        if worst > 2e-3 || mean > mean_limit(source) {
+            failures.push(format!("{name}: worst {worst}, mean {mean}, bias {bias}"));
+        }
     }
 
     /// The largest mean difference an effect may show. A fine rotation resamples the effect's
@@ -575,7 +713,10 @@ mod tests {
             for fit in [None, Some((120, 120))] {
                 let mut source = RenderSource::edited(&image, 0, &adjustments);
                 source.output_fit = fit;
-                let (worst, _) = gpu_cpu_difference(&context, &source);
+                let Difference { worst, mean, bias } = gpu_cpu_difference(&context, &source);
+                eprintln!(
+                    "frame {adjustments} {fit:?}: worst {worst:.2e}, mean {mean:.2e}, bias {bias:+.2e}"
+                );
                 // Two half-float roundings of values up to 1.5.
                 assert!(worst <= 2e-3, "{adjustments} {fit:?}: worst {worst}");
             }
@@ -618,22 +759,18 @@ mod tests {
             json!({ "orientationSteps": 1, "rotation": 4.0,
                     "crop": { "x": 20.0, "y": 30.0, "width": 300.0, "height": 500.0 } }),
         ];
+        let mut failures = Vec::new();
         for (width, height) in [(640, 420), (203, 151)] {
             let image = scene(width, height);
             for overrides in &cases {
                 let adjustments = lens_blur(overrides.clone());
                 let source = RenderSource::edited(&image, 0, &adjustments);
                 assert!(source.effects.lens_blur.is_some(), "{overrides}");
-                let (worst, mean) = gpu_cpu_difference(&context, &source);
-                eprintln!(
-                    "lens blur {width}x{height} {overrides}: worst {worst:.2e}, mean {mean:.2e}"
-                );
-                assert!(
-                    worst <= 2e-3 && mean <= mean_limit(&source),
-                    "{width}x{height} {overrides}: worst {worst}, mean {mean}"
-                );
+                let name = format!("lens blur {width}x{height} {overrides}");
+                compare(&context, &name, &source, &mut failures);
             }
         }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
     }
 
     /// Fog on the GPU renders what the CPU version does: Fog Feather (the fork's, not in
@@ -660,19 +797,69 @@ mod tests {
             json!({ "rotation": -6.0,
                     "crop": { "x": 10.0, "y": 20.0, "width": 300.0, "height": 200.0 } }),
         ];
+        let mut failures = Vec::new();
         for (width, height) in [(640, 420), (203, 151)] {
             let image = scene(width, height);
             for overrides in &cases {
                 let adjustments = fog(overrides.clone());
                 let source = RenderSource::edited(&image, 0, &adjustments);
                 assert!(source.effects.fog.is_some(), "{overrides}");
-                let (worst, mean) = gpu_cpu_difference(&context, &source);
-                eprintln!("fog {width}x{height} {overrides}: worst {worst:.2e}, mean {mean:.2e}");
-                assert!(
-                    worst <= 2e-3 && mean <= mean_limit(&source),
-                    "{width}x{height} {overrides}: worst {worst}, mean {mean}"
-                );
+                let name = format!("fog {width}x{height} {overrides}");
+                compare(&context, &name, &source, &mut failures);
             }
         }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    /// Relight on the GPU renders what the CPU version does: point, spot and directional
+    /// lights, ambient only, shine and softness, shadows with and without softening, several
+    /// coloured lights casting shadows, orientations (relight follows the unrotated image),
+    /// relight then fog and lens blur, and a frame.
+    #[test]
+    fn gpu_relight_matches_the_cpu() {
+        let Some(context) = crate::gpu_processing::headless_gpu_context() else {
+            eprintln!("No GPU adapter; skipping the GPU relight comparison.");
+            return;
+        };
+        let lights = |lights: Vec<Value>| json!({ "relightLights": lights });
+        let cases = [
+            json!({}),
+            json!({ "relightLights": [], "relightAmbient": 40 }),
+            lights(vec![light(
+                json!({ "type": "spot", "cone": 30, "feather": 60,
+                                      "angle": 200, "elevation": 40 }),
+            )]),
+            lights(vec![light(
+                json!({ "type": "directional", "angle": 60, "elevation": 30 }),
+            )]),
+            json!({ "relightShine": 70, "relightSoftness": 5 }),
+            json!({ "relightShadows": true, "relightShadowSoftness": 0 }),
+            json!({ "relightShadows": true, "relightShadowSoftness": 40 }),
+            json!({
+                "relightShadows": true,
+                "relightLights": [
+                    light(json!({ "color": "#80a0ff", "temperature": -40, "x": 0.8 })),
+                    light(json!({ "type": "directional", "tint": 30, "elevation": 20 })),
+                    light(json!({ "type": "spot", "intensity": 120, "depth": 10, "y": 0.8 })),
+                    light(json!({ "visible": false, "intensity": 400 })),
+                ],
+            }),
+            json!({ "orientationSteps": 1, "flipHorizontal": true }),
+            fog(lens_blur(json!({ "relightShadows": true }))),
+            json!({ "rotation": 5.0,
+                    "crop": { "x": 15.0, "y": 25.0, "width": 320.0, "height": 210.0 } }),
+        ];
+        let mut failures = Vec::new();
+        for (width, height) in [(640, 420), (203, 151)] {
+            let image = scene(width, height);
+            for overrides in &cases {
+                let adjustments = relight(overrides.clone());
+                let source = RenderSource::edited(&image, 0, &adjustments);
+                assert!(source.effects.relight.is_some(), "{overrides}");
+                let name = format!("relight {width}x{height} {overrides}");
+                compare(&context, &name, &source, &mut failures);
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
     }
 }
