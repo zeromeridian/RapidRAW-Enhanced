@@ -1,9 +1,10 @@
 # Mask Management Plan (LrC-style components)
 
-Status: proposed (owner, 2026-11-17). WP0 done as item 43 (`1.85.2`,
-2026-11-17, `fix/mask-drop-insert`, uncommitted; also repairs saved
-numeric modes on read, owner decision); WP1–WP6 not started. Plan item
-51 in `UPSTREAM_FEATURE_GAP.md`. Code check
+Status: proposed (owner, 2026-11-17). WP0's code fix done as item 43
+(`1.85.2`, owner commit `9563da6f` on `fix/mask-drop-insert`), but the
+drop it fixes cannot be reached yet (see P1); making it reachable is
+part of WP3 (owner 2026-11-17). WP1–WP6 not started. Plan item 51 in
+`UPSTREAM_FEATURE_GAP.md`. Code check
 2026-11-17: section 1 and the problems P1, P2 and P7 match the code. Open
 decision before WP1: base rule or start from white (WP1). Item 41
 (stronger feather) follows this plan.
@@ -60,6 +61,12 @@ P1. Bug: in `handleDragEnd`, dropping a creation tile onto an existing
     component calls `handleAddSubMask(overData.parentId!, dragData.maskType!, targetIndex)`.
     This passes the index as `mode`. The new component gets a numeric `mode`
     that is not a valid `SubMaskMode`, and it is appended instead of inserted.
+    **Not reachable (owner found, 2026-11-17):** the tool tiles show only
+    while a photo has no masks (`MasksPanel.tsx`, layout from upstream
+    `ad276373`, 2026-04-09, older than the wrong call); once a mask exists,
+    tools are added through menus, which cannot be dragged. So no tile
+    could ever be dropped onto a component and no saved edit has a numeric
+    `mode`. The AI panel hides its tiles the same way.
 
 P2. A mask can go blank without warning. Because compositing starts from
     black, a mask whose first visible component is Subtractive or Intersect
@@ -103,7 +110,12 @@ Do these in order. Each WP should be a separate, reviewable change.
 
 ### WP0: Fix drag-to-insert (P1)
 
-Done (`1.85.2`, item 43; details in `HANDOFF.md`).
+Code fix done (`1.85.2`, item 43, `9563da6f`; details in `HANDOFF.md`).
+It also reads a `mode` that is not a mode as Additive (Rust
+`deserialize_sub_mask_mode`, `normalizeLoadedAdjustments`). That repair
+turned out to be unneeded (P1) and stays as a harmless guard; remove it
+in WP3 if wanted. The acceptance check below waits on WP3's draggable
+tiles.
 
 - In `handleDragEnd`, call
   `handleAddSubMask(parentId, maskType, SubMaskMode.Additive, targetIndex)`.
@@ -168,6 +180,19 @@ predictable.
   container row's context menu.
 - The "Add new component" row: show it whenever the container is expanded,
   not only when it is selected.
+- **Draggable tool tiles once masks exist** (owner 2026-11-17, folded in
+  here): today the tile grid disappears with the first mask, so dropping a
+  tile on a mask or component (WP0, `NewMaskDropZone`) cannot happen. Keep
+  the tiles reachable while masks exist, clickable (add to the selected
+  mask, else a new one: the tooltips `addToCurrent`/`createNew` already
+  say so) and draggable onto empty space (new mask), a mask row (append)
+  or a component row (insert there). Fork deviation from upstream
+  `ad276373`'s space-saving layout; record it in `UPSTREAM_FEATURE_GAP.md`.
+  **Open points:** where the tiles sit and how much space they take (e.g.
+  a compact one-row strip above the mask list, or a collapsible grid);
+  whether the dragged tile's mode follows Alt/Option (Subtract) like the
+  Add button; whether the AI panel gets the same (it hides its tiles the
+  same way).
 - i18n: add every new string to all 12 files in `src/i18n/locales/` (see
   `src/i18n/update_translations.py`). Remove `switchToSubtract`,
   `switchToIntersect` and `switchToAdd` once nothing uses them. Check with

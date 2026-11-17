@@ -9,11 +9,9 @@ description.
 
 ### Masks
 
-- Dragging a mask tool onto a mask's component now inserts the new
-  component where you drop it. Before, it was always placed at the end and
-  saved in a way that made every mask on the photo stop working.
-- Photos already affected get their masks back: the dropped component is
-  read as an added component in the editor, thumbnails and exports.
+- Internal fix for inserting a mask component by drag and drop, in
+  preparation for making the mask tools draggable once a photo has masks.
+  Nothing changes in how masks look or behave today.
 
 ## 1.85.1-fix-keyword-case — 2026-11-17
 
