@@ -40,7 +40,7 @@ import { type DepthRange, DepthRangePicker } from '../ui/RangePicker';
 import AiEffectSection, { EffectMapStatus } from './AiEffectSection';
 import DepthScope from '../ui/depthScope/DepthScope';
 import { ScenePatch } from '../ui/depthScope/scene';
-import { canvasToolState, useEditorStore } from '../../store/useEditorStore';
+import { useEditorStore } from '../../store/useEditorStore';
 import { useEditorActions } from '../../hooks/useEditorActions';
 import { useContextMenu } from '../../context/ContextMenuContext';
 
@@ -193,7 +193,6 @@ export default function EffectsPanel({
   const { t } = useTranslation();
   const [generatingMaps, setGeneratingMaps] = useState<Partial<Record<EffectMapKey, boolean>>>({});
   const [hoveredLightId, setHoveredLightId] = useState<string | null>(null);
-  const isRelightPickerActive = useEditorStore((state) => state.isRelightPickerActive);
   const activeRelightLightId = useEditorStore((state) => state.activeRelightLightId);
   const setEditor = useEditorStore((state) => state.setEditor);
   // Motion Blur's depth map belongs to the photo, also when a mask's blur uses it.
@@ -295,9 +294,7 @@ export default function EffectsPanel({
 
   const handleRelightToggle = (enabled: boolean) => {
     handleSpatialEffectToggle('relightNormalMap')(enabled);
-    if (!enabled) {
-      setEditor({ isRelightPickerActive: false });
-    } else if (adjustments.relightNormalMap) {
+    if (enabled && adjustments.relightNormalMap) {
       focusRelightLight(relightLights);
     }
   };
@@ -305,17 +302,7 @@ export default function EffectsPanel({
   const relightLights: Array<RelightLight> = adjustments.relightLights || [];
   const activeLight = relightLights.find((light) => light.id === activeRelightLightId);
 
-  const activateLight = (id: string) => {
-    setEditor({ activeRelightLightId: id, ...canvasToolState({ isRelightPickerActive: true }) });
-  };
-
-  const handleSelectLight = (id: string) => {
-    if (activeLight?.id === id && isRelightPickerActive) {
-      setEditor({ isRelightPickerActive: false });
-      return;
-    }
-    activateLight(id);
-  };
+  const handleSelectLight = (id: string) => setEditor({ activeRelightLightId: id });
 
   const handleAddLight = () => {
     const light = createRelightLight(0.5, 0.5);
@@ -323,13 +310,13 @@ export default function EffectsPanel({
       ...prev,
       relightLights: [...(prev.relightLights || []), light],
     }));
-    activateLight(light.id);
+    handleSelectLight(light.id);
   };
 
-  /** Turning Relight on puts the first light in hand (adding one if there is none). */
+  /** Turning Relight on selects the first light (adding one if there is none). */
   const focusRelightLight = (lights: Array<RelightLight> = []) => {
     if (lights.length === 0) handleAddLight();
-    else activateLight(lights[0].id);
+    else handleSelectLight(lights[0].id);
   };
 
   const handleLightPatch = (patch: Partial<RelightLight>) => {
@@ -358,7 +345,7 @@ export default function EffectsPanel({
       relightLights: (prev.relightLights || []).filter((light: RelightLight) => light.id !== id),
     }));
     if (id === activeRelightLightId) {
-      setEditor({ activeRelightLightId: null, isRelightPickerActive: false });
+      setEditor({ activeRelightLightId: null });
     }
   };
 
@@ -371,7 +358,7 @@ export default function EffectsPanel({
       const index = lights.findIndex((l: RelightLight) => l.id === id);
       return { ...prev, relightLights: [...lights.slice(0, index + 1), light, ...lights.slice(index + 1)] };
     });
-    activateLight(light.id);
+    handleSelectLight(light.id);
   };
 
   const handleLightContextMenu = (e: React.MouseEvent, id: string) => {
@@ -511,7 +498,6 @@ export default function EffectsPanel({
             mapMissingLabel={t('adjustments.effects.relightNormalMapMissing')}
             generateMapLabel={t('adjustments.effects.relightGenerateNormalMap')}
             onGenerateMap={() => handleGenerateEffectMap('relightNormalMap')}
-            data-relight-lights
           >
             {adjustments.relightEnabled && (
               <DepthScope

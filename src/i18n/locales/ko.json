@@ -211,7 +211,7 @@
       "relightElevation": "고도",
       "relightFalloff": "감쇠",
       "relightGenerateNormalMap": "노멀 맵 생성",
-      "relightHint": "조명을 추가하거나 선택한 다음 이미지를 클릭하거나 드래그하여 위치를 지정하세요.",
+      "relightHint": "조명을 추가하거나 선택한 다음 이미지에서 핸들을 드래그하여 위치를 지정하세요.",
       "relightIntensity": "강도",
       "relightLight": "조명 {{index}}",
       "relightNormalMapMissing": "이 이미지의 노멀 맵은 XMP에 저장되지 않으므로 이 기기에서 생성해야 합니다.",

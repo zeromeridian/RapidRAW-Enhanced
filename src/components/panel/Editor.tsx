@@ -146,7 +146,6 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   const overlayRotation = useEditorStore((s) => s.overlayRotation);
   const isStraightenActive = useEditorStore((s) => s.isStraightenActive);
   const isWbPickerActive = useEditorStore((s) => s.isWbPickerActive);
-  const isRelightPickerActive = useEditorStore((s) => s.isRelightPickerActive);
   const isTargetedAdjustmentActive = useEditorStore((s) => s.targetedAdjustment !== null);
   const liveRotation = useEditorStore((s) => s.liveRotation);
   const brushSettings = useEditorStore((s) => s.brushSettings);
@@ -688,7 +687,6 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
         isDepthPicking ||
         activeSubMask?.parameters?.isInitialDraw)) ||
     isWbPickerActive ||
-    isRelightPickerActive ||
     isTargetedAdjustmentActive;
 
   /**
@@ -1108,7 +1106,6 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
       isMasking,
       isAiEditing,
       isWbPickerActive,
-      isRelightPickerActive,
       isTargetedAdjustmentActive,
       animateTransform,
       appSettings?.zoomPhotoToPixelClick,

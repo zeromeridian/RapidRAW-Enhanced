@@ -5,6 +5,25 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.86.1-dev-relight-light-visibility — 2026-11-17
+
+### Develop
+
+- Relight lights move only when you drag them: clicking elsewhere on the
+  photo no longer jumps the selected light to that spot. Instead it
+  releases the selected light, and clicking a light selects it again.
+
+## 1.86.0-dev-relight-light-visibility — 2026-11-17
+
+### Develop
+
+- Relight shows every light on the photo while the Relight tool is open,
+  with the selected light highlighted, so you no longer have to click each
+  light in the panel to see where it is.
+- Click a light on the photo to select it; drag it to move or aim it. A
+  click on the photo itself moves the selected light, or adds one, only
+  while a light is picked in the panel, as before.
+
 ## 1.85.2-fix-mask-drop-insert — 2026-11-17
 
 ### Masks

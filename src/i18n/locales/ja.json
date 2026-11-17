@@ -211,7 +211,7 @@
       "relightElevation": "仰角",
       "relightFalloff": "減衰",
       "relightGenerateNormalMap": "法線マップを生成",
-      "relightHint": "ライトを追加または選択し、画像上をクリックまたはドラッグして配置します。",
+      "relightHint": "ライトを追加または選択し、画像上のハンドルをドラッグして配置します。",
       "relightIntensity": "強度",
       "relightLight": "ライト {{index}}",
       "relightNormalMapMissing": "この画像の法線マップは XMP に保存されないため、このデバイスで生成する必要があります。",

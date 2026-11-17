@@ -211,7 +211,7 @@
       "relightElevation": "Wysokość",
       "relightFalloff": "Spadek",
       "relightGenerateNormalMap": "Generuj mapę normalnych",
-      "relightHint": "Dodaj lub wybierz światło, a następnie kliknij lub przeciągnij na obrazie, aby je umieścić.",
+      "relightHint": "Dodaj lub wybierz światło, a następnie przeciągnij jego uchwyt na obrazie, aby je umieścić.",
       "relightIntensity": "Intensywność",
       "relightLight": "Światło {{index}}",
       "relightNormalMapMissing": "Mapa normalnych tego zdjęcia nie jest zapisywana w XMP i musi zostać wygenerowana na tym urządzeniu.",

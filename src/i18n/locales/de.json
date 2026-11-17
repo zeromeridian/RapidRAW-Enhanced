@@ -211,7 +211,7 @@
       "relightElevation": "Höhe",
       "relightFalloff": "Abfall",
       "relightGenerateNormalMap": "Normal-Map erzeugen",
-      "relightHint": "Füge ein Licht hinzu oder wähle eines aus und klicke oder ziehe im Bild, um es zu platzieren.",
+      "relightHint": "Füge ein Licht hinzu oder wähle eines aus und ziehe seinen Griff im Bild, um es zu platzieren.",
       "relightIntensity": "Intensität",
       "relightLight": "Licht {{index}}",
       "relightNormalMapMissing": "Die Normal-Map dieses Bildes wird nicht in XMP gespeichert und muss auf diesem Gerät erzeugt werden.",

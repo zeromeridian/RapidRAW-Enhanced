@@ -12,7 +12,6 @@ import {
   MaskContainer,
   RelightLight,
   aiDepthMaskRangeAround,
-  createRelightLight,
   luminanceMaskRangeAround,
 } from '../../../utils/adjustments';
 import { favoriteKey } from '../../../utils/adjustmentControls';
@@ -1588,7 +1587,6 @@ const ImageCanvas = memo(
     // Its Alt/Option mask preview shows in the mask overlay's place.
     const zoneTintOverlayUrl = useZoneTintOverlay(isZoneTintPanelOpen && !isCropViewVisible);
 
-    const isRelightPickerActive = useEditorStore((state) => state.isRelightPickerActive);
     const isMaskShapeDragging = useEditorStore((state) => state.isMaskShapeDragging);
     const activeRelightLightId = useEditorStore((state) => state.activeRelightLightId);
     const setEditor = useEditorStore((state) => state.setEditor);
@@ -1635,16 +1633,6 @@ const ImageCanvas = memo(
       [effectiveImageDimensions, adjustments, activeRotation, imageRenderSize.scale, cropX, cropY],
     );
 
-    const addRelightLight = useCallback(
-      (pos: Coord) => {
-        const uv = mapCanvasPointToRelightUv(pos);
-        const light = createRelightLight(uv.x, uv.y);
-        setAdjustments((prev: Adjustments) => ({ ...prev, relightLights: [...(prev.relightLights || []), light] }));
-        setEditor({ activeRelightLightId: light.id });
-      },
-      [mapCanvasPointToRelightUv, setAdjustments, setEditor],
-    );
-
     const moveRelightLight = useCallback(
       (id: string, pos: Coord) => {
         const uv = mapCanvasPointToRelightUv(pos);
@@ -1684,26 +1672,9 @@ const ImageCanvas = memo(
       };
     }, [mapRelightUvToCanvas, selectedImage.width, selectedImage.height]);
 
-    const showRelightLights = isRelightPickerActive && isRelightToolOpen && !!adjustments.relightEnabled;
-
-    useEffect(() => {
-      if (isRelightPickerActive && (!isRelightToolOpen || !adjustments.relightEnabled)) {
-        setEditor({ isRelightPickerActive: false });
-      }
-    }, [isRelightPickerActive, isRelightToolOpen, adjustments.relightEnabled, setEditor]);
-
-    useEffect(() => {
-      if (!isRelightPickerActive) return;
-
-      const handlePointerDown = (e: PointerEvent) => {
-        const target = e.target as HTMLElement;
-        if (target.closest('.konvajs-content, [data-relight-lights], [data-dropdown-menu]')) return;
-        setEditor({ isRelightPickerActive: false });
-      };
-
-      window.addEventListener('pointerdown', handlePointerDown, true);
-      return () => window.removeEventListener('pointerdown', handlePointerDown, true);
-    }, [isRelightPickerActive, setEditor]);
+    // Every light's handle shows while the tool is open; a light is selected by its handle and moved
+    // or aimed only by dragging it.
+    const showRelightLights = isRelightToolOpen && !!adjustments.relightEnabled;
     const brushStageSize = (brushSettings?.size ?? 0) / effectiveZoomScale;
     const brushImageSpaceSize = brushStageSize / (imageRenderSize.scale || 1);
 
@@ -2068,21 +2039,11 @@ const ImageCanvas = memo(
 
         if (e.evt && e.evt.cancelable) e.evt.preventDefault();
 
+        // A press on a light's handle belongs to the handle, not to a photo tool; a press beside the
+        // handles releases the selected light.
         if (showRelightLights) {
           if (e.target !== e.target.getStage()) return;
-          const pos = getCanvasPointer(e.target.getStage());
-          if (!pos || pos.x < 0 || pos.y < 0 || pos.x > imageRenderSize.width || pos.y > imageRenderSize.height) {
-            return;
-          }
-          const activeLight = adjustments.relightLights?.find((l) => l.id === activeRelightLightId);
-          if (activeLight) {
-            if (activeLight.type !== 'directional') {
-              moveRelightLight(activeLight.id, pos);
-            }
-          } else {
-            addRelightLight(pos);
-          }
-          return;
+          if (activeRelightLightId) setEditor({ activeRelightLightId: null });
         }
 
         if (isTargetedAdjustmentActive) {
@@ -2328,8 +2289,7 @@ const ImageCanvas = memo(
       [
         showRelightLights,
         activeRelightLightId,
-        moveRelightLight,
-        addRelightLight,
+        setEditor,
         isTargetedAdjustmentActive,
         startTargetedAdjustment,
         isWbPickerActive,
@@ -2922,7 +2882,7 @@ const ImageCanvas = memo(
 
     const effectiveCursor = useMemo(() => {
       if (isTargetedAdjustmentActive) return isClickPicking ? 'crosshair' : TARGETED_ADJUSTMENT_CURSOR;
-      if (isWbPickerActive || showRelightLights) return 'crosshair';
+      if (isWbPickerActive) return 'crosshair';
       if (isParametricActive) return 'crosshair';
       if (isInitialDrawing) return 'crosshair';
 
@@ -2950,7 +2910,6 @@ const ImageCanvas = memo(
       isTargetedAdjustmentActive,
       isClickPicking,
       isWbPickerActive,
-      showRelightLights,
       isInitialDrawing,
       isBrushActive,
       isManualCleanupActive,

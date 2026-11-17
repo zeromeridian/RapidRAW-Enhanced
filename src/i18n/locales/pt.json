@@ -211,7 +211,7 @@
       "relightElevation": "Elevação",
       "relightFalloff": "Atenuação",
       "relightGenerateNormalMap": "Gerar mapa de normais",
-      "relightHint": "Adicione ou selecione uma luz e clique ou arraste na imagem para posicioná-la.",
+      "relightHint": "Adicione ou selecione uma luz e arraste a sua alça na imagem para posicioná-la.",
       "relightIntensity": "Intensidade",
       "relightLight": "Luz {{index}}",
       "relightNormalMapMissing": "O mapa de normais desta imagem não é guardado no XMP e precisa de ser gerado neste dispositivo.",

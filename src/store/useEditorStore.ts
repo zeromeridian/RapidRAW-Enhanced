@@ -86,7 +86,6 @@ export interface EditorState {
   overlayRotation: number;
   isStraightenActive: boolean;
   isWbPickerActive: boolean;
-  isRelightPickerActive: boolean;
   /** The colour mixer or tone curve pipette acting on the photo, or null. */
   targetedAdjustment: TargetedAdjustment | null;
   /** The Point Color the Color Mixer edits, and whether the preview shows its range only. */
@@ -133,12 +132,11 @@ export interface EditorState {
   goToHistoryIndex: (index: number) => void;
 }
 
-type CanvasToolState = Pick<EditorState, 'isWbPickerActive' | 'isRelightPickerActive' | 'targetedAdjustment'>;
+type CanvasToolState = Pick<EditorState, 'isWbPickerActive' | 'targetedAdjustment'>;
 
 /** Turns every tool that takes clicks on the photo off, except `activeTool` if given (one is active at a time). */
 export const canvasToolState = (activeTool: Partial<CanvasToolState> = {}): CanvasToolState => ({
   isWbPickerActive: false,
-  isRelightPickerActive: false,
   targetedAdjustment: null,
   ...activeTool,
 });
@@ -184,7 +182,6 @@ export const useEditorStore = create<EditorState>((set) => ({
   transformedOriginalUrl: null,
   isStraightenActive: false,
   isWbPickerActive: false,
-  isRelightPickerActive: false,
   targetedAdjustment: null,
   activePointColorId: null,
   isPointColorRangeVisualized: false,

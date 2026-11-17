@@ -496,7 +496,10 @@ details are in `RELEASE_NOTES.MD`.
   using an AI-generated surface normal map, with ambient, softness, shine,
   optional cast shadows, and per-light color, temperature, tint, intensity,
   depth, falloff, angle, elevation, cone, and feather. Lights are placed,
-  moved, aimed, and duplicated directly on the image; turning Relight on
+  moved, aimed, and duplicated directly on the image; every light's handle
+  shows on the photo while the tool is open (the selected one highlighted);
+  a light is selected by clicking its handle and moved or aimed only by
+  dragging it, and a click elsewhere on the photo releases it; turning Relight on
   selects the first light (or adds one), and new edits start with Ambient
   −50 so the lights stand out. Light settings travel in
   XMP; the image-derived normal map stays local and can be regenerated on

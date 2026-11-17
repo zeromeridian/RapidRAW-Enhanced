@@ -212,7 +212,7 @@
       "relightElevation": "Elevation",
       "relightFalloff": "Falloff",
       "relightGenerateNormalMap": "Generate Normal Map",
-      "relightHint": "Add or select a light, then click or drag on the image to position it.",
+      "relightHint": "Add or select a light, then drag its handle on the image to position it.",
       "relightIntensity": "Intensity",
       "relightLight": "Light {{index}}",
       "relightNormalMapMissing": "The normal map for this image is not stored in XMP and needs to be generated on this device.",

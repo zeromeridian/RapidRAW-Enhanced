@@ -211,7 +211,7 @@
       "relightElevation": "仰角",
       "relightFalloff": "衰减",
       "relightGenerateNormalMap": "生成法线贴图",
-      "relightHint": "添加或选择一个灯光，然后在图像上点击或拖动以放置。",
+      "relightHint": "添加或选择一个灯光，然后在图像上拖动其手柄以放置。",
       "relightIntensity": "强度",
       "relightLight": "灯光 {{index}}",
       "relightNormalMapMissing": "此图像的法线贴图不会保存在 XMP 中，需要在此设备上生成。",
