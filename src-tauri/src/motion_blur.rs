@@ -303,8 +303,8 @@ pub fn estimate_grain(
             "tf_grain",
             &crate::render_source::TransformParams::grain(stride, blocks, is_raw),
             blocks,
-            image,
-            crate::gpu_compute::Out::Scratch(&energies),
+            crate::gpu_compute::Out::None,
+            crate::gpu_compute::Bind::reading(&[image]).with_scratch(&energies),
         );
         enc.encoder
             .copy_buffer_to_buffer(&energies, 0, &readback, 0, bytes);

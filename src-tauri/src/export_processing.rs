@@ -43,9 +43,9 @@ use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::tiff_metadata::{TiffSamples, encode_tiff_with_metadata};
 
 use crate::cache_utils::{calculate_full_job_hash, calculate_transform_hash};
-use crate::render_source::{Frame, RenderSource};
+use crate::render_source::{Effects, Frame, RenderSource};
 use crate::{
-    apply_warp_and_effects, get_cached_or_generate_mask, hydrate_adjustments, load_settings,
+    apply_warp_relight_and_fog, get_cached_or_generate_mask, hydrate_adjustments, load_settings,
     prepare_preview_source, resolve_warped_image_for_masks,
 };
 
@@ -1033,11 +1033,12 @@ impl Drop for ExportTaskGuard {
     }
 }
 
-/// A prepared base shrunk to the GPU limit, warped and with its spatial
-/// effects, plus the edit's frame scaled onto it, with the scale from
+/// A prepared base shrunk to the GPU limit, warped, relit and fogged, plus
+/// the edit's GPU effects and frame scaled onto it, with the scale from
 /// decoded-photo pixels (crop, masks) onto it.
 struct ExportFrame<'a> {
     image: Cow<'a, DynamicImage>,
+    effects: Effects,
     frame: Frame,
     scale: f32,
     render_extent: f32,
@@ -1046,7 +1047,7 @@ struct ExportFrame<'a> {
 impl ExportFrame<'_> {
     /// The render of this frame; `id` identifies the photo and its edit.
     fn source(&self, id: u64) -> RenderSource<'_> {
-        RenderSource::new(&self.image, id, self.frame.clone())
+        RenderSource::new(&self.image, id, self.frame.clone()).with_effects(self.effects.clone())
     }
 }
 
@@ -1062,8 +1063,10 @@ fn transform_for_export<'a>(
     let scale = base_scale * fit_scale;
     let render_extent = crate::motion_blur::render_extent(&fitted, 1.0);
     let adjustments = crate::image_processing::with_crop_scaled(js_adjustments, scale);
+    let image = apply_warp_relight_and_fog(fitted, &adjustments);
     ExportFrame {
-        image: apply_warp_and_effects(fitted, &adjustments),
+        effects: Effects::prepare(&adjustments, image.dimensions()),
+        image,
         frame: Frame::from_adjustments(&adjustments),
         scale,
         render_extent,
@@ -2603,7 +2606,7 @@ pub async fn estimate_export_sizes(
             .unwrap_or(serde_json::Value::Null);
         }
 
-        let effected_image = apply_warp_and_effects(&original_image, &js_adjustments);
+        let effected_image = apply_warp_relight_and_fog(&original_image, &js_adjustments);
         let source = RenderSource::edited(
             &effected_image,
             calculate_full_job_hash(&source_path_str, &js_adjustments).wrapping_add(1),

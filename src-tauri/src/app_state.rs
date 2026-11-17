@@ -36,12 +36,13 @@ pub struct LoadedImage {
     pub is_raw: bool,
 }
 
-/// The editor preview before its frame (`lib::prepare_preview_source`): the working-size
-/// image with geometry and spatial effects, and the frame the GPU applies to it.
+/// The editor preview before its GPU stages (`lib::prepare_preview_source`): the working-size
+/// image with geometry, relight and fog, and the effects and frame the GPU applies to it.
 #[derive(Clone)]
 pub struct PreviewSource {
     pub image: Arc<DynamicImage>,
     pub id: u64,
+    pub effects: crate::render_source::Effects,
     pub frame: crate::render_source::Frame,
     /// Preview pixels per photo pixel, for the framed (not fitted) preview.
     pub scale: f32,
@@ -51,6 +52,7 @@ pub struct PreviewSource {
 impl PreviewSource {
     pub fn render_source(&self) -> crate::render_source::RenderSource<'_> {
         crate::render_source::RenderSource::new(&self.image, self.id, self.frame.clone())
+            .with_effects(self.effects.clone())
     }
 }
 

@@ -1,8 +1,22 @@
-use image::{DynamicImage, GenericImageView, Rgb32FImage};
+//! Lens blur: a depth map turned into a circle of confusion, then near and far layers blurred
+//! with a bokeh kernel. `prepare` reads the edit once for both versions: `encode` on the GPU
+//! (upstream `15a9ff2e`, `shaders/lens_blur.wgsl`), `apply_on_cpu` as the fallback, for
+//! thumbnails, and as the reference the GPU result is tested against.
+
+use image::{DynamicImage, GenericImageView, GrayImage, Rgb32FImage};
 use rayon::prelude::*;
 use std::borrow::Cow;
+use std::hash::{Hash, Hasher};
+use std::sync::Arc;
+
+use crate::gpu_compute::{
+    Bind, ComputeEncoder, F32X4, Grid, Group, IMAGE_FORMAT, KEEP_ZW, Out, R32, Slot, Tex,
+};
 
 pub const LENS_BLUR_DEPTH_MAP_KEY: &str = "lensBlurDepthMap";
+
+/// `build_guided_model`'s regularisation.
+const GUIDE_EPS: f32 = 4.0e-3;
 
 pub const LENS_BLUR_KEYS: &[&str] = &[
     "lensBlurAmount",
@@ -24,74 +38,121 @@ struct BokehTap {
     weight: f32,
 }
 
+/// A lens blur read from an edit for an image of one size.
+pub struct LensBlur {
+    depth_map: Arc<GrayImage>,
+    map_key: u64,
+    max_radius: f32,
+    shape: String,
+    min_depth: f32,
+    max_depth: f32,
+    min_fade: f32,
+    max_fade: f32,
+    diffusion: f32,
+}
+
+/// The lens blur `adjustments` ask for on an image of `(w, h)`, or `None` when it would leave
+/// the image unchanged.
+pub fn prepare(adjustments: &serde_json::Value, (w, h): (u32, u32)) -> Option<LensBlur> {
+    if !crate::adjustment_utils::is_tool_enabled(adjustments, "lensBlur", "lensBlurEnabled") {
+        return None;
+    }
+    let depth_b64 = adjustments[LENS_BLUR_DEPTH_MAP_KEY]
+        .as_str()
+        .filter(|map| !map.is_empty())?;
+    let amount = adjustments["lensBlurAmount"].as_f64().unwrap_or(50.0) as f32;
+    if amount <= 0.0 {
+        return None;
+    }
+    let depth_map = crate::effect_maps::resolve_luma_map(depth_b64, adjustments)?;
+    if depth_map.width() < 2 || depth_map.height() < 2 || w < 8 || h < 8 {
+        return None;
+    }
+    let max_radius = (amount / 100.0) * (w.max(h) as f32) * 0.012;
+    if max_radius < 0.35 {
+        return None;
+    }
+
+    let percent =
+        |key: &str, default: f64| adjustments[key].as_f64().unwrap_or(default) as f32 / 100.0;
+    Some(LensBlur {
+        map_key: crate::effect_maps::effect_map_key(depth_b64, adjustments),
+        depth_map,
+        max_radius,
+        shape: adjustments["lensBlurShape"]
+            .as_str()
+            .unwrap_or("circle")
+            .to_string(),
+        min_depth: percent("lensBlurMinDepth", 20.0),
+        max_depth: percent("lensBlurMaxDepth", 100.0),
+        min_fade: percent("lensBlurMinFade", 15.0),
+        max_fade: percent("lensBlurMaxFade", 15.0),
+        diffusion: percent("lensBlurDiffusion", 0.0).clamp(0.0, 1.0),
+    })
+}
+
+/// The lens blur of `adjustments` on the CPU.
 pub fn apply_lens_blur<'a>(
     image: Cow<'a, DynamicImage>,
     adjustments: &serde_json::Value,
 ) -> Cow<'a, DynamicImage> {
-    if !crate::adjustment_utils::is_tool_enabled(adjustments, "lensBlur", "lensBlurEnabled") {
-        return image;
+    match prepare(adjustments, image.dimensions()) {
+        Some(job) => job.apply_on_cpu(image),
+        None => image,
+    }
+}
+
+impl LensBlur {
+    /// Identifies what this blur does, for `RenderSource::key`.
+    pub fn hash_into(&self, hasher: &mut impl Hasher) {
+        self.map_key.hash(hasher);
+        self.shape.hash(hasher);
+        for value in [
+            self.max_radius,
+            self.min_depth,
+            self.max_depth,
+            self.min_fade,
+            self.max_fade,
+            self.diffusion,
+        ] {
+            value.to_bits().hash(hasher);
+        }
     }
 
-    let depth_b64 = adjustments[LENS_BLUR_DEPTH_MAP_KEY].as_str().unwrap_or("");
-    if depth_b64.is_empty() {
-        return image;
+    /// The blur on the CPU, on an image of the size it was prepared for.
+    pub fn apply_on_cpu<'a>(&self, image: Cow<'a, DynamicImage>) -> Cow<'a, DynamicImage> {
+        let start = std::time::Instant::now();
+        let (w, h) = image.dimensions();
+        let src = image.as_ref().to_rgb32f();
+
+        let coc = build_coc_field(
+            &src,
+            &self.depth_map,
+            self.min_depth,
+            self.max_depth,
+            self.min_fade,
+            self.max_fade,
+            self.max_radius,
+        );
+
+        let blurred_px = coc.par_iter().filter(|c| c.abs() > 0.4).count();
+        if blurred_px * 400 < coc.len() && self.diffusion <= 0.0 {
+            return image;
+        }
+
+        let out = render_depth_of_field(&src, &coc, self.max_radius, &self.shape, self.diffusion);
+
+        log::info!(
+            "lens blur ({}x{}, r_max {:.1}px, diffusion {:.2}) took {:.2?}",
+            w,
+            h,
+            self.max_radius,
+            self.diffusion,
+            start.elapsed()
+        );
+
+        Cow::Owned(DynamicImage::ImageRgb32F(out))
     }
-
-    let amount = adjustments["lensBlurAmount"].as_f64().unwrap_or(50.0) as f32;
-    if amount <= 0.0 {
-        return image;
-    }
-
-    let depth_map = match crate::effect_maps::resolve_luma_map(depth_b64, adjustments) {
-        Some(map) => map,
-        None => return image,
-    };
-    if depth_map.width() < 2 || depth_map.height() < 2 {
-        return image;
-    }
-
-    let (w, h) = image.dimensions();
-    if w < 8 || h < 8 {
-        return image;
-    }
-
-    let max_radius = (amount / 100.0) * (w.max(h) as f32) * 0.012;
-    if max_radius < 0.35 {
-        return image;
-    }
-
-    let shape = adjustments["lensBlurShape"].as_str().unwrap_or("circle");
-    let min_depth = adjustments["lensBlurMinDepth"].as_f64().unwrap_or(20.0) as f32 / 100.0;
-    let max_depth = adjustments["lensBlurMaxDepth"].as_f64().unwrap_or(100.0) as f32 / 100.0;
-    let min_fade = adjustments["lensBlurMinFade"].as_f64().unwrap_or(15.0) as f32 / 100.0;
-    let max_fade = adjustments["lensBlurMaxFade"].as_f64().unwrap_or(15.0) as f32 / 100.0;
-    let diffusion =
-        (adjustments["lensBlurDiffusion"].as_f64().unwrap_or(0.0) as f32 / 100.0).clamp(0.0, 1.0);
-
-    let start = std::time::Instant::now();
-    let src = image.as_ref().to_rgb32f();
-
-    let coc = build_coc_field(
-        &src, &depth_map, min_depth, max_depth, min_fade, max_fade, max_radius,
-    );
-
-    let blurred_px = coc.par_iter().filter(|c| c.abs() > 0.4).count();
-    if blurred_px * 400 < coc.len() && diffusion <= 0.0 {
-        return image;
-    }
-
-    let out = render_depth_of_field(&src, &coc, max_radius, shape, diffusion);
-
-    log::info!(
-        "lens blur ({}x{}, r_max {:.1}px, diffusion {:.2}) took {:.2?}",
-        w,
-        h,
-        max_radius,
-        diffusion,
-        start.elapsed()
-    );
-
-    Cow::Owned(DynamicImage::ImageRgb32F(out))
 }
 
 #[inline(always)]
@@ -160,9 +221,8 @@ fn build_coc_field(
         });
     dof_box_filter(&mut luma_full, w, h, 1, 2);
 
-    let scale = (1024.0 / w.max(h) as f32).min(1.0);
-    let gw = ((w as f32 * scale).round() as usize).clamp(4, w);
-    let gh = ((h as f32 * scale).round() as usize).clamp(4, h);
+    let (gw, gh) = guide_size((w as u32, h as u32));
+    let (gw, gh) = (gw as usize, gh as usize);
 
     let x_ratio = w as f32 / gw as f32;
     let y_ratio = h as f32 / gh as f32;
@@ -195,7 +255,7 @@ fn build_coc_field(
         });
 
     let depth_small = dof_depth_to_f32(depth, gw, gh);
-    let radius = ((gw.max(gh) as f32) * 0.015).round().max(2.0) as usize;
+    let radius = guide_radius((gw as u32, gh as u32)) as usize;
     let packed = build_guided_model(&guide, &depth_small, gw, gh, radius);
 
     let mut coc = vec![0.0f32; w * h];
@@ -241,9 +301,59 @@ fn build_coc_field(
     coc
 }
 
+/// The size the depth model is fitted at: the long side at most 1024.
+fn guide_size((w, h): (u32, u32)) -> (u32, u32) {
+    let scale = (1024.0 / w.max(h) as f32).min(1.0);
+    (
+        ((w as f32 * scale).round() as u32).clamp(4, w),
+        ((h as f32 * scale).round() as u32).clamp(4, h),
+    )
+}
+
+/// The guided filter's box radius at the guide size.
+fn guide_radius((gw, gh): (u32, u32)) -> u32 {
+    ((gw.max(gh) as f32) * 0.015).round().max(2.0) as u32
+}
+
+/// How much smaller the layers are blurred than the image.
+fn downsample_factor(pixels: usize, max_radius: f32) -> usize {
+    let mut ds = (max_radius / 18.0).ceil().max(1.0) as usize;
+    while ds < 6 {
+        let rw = max_radius / ds as f32;
+        let taps = (std::f32::consts::PI * rw * rw).min(128.0) as f64;
+        if (pixels as f64 / (ds * ds) as f64) * taps <= 7.0e8 {
+            break;
+        }
+        ds += 1;
+    }
+    ds
+}
+
+/// The blur radius of each of the five layers, the sharp one first.
+fn layer_radii(max_radius: f32) -> [f32; 5] {
+    let mut radii = [0.0f32; 5];
+    for (k, r) in radii.iter_mut().enumerate() {
+        *r = max_radius * (k as f32 / 4.0).powf(1.7);
+    }
+    radii
+}
+
+/// A layer's bokeh radius in working pixels.
+fn working_radius(radius: f32, ds: usize, diffusion: f32) -> f32 {
+    (radius / ds as f32) * (1.0 + 0.3 * diffusion)
+}
+
+/// The two box radii of the diffusion bloom at the working size.
+fn bloom_radii(max_radius: f32, ds: usize, (ww, wh): (usize, usize)) -> (usize, usize) {
+    let cap = (ww.min(wh) / 2).max(2);
+    let br1 = (((max_radius / ds as f32) * 0.8).max(6.0) as usize).min(cap);
+    let br2 = ((br1 * 2) / 3).max(3).min(cap);
+    (br1, br2)
+}
+
 fn build_guided_model(guide: &[f32], p: &[f32], w: usize, h: usize, radius: usize) -> Vec<f32> {
     let n = w * h;
-    let eps = 4.0e-3f32;
+    let eps = GUIDE_EPS;
 
     let mut mean_i = guide.to_vec();
     dof_box_filter(&mut mean_i, w, h, 1, radius);
@@ -376,24 +486,13 @@ fn render_depth_of_field(
     let n = w * h;
     let raw = src.as_raw();
 
-    let mut ds = (max_radius / 18.0).ceil().max(1.0) as usize;
-    while ds < 6 {
-        let rw = max_radius / ds as f32;
-        let taps = (std::f32::consts::PI * rw * rw).min(128.0) as f64;
-        if (n as f64 / (ds * ds) as f64) * taps <= 7.0e8 {
-            break;
-        }
-        ds += 1;
-    }
+    let ds = downsample_factor(n, max_radius);
     let ww = (w / ds).max(4);
     let wh = (h / ds).max(4);
 
     let (base, coc_small) = dof_downsample_fused(raw, coc, w, h, ww, wh);
 
-    let mut radii = [0.0f32; 5];
-    for (k, r) in radii.iter_mut().enumerate() {
-        *r = max_radius * (k as f32 / 4.0).powf(1.7);
-    }
+    let radii = layer_radii(max_radius);
 
     let (far_rgb, far_a) = dof_composite_stack(
         &base, &coc_small, ww, wh, &radii, ds, shape, diffusion, false,
@@ -411,9 +510,7 @@ fn render_depth_of_field(
             px[2] = base[i * 3 + 2];
             px[3] = 1.0 - dof_tent(coc_small[i].abs(), &radii, 0);
         });
-        let cap = (ww.min(wh) / 2).max(2);
-        let br1 = (((max_radius / ds as f32) * 0.8).max(6.0) as usize).min(cap);
-        let br2 = ((br1 * 2) / 3).max(3).min(cap);
+        let (br1, br2) = bloom_radii(max_radius, ds, (ww, wh));
         dof_box_filter(&mut bl, ww, wh, 4, br1);
         dof_box_filter(&mut bl, ww, wh, 4, br2);
         bl.par_chunks_exact_mut(4).for_each(|px| {
@@ -606,7 +703,7 @@ fn dof_composite_stack(
             continue;
         }
 
-        let r_work = (radii[k] / ds as f32) * (1.0 + 0.3 * diffusion);
+        let r_work = working_radius(radii[k], ds, diffusion);
         let (blurred, spans) = if r_work >= 0.6 {
             let (taps, ext) = build_bokeh_kernel(r_work, shape, diffusion);
             let spans = dof_dilate_spans(&row_bounds, ww, wh, ext);
@@ -1030,4 +1127,321 @@ fn dof_depth_to_f32(depth: &image::GrayImage, dw: usize, dh: usize) -> Vec<f32> 
             }
         });
     out
+}
+
+/// `Params` in `shaders/lens_blur.wgsl`.
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct Params {
+    grid: Grid,
+    radii: [[f32; 4]; 2],
+    max_radius: f32,
+    min_depth: f32,
+    max_depth: f32,
+    min_fade: f32,
+    max_fade: f32,
+    diffusion: f32,
+    cat_eye: f32,
+    veil: f32,
+    span2: f32,
+    first: u32,
+    scale: [f32; 2],
+    layer: u32,
+    near: u32,
+    taps: u32,
+    direct: u32,
+    threshold: u32,
+    diffusion_on: u32,
+    guide_size: [u32; 2],
+    small_size: [u32; 2],
+    ext: u32,
+    _pad1: u32,
+}
+
+/// The blur on the GPU from `src` into `dst` (`IMAGE_FORMAT`, the same size), the steps of
+/// `apply_on_cpu` in the same order.
+pub fn encode(enc: &mut ComputeEncoder, job: &LensBlur, src: &Slot, dst: &Slot) {
+    let full = src.size;
+    let (w, h) = full;
+    let guide_size = guide_size(full);
+    let guide_radius = guide_radius(guide_size);
+    let ds = downsample_factor(w as usize * h as usize, job.max_radius);
+    let small_size = ((w / ds as u32).max(4), (h / ds as u32).max(4));
+    let radii = layer_radii(job.max_radius);
+    let span = (2 * guide_radius + 1) as f32;
+    let diffusion_on = job.diffusion > 1.0e-3;
+
+    let params = Params {
+        grid: Grid::new(full),
+        radii: [
+            [radii[0], radii[1], radii[2], radii[3]],
+            [radii[4], 0.0, 0.0, 0.0],
+        ],
+        max_radius: job.max_radius,
+        min_depth: job.min_depth,
+        max_depth: job.max_depth,
+        min_fade: job.min_fade,
+        max_fade: job.max_fade,
+        diffusion: job.diffusion,
+        cat_eye: 0.38 * (1.0 - 0.7 * job.diffusion),
+        veil: 0.75 * job.diffusion,
+        span2: span * span,
+        // `apply_on_cpu` leaves the image as it is when under 1 in 400 pixels blur.
+        threshold: (w * h).div_ceil(400),
+        diffusion_on: diffusion_on as u32,
+        guide_size: [guide_size.0, guide_size.1],
+        small_size: [small_size.0, small_size.1],
+        ..Default::default()
+    };
+    let at = |grid: Grid| Params { grid, ..params };
+
+    // The circle of confusion (`build_coc_field`).
+    let luma = enc.texture("Lens Blur Luma", full, R32);
+    enc.run(
+        Group::LensBlur,
+        "lb_luma",
+        &params,
+        full,
+        Out::R32(&luma.view),
+        Bind::reading(&[&src.view]),
+    );
+    let depth = enc.cached_map(
+        "Lens Blur Depth",
+        job.map_key,
+        job.depth_map.dimensions(),
+        || job.depth_map.pixels().map(|p| p[0] as f32).collect(),
+    );
+    let guide = enc.texture("Lens Blur Guide", guide_size, F32X4);
+    enc.run(
+        Group::LensBlur,
+        "lb_guide",
+        &at(Grid::new(guide_size).with_src(full)),
+        guide_size,
+        Out::F32(&guide.view),
+        Bind::reading(&[&luma.view, &depth.view]),
+    );
+    let moments: Vec<Tex> = (0..2)
+        .map(|channel| {
+            let packed = enc.texture("Lens Blur Moments", guide_size, F32X4);
+            enc.run(
+                Group::LensBlur,
+                "lb_pack",
+                &at(Grid {
+                    channel,
+                    ..Grid::new(guide_size)
+                }),
+                guide_size,
+                Out::F32(&packed.view),
+                Bind::reading(&[&guide.view]),
+            );
+            enc.blur(packed, guide_radius, 1, 0)
+        })
+        .collect();
+    let coeffs = enc.texture("Lens Blur Coeffs", guide_size, F32X4);
+    enc.run(
+        Group::LensBlur,
+        "lb_coeffs",
+        &at(Grid {
+            eps: GUIDE_EPS,
+            ..Grid::new(guide_size)
+        }),
+        guide_size,
+        Out::F32(&coeffs.view),
+        Bind::reading(&[&moments[0].view, &moments[1].view]),
+    );
+    let model = enc.blur(coeffs, guide_radius, 1, KEEP_ZW);
+    let coc = enc.texture("Lens Blur CoC", full, R32);
+    enc.run(
+        Group::LensBlur,
+        "lb_coc",
+        &Params {
+            scale: [
+                guide_size.0 as f32 / w as f32,
+                guide_size.1 as f32 / h as f32,
+            ],
+            ..params
+        },
+        full,
+        Out::R32(&coc.view),
+        Bind::reading(&[&luma.view, &model.view]),
+    );
+    let count = enc.buffer("Lens Blur Count", bytemuck::cast_slice(&[0u32; 4]));
+    enc.run(
+        Group::LensBlur,
+        "lb_median_h",
+        &params,
+        full,
+        Out::R32(&luma.view),
+        Bind::reading(&[&coc.view]),
+    );
+    enc.run(
+        Group::LensBlur,
+        "lb_median_v",
+        &params,
+        full,
+        Out::R32(&coc.view),
+        Bind::reading(&[&luma.view]).with_scratch(&count),
+    );
+    drop(luma);
+
+    // The near and far layer stacks at the working size (`render_depth_of_field`).
+    let small = at(Grid::new(small_size));
+    let base = enc.texture("Lens Blur Base", small_size, F32X4);
+    enc.run(
+        Group::LensBlur,
+        "lb_down",
+        &at(Grid::new(small_size).with_src(full)),
+        small_size,
+        Out::F32(&base.view),
+        Bind::reading(&[&src.view, &coc.view]),
+    );
+    let tile_count = small_size.0.div_ceil(8) * small_size.1.div_ceil(8);
+    let tiles = enc.buffer(
+        "Lens Blur Tiles",
+        bytemuck::cast_slice(&vec![0u32; tile_count as usize]),
+    );
+    enc.run(
+        Group::LensBlur,
+        "lb_tiles",
+        &small,
+        small_size,
+        Out::None,
+        Bind::reading(&[&base.view]).with_scratch(&tiles),
+    );
+
+    let stack = |enc: &mut ComputeEncoder, near: bool| {
+        let order: Vec<u32> = if near {
+            (1..5).collect()
+        } else {
+            (1..5).rev().collect()
+        };
+        let mut acc: Option<Tex> = None;
+        for k in order {
+            let r_work = working_radius(radii[k as usize], ds, job.diffusion);
+            let (taps, ext) = if r_work >= 0.6 {
+                build_bokeh_kernel(r_work, &job.shape, job.diffusion)
+            } else {
+                (Vec::new(), 0)
+            };
+            let tap_data: Vec<f32> = taps
+                .iter()
+                .flat_map(|t| [t.x as f32, t.y as f32, t.ux, t.uy, t.weight, 0.0, 0.0, 0.0])
+                .collect();
+            let tap_buffer = (!taps.is_empty())
+                .then(|| enc.buffer("Lens Blur Taps", bytemuck::cast_slice(&tap_data)));
+            let blurred = enc.texture("Lens Blur Layer", small_size, F32X4);
+            enc.run(
+                Group::LensBlur,
+                "lb_gather",
+                &Params {
+                    layer: k,
+                    near: near as u32,
+                    taps: taps.len() as u32,
+                    direct: taps.is_empty() as u32,
+                    ext: ext as u32,
+                    ..small
+                },
+                small_size,
+                Out::F32(&blurred.view),
+                Bind::reading(&[&base.view])
+                    .with_scratch(&tiles)
+                    .with_data(tap_buffer.as_ref()),
+            );
+            // `blur_layer_bokeh` smooths wide kernels' sparse taps.
+            let passes = (!taps.is_empty() && r_work > 7.0) as u32;
+            let blurred = enc.blur(blurred, 1, passes, 0);
+            let next = enc.texture("Lens Blur Stack", small_size, F32X4);
+            enc.run(
+                Group::LensBlur,
+                "lb_accum",
+                &Params {
+                    first: acc.is_none() as u32,
+                    ..small
+                },
+                small_size,
+                Out::F32(&next.view),
+                Bind::reading(&[&blurred.view, &acc.as_ref().unwrap_or(&blurred).view]),
+            );
+            acc = Some(next);
+        }
+        acc.expect("four layers per side")
+    };
+    let far = stack(enc, false);
+    let near = stack(enc, true);
+
+    let linear = |enc: &mut ComputeEncoder, acc: &Tex, channel: u32| {
+        let out = enc.texture("Lens Blur Linear", small_size, F32X4);
+        enc.run(
+            Group::LensBlur,
+            "lb_lin",
+            &at(Grid {
+                channel,
+                ..Grid::new(small_size)
+            }),
+            small_size,
+            Out::F32(&out.view),
+            Bind::reading(&[&acc.view, &base.view]),
+        );
+        out
+    };
+    let far_lin = linear(enc, &far, 0);
+    let near_lin = linear(enc, &near, 1);
+    let bloom = diffusion_on.then(|| {
+        let prepared = linear(enc, &base, 2);
+        let (br1, br2) = bloom_radii(
+            job.max_radius,
+            ds,
+            (small_size.0 as usize, small_size.1 as usize),
+        );
+        let once = enc.blur(prepared, br1 as u32, 1, 0);
+        let twice = enc.blur(once, br2 as u32, 1, 0);
+        let out = enc.texture("Lens Blur Bloom", small_size, F32X4);
+        enc.run(
+            Group::LensBlur,
+            "lb_bloom",
+            &small,
+            small_size,
+            Out::F32(&out.view),
+            Bind::reading(&[&twice.view]),
+        );
+        out
+    });
+
+    debug_assert_eq!(dst.size, full);
+    debug_assert_eq!(dst.texture.format(), IMAGE_FORMAT);
+    enc.run(
+        Group::LensBlur,
+        "lb_final",
+        &Params {
+            scale: [
+                small_size.0 as f32 / w as f32,
+                small_size.1 as f32 / h as f32,
+            ],
+            ..params
+        },
+        full,
+        Out::F16(&dst.view),
+        Bind::reading(&[
+            &src.view,
+            &coc.view,
+            &far_lin.view,
+            &near_lin.view,
+            &bloom.as_ref().unwrap_or(&far_lin).view,
+        ])
+        .with_scratch(&count),
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn params_match_the_shader() {
+        let module = crate::gpu_compute::group_module(Group::LensBlur);
+        assert_eq!(
+            crate::gpu_compute::struct_span(&module, "Params"),
+            size_of::<Params>()
+        );
+    }
 }

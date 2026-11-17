@@ -5,6 +5,16 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.80.0-dev-gpu-compute-foundation — 2026-11-17
+
+### Develop
+
+- Lens Blur now runs on the graphics card in the Develop preview,
+  presets, the uncropped crop view and exports. Moving a Lens Blur
+  slider no longer recomputes Relight and Fog. Photos look the same.
+  If the graphics card cannot do it, the processor takes over as
+  before. Thumbnails still blur on the processor for now.
+
 ## 1.79.0-dev-gpu-compute-foundation — 2026-11-16
 
 ### Develop

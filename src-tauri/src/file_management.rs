@@ -3142,8 +3142,12 @@ pub fn generate_thumbnail_data(
             let warped_image =
                 apply_geometry_warp(Cow::Borrowed(&composite_image), &meta.adjustments);
 
-            let blurred_image =
-                crate::adjustment_utils::apply_spatial_effects(warped_image, &meta.adjustments);
+            // Lens blur stays on the CPU here, before the coarse rotation the depth map does
+            // not follow (moves to the GPU with the warp, `GPU_COMPUTE_PLAN.md` step 5).
+            let blurred_image = crate::lens_blur::apply_lens_blur(
+                crate::adjustment_utils::apply_relight_and_fog(warped_image, &meta.adjustments),
+                &meta.adjustments,
+            );
 
             let orientation_steps =
                 meta.adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;

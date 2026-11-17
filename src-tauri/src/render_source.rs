@@ -1,22 +1,24 @@
 //! What a render starts from: an image prepared on the CPU plus the stages that turn it into
 //! the main shader's input on the GPU (upstream `15a9ff2e`; `docs/GPU_COMPUTE_PLAN.md`).
-//! Step 1 runs the frame (orientation, flips, rotation, crop) and the output downscale on the
-//! GPU; the geometry warp and the spatial effects still run on the CPU before
-//! (`adjustment_utils::apply_warp_and_effects`). The same stages run on the CPU when the GPU
-//! ones fail (`render_on_cpu`), and are the reference the GPU stages are tested against.
+//! The GPU runs lens blur, then the frame (orientation, flips, rotation, crop) and the output
+//! downscale; the geometry warp, relight and fog still run on the CPU before
+//! (`adjustment_utils::apply_warp_relight_and_fog`). The same stages run on the CPU when the
+//! GPU ones fail (`render_on_cpu`), and are the reference the GPU stages are tested against.
 
 use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 
 use image::{DynamicImage, GenericImageView};
 use serde_json::Value;
 
-use crate::gpu_compute::{Grid, Group, Out, Slot};
+use crate::gpu_compute::{Bind, Grid, Group, IMAGE_FORMAT, Out, Slot};
 use crate::image_processing::{
     Crop, GpuContext, apply_coarse_rotation, apply_flip, apply_rotation, crop_rect,
     downscale_f32_image, fitted_size,
 };
+use crate::lens_blur::LensBlur;
 
 const FRAME_ROTATE: u32 = 1;
 
@@ -143,8 +145,8 @@ impl Frame {
             "tf_frame",
             &params,
             dst.size,
-            &src.view,
             Out::F16(&dst.view),
+            Bind::reading(&[&src.view]),
         );
     }
 }
@@ -159,17 +161,56 @@ fn downscale(enc: &mut crate::gpu_compute::ComputeEncoder, src: &Slot, dst: &Slo
         "tf_downscale",
         &params,
         dst.size,
-        &src.view,
         Out::F16(&dst.view),
+        Bind::reading(&[&src.view]),
     );
 }
 
-/// An image for the main shader: `image` (already warped and with its spatial effects), then
-/// `frame`, then shrunk to fit `output_fit` when that is smaller.
+/// The spatial effects the GPU runs before the frame, read from an edit for an image of one
+/// size (the effects scale with it).
+#[derive(Clone, Default)]
+pub struct Effects {
+    lens_blur: Option<Arc<LensBlur>>,
+}
+
+impl Effects {
+    pub fn prepare(adjustments: &Value, size: (u32, u32)) -> Self {
+        Self {
+            lens_blur: crate::lens_blur::prepare(adjustments, size).map(Arc::new),
+        }
+    }
+
+    fn hash_into(&self, hasher: &mut impl Hasher) {
+        self.lens_blur.is_some().hash(hasher);
+        if let Some(job) = &self.lens_blur {
+            job.hash_into(hasher);
+        }
+    }
+
+    fn encode(&self, enc: &mut crate::gpu_compute::ComputeEncoder, src: Slot) -> Slot {
+        let Some(job) = &self.lens_blur else {
+            return src;
+        };
+        let blurred = enc.texture("Lens Blur Output", src.size, IMAGE_FORMAT);
+        crate::lens_blur::encode(enc, job, &src, &blurred);
+        blurred.detach()
+    }
+
+    fn apply_on_cpu<'a>(&self, image: Cow<'a, DynamicImage>) -> Cow<'a, DynamicImage> {
+        match &self.lens_blur {
+            Some(job) => job.apply_on_cpu(image),
+            None => image,
+        }
+    }
+}
+
+/// An image for the main shader: `image` (already warped, relit and fogged), then `effects`,
+/// then `frame`, then shrunk to fit `output_fit` when that is smaller.
 pub struct RenderSource<'a> {
     pub image: &'a DynamicImage,
     /// Identifies `image`'s pixels; renders of the same id and stages reuse their GPU input.
     pub id: u64,
+    pub effects: Effects,
     pub frame: Frame,
     pub output_fit: Option<(u32, u32)>,
 }
@@ -179,6 +220,7 @@ impl<'a> RenderSource<'a> {
         Self {
             image,
             id,
+            effects: Effects::default(),
             frame,
             output_fit: None,
         }
@@ -189,9 +231,15 @@ impl<'a> RenderSource<'a> {
         Self::new(image, id, Frame::default())
     }
 
-    /// `image` framed as `adjustments` say, its crop in `image`'s pixels.
+    /// `image` with the effects and frame `adjustments` say, the crop in `image`'s pixels.
     pub fn edited(image: &'a DynamicImage, id: u64, adjustments: &Value) -> Self {
         Self::new(image, id, Frame::from_adjustments(adjustments))
+            .with_effects(Effects::prepare(adjustments, image.dimensions()))
+    }
+
+    /// With `effects`, prepared for `image`'s size.
+    pub fn with_effects(self, effects: Effects) -> Self {
+        Self { effects, ..self }
     }
 
     /// Shrunk to fit inside `target`.
@@ -226,6 +274,7 @@ impl<'a> RenderSource<'a> {
     pub fn key(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         (self.id, format!("{:?}", self.frame), self.output_fit).hash(&mut hasher);
+        self.effects.hash_into(&mut hasher);
         hasher.finish()
     }
 
@@ -236,17 +285,18 @@ impl<'a> RenderSource<'a> {
         let output_size = self.size();
         crate::gpu_compute::encode(context, |enc| {
             let source = crate::gpu_compute::upload_image(context, self.image);
+            let effected = self.effects.encode(enc, source);
             let framed = if self.frame.is_identity(source_size) {
-                source
+                effected
             } else {
-                let framed = enc.texture("Framed Source", framed_size);
-                self.frame.encode(enc, &source, &framed);
+                let framed = enc.texture("Framed Source", framed_size, IMAGE_FORMAT);
+                self.frame.encode(enc, &effected, &framed);
                 framed.detach()
             };
             if output_size == framed_size {
                 return framed;
             }
-            let fitted = enc.texture("Fitted Source", output_size);
+            let fitted = enc.texture("Fitted Source", output_size, IMAGE_FORMAT);
             downscale(enc, &framed, &fitted);
             fitted.detach()
         })
@@ -254,7 +304,8 @@ impl<'a> RenderSource<'a> {
 
     /// The same stages on the CPU: the fallback when the GPU ones fail.
     pub fn render_on_cpu(&self) -> Cow<'a, DynamicImage> {
-        let framed = self.frame.apply_on_cpu(Cow::Borrowed(self.image));
+        let effected = self.effects.apply_on_cpu(Cow::Borrowed(self.image));
+        let framed = self.frame.apply_on_cpu(effected);
         match self.output_fit {
             Some((w, h)) if self.size() != framed.dimensions() => {
                 Cow::Owned(downscale_f32_image(&framed, w, h))
@@ -275,6 +326,23 @@ mod tests {
         assert_eq!(
             crate::gpu_compute::struct_span(&module, "Params"),
             size_of::<TransformParams>()
+        );
+    }
+
+    #[test]
+    fn the_cpu_render_runs_lens_blur_before_the_frame() {
+        let image = scene(120, 90);
+        let adjustments = lens_blur(json!({ "orientationSteps": 1 }));
+        let source = RenderSource::edited(&image, 0, &adjustments);
+        let blurred = crate::lens_blur::apply_lens_blur(Cow::Borrowed(&image), &adjustments);
+        assert!(
+            matches!(blurred, Cow::Owned(_)),
+            "the test blur should change the image"
+        );
+        let expected = Frame::from_adjustments(&adjustments).apply_on_cpu(blurred);
+        assert_eq!(
+            source.render_on_cpu().to_rgb32f().as_raw(),
+            expected.to_rgb32f().as_raw()
         );
     }
 
@@ -335,6 +403,50 @@ mod tests {
             RenderSource::edited(&image, 1, &json!({ "rotation": 1.0 })).key(),
             plain
         );
+
+        let image = ramp(64, 48);
+        let blurred = lens_blur(json!({}));
+        let key = RenderSource::edited(&image, 1, &blurred).key();
+        assert_ne!(key, RenderSource::plain(&image, 1).key());
+        assert_eq!(RenderSource::edited(&image, 1, &blurred).key(), key);
+        assert_ne!(
+            RenderSource::edited(&image, 1, &lens_blur(json!({ "lensBlurAmount": 70 }))).key(),
+            key
+        );
+    }
+
+    /// A depth map as the AI depth tool stores it: far on the left, near on the right, and a
+    /// near block standing in front.
+    fn depth_map_url(width: u32, height: u32) -> String {
+        use base64::Engine as _;
+        let map = image::GrayImage::from_fn(width, height, |x, y| {
+            let block =
+                (width / 3..width / 2).contains(&x) && (height / 4..height / 2).contains(&y);
+            image::Luma([if block { 240 } else { (x * 255 / width) as u8 }])
+        });
+        let mut png = std::io::Cursor::new(Vec::new());
+        DynamicImage::ImageLuma8(map)
+            .write_to(&mut png, image::ImageFormat::Png)
+            .expect("encode the depth map");
+        format!(
+            "data:image/png;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(png.get_ref())
+        )
+    }
+
+    /// Lens blur on, with `overrides`.
+    fn lens_blur(overrides: Value) -> Value {
+        let mut adjustments = json!({
+            "lensBlurEnabled": true,
+            "lensBlurAmount": 100,
+            "lensBlurDepthMap": depth_map_url(160, 105),
+            "lensBlurMinDepth": 30,
+            "lensBlurMaxDepth": 60,
+        });
+        for (key, value) in overrides.as_object().expect("an object") {
+            adjustments[key] = value.clone();
+        }
+        adjustments
     }
 
     /// The RGBA half floats of `slot`.
@@ -359,6 +471,26 @@ mod tests {
             .collect()
     }
 
+    /// The largest and the mean difference between the GPU and the CPU render of `source`,
+    /// relative to the value where it is above 1.
+    fn gpu_cpu_difference(context: &GpuContext, source: &RenderSource) -> (f32, f32) {
+        let gpu = read_back(context, &source.render(context).expect("GPU stages"));
+        let cpu = crate::gpu_compute::rgba_halves(&source.render_on_cpu());
+        assert_eq!(gpu.len(), cpu.len());
+        let errors: Vec<f32> = gpu
+            .chunks_exact(4)
+            .zip(cpu.chunks_exact(4))
+            .flat_map(|(g, c)| {
+                (0..3).map(move |i| {
+                    let c = c[i].to_f32();
+                    (g[i] - c).abs() / c.abs().max(1.0)
+                })
+            })
+            .collect();
+        let worst = errors.iter().copied().fold(0.0f32, f32::max);
+        (worst, errors.iter().sum::<f32>() / errors.len() as f32)
+    }
+
     /// The GPU stages render what the CPU ones do, within half-float rounding (decision 1 in
     /// `GPU_COMPUTE_PLAN.md`: the final 8-bit output may move by under a quarter step).
     #[test]
@@ -372,16 +504,63 @@ mod tests {
             for fit in [None, Some((120, 120))] {
                 let mut source = RenderSource::edited(&image, 0, &adjustments);
                 source.output_fit = fit;
-                let gpu = read_back(&context, &source.render(&context).expect("GPU stages"));
-                let cpu = crate::gpu_compute::rgba_halves(&source.render_on_cpu());
-                assert_eq!(gpu.len(), cpu.len(), "{adjustments} {fit:?}");
-                let worst = gpu
-                    .chunks_exact(4)
-                    .zip(cpu.chunks_exact(4))
-                    .flat_map(|(g, c)| (0..3).map(move |i| (g[i] - c[i].to_f32()).abs()))
-                    .fold(0.0f32, f32::max);
+                let (worst, _) = gpu_cpu_difference(&context, &source);
                 // Two half-float roundings of values up to 1.5.
                 assert!(worst <= 2e-3, "{adjustments} {fit:?}: worst {worst}");
+            }
+        }
+    }
+
+    /// A photo-like test image: gradients, hard edges and a few highlights above 1, which the
+    /// bokeh energy weighting brightens.
+    fn scene(width: u32, height: u32) -> DynamicImage {
+        DynamicImage::ImageRgb32F(image::ImageBuffer::from_fn(width, height, |x, y| {
+            let checker = ((x / 23 + y / 17) % 2) as f32;
+            let highlight = x % 97 == 40 && y % 61 == 30;
+            let lift = if highlight { 2.5 } else { 0.0 };
+            image::Rgb([
+                0.15 + 0.6 * x as f32 / width as f32 + lift,
+                0.1 + 0.5 * checker + lift,
+                0.8 * y as f32 / height as f32 + lift,
+            ])
+        }))
+    }
+
+    /// Lens blur on the GPU renders what the CPU version does (decision 3: the shader follows
+    /// the fork's CPU result). Every shape, with and without diffusion, small kernels (under
+    /// 3.5 working pixels, a full disc of taps) and large ones (golden-angle taps, smoothed above
+    /// 7), the skipped case where almost nothing blurs, and with a frame after it.
+    #[test]
+    fn gpu_lens_blur_matches_the_cpu() {
+        let Some(context) = crate::gpu_processing::headless_gpu_context() else {
+            eprintln!("No GPU adapter; skipping the GPU lens blur comparison.");
+            return;
+        };
+        let cases = [
+            json!({}),
+            json!({ "lensBlurShape": "hexagon" }),
+            json!({ "lensBlurShape": "octagon", "lensBlurDiffusion": 40 }),
+            json!({ "lensBlurShape": "ring", "lensBlurDiffusion": 100 }),
+            json!({ "lensBlurDiffusion": 25, "lensBlurMinFade": 40, "lensBlurMaxFade": 5 }),
+            json!({ "lensBlurAmount": 20 }),
+            json!({ "lensBlurMinDepth": 0, "lensBlurMaxDepth": 100 }),
+            json!({ "orientationSteps": 1, "rotation": 4.0,
+                    "crop": { "x": 20.0, "y": 30.0, "width": 300.0, "height": 500.0 } }),
+        ];
+        for (width, height) in [(640, 420), (203, 151)] {
+            let image = scene(width, height);
+            for overrides in &cases {
+                let adjustments = lens_blur(overrides.clone());
+                let source = RenderSource::edited(&image, 0, &adjustments);
+                assert!(source.effects.lens_blur.is_some(), "{overrides}");
+                let (worst, mean) = gpu_cpu_difference(&context, &source);
+                eprintln!(
+                    "lens blur {width}x{height} {overrides}: worst {worst:.2e}, mean {mean:.2e}"
+                );
+                assert!(
+                    worst <= 2e-3 && mean <= 2e-4,
+                    "{width}x{height} {overrides}: worst {worst}, mean {mean}"
+                );
             }
         }
     }

@@ -55,22 +55,33 @@ fn hash_effect_keys(adjustments: &serde_json::Value, keys: &[&str], hasher: &mut
     }
 }
 
-/// Hashes every input of the post-warp spatial effect stage
-/// (`adjustment_utils::apply_spatial_effects`).
-pub fn calculate_effects_hash(adjustments: &serde_json::Value) -> u64 {
-    let mut hasher = DefaultHasher::new();
-
-    for (group, enabled_key, keys) in [
-        ("relight", "relightEnabled", RELIGHT_KEYS),
-        ("fog", "fogEnabled", FOG_KEYS),
-        ("lensBlur", "lensBlurEnabled", LENS_BLUR_KEYS),
-    ] {
+/// Hashes the inputs of `effects` (tool group, enabled key, adjustment keys).
+fn hash_effects(
+    adjustments: &serde_json::Value,
+    effects: &[(&str, &str, &[&str])],
+    hasher: &mut DefaultHasher,
+) {
+    for (group, enabled_key, keys) in effects {
         let enabled = is_tool_enabled(adjustments, group, enabled_key);
-        enabled.hash(&mut hasher);
+        enabled.hash(hasher);
         if enabled {
-            hash_effect_keys(adjustments, keys, &mut hasher);
+            hash_effect_keys(adjustments, keys, hasher);
         }
     }
+}
+
+/// Hashes every input of the spatial effects still on the CPU
+/// (`adjustment_utils::apply_relight_and_fog`).
+pub fn calculate_relight_and_fog_hash(adjustments: &serde_json::Value) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    hash_effects(
+        adjustments,
+        &[
+            ("relight", "relightEnabled", RELIGHT_KEYS),
+            ("fog", "fogEnabled", FOG_KEYS),
+        ],
+        &mut hasher,
+    );
 
     if is_tool_enabled(adjustments, "fog", "fogEnabled") {
         adjustments["orientationSteps"].as_u64().hash(&mut hasher);
@@ -78,6 +89,18 @@ pub fn calculate_effects_hash(adjustments: &serde_json::Value) -> u64 {
         adjustments["flipVertical"].as_bool().hash(&mut hasher);
     }
 
+    hasher.finish()
+}
+
+/// Hashes every input of the spatial effects: relight and fog, and lens blur.
+pub fn calculate_effects_hash(adjustments: &serde_json::Value) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    calculate_relight_and_fog_hash(adjustments).hash(&mut hasher);
+    hash_effects(
+        adjustments,
+        &[("lensBlur", "lensBlurEnabled", LENS_BLUR_KEYS)],
+        &mut hasher,
+    );
     hasher.finish()
 }
 
