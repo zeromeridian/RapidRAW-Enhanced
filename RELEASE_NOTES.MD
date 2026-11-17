@@ -5,6 +5,16 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.85.2-fix-mask-drop-insert — 2026-11-17
+
+### Masks
+
+- Dragging a mask tool onto a mask's component now inserts the new
+  component where you drop it. Before, it was always placed at the end and
+  saved in a way that made every mask on the photo stop working.
+- Photos already affected get their masks back: the dropped component is
+  read as an added component in the editor, thumbnails and exports.
+
 ## 1.85.1-fix-keyword-case — 2026-11-17
 
 ### Keywords

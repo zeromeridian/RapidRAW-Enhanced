@@ -1,7 +1,9 @@
 # Mask Management Plan (LrC-style components)
 
-Status: proposed (owner, 2026-11-17). Not started. Plan item 51 in
-`UPSTREAM_FEATURE_GAP.md`; WP0 is pulled forward as item 43. Code check
+Status: proposed (owner, 2026-11-17). WP0 done as item 43 (`1.85.2`,
+2026-11-17, `fix/mask-drop-insert`, uncommitted; also repairs saved
+numeric modes on read, owner decision); WP1–WP6 not started. Plan item
+51 in `UPSTREAM_FEATURE_GAP.md`. Code check
 2026-11-17: section 1 and the problems P1, P2 and P7 match the code. Open
 decision before WP1: base rule or start from white (WP1). Item 41
 (stronger feather) follows this plan.
@@ -100,6 +102,8 @@ P7. Editing one component recomputes all of them. The cache key covers the
 Do these in order. Each WP should be a separate, reviewable change.
 
 ### WP0: Fix drag-to-insert (P1)
+
+Done (`1.85.2`, item 43; details in `HANDOFF.md`).
 
 - In `handleDragEnd`, call
   `handleAddSubMask(parentId, maskType, SubMaskMode.Additive, targetIndex)`.

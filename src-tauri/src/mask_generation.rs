@@ -37,12 +37,24 @@ pub struct SubMask {
     pub invert: bool,
     #[serde(default = "default_opacity")]
     pub opacity: f32,
+    #[serde(deserialize_with = "deserialize_sub_mask_mode")]
     pub mode: SubMaskMode,
     pub parameters: Value,
 }
 
 fn default_opacity() -> f32 {
     100.0
+}
+
+/// Reads a sub-mask mode, taking `Additive` for a value that is not a mode. Before 1.85.2,
+/// dropping a mask tool onto a component saved the drop position (a number) as its mode,
+/// which made the photo's whole mask list unreadable.
+fn deserialize_sub_mask_mode<'de, D>(deserializer: D) -> Result<SubMaskMode, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    Ok(SubMaskMode::deserialize(value).unwrap_or(SubMaskMode::Additive))
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -1669,8 +1681,8 @@ pub fn get_cached_or_generate_mask(
 #[cfg(test)]
 mod tests {
     use super::{
-        MaskDefinition, ai_depth_mask_weight, gaussian_blur_mask, generate_luminance_bitmap,
-        grayscale_square_filter, mask_cache_key,
+        MaskDefinition, SubMaskMode, ai_depth_mask_weight, gaussian_blur_mask,
+        generate_luminance_bitmap, grayscale_square_filter, mask_cache_key,
     };
     use crate::ai_processing::AiDepthMaskParameters;
     use image::{DynamicImage, GrayImage, RgbImage};
@@ -1817,6 +1829,35 @@ mod tests {
             }],
         }))
         .unwrap()
+    }
+
+    #[test]
+    fn sub_mask_modes_that_are_not_a_mode_read_as_additive() {
+        let masks: Vec<MaskDefinition> = serde_json::from_value(json!([{
+            "id": "m1",
+            "name": "Mask",
+            "visible": true,
+            "invert": false,
+            "adjustments": {},
+            "subMasks": [
+                { "id": "s1", "type": "radial", "visible": true, "mode": "subtractive", "parameters": {} },
+                { "id": "s2", "type": "radial", "visible": true, "mode": 1, "parameters": {} },
+                { "id": "s3", "type": "radial", "visible": true, "mode": "sideways", "parameters": {} },
+                { "id": "s4", "type": "radial", "visible": true, "mode": "intersect", "parameters": {} },
+            ],
+        }]))
+        .unwrap();
+
+        let modes: Vec<SubMaskMode> = masks[0].sub_masks.iter().map(|s| s.mode).collect();
+        assert_eq!(
+            modes,
+            [
+                SubMaskMode::Subtractive,
+                SubMaskMode::Additive,
+                SubMaskMode::Additive,
+                SubMaskMode::Intersect,
+            ]
+        );
     }
 
     #[test]

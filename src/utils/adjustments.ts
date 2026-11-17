@@ -1110,13 +1110,15 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     return INITIAL_ADJUSTMENTS;
   }
 
+  const subMaskModes = Object.values(SubMaskMode) as unknown[];
+  // Before 1.85.2, dropping a mask tool onto a component saved a number as its mode.
   const normalizeSubMasks = (subMasks: any[]) => {
     return (subMasks || []).map((subMask: Partial<SubMask>) => ({
       visible: true,
-      mode: SubMaskMode.Additive,
       invert: false,
       opacity: 100,
       ...subMask,
+      mode: subMaskModes.includes(subMask.mode) ? subMask.mode : SubMaskMode.Additive,
     }));
   };
 
