@@ -5,6 +5,30 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.83.1-dev-gpu-compute-foundation — 2026-11-17
+
+### Develop
+
+- Perspective and lens corrections computed on the processor are now
+  exact across the whole width of the photo; before, they could shift
+  the right side of wide photos by a small fraction of a pixel. The
+  processor and the graphics card now warp a photo the same way.
+
+## 1.83.0-dev-gpu-compute-foundation — 2026-11-17
+
+### Develop
+
+- Perspective, Guided Perspective, Distortion and the lens profile
+  corrections (distortion, chromatic aberration, vignetting) now run on
+  the graphics card in the Develop preview, presets, the uncropped crop
+  view, thumbnails and exports. Moving a geometry slider no longer
+  warps the full-size photo on the processor first. If the graphics card
+  cannot do it, the processor takes over as before.
+- The preview and thumbnails of a straightened or corrected photo are
+  now warped at twice their size and then shrunk, which keeps them sharp.
+- Thumbnails now apply Relight, Fog and Lens Blur on the graphics card
+  too. The Before view still uses the processor.
+
 ## 1.82.1-dev-gpu-compute-foundation — 2026-11-17
 
 ### Develop
