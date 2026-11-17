@@ -1,11 +1,26 @@
-// Orientation, flips, rotation, crop and downscaling of the prepared photo (`render_source.rs`),
-// plus the motion-blur grain estimate. Each stage matches the CPU code it replaces, which stays
-// as the fallback: `tf_frame` the image crate's rotate/flip, imageproc's `rotate_about_center`
-// and `apply_crop`; `tf_downscale` the fork's root-mean-square `downscale_f32_image`;
-// `tf_grain` `motion_blur::estimate_grain`'s blocks.
+// Geometry warp, orientation, flips, rotation, crop and downscaling of the prepared photo
+// (`render_source.rs`), plus the motion-blur grain estimate. Each stage matches the CPU code it
+// replaces, which stays as the fallback: `tf_warp` `image_processing::warp_image_geometry`;
+// `tf_frame` the image crate's rotate/flip, imageproc's `rotate_about_center` and `apply_crop`;
+// `tf_downscale` the fork's root-mean-square `downscale_f32_image`; `tf_grain`
+// `motion_blur::estimate_grain`'s blocks.
 
 struct Params {
     grid: Grid,
+    inverse_x: vec4<f32>,
+    inverse_y: vec4<f32>,
+    inverse_z: vec4<f32>,
+    center: vec2<f32>,
+    half_diagonal: f32,
+    max_radius_sq_inv: f32,
+    distortion: f32,
+    lens_amount: f32,
+    auto_crop_scale: f32,
+    vignette_amount: f32,
+    lens_k: vec4<f32>,
+    vignette_k: vec4<f32>,
+    tca: vec2<f32>,
+    warp_flags: u32,
     orientation: u32,
     rotation: vec4<f32>,
     rotation_offset: vec2<f32>,
@@ -18,6 +33,116 @@ struct Params {
 @group(0) @binding(7) var<uniform> params: Params;
 
 const FRAME_ROTATE: u32 = 1u;
+const WARP_LENS: u32 = 1u;
+const WARP_PTLENS: u32 = 2u;
+const WARP_TCA: u32 = 4u;
+const WARP_VIGNETTE: u32 = 8u;
+const WARP_DISTORTION: u32 = 16u;
+
+// The warp's sources lie inside the image when bilinear sampling has all four taps there, as
+// `is_outside_source`; outside it is black.
+fn inside_source(p: vec2<f32>, size: vec2<u32>) -> bool {
+    let last = vec2<f32>(size) - 1.0;
+    return p.x >= 0.0 && p.y >= 0.0 && p.x < last.x && p.y < last.y;
+}
+
+// `interpolate_pixel`.
+fn sample_inside(p: vec2<f32>, size: vec2<u32>) -> vec3<f32> {
+    if (!inside_source(p, size)) {
+        return vec3<f32>(0.0);
+    }
+    let p0 = vec2<u32>(floor(p));
+    let w = p - vec2<f32>(p0);
+    let a = textureLoad(t0, p0, 0).rgb;
+    let b = textureLoad(t0, p0 + vec2<u32>(1u, 0u), 0).rgb;
+    let c = textureLoad(t0, p0 + vec2<u32>(0u, 1u), 0).rgb;
+    let d = textureLoad(t0, p0 + vec2<u32>(1u, 1u), 0).rgb;
+    let top = a * (1.0 - w.x) + b * w.x;
+    let bot = c * (1.0 - w.x) + d * w.x;
+    return top * (1.0 - w.y) + bot * w.y;
+}
+
+// One channel of `interpolate_pixel_with_tca`, clamped to the edge (red and blue are shifted
+// by their sub-pixel TCA scale).
+fn sample_channel(p: vec2<f32>, size: vec2<u32>, channel: u32) -> f32 {
+    let last = vec2<f32>(size) - 1.0;
+    let q = clamp(p, vec2<f32>(0.0), last);
+    let p0 = min(vec2<u32>(floor(q)), max(size, vec2<u32>(2u)) - 2u);
+    let w = q - vec2<f32>(p0);
+    let a = textureLoad(t0, p0, 0)[channel];
+    let b = textureLoad(t0, p0 + vec2<u32>(1u, 0u), 0)[channel];
+    let c = textureLoad(t0, p0 + vec2<u32>(0u, 1u), 0)[channel];
+    let d = textureLoad(t0, p0 + vec2<u32>(1u, 1u), 0)[channel];
+    let top = a * (1.0 - w.x) + b * w.x;
+    let bot = c * (1.0 - w.x) + d * w.x;
+    return top * (1.0 - w.y) + bot * w.y;
+}
+
+fn radial(r2: f32, k: vec4<f32>) -> f32 {
+    return 1.0 + k.x * r2 + k.y * (r2 * r2) + k.z * (r2 * r2 * r2);
+}
+
+// Each output pixel's source through the inverse perspective matrix, Constrain Crop and the
+// lens auto-crop scale, lens profile distortion (poly3 or PTLens), manual distortion; then
+// sampled with or without TCA and corrected for lens vignetting.
+@compute @workgroup_size(8, 8, 1)
+fn tf_warp(@builtin(global_invocation_id) id: vec3<u32>) {
+    if (outside(id)) { return; }
+    let size = params.grid.dst;
+    let h = params.inverse_x * f32(id.x) + params.inverse_y * f32(id.y) + params.inverse_z;
+    var rgb = vec3<f32>(0.0);
+    if (abs(h.z) > 1e-6) {
+        let flags = params.warp_flags;
+        let c = params.center;
+        var p = h.xy * (1.0 / h.z);
+        if (params.auto_crop_scale > 1.0) {
+            p = c + (p - c) / params.auto_crop_scale;
+        }
+        if ((flags & WARP_LENS) != 0u) {
+            let d = p - c;
+            let ru = sqrt(d.x * d.x + d.y * d.y);
+            if (ru > 1e-6) {
+                let r = ru / params.half_diagonal;
+                let r2 = r * r;
+                let k = params.lens_k;
+                var rd: f32;
+                if ((flags & WARP_PTLENS) != 0u) {
+                    rd = r * (k.x * r2 * r + k.y * r2 + k.z * r + (1.0 - k.x - k.y - k.z));
+                } else {
+                    rd = r * radial(r2, k);
+                }
+                let effective = r + (rd - r) * params.lens_amount;
+                p = c + d * (effective / r);
+            }
+        }
+        if ((flags & WARP_DISTORTION) != 0u) {
+            let d = p - c;
+            p = c + d * (1.0 + params.distortion * ((d.x * d.x + d.y * d.y) * params.max_radius_sq_inv));
+        }
+        if ((flags & WARP_TCA) != 0u) {
+            // Fork deviation (`1.28.2`): black where the green source lies outside the image,
+            // as the CPU; upstream clamps every channel, which streaks the edge pixels.
+            if (inside_source(p, size)) {
+                rgb = vec3<f32>(
+                    sample_channel(c + (p - c) * params.tca.x, size, 0u),
+                    sample_channel(p, size, 1u),
+                    sample_channel(c + (p - c) * params.tca.y, size, 2u),
+                );
+            }
+        } else {
+            rgb = sample_inside(p, size);
+        }
+        if ((flags & WARP_VIGNETTE) != 0u) {
+            let d = p - c;
+            let r = sqrt(d.x * d.x + d.y * d.y) / params.half_diagonal;
+            let factor = radial(r * r, params.vignette_k);
+            if (factor > 1e-6) {
+                rgb *= 1.0 + (1.0 / factor - 1.0) * params.vignette_amount;
+            }
+        }
+    }
+    store_half(id.xy, vec4<f32>(rgb, 1.0));
+}
 
 // The source pixel at `p` of the oriented (coarse-rotated, then flipped) image; black and
 // transparent outside it, like imageproc's constant border.

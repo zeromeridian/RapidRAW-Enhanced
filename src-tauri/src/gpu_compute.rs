@@ -104,7 +104,7 @@ impl Group {
             ),
             Group::Transform => (
                 include_str!("shaders/transform.wgsl"),
-                &["tf_frame", "tf_downscale", "tf_grain"],
+                &["tf_warp", "tf_frame", "tf_downscale", "tf_grain"],
             ),
             Group::Relight => (
                 include_str!("shaders/relight.wgsl"),

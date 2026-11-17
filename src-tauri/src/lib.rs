@@ -101,15 +101,15 @@ use tokio::sync::Mutex as TokioMutex;
 
 use crate::cache_utils::{
     DecodedImageCache, GEOMETRY_KEYS, calculate_full_job_hash, calculate_geometry_hash,
-    calculate_transform_hash, calculate_visual_hash,
+    calculate_patch_hash, calculate_transform_hash, calculate_visual_hash,
 };
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
 use crate::hdr_deghosting::{align_hdr_frames, assert_uniform_dimensions, load_hdr_frames};
 use crate::image_loader::{BaseSize, load_and_composite, prepare_base_image};
 use crate::image_processing::{
-    Crop, GeometryParams, RenderRequest, apply_coarse_rotation, apply_flip, apply_geometry_warp,
-    apply_linear_to_srgb, build_full_source_image, downscale_f32_image,
+    Crop, GeometryParams, GpuContext, RenderRequest, apply_coarse_rotation, apply_flip,
+    apply_geometry_warp, apply_linear_to_srgb, build_full_source_image, downscale_f32_image,
     get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
     resolve_tonemapper_override, resolve_tonemapper_override_from_handle, warp_image_geometry,
 };
@@ -221,34 +221,40 @@ fn into_stage_image(image: Cow<'_, DynamicImage>, source: &Arc<DynamicImage>) ->
     }
 }
 
-/// Builds the editor preview in cached stages: patched and warped full
-/// resolution, then the downscaled working image; relight, fog, lens blur,
-/// orientation, rotation and crop follow on the GPU (the returned effects
-/// and frame), so adjusting an effect only re-runs the GPU stages.
+/// How much larger than the preview the editor preview is warped (upstream `346a49ea`,
+/// decision 2 in `GPU_COMPUTE_PLAN.md`), so the warp's resampling stays sharp.
+pub(crate) const GEOMETRY_PREVIEW_SUPERSAMPLE: f64 = 2.0;
+
+/// Builds the editor preview: the patched full-resolution base (cached), shrunk (cached) to
+/// the preview size, or to `GEOMETRY_PREVIEW_SUPERSAMPLE` times it when the edit warps; the
+/// warp, the shrink to the preview size, relight, fog, lens blur, orientation, rotation and
+/// crop follow on the GPU (the returned stages), so adjusting any of them only re-runs the
+/// GPU stages.
 pub fn prepare_preview_source(
     state: &tauri::State<AppState>,
+    context: &GpuContext,
     loaded_image: &LoadedImage,
     adjustments: &serde_json::Value,
     preview_dim: u32,
 ) -> Result<PreviewSource, String> {
     let mut hasher = DefaultHasher::new();
     loaded_image.path.hash(&mut hasher);
-    calculate_geometry_hash(adjustments).hash(&mut hasher);
-    let warped_key = hasher.finish();
+    calculate_patch_hash(adjustments).hash(&mut hasher);
+    let patched_key = hasher.finish();
 
-    let warped = get_or_compute_stage(&state.patched_warped_cache, warped_key, || {
-        compute_patched_and_warped(loaded_image, adjustments)
+    let patched = get_or_compute_stage(&state.patched_cache, patched_key, || {
+        compute_patched(loaded_image, adjustments)
     })?;
 
-    let (warped_w, warped_h) = warped.dimensions();
-    // The crop and the returned scale are in decoded-photo pixels; the warped
+    let (patched_w, patched_h) = patched.dimensions();
+    // The crop and the returned scale are in decoded-photo pixels; the patched
     // base is `base_scale` times larger with Super Resolution.
-    let base_scale = warped_w as f64 / loaded_image.image.width().max(1) as f64;
+    let base_scale = patched_w as f64 / loaded_image.image.width().max(1) as f64;
     let orientation_steps = adjustments["orientationSteps"].as_u64().unwrap_or(0);
     let (oriented_w, oriented_h) = if orientation_steps % 2 == 1 {
-        (warped_h as f64 / base_scale, warped_w as f64 / base_scale)
+        (patched_h as f64 / base_scale, patched_w as f64 / base_scale)
     } else {
-        (warped_w as f64 / base_scale, warped_h as f64 / base_scale)
+        (patched_w as f64 / base_scale, patched_h as f64 / base_scale)
     };
 
     let crop: Option<Crop> = serde::Deserialize::deserialize(&adjustments["crop"]).ok();
@@ -263,28 +269,45 @@ pub fn prepare_preview_source(
         .unwrap_or((oriented_w, oriented_h));
 
     let target_scale = (preview_dim as f64 / (full_w.max(full_h) * base_scale)).min(1.0);
+    let target_w = ((patched_w as f64 * target_scale).round() as u32).max(1);
+    let target_h = ((patched_h as f64 * target_scale).round() as u32).max(1);
 
-    let working = if target_scale < 1.0 {
-        let working_w = ((warped_w as f64 * target_scale).round() as u32).max(1);
-        let working_h = ((warped_h as f64 * target_scale).round() as u32).max(1);
+    let warp = crate::render_source::warp_of(adjustments);
+    let upload_scale = if warp.is_some() {
+        target_scale * GEOMETRY_PREVIEW_SUPERSAMPLE
+    } else {
+        target_scale
+    }
+    .min(gpu_processing::gpu_fit_scale(context, patched_w, patched_h) as f64)
+    .min(1.0);
+
+    let uploaded = if upload_scale < 1.0 {
+        let upload_w = ((patched_w as f64 * upload_scale).round() as u32).max(1);
+        let upload_h = ((patched_h as f64 * upload_scale).round() as u32).max(1);
 
         let mut hasher = DefaultHasher::new();
-        warped_key.hash(&mut hasher);
-        (working_w, working_h).hash(&mut hasher);
+        patched_key.hash(&mut hasher);
+        (upload_w, upload_h).hash(&mut hasher);
 
         get_or_compute_stage(&state.working_cache, hasher.finish(), || {
-            Ok(Arc::new(downscale_f32_image(&warped, working_w, working_h)))
+            Ok(Arc::new(downscale_f32_image(&patched, upload_w, upload_h)))
         })?
     } else {
-        Arc::clone(&warped)
+        Arc::clone(&patched)
     };
 
-    let working_scale = working.width() as f64 / warped_w.max(1) as f64 * base_scale;
-
     let mut hasher = DefaultHasher::new();
-    warped_key.hash(&mut hasher);
-    working.dimensions().hash(&mut hasher);
-    let working_key = hasher.finish();
+    patched_key.hash(&mut hasher);
+    uploaded.dimensions().hash(&mut hasher);
+    let uploaded_key = hasher.finish();
+
+    // The supersampled upload shrinks to the preview size after the warp.
+    let working_fit =
+        (warp.is_some() && uploaded.width() > target_w).then_some((target_w, target_h));
+    let working_size = crate::render_source::RenderSource::plain(&uploaded, uploaded_key)
+        .with_working_fit(working_fit)
+        .working_size();
+    let working_scale = working_size.0 as f64 / patched_w.max(1) as f64 * base_scale;
 
     let max_dim = preview_dim as f64;
     let frame = Frame {
@@ -298,22 +321,24 @@ pub fn prepare_preview_source(
     };
 
     let scale = if full_w > 0.0 {
-        (frame.size(working.dimensions()).0 as f64 / full_w) as f32
+        (frame.size(working_size).0 as f64 / full_w) as f32
     } else {
         1.0
     };
 
     Ok(PreviewSource {
-        effects: Effects::prepare(adjustments, working.dimensions()),
-        image: working,
-        id: working_key,
+        warp,
+        working_fit,
+        effects: Effects::prepare(adjustments, working_size),
+        image: uploaded,
+        id: uploaded_key,
         frame,
         scale,
         unscaled_crop_offset: crop.map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32)),
     })
 }
 
-fn compute_patched_and_warped(
+fn compute_patched(
     loaded_image: &LoadedImage,
     adjustments: &serde_json::Value,
 ) -> Result<Arc<DynamicImage>, String> {
@@ -324,10 +349,7 @@ fn compute_patched_and_warped(
         BaseSize::Upscaled,
     )
     .map_err(|e| format!("Failed to prepare base image: {}", e))?;
-    let patched = into_stage_image(prepared, &loaded_image.image);
-
-    let warped = apply_geometry_warp(Cow::Borrowed(patched.as_ref()), adjustments);
-    Ok(into_stage_image(warped, &patched))
+    Ok(into_stage_image(prepared, &loaded_image.image))
 }
 
 #[tauri::command]
@@ -678,8 +700,13 @@ fn process_preview_job(
     {
         Some(cached) => cached.preview.clone(),
         None => {
-            let preview =
-                prepare_preview_source(&state, &loaded_image, &adjustments_clone, preview_dim)?;
+            let preview = prepare_preview_source(
+                &state,
+                &context,
+                &loaded_image,
+                &adjustments_clone,
+                preview_dim,
+            )?;
             *cached_preview_lock = Some(CachedPreview {
                 preview: preview.clone(),
                 transform_hash: new_transform_hash,
@@ -1039,14 +1066,12 @@ fn render_uncropped_preview(app_handle: &tauri::AppHandle, job: UncroppedPreview
         Cow::Borrowed(loaded_image.image.as_ref())
     });
 
-    let effected_image = apply_geometry_warp(patched_image, &adjustments_clone);
-
     let settings = app_settings::settings_snapshot(app_handle).unwrap_or_default();
     let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
 
     // Uncropped and unrotated: only orientation and flips, at preview size.
     let source = RenderSource::new(
-        &effected_image,
+        &patched_image,
         unique_hash,
         Frame {
             rotation: 0.0,
@@ -1054,9 +1079,10 @@ fn render_uncropped_preview(app_handle: &tauri::AppHandle, job: UncroppedPreview
             ..Frame::from_adjustments(&adjustments_clone)
         },
     )
+    .with_warp(crate::render_source::warp_of(&adjustments_clone))
     .with_effects(Effects::prepare(
         &adjustments_clone,
-        effected_image.dimensions(),
+        patched_image.dimensions(),
     ))
     .fitted((preview_dim, preview_dim));
     let (preview_width, preview_height) = source.size();
@@ -1171,11 +1197,10 @@ fn generate_original_transformed_preview_blocking(
 
     let image_for_preview = build_full_source_image(&loaded_image.image, loaded_image.is_raw);
 
-    // Shown as it is, without the main shader, so the effects (relight and fog; lens blur is
-    // off above) and the frame run on the CPU here.
-    let warped = apply_geometry_warp(image_for_preview, &adjustments_clone);
-    let effected = Effects::prepare(&adjustments_clone, warped.dimensions()).apply_on_cpu(warped);
-    let transformed_full_res = Frame::from_adjustments(&adjustments_clone).apply_on_cpu(effected);
+    // Shown as it is, without the main shader, so the warp, the effects (relight and fog; lens
+    // blur is off above) and the frame run on the CPU here.
+    let transformed_full_res =
+        RenderSource::edited(&image_for_preview, 0, &adjustments_clone).render_on_cpu();
 
     let settings = app_settings::settings_snapshot(app_handle).unwrap_or_default();
     let default_dim = settings.editor_preview_resolution.unwrap_or(1920);
@@ -1448,8 +1473,13 @@ fn generate_preset_preview_blocking(
 
     const PRESET_PREVIEW_DIM: u32 = 400;
 
-    let preview =
-        prepare_preview_source(&state, &loaded_image, &js_adjustments, PRESET_PREVIEW_DIM)?;
+    let preview = prepare_preview_source(
+        &state,
+        &context,
+        &loaded_image,
+        &js_adjustments,
+        PRESET_PREVIEW_DIM,
+    )?;
     let source = preview.render_source();
     let (scale_for_gpu, unscaled_crop_offset) = (preview.scale, preview.unscaled_crop_offset);
 
@@ -1593,9 +1623,8 @@ async fn generate_all_community_previews(
             let scaled_adjustments =
                 crate::image_processing::with_crop_scaled(js_adjustments, *base_scale);
 
-            let effected_image = apply_geometry_warp(base_image, &scaled_adjustments);
             let source = RenderSource::edited(
-                &effected_image,
+                base_image,
                 preset_hash.wrapping_add(i as u64),
                 &scaled_adjustments,
             );
@@ -1887,9 +1916,8 @@ async fn generate_preview_for_path(
             }
         };
 
-        let effected_image = apply_geometry_warp(&base_image, &js_adjustments);
         let source = RenderSource::edited(
-            &effected_image,
+            &base_image,
             calculate_full_job_hash(&source_path_str, &js_adjustments),
             &js_adjustments,
         );
@@ -2662,11 +2690,11 @@ pub fn run() {
             mask_cache: Mutex::new(HashMap::new()),
             patch_cache: Mutex::new(HashMap::new()),
             geometry_cache: Mutex::new(HashMap::new()),
-            thumbnail_geometry_cache: Mutex::new(HashMap::new()),
+            thumbnail_base_cache: Mutex::new(HashMap::new()),
             lens_db: Mutex::new(None),
             load_image_generation: Arc::new(AtomicUsize::new(0)),
             full_warped_cache: Mutex::new(None),
-            patched_warped_cache: Mutex::new(None),
+            patched_cache: Mutex::new(None),
             working_cache: Mutex::new(None),
             decoded_image_cache: Mutex::new(DecodedImageCache::new(5)),
             image_preloader: Default::default(),

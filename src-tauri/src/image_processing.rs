@@ -859,59 +859,122 @@ fn compute_lens_auto_crop_scale(params: &GeometryParams, width: f32, height: f32
     }
 }
 
+/// What the geometry warp of an image of one size computes before its pixels (upstream
+/// `15a9ff2e`): the inverse matrix, the lens terms and which corrections apply. The CPU warp
+/// (`warp_image_geometry`) and the GPU one (`render_source`'s `tf_warp`) both start from it.
+pub(crate) struct WarpModel {
+    pub inverse: NaMatrix3<f32>,
+    pub cx: f32,
+    pub cy: f32,
+    pub half_diagonal: f64,
+    pub max_radius_sq_inv: f64,
+    pub k_distortion: f64,
+    pub lens_k: [f64; 3],
+    pub lens_amount: f64,
+    pub has_lens_correction: bool,
+    pub is_ptlens: bool,
+    pub auto_crop_scale: f32,
+    pub vr: f32,
+    pub vb: f32,
+    pub has_tca: bool,
+    pub vignette_k: [f64; 3],
+    pub vignette_amount: f64,
+    pub has_vignetting: bool,
+}
+
+impl WarpModel {
+    pub fn new(params: &GeometryParams, width: u32, height: u32) -> Self {
+        let (forward_transform, cx, cy, half_diagonal) =
+            build_transform_matrices(params, width as f32, height as f32);
+        let inverse = forward_transform
+            .try_inverse()
+            .unwrap_or(NaMatrix3::identity());
+
+        let k_distortion = (params.distortion as f64 / 100.0) * 2.5;
+        let lens_k = [
+            params.lens_dist_k1 as f64,
+            params.lens_dist_k2 as f64,
+            params.lens_dist_k3 as f64,
+        ];
+        let has_lens_correction =
+            params.lens_distortion_enabled && lens_k.iter().any(|k| k.abs() > 1e-6);
+
+        let auto_crop_scale = if has_lens_correction || k_distortion.abs() > 1e-5 {
+            compute_lens_auto_crop_scale(params, width as f32, height as f32) as f32
+        } else {
+            1.0
+        };
+
+        let tca_scale = |v: f32| {
+            if (v - 1.0).abs() > 1e-5 {
+                v + (1.0 - v) * (1.0 - params.lens_tca_amount)
+            } else {
+                1.0
+            }
+        };
+        let vr = tca_scale(params.tca_vr);
+        let vb = tca_scale(params.tca_vb);
+
+        let vignette_k = [
+            params.vig_k1 as f64,
+            params.vig_k2 as f64,
+            params.vig_k3 as f64,
+        ];
+        let vignette_amount = (params.lens_vignette_amount as f64) * 0.8;
+
+        Self {
+            inverse,
+            cx,
+            cy,
+            half_diagonal,
+            max_radius_sq_inv: 1.0 / ((cx * cx + cy * cy) as f64),
+            k_distortion,
+            lens_k,
+            lens_amount: (params.lens_distortion_amount as f64) * 2.5,
+            has_lens_correction,
+            is_ptlens: params.lens_model == 1,
+            auto_crop_scale,
+            vr,
+            vb,
+            has_tca: params.lens_tca_enabled
+                && ((vr - 1.0).abs() > 1e-5 || (vb - 1.0).abs() > 1e-5),
+            vignette_k,
+            vignette_amount,
+            has_vignetting: params.lens_vignette_enabled
+                && vignette_k.iter().any(|k| k.abs() > 1e-6)
+                && vignette_amount > 0.01,
+        }
+    }
+}
+
 pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> DynamicImage {
     let src_img = image.to_rgb32f();
     let (width, height) = src_img.dimensions();
     let mut out_buffer = vec![0.0f32; (width * height * 3) as usize];
 
-    let (forward_transform, cx, cy, half_diagonal) =
-        build_transform_matrices(&params, width as f32, height as f32);
-    let inv = forward_transform
-        .try_inverse()
-        .unwrap_or(NaMatrix3::identity());
+    let WarpModel {
+        inverse: inv,
+        cx,
+        cy,
+        half_diagonal: hd,
+        max_radius_sq_inv,
+        k_distortion,
+        lens_k: [lk1, lk2, lk3],
+        lens_amount: lens_dist_amt,
+        has_lens_correction,
+        is_ptlens,
+        auto_crop_scale,
+        vr,
+        vb,
+        has_tca,
+        vignette_k: [vk1, vk2, vk3],
+        vignette_amount: lens_vig_amt,
+        has_vignetting,
+    } = WarpModel::new(&params, width, height);
 
     let step_vec_x = NaVector3::new(inv[(0, 0)], inv[(1, 0)], inv[(2, 0)]);
     let step_vec_y = NaVector3::new(inv[(0, 1)], inv[(1, 1)], inv[(2, 1)]);
     let origin_vec = NaVector3::new(inv[(0, 2)], inv[(1, 2)], inv[(2, 2)]);
-
-    let max_radius_sq_inv = 1.0 / ((cx * cx + cy * cy) as f64);
-    let hd = half_diagonal;
-
-    let k_distortion = (params.distortion as f64 / 100.0) * 2.5;
-    let lk1 = params.lens_dist_k1 as f64;
-    let lk2 = params.lens_dist_k2 as f64;
-    let lk3 = params.lens_dist_k3 as f64;
-    let lens_dist_amt = (params.lens_distortion_amount as f64) * 2.5;
-
-    let has_lens_correction = params.lens_distortion_enabled
-        && (lk1.abs() > 1e-6 || lk2.abs() > 1e-6 || lk3.abs() > 1e-6);
-    let is_ptlens = params.lens_model == 1;
-
-    let auto_crop_scale = if has_lens_correction || k_distortion.abs() > 1e-5 {
-        compute_lens_auto_crop_scale(&params, width as f32, height as f32) as f32
-    } else {
-        1.0
-    };
-
-    let vr = if (params.tca_vr - 1.0).abs() > 1e-5 {
-        params.tca_vr + (1.0 - params.tca_vr) * (1.0 - params.lens_tca_amount)
-    } else {
-        1.0
-    };
-    let vb = if (params.tca_vb - 1.0).abs() > 1e-5 {
-        params.tca_vb + (1.0 - params.tca_vb) * (1.0 - params.lens_tca_amount)
-    } else {
-        1.0
-    };
-    let has_tca = params.lens_tca_enabled && ((vr - 1.0).abs() > 1e-5 || (vb - 1.0).abs() > 1e-5);
-
-    let vk1 = params.vig_k1 as f64;
-    let vk2 = params.vig_k2 as f64;
-    let vk3 = params.vig_k3 as f64;
-    let lens_vig_amt = (params.lens_vignette_amount as f64) * 0.8;
-    let has_vignetting = params.lens_vignette_enabled
-        && (vk1.abs() > 1e-6 || vk2.abs() > 1e-6 || vk3.abs() > 1e-6)
-        && lens_vig_amt > 0.01;
 
     let src_raw = src_img.as_raw();
     let width_usize = width as usize;
@@ -928,10 +991,12 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
         .par_chunks_exact_mut(width_usize * 3)
         .enumerate()
         .for_each(|(y, row_pixel_data)| {
-            let y_f = y as f32;
-            let mut current_vec = origin_vec + (step_vec_y * y_f);
+            let row_vec = step_vec_y * y as f32 + origin_vec;
 
-            for pixel in row_pixel_data.chunks_exact_mut(3) {
+            for (x, pixel) in row_pixel_data.chunks_exact_mut(3).enumerate() {
+                // Each source evaluated directly, as `tf_warp` does: stepping it along the row
+                // in f32 drifted by up to 0.02 px across 640 px (owner's GPU run, 2026-11-17).
+                let current_vec = step_vec_x * x as f32 + row_vec;
                 if current_vec.z.abs() > 1e-6 {
                     let inv_z = 1.0 / current_vec.z;
                     let mut src_x = current_vec.x * inv_z;
@@ -1011,7 +1076,6 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
                         }
                     }
                 }
-                current_vec += step_vec_x;
             }
         });
 
@@ -4120,6 +4184,39 @@ mod tests {
             assert!((cx - expected.0).abs() < 1e-2, "{cx} vs {}", expected.0);
             assert!((cy - expected.1).abs() < 1e-2, "{cy} vs {}", expected.1);
         }
+    }
+
+    /// Every source position is exact to well under a pixel, also at the far end of a wide row
+    /// (stepping it along the row in f32 drifted, `GPU_COMPUTE_PLAN.md` step 5). The image's
+    /// values are their own coordinates, which bilinear sampling reproduces exactly, so each
+    /// warped value is the source position the warp used.
+    #[test]
+    fn warp_sources_stay_exact_across_wide_rows() {
+        let (width, height) = (3000u32, 40u32);
+        let source = DynamicImage::ImageRgb32F(Rgb32FImage::from_fn(width, height, |x, y| {
+            Rgb([x as f32, y as f32, 1.0])
+        }));
+        let params = GeometryParams {
+            horizontal: -25.0,
+            rotate: 0.3,
+            ..GeometryParams::default()
+        };
+        let inverse = super::WarpModel::new(&params, width, height)
+            .inverse
+            .cast::<f64>();
+        let warped = warp_image_geometry(&source, params).into_rgb32f();
+        let mut worst = 0.0f64;
+        for (x, y, pixel) in warped.enumerate_pixels() {
+            let h = inverse * nalgebra::Vector3::new(x as f64, y as f64, 1.0);
+            let (sx, sy) = (h.x / h.z, h.y / h.z);
+            if pixel.0[2] == 0.0 || sx < 0.0 || sy < 0.0 {
+                continue; // Black outside the source.
+            }
+            worst = worst
+                .max((pixel.0[0] as f64 - sx).abs())
+                .max((pixel.0[1] as f64 - sy).abs());
+        }
+        assert!(worst < 2e-3, "worst source error {worst} px");
     }
 
     #[test]

@@ -1,9 +1,9 @@
-//! What a render starts from: an image prepared on the CPU plus the stages that turn it into
-//! the main shader's input on the GPU (upstream `15a9ff2e`; `docs/GPU_COMPUTE_PLAN.md`).
-//! The GPU runs relight, fog and lens blur, then the frame (orientation, flips, rotation, crop)
-//! and the output downscale; the geometry warp still runs on the CPU before
-//! (`image_processing::apply_geometry_warp`). The same stages run on the CPU when the GPU ones
-//! fail (`render_on_cpu`), and are the reference the GPU stages are tested against.
+//! What a render starts from: an image prepared on the CPU (patched, not warped) plus the
+//! stages that turn it into the main shader's input on the GPU (upstream `15a9ff2e`;
+//! `docs/GPU_COMPUTE_PLAN.md`). The GPU runs the geometry warp, a working-size downscale,
+//! relight, fog and lens blur, then the frame (orientation, flips, rotation, crop) and the
+//! output downscale. The same stages run on the CPU when the GPU ones fail (`render_on_cpu`),
+//! and are the reference the GPU stages are tested against.
 
 use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
@@ -16,21 +16,40 @@ use serde_json::Value;
 use crate::fog::Fog;
 use crate::gpu_compute::{Bind, Grid, Group, IMAGE_FORMAT, Out, Slot};
 use crate::image_processing::{
-    Crop, GpuContext, apply_coarse_rotation, apply_flip, apply_rotation, crop_rect,
-    downscale_f32_image, fitted_size,
+    Crop, GeometryParams, GpuContext, WarpModel, apply_coarse_rotation, apply_flip, apply_rotation,
+    crop_rect, downscale_f32_image, fitted_size, get_geometry_params_from_json,
+    is_geometry_identity, warp_image_geometry,
 };
 use crate::lens_blur::LensBlur;
 use crate::relight::Relight;
 
 const FRAME_ROTATE: u32 = 1;
+const WARP_LENS: u32 = 1;
+const WARP_PTLENS: u32 = 2;
+const WARP_TCA: u32 = 4;
+const WARP_VIGNETTE: u32 = 8;
+const WARP_DISTORTION: u32 = 16;
 
 /// The parameters of every stage in `shaders/transform.wgsl` (its `Params`).
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct TransformParams {
     grid: Grid,
+    inverse_x: [f32; 4],
+    inverse_y: [f32; 4],
+    inverse_z: [f32; 4],
+    center: [f32; 2],
+    half_diagonal: f32,
+    max_radius_sq_inv: f32,
+    distortion: f32,
+    lens_amount: f32,
+    auto_crop_scale: f32,
+    vignette_amount: f32,
+    lens_k: [f32; 4],
+    vignette_k: [f32; 4],
+    tca: [f32; 2],
+    warp_flags: u32,
     orientation: u32,
-    _pad: [u32; 3],
     rotation: [f32; 4],
     rotation_offset: [f32; 2],
     crop_origin: [u32; 2],
@@ -153,6 +172,68 @@ impl Frame {
     }
 }
 
+/// The edit's geometry warp, `None` when it leaves the image as it is.
+pub fn warp_of(adjustments: &Value) -> Option<GeometryParams> {
+    let params = get_geometry_params_from_json(adjustments);
+    (!is_geometry_identity(&params)).then_some(params)
+}
+
+/// `tf_warp`: `src` warped into `dst` of the same size.
+fn warp(
+    enc: &mut crate::gpu_compute::ComputeEncoder,
+    geometry: &GeometryParams,
+    src: &Slot,
+    dst: &Slot,
+) {
+    let model = WarpModel::new(geometry, src.size.0, src.size.1);
+    let column = |c: usize| {
+        [
+            model.inverse[(0, c)],
+            model.inverse[(1, c)],
+            model.inverse[(2, c)],
+            0.0,
+        ]
+    };
+    let warp_flags = [
+        (model.has_lens_correction, WARP_LENS),
+        (model.is_ptlens, WARP_PTLENS),
+        (model.has_tca, WARP_TCA),
+        (model.has_vignetting, WARP_VIGNETTE),
+        (model.k_distortion.abs() > 1e-5, WARP_DISTORTION),
+    ]
+    .iter()
+    .filter(|(on, _)| *on)
+    .fold(0, |flags, (_, flag)| flags | flag);
+    let [k1, k2, k3] = model.lens_k.map(|k| k as f32);
+    let [v1, v2, v3] = model.vignette_k.map(|k| k as f32);
+    let params = TransformParams {
+        grid: Grid::new(dst.size),
+        inverse_x: column(0),
+        inverse_y: column(1),
+        inverse_z: column(2),
+        center: [model.cx, model.cy],
+        half_diagonal: model.half_diagonal as f32,
+        max_radius_sq_inv: model.max_radius_sq_inv as f32,
+        distortion: model.k_distortion as f32,
+        lens_amount: model.lens_amount as f32,
+        auto_crop_scale: model.auto_crop_scale,
+        vignette_amount: model.vignette_amount as f32,
+        lens_k: [k1, k2, k3, 0.0],
+        vignette_k: [v1, v2, v3, 0.0],
+        tca: [model.vr, model.vb],
+        warp_flags,
+        ..Default::default()
+    };
+    enc.run(
+        Group::Transform,
+        "tf_warp",
+        &params,
+        dst.size,
+        Out::F16(&dst.view),
+        Bind::reading(&[&src.view]),
+    );
+}
+
 fn downscale(enc: &mut crate::gpu_compute::ComputeEncoder, src: &Slot, dst: &Slot) {
     let params = TransformParams {
         grid: Grid::new(dst.size).with_src(src.size),
@@ -246,12 +327,15 @@ impl Effects {
     }
 }
 
-/// An image for the main shader: `image` (already warped), then `effects`,
-/// then `frame`, then shrunk to fit `output_fit` when that is smaller.
+/// An image for the main shader: `image` warped by `warp`, shrunk to fit `working_fit` when
+/// that is smaller, then `effects`, then `frame`, then shrunk to fit `output_fit` when that is
+/// smaller.
 pub struct RenderSource<'a> {
     pub image: &'a DynamicImage,
     /// Identifies `image`'s pixels; renders of the same id and stages reuse their GPU input.
     pub id: u64,
+    pub warp: Option<GeometryParams>,
+    pub working_fit: Option<(u32, u32)>,
     pub effects: Effects,
     pub frame: Frame,
     pub output_fit: Option<(u32, u32)>,
@@ -262,6 +346,8 @@ impl<'a> RenderSource<'a> {
         Self {
             image,
             id,
+            warp: None,
+            working_fit: None,
             effects: Effects::default(),
             frame,
             output_fit: None,
@@ -273,15 +359,38 @@ impl<'a> RenderSource<'a> {
         Self::new(image, id, Frame::default())
     }
 
-    /// `image` with the effects and frame `adjustments` say, the crop in `image`'s pixels.
+    /// `image` with the warp, effects and frame `adjustments` say, the crop in `image`'s
+    /// pixels.
     pub fn edited(image: &'a DynamicImage, id: u64, adjustments: &Value) -> Self {
         Self::new(image, id, Frame::from_adjustments(adjustments))
+            .with_warp(warp_of(adjustments))
             .with_effects(Effects::prepare(adjustments, image.dimensions()))
     }
 
-    /// With `effects`, prepared for `image`'s size.
+    /// With `warp` first.
+    pub fn with_warp(self, warp: Option<GeometryParams>) -> Self {
+        Self { warp, ..self }
+    }
+
+    /// Shrunk to fit inside `target` after the warp, before the effects.
+    pub fn with_working_fit(self, target: Option<(u32, u32)>) -> Self {
+        Self {
+            working_fit: target,
+            ..self
+        }
+    }
+
+    /// With `effects`, prepared for the working size (`working_size`).
     pub fn with_effects(self, effects: Effects) -> Self {
         Self { effects, ..self }
+    }
+
+    /// The size the effects run at and the frame starts from.
+    pub fn working_size(&self) -> (u32, u32) {
+        let size = self.image.dimensions();
+        self.working_fit
+            .and_then(|target| fitted_size(size, target))
+            .unwrap_or(size)
     }
 
     /// Shrunk to fit inside `target`.
@@ -292,7 +401,7 @@ impl<'a> RenderSource<'a> {
         }
     }
 
-    /// The crop's origin in `image`'s pixels, which masks are positioned from.
+    /// The crop's origin in working pixels, which masks are positioned from.
     pub fn crop_offset(&self) -> (f32, f32) {
         self.frame
             .crop
@@ -301,7 +410,7 @@ impl<'a> RenderSource<'a> {
 
     /// The size after the frame, before `output_fit`.
     pub fn framed_size(&self) -> (u32, u32) {
-        self.frame.size(self.image.dimensions())
+        self.frame.size(self.working_size())
     }
 
     /// The size of the main shader's input.
@@ -315,20 +424,42 @@ impl<'a> RenderSource<'a> {
     /// Identifies the rendered input: the image and every stage on it.
     pub fn key(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
-        (self.id, format!("{:?}", self.frame), self.output_fit).hash(&mut hasher);
+        (
+            self.id,
+            format!("{:?}", self.warp),
+            self.working_fit,
+            format!("{:?}", self.frame),
+            self.output_fit,
+        )
+            .hash(&mut hasher);
         self.effects.hash_into(&mut hasher);
         hasher.finish()
     }
 
     /// Uploads `image` and runs the stages on the GPU.
     pub fn render(&self, context: &GpuContext) -> Result<Slot, String> {
-        let source_size = self.image.dimensions();
+        let working_size = self.working_size();
         let framed_size = self.framed_size();
         let output_size = self.size();
         crate::gpu_compute::encode(context, |enc| {
             let source = crate::gpu_compute::upload_image(context, self.image);
-            let effected = self.effects.encode(enc, source);
-            let framed = if self.frame.is_identity(source_size) {
+            let warped = match &self.warp {
+                Some(geometry) => {
+                    let warped = enc.texture("Warped Source", source.size, IMAGE_FORMAT);
+                    warp(enc, geometry, &source, &warped);
+                    warped.detach()
+                }
+                None => source,
+            };
+            let working = if working_size == warped.size {
+                warped
+            } else {
+                let working = enc.texture("Working Source", working_size, IMAGE_FORMAT);
+                downscale(enc, &warped, &working);
+                working.detach()
+            };
+            let effected = self.effects.encode(enc, working);
+            let framed = if self.frame.is_identity(working_size) {
                 effected
             } else {
                 let framed = enc.texture("Framed Source", framed_size, IMAGE_FORMAT);
@@ -346,7 +477,17 @@ impl<'a> RenderSource<'a> {
 
     /// The same stages on the CPU: the fallback when the GPU ones fail.
     pub fn render_on_cpu(&self) -> Cow<'a, DynamicImage> {
-        let effected = self.effects.apply_on_cpu(Cow::Borrowed(self.image));
+        let warped = match self.warp {
+            Some(geometry) => Cow::Owned(warp_image_geometry(self.image, geometry)),
+            None => Cow::Borrowed(self.image),
+        };
+        let working = match self.working_fit {
+            Some((w, h)) if self.working_size() != warped.dimensions() => {
+                Cow::Owned(downscale_f32_image(&warped, w, h))
+            }
+            _ => warped,
+        };
+        let effected = self.effects.apply_on_cpu(working);
         let framed = self.frame.apply_on_cpu(effected);
         match self.output_fit {
             Some((w, h)) if self.size() != framed.dimensions() => {
@@ -372,20 +513,28 @@ mod tests {
     }
 
     #[test]
-    fn the_cpu_render_runs_relight_fog_then_lens_blur_before_the_frame() {
+    fn the_cpu_render_runs_warp_shrink_relight_fog_then_lens_blur_before_the_frame() {
         let image = scene(120, 90);
-        let adjustments = relight(fog(lens_blur(json!({ "orientationSteps": 1 }))));
-        let source = RenderSource::edited(&image, 0, &adjustments);
-        let relight = crate::relight::prepare(&adjustments, image.dimensions()).expect("relit");
-        let relit = relight.apply_on_cpu(Cow::Borrowed(&image));
-        let fog = crate::fog::prepare(&adjustments, image.dimensions()).expect("fog on");
+        let adjustments = relight(fog(lens_blur(json!({
+            "orientationSteps": 1,
+            "transformVertical": 20,
+            "transformDistortion": 30,
+        }))));
+        let working = (80, 80);
+        let working_size = fitted_size(image.dimensions(), working).expect("a smaller size");
+        let source = RenderSource::edited(&image, 0, &adjustments)
+            .with_working_fit(Some(working))
+            .with_effects(Effects::prepare(&adjustments, working_size));
+        let geometry = warp_of(&adjustments).expect("a warp");
+        let warped = warp_image_geometry(&image, geometry);
+        let shrunk = downscale_f32_image(&warped, working.0, working.1);
+        assert_eq!(shrunk.dimensions(), working_size);
+        let relight = crate::relight::prepare(&adjustments, working_size).expect("relit");
+        let relit = relight.apply_on_cpu(Cow::Owned(shrunk));
+        let fog = crate::fog::prepare(&adjustments, working_size).expect("fog on");
         let fogged = fog.apply_on_cpu(relit);
-        let blur = crate::lens_blur::prepare(&adjustments, image.dimensions()).expect("blur on");
+        let blur = crate::lens_blur::prepare(&adjustments, working_size).expect("blur on");
         let blurred = blur.apply_on_cpu(fogged);
-        assert!(
-            matches!(blurred, Cow::Owned(_)),
-            "the test effects should change the image"
-        );
         let expected = Frame::from_adjustments(&adjustments).apply_on_cpu(blurred);
         let rendered = source.render_on_cpu().to_rgb32f();
         let expected = expected.to_rgb32f();
@@ -445,6 +594,15 @@ mod tests {
                 fitted.size(),
                 "{adjustments}"
             );
+            let mut warped = adjustments.clone();
+            warped["transformVertical"] = json!(25);
+            let working =
+                RenderSource::edited(&image, 0, &warped).with_working_fit(Some((150, 99)));
+            assert_eq!(
+                working.render_on_cpu().dimensions(),
+                working.size(),
+                "{warped}"
+            );
         }
     }
 
@@ -457,6 +615,18 @@ mod tests {
         assert_ne!(RenderSource::plain(&image, 1).fitted((4, 4)).key(), plain);
         assert_ne!(
             RenderSource::edited(&image, 1, &json!({ "rotation": 1.0 })).key(),
+            plain
+        );
+        let warped = RenderSource::edited(&image, 1, &json!({ "transformVertical": 10 })).key();
+        assert_ne!(warped, plain);
+        assert_ne!(
+            RenderSource::edited(&image, 1, &json!({ "transformVertical": 11 })).key(),
+            warped
+        );
+        assert_ne!(
+            RenderSource::plain(&image, 1)
+                .with_working_fit(Some((4, 4)))
+                .key(),
             plain
         );
 
@@ -649,32 +819,49 @@ mod tests {
 
     /// How the GPU render of a source differs from the CPU one, per value and relative to it
     /// where it is above 1: the largest difference, the mean one, and the mean signed one
-    /// (`bias`, negative when the GPU comes out lower).
+    /// (`bias`, negative when the GPU comes out lower). `flips` counts the pixels black on one
+    /// side only, which the other numbers leave out: a warped source that lies within f32
+    /// rounding of the image's edge is black on one side and the edge colour on the other.
     struct Difference {
         worst: f32,
         mean: f32,
         bias: f32,
+        flips: usize,
     }
 
     fn gpu_cpu_difference(context: &GpuContext, source: &RenderSource) -> Difference {
         let gpu = read_back(context, &source.render(context).expect("GPU stages"));
         let cpu = crate::gpu_compute::rgba_halves(&source.render_on_cpu());
         assert_eq!(gpu.len(), cpu.len());
-        let errors: Vec<f32> = gpu
-            .chunks_exact(4)
-            .zip(cpu.chunks_exact(4))
-            .flat_map(|(g, c)| {
-                (0..3).map(move |i| {
-                    let c = c[i].to_f32();
-                    (g[i] - c) / c.abs().max(1.0)
-                })
-            })
-            .collect();
+        let is_black = |rgb: [f32; 3]| rgb == [0.0; 3];
+        let mut flips = 0;
+        let mut errors = Vec::with_capacity(gpu.len());
+        for (g, c) in gpu.chunks_exact(4).zip(cpu.chunks_exact(4)) {
+            let c = [c[0].to_f32(), c[1].to_f32(), c[2].to_f32()];
+            if is_black([g[0], g[1], g[2]]) != is_black(c) {
+                flips += 1;
+                continue;
+            }
+            errors.extend((0..3).map(|i| (g[i] - c[i]) / c[i].abs().max(1.0)));
+        }
         let count = errors.len() as f32;
         Difference {
             worst: errors.iter().map(|e| e.abs()).fold(0.0f32, f32::max),
             mean: errors.iter().map(|e| e.abs()).sum::<f32>() / count,
             bias: errors.iter().sum::<f32>() / count,
+            flips,
+        }
+    }
+
+    /// The edge flips (`Difference::flips`) a source may show: none without a warp, and at most
+    /// one pixel in a thousand with one.
+    fn flip_limit(source: &RenderSource) -> usize {
+        match source.warp {
+            Some(_) => {
+                let (w, h) = source.size();
+                (w * h / 1000) as usize
+            }
+            None => 0,
         }
     }
 
@@ -686,10 +873,17 @@ mod tests {
         source: &RenderSource,
         failures: &mut Vec<String>,
     ) {
-        let Difference { worst, mean, bias } = gpu_cpu_difference(context, source);
-        eprintln!("{name}: worst {worst:.2e}, mean {mean:.2e}, bias {bias:+.2e}");
-        if worst > 2e-3 || mean > mean_limit(source) {
-            failures.push(format!("{name}: worst {worst}, mean {mean}, bias {bias}"));
+        let Difference {
+            worst,
+            mean,
+            bias,
+            flips,
+        } = gpu_cpu_difference(context, source);
+        eprintln!("{name}: worst {worst:.2e}, mean {mean:.2e}, bias {bias:+.2e}, flips {flips}");
+        if worst > 2e-3 || mean > mean_limit(source) || flips > flip_limit(source) {
+            failures.push(format!(
+                "{name}: worst {worst}, mean {mean}, bias {bias}, flips {flips}"
+            ));
         }
     }
 
@@ -713,12 +907,18 @@ mod tests {
             for fit in [None, Some((120, 120))] {
                 let mut source = RenderSource::edited(&image, 0, &adjustments);
                 source.output_fit = fit;
-                let Difference { worst, mean, bias } = gpu_cpu_difference(&context, &source);
+                let Difference {
+                    worst,
+                    mean,
+                    bias,
+                    flips,
+                } = gpu_cpu_difference(&context, &source);
                 eprintln!(
-                    "frame {adjustments} {fit:?}: worst {worst:.2e}, mean {mean:.2e}, bias {bias:+.2e}"
+                    "frame {adjustments} {fit:?}: worst {worst:.2e}, mean {mean:.2e}, bias {bias:+.2e}, flips {flips}"
                 );
                 // Two half-float roundings of values up to 1.5.
                 assert!(worst <= 2e-3, "{adjustments} {fit:?}: worst {worst}");
+                assert_eq!(flips, 0, "{adjustments} {fit:?}");
             }
         }
     }
@@ -859,6 +1059,77 @@ mod tests {
                 let name = format!("relight {width}x{height} {overrides}");
                 compare(&context, &name, &source, &mut failures);
             }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    /// A lens profile's coefficients (`lensDistortionParams`).
+    fn lens_profile(profile: Value) -> Value {
+        json!({ "lensDistortionParams": profile })
+    }
+
+    /// The geometry warp on the GPU renders what the CPU version does: every perspective
+    /// slider, Guided Perspective, Constrain Crop, manual distortion both ways, both lens
+    /// profile models, TCA (black outside the image, the fork's rule), lens vignetting, then
+    /// everything at once with a supersampled shrink, the effects and a frame after it.
+    #[test]
+    fn gpu_warp_matches_the_cpu() {
+        let Some(context) = crate::gpu_processing::headless_gpu_context() else {
+            eprintln!("No GPU adapter; skipping the GPU warp comparison.");
+            return;
+        };
+        let guides = json!({
+            "enabled": true,
+            "lines": [
+                { "type": "vertical", "p1": { "x": 0.2, "y": 0.1 }, "p2": { "x": 0.26, "y": 0.9 } },
+                { "type": "vertical", "p1": { "x": 0.8, "y": 0.1 }, "p2": { "x": 0.73, "y": 0.9 } },
+            ],
+        });
+        let everything = json!({
+            "transformVertical": 15,
+            "transformRotate": -2.0,
+            "transformDistortion": -20,
+            "lensDistortionParams": { "k1": -0.06, "tca_vr": 1.0015, "vig_k1": -0.25 },
+            "orientationSteps": 1,
+            "rotation": 3.0,
+            "crop": { "x": 20.0, "y": 25.0, "width": 250.0, "height": 330.0 },
+        });
+        let cases = [
+            json!({ "transformVertical": 30 }),
+            json!({ "transformHorizontal": -25, "transformRotate": 3.5 }),
+            json!({ "transformAspect": 20, "transformScale": 90,
+                    "transformXOffset": 10, "transformYOffset": -8 }),
+            json!({ "guidedPerspective": guides }),
+            json!({ "transformVertical": -20, "transformConstrainCrop": true }),
+            json!({ "transformDistortion": 40 }),
+            json!({ "transformDistortion": -40 }),
+            lens_profile(json!({ "k1": -0.08, "k2": 0.02, "k3": 0.004 })),
+            json!({ "lensDistortionAmount": 70,
+                    "lensDistortionParams": { "model": 1, "k1": 0.01, "k2": -0.04, "k3": 0.02 } }),
+            json!({ "transformScale": 92,
+                    "lensDistortionParams": { "tca_vr": 1.002, "tca_vb": 0.998 } }),
+            json!({ "lensVignetteAmount": 80,
+                    "lensDistortionParams": { "vig_k1": -0.3, "vig_k2": 0.05 } }),
+            everything.clone(),
+        ];
+        let mut failures = Vec::new();
+        for (width, height) in [(640, 420), (203, 151)] {
+            let image = scene(width, height);
+            for adjustments in &cases {
+                let source = RenderSource::edited(&image, 0, adjustments);
+                assert!(source.warp.is_some(), "{adjustments}");
+                let name = format!("warp {width}x{height} {adjustments}");
+                compare(&context, &name, &source, &mut failures);
+            }
+            // The editor preview's order: warped at twice the size, shrunk, then the effects.
+            let adjustments = relight(fog(lens_blur(everything.clone())));
+            let working = (width / 2, height / 2);
+            let working_size = fitted_size((width, height), working).expect("a smaller size");
+            let source = RenderSource::edited(&image, 0, &adjustments)
+                .with_working_fit(Some(working))
+                .with_effects(Effects::prepare(&adjustments, working_size));
+            let name = format!("warp {width}x{height} supersampled with effects");
+            compare(&context, &name, &source, &mut failures);
         }
         assert!(failures.is_empty(), "{}", failures.join("\n"));
     }

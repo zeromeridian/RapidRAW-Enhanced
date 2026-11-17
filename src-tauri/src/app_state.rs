@@ -36,12 +36,14 @@ pub struct LoadedImage {
     pub is_raw: bool,
 }
 
-/// The editor preview before its GPU stages (`lib::prepare_preview_source`): the working-size
-/// image with geometry, relight and fog, and the effects and frame the GPU applies to it.
+/// The editor preview before its GPU stages (`lib::prepare_preview_source`): the patched image
+/// shrunk for upload, and the warp, working size, effects and frame the GPU applies to it.
 #[derive(Clone)]
 pub struct PreviewSource {
     pub image: Arc<DynamicImage>,
     pub id: u64,
+    pub warp: Option<crate::image_processing::GeometryParams>,
+    pub working_fit: Option<(u32, u32)>,
     pub effects: crate::render_source::Effects,
     pub frame: crate::render_source::Frame,
     /// Preview pixels per photo pixel, for the framed (not fitted) preview.
@@ -52,8 +54,23 @@ pub struct PreviewSource {
 impl PreviewSource {
     pub fn render_source(&self) -> crate::render_source::RenderSource<'_> {
         crate::render_source::RenderSource::new(&self.image, self.id, self.frame.clone())
+            .with_warp(self.warp)
+            .with_working_fit(self.working_fit)
             .with_effects(self.effects.clone())
     }
+}
+
+/// A thumbnail's patched photo, shrunk for upload (`file_management::generate_thumbnail_data`);
+/// the warp, effects and frame run on it on the GPU.
+#[derive(Clone)]
+pub struct ThumbnailBase {
+    /// `cache_utils::calculate_patch_hash` of the edit it was made for.
+    pub hash: u64,
+    pub image: DynamicImage,
+    /// Its pixels per photo pixel (the crop's units).
+    pub scale: f32,
+    /// Not shrunk: no larger base exists.
+    pub is_full_size: bool,
 }
 
 #[derive(Clone)]
@@ -265,11 +282,12 @@ pub struct AppState {
     pub mask_cache: Mutex<HashMap<u64, GrayImage>>,
     pub patch_cache: Mutex<HashMap<String, serde_json::Value>>,
     pub geometry_cache: Mutex<HashMap<u64, DynamicImage>>,
-    pub thumbnail_geometry_cache: Mutex<HashMap<String, (u64, DynamicImage, f32)>>,
+    pub thumbnail_base_cache: Mutex<HashMap<String, ThumbnailBase>>,
     pub lens_db: Mutex<Option<Arc<LensDatabase>>>,
     pub load_image_generation: Arc<AtomicUsize>,
     pub full_warped_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
-    pub patched_warped_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
+    /// The editor's patched full-resolution base (`lib::prepare_preview_source`).
+    pub patched_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
     pub working_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
     pub decoded_image_cache: Mutex<DecodedImageCache>,
     pub image_preloader: crate::image_preload::ImagePreloader,

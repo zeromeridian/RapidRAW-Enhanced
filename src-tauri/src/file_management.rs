@@ -38,8 +38,7 @@ use crate::image_loader;
 use crate::image_processing::GpuContext;
 use crate::image_processing::{
     Crop, ImageMetadata, XmpStackMetadata, apply_coarse_rotation, apply_cpu_default_raw_processing,
-    apply_geometry_warp, auto_results_to_json, get_all_adjustments_from_json,
-    perform_auto_analysis,
+    auto_results_to_json, get_all_adjustments_from_json, perform_auto_analysis,
 };
 use crate::mask_generation::MaskDefinition;
 use crate::naming::{self, NamingSource};
@@ -3052,37 +3051,39 @@ pub fn generate_thumbnail_data(
         let state = app_handle.state::<AppState>();
         let target_res = settings.thumbnail_resolution.unwrap_or(720);
 
-        let base_cache_hash = crate::cache_utils::calculate_thumbnail_base_hash(&meta.adjustments);
+        let base_cache_hash = crate::cache_utils::calculate_patch_hash(&meta.adjustments);
 
-        let crop_data: Option<Crop> =
-            serde::Deserialize::deserialize(&meta.adjustments["crop"]).ok();
-
-        let cached_base: Option<(DynamicImage, f32)> = {
-            let cache = state.thumbnail_geometry_cache.lock().unwrap();
-            if let Some((cached_hash, img, scale)) = cache.get(path_str) {
-                let mut sufficient_resolution = true;
-                if let Some(c) = &crop_data
-                    && c.width > 0.0
-                    && c.height > 0.0
-                {
-                    let final_crop_max_dim =
-                        (c.width as f32 * *scale).max(c.height as f32 * *scale);
-                    if final_crop_max_dim < (target_res as f32 * 0.95) {
-                        sufficient_resolution = false;
-                    }
-                }
-
-                if *cached_hash == base_cache_hash && sufficient_resolution {
-                    Some((img.clone(), *scale))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
+        let crop_data: Option<Crop> = serde::Deserialize::deserialize(&meta.adjustments["crop"])
+            .ok()
+            .filter(|c: &Crop| c.width > 0.0 && c.height > 0.0);
+        let warp = crate::render_source::warp_of(&meta.adjustments);
+        // Like the editor preview: a warp runs at twice the thumbnail's size, then shrinks.
+        let supersample = if warp.is_some() {
+            crate::GEOMETRY_PREVIEW_SUPERSAMPLE
+        } else {
+            1.0
+        };
+        // The long side of what the thumbnail shows (the crop, else all), in `base`'s pixels.
+        let shown_long_side = |base: &crate::app_state::ThumbnailBase| -> f64 {
+            let (w, h) = base.image.dimensions();
+            crop_data.as_ref().map_or(w.max(h) as f64, |c| {
+                c.width.max(c.height) * base.scale as f64
+            })
         };
 
-        let (processing_base, total_scale) = if let Some(hit) = cached_base {
+        let cached_base = state
+            .thumbnail_base_cache
+            .lock()
+            .unwrap()
+            .get(path_str)
+            .filter(|base| {
+                base.hash == base_cache_hash
+                    && (base.is_full_size
+                        || shown_long_side(base) >= target_res as f64 * supersample * 0.95)
+            })
+            .cloned();
+
+        let base = if let Some(hit) = cached_base {
             hit
         } else {
             let mut raw_scale_factor = 1.0f32;
@@ -3139,81 +3140,71 @@ pub fn generate_thumbnail_data(
                 img
             };
 
-            let warped_image =
-                apply_geometry_warp(Cow::Borrowed(&composite_image), &meta.adjustments);
-
-            // Relight, fog and lens blur stay on the CPU here, before the coarse rotation their
-            // maps do not follow (move to the GPU with the warp, `GPU_COMPUTE_PLAN.md` step 5).
-            let blurred_image = crate::render_source::Effects::prepare(
-                &meta.adjustments,
-                warped_image.dimensions(),
-            )
-            .apply_on_cpu(warped_image);
-
-            let orientation_steps =
-                meta.adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
-            let coarse_rotated_image = apply_coarse_rotation(blurred_image, orientation_steps);
-
-            let (full_w, full_h) = coarse_rotated_image.dimensions();
+            let (full_w, full_h) = composite_image.dimensions();
+            let full_max_dim = full_w.max(full_h);
 
             let mut processing_dim = target_res;
-            if let Some(c) = &crop_data
-                && c.width > 0.0
-                && c.height > 0.0
-            {
+            if let Some(c) = &crop_data {
                 let crop_max_dim_loaded = c.width.max(c.height) * raw_scale_factor as f64;
-                let full_max_dim = full_w.max(full_h) as f64;
                 if crop_max_dim_loaded > 0.0 {
-                    processing_dim = ((target_res as f64 * full_max_dim / crop_max_dim_loaded)
-                        .round() as u32)
-                        .min(full_w.max(full_h));
+                    processing_dim = (target_res as f64 * full_max_dim as f64 / crop_max_dim_loaded)
+                        .round() as u32;
                 }
             }
+            let upload_dim =
+                ((processing_dim as f64 * supersample).round() as u32).min(full_max_dim);
 
-            let (base, gpu_scale) = if full_w > processing_dim || full_h > processing_dim {
-                let base = crate::image_processing::downscale_f32_image(
-                    &coarse_rotated_image,
-                    processing_dim,
-                    processing_dim,
-                );
-                let scale = if full_w > 0 {
-                    base.width() as f32 / full_w as f32
-                } else {
-                    1.0
-                };
-                (base, scale)
+            let is_full_size = full_max_dim <= upload_dim;
+            let (image, gpu_scale) = if is_full_size {
+                (composite_image, 1.0)
             } else {
-                (coarse_rotated_image.into_owned(), 1.0)
+                let base = crate::image_processing::downscale_f32_image(
+                    &composite_image,
+                    upload_dim,
+                    upload_dim,
+                );
+                let scale = base.width() as f32 / full_w.max(1) as f32;
+                (base, scale)
             };
 
-            let total_scale = gpu_scale * raw_scale_factor;
-
-            let mut cache = state.thumbnail_geometry_cache.lock().unwrap();
+            let base = crate::app_state::ThumbnailBase {
+                hash: base_cache_hash,
+                image,
+                scale: gpu_scale * raw_scale_factor,
+                is_full_size,
+            };
+            let mut cache = state.thumbnail_base_cache.lock().unwrap();
             if cache.len() > 30 {
                 cache.clear();
             }
-            cache.insert(
-                path_str.to_string(),
-                (base_cache_hash, base.clone(), total_scale),
-            );
-
-            (base, total_scale)
+            cache.insert(path_str.to_string(), base.clone());
+            base
         };
 
-        let motion_extent = crate::motion_blur::render_extent(&processing_base, 1.0);
+        // A supersampled warp shrinks to the thumbnail's size before the effects.
+        let shown = shown_long_side(&base);
+        let working_fit = (warp.is_some() && shown > target_res as f64).then(|| {
+            let shrink = target_res as f64 / shown;
+            let (w, h) = base.image.dimensions();
+            let fit = |v: u32| ((v as f64 * shrink).round() as u32).max(1);
+            (fit(w), fit(h))
+        });
+
         let mut hasher = DefaultHasher::new();
         path_str.hash(&mut hasher);
         meta.adjustments.to_string().hash(&mut hasher);
-        // The base is already coarse-rotated; flips, rotation and crop follow on the GPU.
-        let source = crate::render_source::RenderSource::new(
-            &processing_base,
-            hasher.finish(),
-            crate::render_source::Frame {
-                orientation_steps: 0,
-                crop: crop_data.map(|c| c.scaled(total_scale as f64)),
-                ..crate::render_source::Frame::from_adjustments(&meta.adjustments)
-            },
-        );
+        let mut source = crate::render_source::RenderSource::plain(&base.image, hasher.finish())
+            .with_warp(warp)
+            .with_working_fit(working_fit);
+        let working_size = source.working_size();
+        let working_scale = working_size.0 as f32 / base.image.width().max(1) as f32;
+        let total_scale = base.scale * working_scale;
+        source.effects = crate::render_source::Effects::prepare(&meta.adjustments, working_size);
+        source.frame = crate::render_source::Frame {
+            crop: crop_data.map(|c| c.scaled(total_scale as f64)),
+            ..crate::render_source::Frame::from_adjustments(&meta.adjustments)
+        };
+        let motion_extent = crate::motion_blur::render_extent(&base.image, working_scale);
         let (preview_w, preview_h) = source.size();
         let unscaled_crop_offset = crop_data.map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
 

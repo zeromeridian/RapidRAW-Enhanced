@@ -34,15 +34,6 @@ pub const GEOMETRY_KEYS: &[&str] = &[
     "lensVignetteEnabled",
 ];
 
-pub fn calculate_thumbnail_base_hash(adjustments: &serde_json::Value) -> u64 {
-    let mut hasher = DefaultHasher::new();
-
-    calculate_geometry_hash(adjustments).hash(&mut hasher);
-    calculate_effects_hash(adjustments).hash(&mut hasher);
-
-    hasher.finish()
-}
-
 fn hash_effect_keys(adjustments: &serde_json::Value, keys: &[&str], hasher: &mut DefaultHasher) {
     for key in keys {
         if let Some(val) = adjustments.get(*key) {
@@ -108,7 +99,9 @@ fn hash_ai_base(adjustments: &serde_json::Value, hasher: &mut DefaultHasher) {
     }
 }
 
-pub fn calculate_geometry_hash(adjustments: &serde_json::Value) -> u64 {
+/// Identifies the patched base (`image_loader::prepare_base_image`): AI Denoise, Super
+/// Resolution and the AI patches.
+pub fn calculate_patch_hash(adjustments: &serde_json::Value) -> u64 {
     let mut hasher = DefaultHasher::new();
 
     hash_ai_base(adjustments, &mut hasher);
@@ -116,6 +109,14 @@ pub fn calculate_geometry_hash(adjustments: &serde_json::Value) -> u64 {
     if let Some(patches) = adjustments.get("aiPatches") {
         patches.to_string().hash(&mut hasher);
     }
+
+    hasher.finish()
+}
+
+pub fn calculate_geometry_hash(adjustments: &serde_json::Value) -> u64 {
+    let mut hasher = DefaultHasher::new();
+
+    calculate_patch_hash(adjustments).hash(&mut hasher);
 
     adjustments["orientationSteps"].as_u64().hash(&mut hasher);
 
@@ -392,7 +393,7 @@ pub fn clear_image_caches(state: tauri::State<AppState>) {
 }
 
 pub fn clear_preview_stage_caches(state: &AppState) {
-    for cache in [&state.patched_warped_cache, &state.working_cache] {
+    for cache in [&state.patched_cache, &state.working_cache] {
         *cache.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
 }

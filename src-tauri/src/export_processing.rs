@@ -32,7 +32,7 @@ use crate::file_management::{
 use crate::formats::is_raw_file;
 use crate::image_loader::{BaseSize, load_base_image_from_bytes, prepare_base_image};
 use crate::image_processing::{
-    AllAdjustments, Crop, GpuContext, RenderOutputPrecision, RenderRequest, apply_geometry_warp,
+    AllAdjustments, Crop, GeometryParams, GpuContext, RenderOutputPrecision, RenderRequest,
     get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
     process_and_get_dynamic_image_with_precision, resolve_tonemapper_override_from_handle,
 };
@@ -1033,11 +1033,12 @@ impl Drop for ExportTaskGuard {
     }
 }
 
-/// A prepared base shrunk to the GPU limit and warped, plus the edit's GPU
+/// A prepared base shrunk to the GPU limit, plus the edit's GPU warp,
 /// effects and frame scaled onto it, with the scale from decoded-photo
 /// pixels (crop, masks) onto it.
 struct ExportFrame<'a> {
     image: Cow<'a, DynamicImage>,
+    warp: Option<GeometryParams>,
     effects: Effects,
     frame: Frame,
     scale: f32,
@@ -1047,7 +1048,9 @@ struct ExportFrame<'a> {
 impl ExportFrame<'_> {
     /// The render of this frame; `id` identifies the photo and its edit.
     fn source(&self, id: u64) -> RenderSource<'_> {
-        RenderSource::new(&self.image, id, self.frame.clone()).with_effects(self.effects.clone())
+        RenderSource::new(&self.image, id, self.frame.clone())
+            .with_warp(self.warp)
+            .with_effects(self.effects.clone())
     }
 }
 
@@ -1063,10 +1066,10 @@ fn transform_for_export<'a>(
     let scale = base_scale * fit_scale;
     let render_extent = crate::motion_blur::render_extent(&fitted, 1.0);
     let adjustments = crate::image_processing::with_crop_scaled(js_adjustments, scale);
-    let image = apply_geometry_warp(fitted, &adjustments);
     ExportFrame {
-        effects: Effects::prepare(&adjustments, image.dimensions()),
-        image,
+        warp: crate::render_source::warp_of(&adjustments),
+        effects: Effects::prepare(&adjustments, fitted.dimensions()),
+        image: fitted,
         frame: Frame::from_adjustments(&adjustments),
         scale,
         render_extent,
@@ -2475,7 +2478,13 @@ pub async fn estimate_export_sizes(
         drop(cached_preview_lock);
         let preview = match cached {
             Some(preview) => preview,
-            None => prepare_preview_source(&state, &loaded_image, &adjustments_clone, preview_dim)?,
+            None => prepare_preview_source(
+                &state,
+                &context,
+                &loaded_image,
+                &adjustments_clone,
+                preview_dim,
+            )?,
         };
         let (scale, unscaled_crop_offset) = (preview.scale, preview.unscaled_crop_offset);
         let source = preview.render_source();
@@ -2606,9 +2615,8 @@ pub async fn estimate_export_sizes(
             .unwrap_or(serde_json::Value::Null);
         }
 
-        let effected_image = apply_geometry_warp(&original_image, &js_adjustments);
         let source = RenderSource::edited(
-            &effected_image,
+            &original_image,
             calculate_full_job_hash(&source_path_str, &js_adjustments).wrapping_add(1),
             &js_adjustments,
         )
