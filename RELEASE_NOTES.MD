@@ -5,6 +5,13 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.85.0-dev-gpu-compute-foundation — 2026-11-17
+
+### Masks
+
+- Grow and Feather on AI, Color and Luminance masks are several times
+  faster on large photos. Masks look exactly as before.
+
 ## 1.84.0-dev-gpu-compute-foundation — 2026-11-17
 
 ### Develop

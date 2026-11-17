@@ -256,86 +256,114 @@ fn source_pixel_at(warped: &DynamicImage, x: f64, y: f64) -> Option<Rgba<u8>> {
         .then(|| warped.get_pixel(x as u32, y as u32))
 }
 
-fn grayscale_dilate(image: &GrayImage, k: u8) -> GrayImage {
+/// Grows (`pick` = `max`) or shrinks (`min`) a mask: each pixel takes the `pick` of the
+/// square of side `2k + 1` around it, clipped at the image edges. A row pass then a column
+/// pass, each over rows in parallel (upstream `15a9ff2e`); the result is exact, so the
+/// order of the work does not matter.
+fn grayscale_square_filter(image: &GrayImage, k: u8, pick: fn(u8, u8) -> u8) -> GrayImage {
     let (width, height) = image.dimensions();
     if width == 0 || height == 0 {
         return image.clone();
     }
-    let w = width as usize;
-    let h = height as usize;
-    let r = k as i32;
-    let src = image.as_raw();
+    let (w, h, r) = (width as usize, height as usize, k as usize);
+    let window = |center: usize, len: usize| center.saturating_sub(r)..=(center + r).min(len - 1);
 
-    let mut temp = vec![0u8; w * h];
-    let mut out = vec![0u8; w * h];
-
-    for y in 0..h {
-        let row_offset = y * w;
-        for x in 0..w {
-            let mut max_val = 0;
-            let start = (x as i32 - r).max(0) as usize;
-            let end = (x as i32 + r).min((w - 1) as i32) as usize;
-            for xi in start..=end {
-                max_val = max_val.max(src[row_offset + xi]);
+    let mut rows = vec![0u8; w * h];
+    rows.par_chunks_exact_mut(w)
+        .zip(image.as_raw().par_chunks_exact(w))
+        .for_each(|(out, row)| {
+            for (x, value) in out.iter_mut().enumerate() {
+                let taps = &row[window(x, w)];
+                *value = taps[1..].iter().fold(taps[0], |a, &b| pick(a, b));
             }
-            temp[row_offset + x] = max_val;
-        }
-    }
+        });
 
-    for x in 0..w {
-        for y in 0..h {
-            let mut max_val = 0;
-            let start = (y as i32 - r).max(0) as usize;
-            let end = (y as i32 + r).min((h - 1) as i32) as usize;
-            for yi in start..=end {
-                max_val = max_val.max(temp[yi * w + x]);
+    let mut filtered = vec![0u8; w * h];
+    filtered
+        .par_chunks_exact_mut(w)
+        .enumerate()
+        .for_each(|(y, out)| {
+            let taps = window(y, h);
+            out.copy_from_slice(&rows[taps.start() * w..][..w]);
+            for yi in taps.skip(1) {
+                for (o, &t) in out.iter_mut().zip(&rows[yi * w..][..w]) {
+                    *o = pick(*o, t);
+                }
             }
-            out[y * w + x] = max_val;
-        }
-    }
+        });
 
-    GrayImage::from_raw(width, height, out).unwrap()
+    GrayImage::from_raw(width, height, filtered).expect("mask buffer size")
 }
 
-fn grayscale_erode(image: &GrayImage, k: u8) -> GrayImage {
-    let (width, height) = image.dimensions();
-    if width == 0 || height == 0 {
-        return image.clone();
+/// imageproc's `gaussian_blur_f32` on a mask, computed the same way (its kernel cut at 2σ,
+/// edges clamped, the row pass stored as `u8`, values truncated), so the result is
+/// bit-identical, but over rows in parallel (upstream `15a9ff2e`'s `gaussian_blur_mask`).
+fn gaussian_blur_mask(mask: &GrayImage, sigma: f32) -> GrayImage {
+    let (w, h) = (mask.width() as usize, mask.height() as usize);
+    if w == 0 || h == 0 {
+        return mask.clone();
     }
-    let w = width as usize;
-    let h = height as usize;
-    let r = k as i32;
-    let src = image.as_raw();
+    let kernel = gaussian_kernel(sigma);
+    let radius = kernel.len() / 2;
+    let tap = |center: usize, offset: usize, len: usize| {
+        (center + offset).saturating_sub(radius).min(len - 1)
+    };
 
-    let mut temp = vec![0u8; w * h];
-    let mut out = vec![0u8; w * h];
-
-    for y in 0..h {
-        let row_offset = y * w;
-        for x in 0..w {
-            let mut min_val = 255;
-            let start = (x as i32 - r).max(0) as usize;
-            let end = (x as i32 + r).min((w - 1) as i32) as usize;
-            for xi in start..=end {
-                min_val = min_val.min(src[row_offset + xi]);
+    let mut rows = vec![0u8; w * h];
+    rows.par_chunks_exact_mut(w)
+        .zip(mask.as_raw().par_chunks_exact(w))
+        .for_each(|(out, row)| {
+            for (x, value) in out.iter_mut().enumerate() {
+                let mut acc = 0.0f32;
+                for (i, k) in kernel.iter().enumerate() {
+                    acc += row[tap(x, i, w)] as f32 * k;
+                }
+                *value = saturate_u8(acc);
             }
-            temp[row_offset + x] = min_val;
-        }
-    }
+        });
 
-    for x in 0..w {
-        for y in 0..h {
-            let mut min_val = 255;
-            let start = (y as i32 - r).max(0) as usize;
-            let end = (y as i32 + r).min((h - 1) as i32) as usize;
-            for yi in start..=end {
-                min_val = min_val.min(temp[yi * w + x]);
+    let mut blurred = vec![0u8; w * h];
+    blurred
+        .par_chunks_exact_mut(w)
+        .enumerate()
+        .for_each(|(y, out)| {
+            let mut acc = vec![0.0f32; w];
+            for (i, k) in kernel.iter().enumerate() {
+                for (a, &v) in acc.iter_mut().zip(&rows[tap(y, i, h) * w..][..w]) {
+                    *a += v as f32 * k;
+                }
             }
-            out[y * w + x] = min_val;
-        }
-    }
+            for (value, a) in out.iter_mut().zip(acc) {
+                *value = saturate_u8(a);
+            }
+        });
 
-    GrayImage::from_raw(width, height, out).unwrap()
+    GrayImage::from_raw(w as u32, h as u32, blurred).expect("mask buffer size")
+}
+
+/// imageproc's normalised Gaussian kernel: radius `ceil(2σ)`, the same density formula.
+fn gaussian_kernel(sigma: f32) -> Vec<f32> {
+    let radius = (2.0 * sigma).ceil() as usize;
+    let pdf =
+        |x: f32| (sigma * (2.0 * PI).sqrt()).recip() * (-x.powi(2) / (2.0 * sigma.powi(2))).exp();
+    let mut kernel = vec![0.0f32; 2 * radius + 1];
+    for i in 0..=radius {
+        let value = pdf(i as f32);
+        kernel[radius + i] = value;
+        kernel[radius - i] = value;
+    }
+    let sum: f32 = kernel.iter().sum();
+    kernel.iter_mut().for_each(|k| *k /= sum);
+    kernel
+}
+
+/// imageproc's `Clamp<f32> for u8`: truncates, saturating at 0 and 255 (NaN gives 0).
+fn saturate_u8(value: f32) -> u8 {
+    if value < 255.0 {
+        if value > 0.0 { value as u8 } else { 0 }
+    } else {
+        255
+    }
 }
 
 fn apply_grow_and_feather(mask: &mut GrayImage, grow: f32, feather: f32, width: u32, height: u32) {
@@ -348,11 +376,8 @@ fn apply_grow_and_feather(mask: &mut GrayImage, grow: f32, feather: f32, width: 
         let amount = grow_pixels.abs().round() as u8;
 
         if amount > 0 {
-            if grow_pixels > 0.0 {
-                *mask = grayscale_dilate(mask, amount);
-            } else {
-                *mask = grayscale_erode(mask, amount);
-            }
+            let pick: fn(u8, u8) -> u8 = if grow_pixels > 0.0 { u8::max } else { u8::min };
+            *mask = grayscale_square_filter(mask, amount, pick);
         }
     }
 
@@ -361,7 +386,7 @@ fn apply_grow_and_feather(mask: &mut GrayImage, grow: f32, feather: f32, width: 
         let sigma = (feather / 100.0) * base_dimension * MAX_FEATHER_SIGMA_PERCENTAGE;
 
         if sigma > 0.01 {
-            *mask = imageproc::filter::gaussian_blur_f32(mask, sigma);
+            *mask = gaussian_blur_mask(mask, sigma);
         }
     }
 }
@@ -1643,10 +1668,73 @@ pub fn get_cached_or_generate_mask(
 
 #[cfg(test)]
 mod tests {
-    use super::{MaskDefinition, ai_depth_mask_weight, generate_luminance_bitmap, mask_cache_key};
+    use super::{
+        MaskDefinition, ai_depth_mask_weight, gaussian_blur_mask, generate_luminance_bitmap,
+        grayscale_square_filter, mask_cache_key,
+    };
     use crate::ai_processing::AiDepthMaskParameters;
-    use image::{DynamicImage, RgbImage};
+    use image::{DynamicImage, GrayImage, RgbImage};
     use serde_json::json;
+
+    /// Masks that stress a feather or grow: hard edges, a thin line, a lone dot, content at
+    /// the borders, noise, and images narrower than the kernel.
+    fn test_masks() -> Vec<GrayImage> {
+        let mut seed = 0x2545_f491_u32;
+        let mut noise = move || {
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (seed >> 24) as u8
+        };
+        vec![
+            GrayImage::from_fn(97, 61, |x, _| image::Luma([if x < 40 { 255 } else { 0 }])),
+            GrayImage::from_fn(97, 61, |x, y| image::Luma([if x == y { 255 } else { 0 }])),
+            GrayImage::from_fn(64, 64, |x, y| {
+                image::Luma([if (x, y) == (31, 32) { 255 } else { 0 }])
+            }),
+            GrayImage::from_fn(50, 40, |x, y| {
+                image::Luma([if x == 0 || y == 39 { 255 } else { 17 }])
+            }),
+            GrayImage::from_fn(83, 57, |_, _| image::Luma([noise()])),
+            GrayImage::from_fn(3, 2, |x, y| image::Luma([(x * 90 + y * 40) as u8])),
+            GrayImage::from_pixel(1, 1, image::Luma([200])),
+        ]
+    }
+
+    #[test]
+    fn mask_feather_matches_imageproc_bit_for_bit() {
+        for (n, mask) in test_masks().iter().enumerate() {
+            for sigma in [0.02, 0.4, 1.0, 2.5, 7.9, 40.0] {
+                let expected = imageproc::filter::gaussian_blur_f32(mask, sigma);
+                assert_eq!(
+                    gaussian_blur_mask(mask, sigma).into_raw(),
+                    expected.into_raw(),
+                    "mask {n}, sigma {sigma}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn mask_grow_and_shrink_take_the_square_window_around_each_pixel() {
+        for (n, mask) in test_masks().iter().enumerate() {
+            let (w, h) = mask.dimensions();
+            for k in [1u8, 2, 5, 70] {
+                for (pick, name) in [(u8::max as fn(u8, u8) -> u8, "grow"), (u8::min, "shrink")] {
+                    let filtered = grayscale_square_filter(mask, k, pick);
+                    for (x, y, value) in filtered.enumerate_pixels() {
+                        let r = u32::from(k);
+                        let expected = (y.saturating_sub(r)..=(y + r).min(h - 1))
+                            .flat_map(|yi| {
+                                (x.saturating_sub(r)..=(x + r).min(w - 1))
+                                    .map(move |xi| mask.get_pixel(xi, yi)[0])
+                            })
+                            .reduce(pick)
+                            .unwrap();
+                        assert_eq!(value[0], expected, "mask {n}, {name} {k}, ({x}, {y})");
+                    }
+                }
+            }
+        }
+    }
 
     /// A one-row grey ramp: pixel `x` has the tone `x` (0–255).
     fn grey_ramp() -> DynamicImage {
