@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -31,7 +32,7 @@ use crate::file_management::{
 use crate::formats::is_raw_file;
 use crate::image_loader::{BaseSize, load_base_image_from_bytes, prepare_base_image};
 use crate::image_processing::{
-    AllAdjustments, Crop, GpuContext, RenderOutputPrecision, RenderRequest, downscale_f32_image,
+    AllAdjustments, Crop, GpuContext, RenderOutputPrecision, RenderRequest,
     get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
     process_and_get_dynamic_image_with_precision, resolve_tonemapper_override_from_handle,
 };
@@ -42,9 +43,10 @@ use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::tiff_metadata::{TiffSamples, encode_tiff_with_metadata};
 
 use crate::cache_utils::{calculate_full_job_hash, calculate_transform_hash};
+use crate::render_source::{Frame, RenderSource};
 use crate::{
-    apply_all_transformations, generate_transformed_preview, get_cached_or_generate_mask,
-    hydrate_adjustments, load_settings, resolve_warped_image_for_masks,
+    apply_warp_and_effects, get_cached_or_generate_mask, hydrate_adjustments, load_settings,
+    prepare_preview_source, resolve_warped_image_for_masks,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -1031,13 +1033,21 @@ impl Drop for ExportTaskGuard {
     }
 }
 
-/// A prepared base shrunk to the GPU limit and transformed by the edit, with
-/// the scale from decoded-photo pixels (crop, masks) onto it.
+/// A prepared base shrunk to the GPU limit, warped and with its spatial
+/// effects, plus the edit's frame scaled onto it, with the scale from
+/// decoded-photo pixels (crop, masks) onto it.
 struct ExportFrame<'a> {
     image: Cow<'a, DynamicImage>,
-    crop_offset: (f32, f32),
+    frame: Frame,
     scale: f32,
     render_extent: f32,
+}
+
+impl ExportFrame<'_> {
+    /// The render of this frame; `id` identifies the photo and its edit.
+    fn source(&self, id: u64) -> RenderSource<'_> {
+        RenderSource::new(&self.image, id, self.frame.clone())
+    }
 }
 
 /// `base_scale` is the prepared base's size over the decoded photo's: 2 with
@@ -1052,10 +1062,9 @@ fn transform_for_export<'a>(
     let scale = base_scale * fit_scale;
     let render_extent = crate::motion_blur::render_extent(&fitted, 1.0);
     let adjustments = crate::image_processing::with_crop_scaled(js_adjustments, scale);
-    let (image, crop_offset) = apply_all_transformations(fitted, &adjustments);
     ExportFrame {
-        image,
-        crop_offset,
+        image: apply_warp_and_effects(fitted, &adjustments),
+        frame: Frame::from_adjustments(&adjustments),
         scale,
         render_extent,
     }
@@ -1091,7 +1100,9 @@ fn process_image_for_export_pipeline(
     output_precision: RenderOutputPrecision,
 ) -> Result<DynamicImage, String> {
     let frame = transform_for_export(base_image, base_scale, js_adjustments, context);
-    let (img_w, img_h) = frame.image.dimensions();
+    let source = frame.source(calculate_full_job_hash(path, js_adjustments));
+    let crop_offset = source.crop_offset();
+    let (img_w, img_h) = source.size();
 
     let mask_definitions: Vec<MaskDefinition> = js_adjustments
         .get("masks")
@@ -1107,7 +1118,7 @@ fn process_image_for_export_pipeline(
                 img_w,
                 img_h,
                 frame.scale,
-                frame.crop_offset,
+                crop_offset,
                 warped_image.as_deref(),
             )
         })
@@ -1121,13 +1132,10 @@ fn process_image_for_export_pipeline(
     let lut_path = js_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(state, p).ok());
 
-    let unique_hash = calculate_full_job_hash(path, js_adjustments);
-
     process_and_get_dynamic_image_with_precision(
         context,
         state,
-        frame.image.as_ref(),
-        unique_hash,
+        &source,
         RenderRequest {
             adjustments: all_adjustments,
             mask_bitmaps: &mask_bitmaps,
@@ -1137,7 +1145,7 @@ fn process_image_for_export_pipeline(
             motion_blur: crate::motion_blur::MotionBlurs::new(
                 js_adjustments,
                 (img_w, img_h),
-                frame.crop_offset,
+                crop_offset,
                 frame.render_extent,
             ),
         },
@@ -1449,9 +1457,10 @@ fn export_masks_for_image(
 ) -> Result<(), String> {
     ensure_export_not_cancelled(cancellation_token)?;
     let frame = transform_for_export(base_image, base_scale, js_adjustments, context);
-    let transformed_image = &frame.image;
+    let source = frame.source(calculate_full_job_hash(source_path_str, js_adjustments));
+    let crop_offset = source.crop_offset();
     ensure_export_not_cancelled(cancellation_token)?;
-    let (img_w, img_h) = transformed_image.dimensions();
+    let (img_w, img_h) = source.size();
     let mask_definitions: Vec<MaskDefinition> = js_adjustments
         .get("masks")
         .and_then(|m| serde::Deserialize::deserialize(m).ok())
@@ -1466,7 +1475,7 @@ fn export_masks_for_image(
             img_w,
             img_h,
             frame.scale,
-            frame.crop_offset,
+            crop_offset,
             warped_image.as_deref(),
         ) {
             mask_bitmaps.push(bitmap);
@@ -1481,7 +1490,6 @@ fn export_masks_for_image(
         crate::baseline_exposure::apply_natural_exposure(&mut all_adjustments, source_path_str);
         let lut_path = js_adjustments["lutPath"].as_str();
         let lut = lut_path.and_then(|p| get_or_load_lut(state, p).ok());
-        let unique_hash = calculate_full_job_hash(source_path_str, js_adjustments);
         let output_dir = output_path_obj.parent().unwrap_or(output_path_obj);
         let stem = output_path_obj
             .file_stem()
@@ -1501,8 +1509,7 @@ fn export_masks_for_image(
             let processed = process_and_get_dynamic_image_with_precision(
                 context,
                 state,
-                transformed_image.as_ref(),
-                unique_hash,
+                &source,
                 RenderRequest {
                     adjustments: single_adjustments,
                     mask_bitmaps: &single_bitmaps,
@@ -1580,7 +1587,6 @@ fn export_masks_for_image(
 
 fn export_adjustments_as_lut(
     js_adjustments: &Value,
-    source_path_str: &str,
     context: &Arc<GpuContext>,
     state: &tauri::State<AppState>,
     app_handle: &tauri::AppHandle,
@@ -1611,13 +1617,17 @@ fn export_adjustments_as_lut(
 
     let lut_path = js_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(state, p).ok());
-    let unique_hash = calculate_full_job_hash(source_path_str, js_adjustments);
+    // The identity image depends only on its size, so its id is not the photo's.
+    let identity_id = {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        ("identity LUT image", lut_size).hash(&mut hasher);
+        hasher.finish()
+    };
 
     let processed_lut = process_and_get_dynamic_image(
         context,
         state,
-        &identity_image,
-        unique_hash,
+        &RenderSource::plain(&identity_image, identity_id),
         RenderRequest {
             adjustments: all_adjustments,
             mask_bitmaps: &[],
@@ -2033,7 +2043,6 @@ pub(crate) async fn export_images_impl(
                     if extension == "cube" {
                         let cube_bytes = export_adjustments_as_lut(
                             &js_adjustments,
-                            &source_path_str,
                             &context_clone,
                             &state,
                             &app_handle_clone,
@@ -2456,31 +2465,19 @@ pub async fn estimate_export_sizes(
         let cached_preview_lock = state.cached_preview.lock().unwrap();
         let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
 
-        let (preview_image, scale, unscaled_crop_offset) = if let Some(cached) =
-            &*cached_preview_lock
-        {
-            if cached.transform_hash == new_transform_hash && cached.preview_dim == preview_dim {
-                let img = Arc::clone(&cached.image);
-                let s = cached.scale;
-                let offset = cached.unscaled_crop_offset;
-                drop(cached_preview_lock);
-                let owned_img = Arc::try_unwrap(img).unwrap_or_else(|arc| (*arc).clone());
-                (owned_img, s, offset)
-            } else {
-                drop(cached_preview_lock);
-                generate_transformed_preview(
-                    &state,
-                    &loaded_image,
-                    &adjustments_clone,
-                    preview_dim,
-                )?
-            }
-        } else {
-            drop(cached_preview_lock);
-            generate_transformed_preview(&state, &loaded_image, &adjustments_clone, preview_dim)?
+        let cached = cached_preview_lock
+            .as_ref()
+            .filter(|c| c.transform_hash == new_transform_hash && c.preview_dim == preview_dim)
+            .map(|c| c.preview.clone());
+        drop(cached_preview_lock);
+        let preview = match cached {
+            Some(preview) => preview,
+            None => prepare_preview_source(&state, &loaded_image, &adjustments_clone, preview_dim)?,
         };
+        let (scale, unscaled_crop_offset) = (preview.scale, preview.unscaled_crop_offset);
+        let source = preview.render_source();
 
-        let (img_w, img_h) = preview_image.dimensions();
+        let (img_w, img_h) = source.size();
         let mask_definitions: Vec<MaskDefinition> = adjustments_clone
             .get("masks")
             .and_then(|m| serde::Deserialize::deserialize(m).ok())
@@ -2515,14 +2512,11 @@ pub async fn estimate_export_sizes(
         let lut = adjustments_clone["lutPath"]
             .as_str()
             .and_then(|p| get_or_load_lut(&state, p).ok());
-        let unique_hash =
-            calculate_full_job_hash(&loaded_image.path, &adjustments_clone).wrapping_add(1);
 
         let processed_preview = process_and_get_dynamic_image_with_precision(
             &context,
             &state,
-            &preview_image,
-            unique_hash,
+            &source,
             RenderRequest {
                 adjustments: all_adjustments,
                 mask_bitmaps: &mask_bitmaps,
@@ -2544,10 +2538,9 @@ pub async fn estimate_export_sizes(
             encode_image_to_bytes(&processed_preview, &output_format, &export_settings, None)?;
         let preview_byte_size = preview_bytes.len();
 
-        let (transformed_full_res, _) =
-            apply_all_transformations(&loaded_image.image, &adjustments_clone);
+        // The warp and the effects keep the size, so only the frame decides it.
         let (full_w, full_h) = scale_to_export_pixels(
-            transformed_full_res.dimensions(),
+            Frame::from_adjustments(&adjustments_clone).size(loaded_image.image.dimensions()),
             loaded_image.image.dimensions(),
             &adjustments_clone,
             &context,
@@ -2610,17 +2603,16 @@ pub async fn estimate_export_sizes(
             .unwrap_or(serde_json::Value::Null);
         }
 
-        let (transformed_shrunk_res, unscaled_crop_offset) =
-            apply_all_transformations(Cow::Borrowed(&original_image), &js_adjustments);
-        let (shrunk_w, shrunk_h) = transformed_shrunk_res.dimensions();
-
-        let preview_base = if shrunk_w > ESTIMATE_DIM || shrunk_h > ESTIMATE_DIM {
-            downscale_f32_image(transformed_shrunk_res.as_ref(), ESTIMATE_DIM, ESTIMATE_DIM)
-        } else {
-            transformed_shrunk_res.into_owned()
-        };
-
-        let (preview_w, preview_h) = preview_base.dimensions();
+        let effected_image = apply_warp_and_effects(&original_image, &js_adjustments);
+        let source = RenderSource::edited(
+            &effected_image,
+            calculate_full_job_hash(&source_path_str, &js_adjustments).wrapping_add(1),
+            &js_adjustments,
+        )
+        .fitted((ESTIMATE_DIM, ESTIMATE_DIM));
+        let unscaled_crop_offset = source.crop_offset();
+        let (shrunk_w, shrunk_h) = source.framed_size();
+        let (preview_w, preview_h) = source.size();
         let gpu_scale = if shrunk_w > 0 {
             preview_w as f32 / shrunk_w as f32
         } else {
@@ -2661,14 +2653,11 @@ pub async fn estimate_export_sizes(
         let lut = js_adjustments["lutPath"]
             .as_str()
             .and_then(|p| get_or_load_lut(&state, p).ok());
-        let unique_hash =
-            calculate_full_job_hash(&source_path_str, &js_adjustments).wrapping_add(1);
 
         let processed_preview = process_and_get_dynamic_image_with_precision(
             &context,
             &state,
-            &preview_base,
-            unique_hash,
+            &source,
             RenderRequest {
                 adjustments: all_adjustments,
                 mask_bitmaps: &mask_bitmaps,

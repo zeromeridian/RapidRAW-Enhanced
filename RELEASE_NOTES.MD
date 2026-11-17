@@ -5,6 +5,22 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.79.0-dev-gpu-compute-foundation — 2026-11-16
+
+### Develop
+
+- Orientation, flips, straightening and the crop are now applied on the
+  graphics card for the Develop preview, thumbnails, presets and
+  exports, instead of on the processor. Photos look the same; rotating
+  or cropping a large photo no longer copies it through the processor
+  first. If the graphics card cannot do it (for example when it runs
+  out of memory on a very large export), the processor takes over as
+  before.
+- The interactive preview while dragging a slider no longer keeps a
+  second, smaller copy of the photo in memory.
+- Export size estimates for the photo being edited no longer render the
+  full-size photo just to measure it.
+
 ## 1.78.0-dev-lightroom-rename — 2026-11-16
 
 ### Library

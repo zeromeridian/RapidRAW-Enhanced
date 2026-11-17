@@ -12,6 +12,7 @@ use wgpu::util::{DeviceExt, TextureDataOrder};
 
 use crate::image_processing::{AllAdjustments, GpuContext, MAX_MASKS};
 use crate::lut_processing::Lut;
+use crate::render_source::RenderSource;
 use crate::{AppState, GpuImageCache};
 
 #[derive(Clone, Copy, Debug)]
@@ -483,12 +484,17 @@ pub fn get_or_init_gpu_context(
         limits,
         display: Arc::new(std::sync::Mutex::new(display_opt)),
         pipelines: Arc::new(std::sync::OnceLock::new()),
+        compute: Arc::new(std::sync::OnceLock::new()),
     };
+    let warm_context = new_context.clone();
+    std::thread::spawn(move || {
+        warm_context.compute().warm(&warm_context.device);
+    });
     *context_lock = Some(new_context.clone());
     Ok(new_context)
 }
 
-fn read_texture_data_roi(
+pub(crate) fn read_texture_data_roi(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
@@ -560,11 +566,6 @@ fn read_texture_data_roi(
         }
         Ok(unpadded_data)
     }
-}
-
-fn to_rgba_f16(img: &DynamicImage) -> Vec<f16> {
-    let rgba_f32 = img.to_rgba32f();
-    rgba_f32.into_raw().into_iter().map(f16::from_f32).collect()
 }
 
 #[repr(C)]
@@ -1382,7 +1383,6 @@ impl GpuProcessor {
     fn motion_blurred(
         &self,
         input: &GpuImageCache,
-        base_image: &DynamicImage,
         request: &RenderRequest,
         mask_view: &wgpu::TextureView,
     ) -> Result<Option<Arc<MotionBlurred>>, String> {
@@ -1420,7 +1420,16 @@ impl GpuProcessor {
             {
                 Some((_, grain)) => *grain,
                 None => {
-                    let grain = crate::motion_blur::estimate_grain(base_image, is_raw == 1);
+                    let grain = crate::motion_blur::estimate_grain(
+                        &self.context,
+                        &input.texture_view,
+                        (input.width, input.height),
+                        is_raw == 1,
+                    )
+                    .unwrap_or_else(|error| {
+                        log::warn!("Motion blur grain estimate failed: {}", error);
+                        0.0
+                    });
                     if grains.len() >= MOTION_CACHE_ENTRIES {
                         grains.remove(0);
                     }
@@ -2038,16 +2047,14 @@ impl GpuProcessor {
 pub fn process_and_get_dynamic_image(
     context: &GpuContext,
     state: &tauri::State<AppState>,
-    base_image: &DynamicImage,
-    transform_hash: u64,
+    source: &RenderSource,
     request: RenderRequest,
     caller_id: &str,
 ) -> Result<DynamicImage, String> {
     process_and_get_dynamic_image_inner(
         context,
         state,
-        base_image,
-        transform_hash,
+        source,
         request,
         caller_id,
         RenderOutputPrecision::EightBit,
@@ -2059,8 +2066,7 @@ pub fn process_and_get_dynamic_image(
 pub fn process_and_get_dynamic_image_with_precision(
     context: &GpuContext,
     state: &tauri::State<AppState>,
-    base_image: &DynamicImage,
-    transform_hash: u64,
+    source: &RenderSource,
     request: RenderRequest,
     caller_id: &str,
     output_precision: RenderOutputPrecision,
@@ -2068,8 +2074,7 @@ pub fn process_and_get_dynamic_image_with_precision(
     process_and_get_dynamic_image_inner(
         context,
         state,
-        base_image,
-        transform_hash,
+        source,
         request,
         caller_id,
         output_precision,
@@ -2078,12 +2083,10 @@ pub fn process_and_get_dynamic_image_with_precision(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn process_and_get_dynamic_image_with_analytics(
     context: &GpuContext,
     state: &tauri::State<AppState>,
-    base_image: &DynamicImage,
-    transform_hash: u64,
+    source: &RenderSource,
     request: RenderRequest,
     caller_id: &str,
     output_to_display: bool,
@@ -2092,14 +2095,36 @@ pub fn process_and_get_dynamic_image_with_analytics(
     process_and_get_dynamic_image_inner(
         context,
         state,
-        base_image,
-        transform_hash,
+        source,
         request,
         caller_id,
         RenderOutputPrecision::EightBit,
         output_to_display,
         analytics_config,
     )
+}
+
+/// A compute-only context for tests, or `None` on machines without a usable GPU adapter.
+#[cfg(test)]
+pub(crate) fn headless_gpu_context() -> Option<GpuContext> {
+    let instance = wgpu::Instance::default();
+    let adapter =
+        pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
+            .ok()?;
+    let limits = adapter.limits();
+    let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+        required_limits: limits.clone(),
+        ..Default::default()
+    }))
+    .ok()?;
+    Some(GpuContext {
+        device: Arc::new(device),
+        queue: Arc::new(queue),
+        limits,
+        display: Default::default(),
+        pipelines: Default::default(),
+        compute: Default::default(),
+    })
 }
 
 /// How much `fit_to_gpu` shrinks an image of this size: 1 when it fits.
@@ -2142,8 +2167,7 @@ pub fn fit_to_gpu<'a>(
 fn process_and_get_dynamic_image_inner(
     context: &GpuContext,
     state: &tauri::State<AppState>,
-    base_image: &DynamicImage,
-    transform_hash: u64,
+    source: &RenderSource,
     request: RenderRequest,
     caller_id: &str,
     output_precision: RenderOutputPrecision,
@@ -2151,15 +2175,16 @@ fn process_and_get_dynamic_image_inner(
     analytics_config: Option<crate::AnalyticsConfig>,
 ) -> Result<DynamicImage, String> {
     let start_time = Instant::now();
-    let (width, height) = base_image.dimensions();
+    let (width, height) = source.size();
+    let source_size = source.image.dimensions();
     let device = &context.device;
     let queue = &context.queue;
 
     let max_dim = context.limits.max_texture_dimension_2d;
-    if width > max_dim || height > max_dim {
+    if width.max(source_size.0) > max_dim || height.max(source_size.1) > max_dim {
         return Err(format!(
             "Image dimensions ({}x{}) exceed the GPU texture limit ({}). The image could not be processed; try reducing its dimensions.",
-            width, height, max_dim
+            source_size.0, source_size.1, max_dim
         ));
     }
 
@@ -2204,16 +2229,10 @@ fn process_and_get_dynamic_image_inner(
     let processor = &processor_state.processor;
 
     let mut cache_lock = state.gpu_image_cache.lock().unwrap();
-    let mut needs_new_cache = false;
-
-    if let Some(cache) = &*cache_lock {
-        if cache.transform_hash != transform_hash || cache.width != width || cache.height != height
-        {
-            needs_new_cache = true;
-        }
-    } else {
-        needs_new_cache = true;
-    }
+    let source_key = source.key();
+    let needs_new_cache = !cache_lock.as_ref().is_some_and(|cache| {
+        cache.source_key == source_key && cache.width == width && cache.height == height
+    });
 
     if needs_new_cache {
         let old_cache = cache_lock.take();
@@ -2224,35 +2243,21 @@ fn process_and_get_dynamic_image_inner(
             timeout: Some(std::time::Duration::from_millis(500)),
         });
 
-        let img_rgba_f16 = to_rgba_f16(base_image);
-        let texture_size = wgpu::Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        };
-        let texture = device.create_texture_with_data(
-            queue,
-            &wgpu::TextureDescriptor {
-                label: Some("Input Texture"),
-                size: texture_size,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba16Float,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                view_formats: &[],
-            },
-            TextureDataOrder::MipMajor,
-            bytemuck::cast_slice(&img_rgba_f16),
-        );
-        let texture_view = texture.create_view(&Default::default());
+        let input = source.render(context).unwrap_or_else(|error| {
+            log::warn!(
+                "GPU source stages failed for {} ({}); preparing the image on the CPU",
+                caller_id,
+                error
+            );
+            crate::gpu_compute::upload_image(context, &source.render_on_cpu())
+        });
 
         *cache_lock = Some(GpuImageCache {
-            texture,
-            texture_view,
+            texture: input.texture,
+            texture_view: input.view,
             width,
             height,
-            transform_hash,
+            source_key,
             generation: NEXT_INPUT_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
         });
     }
@@ -2260,7 +2265,7 @@ fn process_and_get_dynamic_image_inner(
     let cache = cache_lock.as_ref().unwrap();
 
     let mask_view = processor.mask_texture_view(request.mask_bitmaps, width, height);
-    let motion = processor.motion_blurred(cache, base_image, &request, &mask_view)?;
+    let motion = processor.motion_blurred(cache, &request, &mask_view)?;
     let (input, mask_view) = match &motion {
         Some(blurred) => (
             RenderInput {
@@ -2580,59 +2585,19 @@ mod tests {
         assert_eq!(flare_generation_amount(&adjustments), 0.65);
     }
 
-    /// A compute-only context, or `None` on machines without a usable GPU adapter.
-    fn headless_gpu_context() -> Option<crate::image_processing::GpuContext> {
-        let instance = wgpu::Instance::default();
-        let adapter =
-            pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
-                .ok()?;
-        let limits = adapter.limits();
-        let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-            required_limits: limits.clone(),
-            ..Default::default()
-        }))
-        .ok()?;
-        Some(crate::image_processing::GpuContext {
-            device: std::sync::Arc::new(device),
-            queue: std::sync::Arc::new(queue),
-            limits,
-            display: Default::default(),
-            pipelines: Default::default(),
-        })
-    }
+    use super::headless_gpu_context;
 
     fn upload_test_image(
         context: &crate::image_processing::GpuContext,
         image: &image::DynamicImage,
     ) -> crate::app_state::GpuImageCache {
-        use wgpu::util::DeviceExt;
-        let (width, height) = (image.width(), image.height());
-        let texture = context.device.create_texture_with_data(
-            &context.queue,
-            &wgpu::TextureDescriptor {
-                label: Some("Test Input Texture"),
-                size: wgpu::Extent3d {
-                    width,
-                    height,
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba16Float,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                view_formats: &[],
-            },
-            wgpu::util::TextureDataOrder::MipMajor,
-            bytemuck::cast_slice(&super::to_rgba_f16(image)),
-        );
-        let texture_view = texture.create_view(&Default::default());
+        let input = crate::gpu_compute::upload_image(context, image);
         crate::app_state::GpuImageCache {
-            texture,
-            texture_view,
-            width,
-            height,
-            transform_hash: 0,
+            texture: input.texture,
+            texture_view: input.view,
+            width: input.size.0,
+            height: input.size.1,
+            source_key: 0,
             generation: super::NEXT_INPUT_GENERATION
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
         }

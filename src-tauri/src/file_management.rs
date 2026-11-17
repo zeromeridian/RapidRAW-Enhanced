@@ -38,8 +38,8 @@ use crate::image_loader;
 use crate::image_processing::GpuContext;
 use crate::image_processing::{
     Crop, ImageMetadata, XmpStackMetadata, apply_coarse_rotation, apply_cpu_default_raw_processing,
-    apply_crop, apply_flip, apply_geometry_warp, apply_rotation, auto_results_to_json,
-    get_all_adjustments_from_json, perform_auto_analysis,
+    apply_geometry_warp, auto_results_to_json, get_all_adjustments_from_json,
+    perform_auto_analysis,
 };
 use crate::mask_generation::MaskDefinition;
 use crate::naming::{self, NamingSource};
@@ -3195,30 +3195,21 @@ pub fn generate_thumbnail_data(
             (base, total_scale)
         };
 
-        let rotation_degrees = meta.adjustments["rotation"].as_f64().unwrap_or(0.0) as f32;
-        let flip_horizontal = meta.adjustments["flipHorizontal"]
-            .as_bool()
-            .unwrap_or(false);
-        let flip_vertical = meta.adjustments["flipVertical"].as_bool().unwrap_or(false);
-
         let motion_extent = crate::motion_blur::render_extent(&processing_base, 1.0);
-        let flipped_image = apply_flip(Cow::Owned(processing_base), flip_horizontal, flip_vertical);
-        let rotated_image = apply_rotation(flipped_image, rotation_degrees);
-
-        let scaled_crop_json = if let Some(c) = &crop_data {
-            serde_json::to_value(Crop {
-                x: c.x * total_scale as f64,
-                y: c.y * total_scale as f64,
-                width: c.width * total_scale as f64,
-                height: c.height * total_scale as f64,
-            })
-            .unwrap_or(serde_json::Value::Null)
-        } else {
-            serde_json::Value::Null
-        };
-
-        let cropped_preview = apply_crop(rotated_image, &scaled_crop_json);
-        let (preview_w, preview_h) = cropped_preview.dimensions();
+        let mut hasher = DefaultHasher::new();
+        path_str.hash(&mut hasher);
+        meta.adjustments.to_string().hash(&mut hasher);
+        // The base is already coarse-rotated; flips, rotation and crop follow on the GPU.
+        let source = crate::render_source::RenderSource::new(
+            &processing_base,
+            hasher.finish(),
+            crate::render_source::Frame {
+                orientation_steps: 0,
+                crop: crop_data.map(|c| c.scaled(total_scale as f64)),
+                ..crate::render_source::Frame::from_adjustments(&meta.adjustments)
+            },
+        );
+        let (preview_w, preview_h) = source.size();
         let unscaled_crop_offset = crop_data.map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
 
         let mask_definitions: Vec<MaskDefinition> = meta
@@ -3263,16 +3254,10 @@ pub fn generate_thumbnail_data(
             None
         });
 
-        let mut hasher = DefaultHasher::new();
-        path_str.hash(&mut hasher);
-        meta.adjustments.to_string().hash(&mut hasher);
-        let unique_hash = hasher.finish();
-
         if let Ok(processed_image) = gpu_processing::process_and_get_dynamic_image(
             context,
             &state,
-            cropped_preview.as_ref(),
-            unique_hash,
+            &source,
             gpu_processing::RenderRequest {
                 adjustments: gpu_adjustments,
                 mask_bitmaps: &mask_bitmaps,
@@ -3293,7 +3278,7 @@ pub fn generate_thumbnail_data(
         ) {
             return Ok(processed_image);
         } else {
-            return Ok(cropped_preview.into_owned());
+            return Ok(source.render_on_cpu().into_owned());
         }
     }
 

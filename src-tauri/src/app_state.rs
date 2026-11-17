@@ -36,15 +36,29 @@ pub struct LoadedImage {
     pub is_raw: bool,
 }
 
+/// The editor preview before its frame (`lib::prepare_preview_source`): the working-size
+/// image with geometry and spatial effects, and the frame the GPU applies to it.
 #[derive(Clone)]
-pub struct CachedPreview {
+pub struct PreviewSource {
     pub image: Arc<DynamicImage>,
-    pub small_image: Arc<DynamicImage>,
-    pub transform_hash: u64,
+    pub id: u64,
+    pub frame: crate::render_source::Frame,
+    /// Preview pixels per photo pixel, for the framed (not fitted) preview.
     pub scale: f32,
     pub unscaled_crop_offset: (f32, f32),
+}
+
+impl PreviewSource {
+    pub fn render_source(&self) -> crate::render_source::RenderSource<'_> {
+        crate::render_source::RenderSource::new(&self.image, self.id, self.frame.clone())
+    }
+}
+
+#[derive(Clone)]
+pub struct CachedPreview {
+    pub preview: PreviewSource,
+    pub transform_hash: u64,
     pub preview_dim: u32,
-    pub interactive_divisor: f32,
 }
 
 pub struct GpuImageCache {
@@ -52,7 +66,8 @@ pub struct GpuImageCache {
     pub texture_view: TextureView,
     pub width: u32,
     pub height: u32,
-    pub transform_hash: u64,
+    /// `RenderSource::key` of the image and stages this texture holds.
+    pub source_key: u64,
     /// Unique per upload, so a processor can tell whether its cached blurs are of this
     /// texture (see `gpu_processing::BlurCacheKey`).
     pub generation: u64,
@@ -214,8 +229,6 @@ impl MetadataManager {
     }
 }
 
-pub type TransformedImageCache = (u64, Arc<DynamicImage>, f32, (f32, f32));
-
 pub struct AppState {
     /// `settings.json` as last loaded or saved; see `app_settings::settings_snapshot`.
     pub settings: Mutex<Option<Arc<crate::app_settings::AppSettings>>>,
@@ -257,7 +270,6 @@ pub struct AppState {
     pub patched_warped_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
     pub working_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
     pub effects_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
-    pub full_transformed_cache: Mutex<Option<TransformedImageCache>>,
     pub decoded_image_cache: Mutex<DecodedImageCache>,
     pub image_preloader: crate::image_preload::ImagePreloader,
     pub thumbnail_manager: Arc<ThumbnailManager>,

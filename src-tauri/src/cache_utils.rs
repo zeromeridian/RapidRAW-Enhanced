@@ -388,10 +388,6 @@ pub fn clear_preview_stage_caches(state: &AppState) {
     ] {
         *cache.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
-    *state
-        .full_transformed_cache
-        .lock()
-        .unwrap_or_else(|e| e.into_inner()) = None;
 }
 
 #[tauri::command]

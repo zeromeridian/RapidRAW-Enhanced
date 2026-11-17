@@ -16,7 +16,6 @@ use mozjpeg_rs::{Encoder, Preset};
 use tauri::{AppHandle, Manager, State};
 
 use crate::AppState;
-use crate::cache_utils::calculate_transform_hash;
 use crate::image_processing::{
     RenderRequest, get_all_adjustments_from_json, process_and_get_dynamic_image,
     resolve_tonemapper_override_from_handle,
@@ -594,8 +593,7 @@ pub fn remove_lut(app_handle: AppHandle, path: String) -> Result<Vec<LutEntry>, 
 fn render_lut_swatch(
     context: &crate::image_processing::GpuContext,
     state: &State<AppState>,
-    base_image: &DynamicImage,
-    transform_hash: u64,
+    source: &crate::render_source::RenderSource,
     adjustments: crate::image_processing::AllAdjustments,
     lut_path: &str,
 ) -> Option<String> {
@@ -603,8 +601,7 @@ fn render_lut_swatch(
     let processed = process_and_get_dynamic_image(
         context,
         state,
-        base_image,
-        transform_hash,
+        source,
         RenderRequest {
             adjustments,
             mask_bitmaps: &[],
@@ -646,8 +643,8 @@ pub fn generate_lut_previews(
     let is_raw = loaded_image.is_raw;
 
     let base_json = serde_json::json!({});
-    let (base_image, _scale, _offset) =
-        crate::generate_transformed_preview(&state, &loaded_image, &base_json, size)?;
+    let preview = crate::prepare_preview_source(&state, &loaded_image, &base_json, size)?;
+    let source = preview.render_source();
 
     let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
     let lut_json = serde_json::json!({
@@ -656,19 +653,11 @@ pub fn generate_lut_previews(
         "sectionVisibility": { "effects": true }
     });
     let adjustments = get_all_adjustments_from_json(&lut_json, is_raw, tm_override);
-    let transform_hash = calculate_transform_hash(&base_json);
 
     let previews = lut_paths
         .into_iter()
         .map(|path| {
-            let thumb = render_lut_swatch(
-                &context,
-                &state,
-                &base_image,
-                transform_hash,
-                adjustments,
-                &path,
-            );
+            let thumb = render_lut_swatch(&context, &state, &source, adjustments, &path);
             LutPreview { path, thumb }
         })
         .collect();

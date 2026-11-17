@@ -274,21 +274,28 @@ pub fn get_geometry_params_from_json(adjustments: &serde_json::Value) -> Geometr
     }
 }
 
+/// The size `downscale_f32_image` shrinks `size` to so it fits inside `target`, keeping the
+/// aspect ratio; `None` when it already fits or the target is degenerate (no change).
+pub fn fitted_size(
+    (width, height): (u32, u32),
+    (nwidth, nheight): (u32, u32),
+) -> Option<(u32, u32)> {
+    if nwidth == 0 || nheight == 0 || (nwidth >= width && nheight >= height) {
+        return None;
+    }
+    let ratio = (nwidth as f32 / width as f32).min(nheight as f32 / height as f32);
+    let new_w = (width as f32 * ratio).round() as u32;
+    let new_h = (height as f32 * ratio).round() as u32;
+    (new_w > 0 && new_h > 0).then_some((new_w, new_h))
+}
+
 pub fn downscale_f32_image(image: &DynamicImage, nwidth: u32, nheight: u32) -> DynamicImage {
     let start = std::time::Instant::now();
 
     let (width, height) = image.dimensions();
-    if nwidth == 0 || nheight == 0 || (nwidth >= width && nheight >= height) {
+    let Some((new_w, new_h)) = fitted_size((width, height), (nwidth, nheight)) else {
         return image.clone();
-    }
-
-    let ratio = (nwidth as f32 / width as f32).min(nheight as f32 / height as f32);
-    let new_w = (width as f32 * ratio).round() as u32;
-    let new_h = (height as f32 * ratio).round() as u32;
-
-    if new_w == 0 || new_h == 0 {
-        return image.clone();
-    }
+    };
 
     let tmp_img;
     let img_ref = if let Some(rgb) = image.as_rgb32f() {
@@ -1484,34 +1491,17 @@ pub fn apply_rotation<'a>(
     Cow::Owned(DynamicImage::ImageRgba32F(rotated))
 }
 
-pub fn apply_crop<'a>(image: impl IntoCowImage<'a>, crop_value: &Value) -> Cow<'a, DynamicImage> {
-    let image = image.into_cow();
-    if crop_value.is_null() {
-        return image;
+/// The pixel rectangle `(x, y, width, height)` `crop` keeps of an image of `(img_w, img_h)`:
+/// rounded to whole pixels and clipped to the image; `None` when it keeps nothing.
+pub fn crop_rect(crop: &Crop, (img_w, img_h): (u32, u32)) -> Option<(u32, u32, u32, u32)> {
+    let x = crop.x.round() as u32;
+    let y = crop.y.round() as u32;
+    let width = crop.width.round() as u32;
+    let height = crop.height.round() as u32;
+    if width == 0 || height == 0 || x >= img_w || y >= img_h {
+        return None;
     }
-
-    if let Ok(crop) = serde_json::from_value::<Crop>(crop_value.clone()) {
-        let x = crop.x.round() as u32;
-        let y = crop.y.round() as u32;
-        let width = crop.width.round() as u32;
-        let height = crop.height.round() as u32;
-
-        if width > 0 && height > 0 {
-            let (img_w, img_h) = image.dimensions();
-            if x < img_w && y < img_h {
-                let new_width = (img_w - x).min(width);
-                let new_height = (img_h - y).min(height);
-
-                if new_width > 0 && new_height > 0 {
-                    if x == 0 && y == 0 && new_width == img_w && new_height == img_h {
-                        return image;
-                    }
-                    return Cow::Owned(image.crop_imm(x, y, new_width, new_height));
-                }
-            }
-        }
-    }
-    image
+    Some((x, y, (img_w - x).min(width), (img_h - y).min(height)))
 }
 
 pub fn apply_flip<'a>(
@@ -3027,6 +3017,8 @@ pub struct GpuContext {
     pub display: Arc<std::sync::Mutex<Option<WgpuDisplay>>>,
     /// Built on first use and shared by every `GpuProcessor` of this context.
     pub pipelines: Arc<std::sync::OnceLock<Arc<crate::gpu_processing::GpuPipelines>>>,
+    /// The compute stages of `gpu_compute`, built on first use (or by the warm-up thread).
+    pub compute: Arc<std::sync::OnceLock<crate::gpu_compute::ComputePipelines>>,
 }
 
 impl GpuContext {
@@ -3034,6 +3026,11 @@ impl GpuContext {
         self.pipelines
             .get_or_init(|| Arc::new(crate::gpu_processing::GpuPipelines::new(&self.device)))
             .clone()
+    }
+
+    pub fn compute(&self) -> &crate::gpu_compute::ComputePipelines {
+        self.compute
+            .get_or_init(|| crate::gpu_compute::ComputePipelines::new(&self.device))
     }
 }
 

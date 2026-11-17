@@ -269,60 +269,75 @@ pub fn cache_key(
     hasher.finish()
 }
 
-fn perceptual(is_raw: bool) -> impl Fn(f32) -> f32 + Sync {
-    move |v: f32| {
-        let v = v.max(0.0);
-        if !is_raw {
-            v
-        } else if v <= 0.0031308 {
-            v * 12.92
-        } else {
-            1.055 * v.powf(1.0 / 2.4) - 0.055
-        }
+/// The photo's grain: a low percentile of the luma's high-frequency energy over blocks of
+/// `image` (the main shader's input texture), measured on the GPU (upstream `15a9ff2e`).
+pub fn estimate_grain(
+    context: &GpuContext,
+    image: &wgpu::TextureView,
+    (w, h): (u32, u32),
+    is_raw: bool,
+) -> Result<f32, String> {
+    let block = GRAIN_BLOCK as u32;
+    if w <= block + 2 || h <= block + 2 {
+        return Ok(0.0);
     }
+    let stride = ((w as f32 * h as f32 / GRAIN_BLOCKS)
+        .sqrt()
+        .max(GRAIN_BLOCK as f32) as u32)
+        .max(1);
+    let blocks = (
+        (w - block - 2).div_ceil(stride),
+        (h - block - 2).div_ceil(stride),
+    );
+    let bytes = blocks.0 as u64 * blocks.1 as u64 * 4;
+    let readback = context.device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Grain Readback"),
+        size: bytes,
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+    crate::gpu_compute::encode(context, |enc| {
+        let energies = enc.buffer("Grain Blocks", &vec![0u8; bytes as usize]);
+        enc.run(
+            crate::gpu_compute::Group::Transform,
+            "tf_grain",
+            &crate::render_source::TransformParams::grain(stride, blocks, is_raw),
+            blocks,
+            image,
+            crate::gpu_compute::Out::Scratch(&energies),
+        );
+        enc.encoder
+            .copy_buffer_to_buffer(&energies, 0, &readback, 0, bytes);
+    })?;
+
+    let (tx, rx) = std::sync::mpsc::channel();
+    readback
+        .slice(..)
+        .map_async(wgpu::MapMode::Read, move |result| {
+            let _ = tx.send(result);
+        });
+    context
+        .device
+        .poll(wgpu::PollType::Wait {
+            submission_index: None,
+            timeout: Some(std::time::Duration::from_secs(10)),
+        })
+        .map_err(|e| e.to_string())?;
+    rx.recv()
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+    let mut energies: Vec<f32> = bytemuck::cast_slice(
+        &readback
+            .slice(..)
+            .get_mapped_range()
+            .map_err(|e| e.to_string())?,
+    )
+    .to_vec();
+    readback.unmap();
+    Ok(grain_from_blocks(&mut energies))
 }
 
-pub fn estimate_grain(image: &DynamicImage, is_raw: bool) -> f32 {
-    let owned;
-    let (raw, channels) = match image {
-        DynamicImage::ImageRgb32F(buffer) => (buffer.as_raw(), 3),
-        DynamicImage::ImageRgba32F(buffer) => (buffer.as_raw(), 4),
-        _ => {
-            owned = image.to_rgb32f();
-            (owned.as_raw(), 3)
-        }
-    };
-    let (w, h) = (image.width() as usize, image.height() as usize);
-    if w < GRAIN_BLOCK + 2 || h < GRAIN_BLOCK + 2 {
-        return 0.0;
-    }
-    let encode = perceptual(is_raw);
-    let luma = |x: usize, y: usize| {
-        let i = (y * w + x) * channels;
-        encode(0.2126 * raw[i] + 0.7152 * raw[i + 1] + 0.0722 * raw[i + 2])
-    };
-    let stride = ((w * h) as f32 / GRAIN_BLOCKS)
-        .sqrt()
-        .max(GRAIN_BLOCK as f32) as usize;
-
-    let mut blocks: Vec<f32> = (1..h - GRAIN_BLOCK - 1)
-        .into_par_iter()
-        .step_by(stride)
-        .flat_map_iter(|y0| {
-            (1..w - GRAIN_BLOCK - 1).step_by(stride).map(move |x0| {
-                let mut energy = 0.0;
-                for y in y0..y0 + GRAIN_BLOCK {
-                    for x in x0..x0 + GRAIN_BLOCK {
-                        let around =
-                            luma(x - 1, y) + luma(x + 1, y) + luma(x, y - 1) + luma(x, y + 1);
-                        let r = luma(x, y) - 0.25 * around;
-                        energy += r * r;
-                    }
-                }
-                (energy / (GRAIN_BLOCK * GRAIN_BLOCK) as f32).sqrt()
-            })
-        })
-        .collect();
+fn grain_from_blocks(blocks: &mut [f32]) -> f32 {
     if blocks.is_empty() {
         return 0.0;
     }
@@ -1612,7 +1627,81 @@ pub fn render(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::DynamicImage;
     use serde_json::json;
+
+    /// The CPU estimate `estimate_grain` replaced, kept as its reference.
+    fn estimate_grain_on_cpu(image: &DynamicImage, is_raw: bool) -> f32 {
+        let rgb = image.to_rgb32f();
+        let raw = rgb.as_raw();
+        let (w, h) = (image.width() as usize, image.height() as usize);
+        if w < GRAIN_BLOCK + 2 || h < GRAIN_BLOCK + 2 {
+            return 0.0;
+        }
+        let encode = |v: f32| {
+            let v = v.max(0.0);
+            if !is_raw {
+                v
+            } else if v <= 0.0031308 {
+                v * 12.92
+            } else {
+                1.055 * v.powf(1.0 / 2.4) - 0.055
+            }
+        };
+        let luma = |x: usize, y: usize| {
+            let i = (y * w + x) * 3;
+            encode(0.2126 * raw[i] + 0.7152 * raw[i + 1] + 0.0722 * raw[i + 2])
+        };
+        let stride = ((w * h) as f32 / GRAIN_BLOCKS)
+            .sqrt()
+            .max(GRAIN_BLOCK as f32) as usize;
+        let mut blocks: Vec<f32> = (1..h - GRAIN_BLOCK - 1)
+            .step_by(stride)
+            .flat_map(|y0| {
+                (1..w - GRAIN_BLOCK - 1).step_by(stride).map(move |x0| {
+                    let mut energy = 0.0;
+                    for y in y0..y0 + GRAIN_BLOCK {
+                        for x in x0..x0 + GRAIN_BLOCK {
+                            let around =
+                                luma(x - 1, y) + luma(x + 1, y) + luma(x, y - 1) + luma(x, y + 1);
+                            let r = luma(x, y) - 0.25 * around;
+                            energy += r * r;
+                        }
+                    }
+                    (energy / (GRAIN_BLOCK * GRAIN_BLOCK) as f32).sqrt()
+                })
+            })
+            .collect();
+        grain_from_blocks(&mut blocks)
+    }
+
+    #[test]
+    fn gpu_grain_matches_the_cpu_estimate() {
+        let Some(context) = crate::gpu_processing::headless_gpu_context() else {
+            eprintln!("No GPU adapter; skipping the grain comparison.");
+            return;
+        };
+        let (w, h) = (640, 427);
+        let noisy = DynamicImage::ImageRgb32F(image::ImageBuffer::from_fn(w, h, |x, y| {
+            let noise = ((x.wrapping_mul(73_856_093) ^ y.wrapping_mul(19_349_663)) % 1000) as f32
+                / 1000.0
+                - 0.5;
+            let v = 0.3 + 0.2 * x as f32 / w as f32 + 0.02 * noise;
+            image::Rgb([v, v * 0.9, v * 1.1])
+        }));
+        let input = crate::gpu_compute::upload_image(&context, &noisy);
+        // The GPU reads the half-float texture, so compare with the CPU on the same values.
+        let halved = DynamicImage::ImageRgb32F(image::ImageBuffer::from_fn(w, h, |x, y| {
+            let p = noisy.as_rgb32f().unwrap().get_pixel(x, y).0;
+            image::Rgb(p.map(|v| half::f16::from_f32(v).to_f32()))
+        }));
+        for is_raw in [false, true] {
+            let gpu = estimate_grain(&context, &input.view, (w, h), is_raw).expect("GPU grain");
+            let cpu = estimate_grain_on_cpu(&halved, is_raw);
+            assert!(cpu > 0.0);
+            assert!((gpu - cpu).abs() <= cpu * 1e-3, "{is_raw}: {gpu} vs {cpu}");
+        }
+    }
 
     fn shader_module() -> wgpu::naga::Module {
         wgpu::naga::front::wgsl::parse_str(include_str!("shaders/motion_blur.wgsl"))
