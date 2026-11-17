@@ -555,6 +555,13 @@ mod tests {
         (worst, errors.iter().sum::<f32>() / errors.len() as f32)
     }
 
+    /// The largest mean difference an effect may show. A fine rotation resamples the effect's
+    /// half-float output, a second rounding the CPU (f32 until the end) does not have; it adds
+    /// about 1.2e-4 to the mean whatever the effect (owner's Mac run, 2026-11-17).
+    fn mean_limit(source: &RenderSource) -> f32 {
+        if source.frame.rotates() { 3e-4 } else { 2e-4 }
+    }
+
     /// The GPU stages render what the CPU ones do, within half-float rounding (decision 1 in
     /// `GPU_COMPUTE_PLAN.md`: the final 8-bit output may move by under a quarter step).
     #[test]
@@ -622,7 +629,7 @@ mod tests {
                     "lens blur {width}x{height} {overrides}: worst {worst:.2e}, mean {mean:.2e}"
                 );
                 assert!(
-                    worst <= 2e-3 && mean <= 2e-4,
+                    worst <= 2e-3 && mean <= mean_limit(&source),
                     "{width}x{height} {overrides}: worst {worst}, mean {mean}"
                 );
             }
@@ -662,7 +669,7 @@ mod tests {
                 let (worst, mean) = gpu_cpu_difference(&context, &source);
                 eprintln!("fog {width}x{height} {overrides}: worst {worst:.2e}, mean {mean:.2e}");
                 assert!(
-                    worst <= 2e-3 && mean <= 2e-4,
+                    worst <= 2e-3 && mean <= mean_limit(&source),
                     "{width}x{height} {overrides}: worst {worst}, mean {mean}"
                 );
             }
