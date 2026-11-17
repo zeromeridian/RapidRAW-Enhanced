@@ -800,18 +800,30 @@ fn modify_tags_for_paths(
     Ok(updated_tags)
 }
 
+/// Whether two stored tags are the same tag: user keywords match apart from case.
+fn is_same_tag(left: &str, right: &str) -> bool {
+    left == right
+        || (left.starts_with(USER_TAG_PREFIX)
+            && right.starts_with(USER_TAG_PREFIX)
+            && left.to_lowercase() == right.to_lowercase())
+}
+
+/// Adds `tag` to every path and returns it as stored: a user keyword takes the spelling the
+/// library already uses (`keyword_index::existing_keyword_spelling`), and an image that has
+/// the keyword in another case keeps its own.
 #[tauri::command]
 pub fn add_tag_for_paths(
     paths: Vec<String>,
     tag: String,
     app_handle: AppHandle,
-) -> Result<(), String> {
+) -> Result<String, String> {
+    let tag = crate::keyword_index::existing_keyword_spelling(&app_handle, &tag);
     modify_tags_for_paths(&paths, app_handle, |tags| {
-        if !tags.contains(&tag) {
+        if !tags.iter().any(|existing| is_same_tag(existing, &tag)) {
             tags.push(tag.clone());
         }
     })?;
-    Ok(())
+    Ok(tag)
 }
 
 #[tauri::command]
@@ -864,6 +876,14 @@ mod flag_tests {
 #[cfg(test)]
 mod keyword_tests {
     use super::*;
+
+    #[test]
+    fn user_keywords_are_the_same_tag_apart_from_case_but_other_tags_are_not() {
+        assert!(is_same_tag("user:Places|Berlin", "user:places|berlin"));
+        assert!(!is_same_tag("user:places|berlin", "user:places"));
+        assert!(!is_same_tag("Sky", "sky"));
+        assert!(!is_same_tag("user:sky", "sky"));
+    }
 
     fn strings(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| value.to_string()).collect()

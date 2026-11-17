@@ -16,7 +16,7 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { isImageFlagTag } from '../../../utils/imageFlags';
-import { USER_TAG_PREFIX, displayTag, parseKeywordInput } from '../../../utils/keywords';
+import { USER_TAG_PREFIX, displayTag, parseKeywordPath } from '../../../utils/keywords';
 
 const isEditableTag = (tag: string) => !tag.startsWith('color:') && !isImageFlagTag(tag);
 
@@ -70,7 +70,7 @@ export default function TaggingPanel({ onClose }: TaggingPanelProps) {
   };
 
   const addTag = async () => {
-    const normalized = parseKeywordInput(tagInput);
+    const normalized = parseKeywordPath(tagInput);
     if (normalized && (await setTag(`${USER_TAG_PREFIX}${normalized}`, true))) setTagInput('');
   };
 

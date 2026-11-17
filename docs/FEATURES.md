@@ -355,7 +355,9 @@ details are in `RELEASE_NOTES.MD`.
   or multi-image selection, with common and mixed tags clearly distinguished.
 - Hierarchical keywords, as in Lightroom Classic: type `places > germany >
   berlin` to file a keyword under its parents. Searching any level finds the
-  photo.
+  photo. Keywords keep the case they are typed in; a keyword that already
+  exists in another case is reused with its existing spelling, as in
+  Lightroom Classic (AI tags stay lowercase).
 - Lightroom-style **Keyword Sets**: editable named sets of nine keywords,
   shown as a toggle grid in the Tagging panel and applied with configurable
   Option/Alt+1…9 shortcuts (Option/Alt+0 cycles sets, Caps Lock

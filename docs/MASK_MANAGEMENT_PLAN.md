@@ -1,6 +1,10 @@
 # Mask Management Plan (LrC-style components)
 
-Status: proposed (owner, 2026-11-17). Not started.
+Status: proposed (owner, 2026-11-17). Not started. Plan item 51 in
+`UPSTREAM_FEATURE_GAP.md`; WP0 is pulled forward as item 43. Code check
+2026-11-17: section 1 and the problems P1, P2 and P7 match the code. Open
+decision before WP1: base rule or start from white (WP1). Item 41
+(stronger feather) follows this plan.
 
 Goal: make building masks from components (add, subtract, intersect, invert)
 feel like Lightroom Classic. The data model already matches LrC's
@@ -162,8 +166,9 @@ predictable.
   not only when it is selected.
 - i18n: add every new string to all 12 files in `src/i18n/locales/` (see
   `src/i18n/update_translations.py`). Remove `switchToSubtract`,
-  `switchToIntersect` and `switchToAdd` once nothing uses them. Run
-  `npm run i18n:check`.
+  `switchToIntersect` and `switchToAdd` once nothing uses them. Check with
+  `node src/i18n/check-runtime.mjs` (not `npm run i18n:check`, which this
+  environment does not run).
 
 ### WP4: Hover highlight for any component (P6)
 
@@ -249,13 +254,13 @@ There is no frontend test runner in `package.json`, so do manual checks with
 - Follow `AGENTS.md` Validation Gates, including the Rust Clippy gate
   `cargo clippy --all-targets --all-features -- -D warnings` from `src-tauri`
   and `cargo fmt -p ThisIsRAW -- --check`, plus `npm run format:check`,
-  `npm run lint` and `npm run i18n:check` for the files touched. Don't add new
+  `npm run lint` and `node src/i18n/check-runtime.mjs` for the files touched. Don't add new
   ESLint or typecheck diagnostics on changed lines.
 - If Clippy can't run in the sandbox (see `CLAUDE.md` notes on `rawler`),
   report it as a blocker and ask the owner to run it; don't claim the gate
   passed.
-- Update `docs/HANDOFF.md`, `docs/FEATURES.md` and `docs/RELEASE_NOTES.MD`
-  per `AGENTS.md`.
+- Update `docs/HANDOFF.md`, `docs/FEATURES.md` and `RELEASE_NOTES.MD`
+  (repository root) per `AGENTS.md`.
 
 ## 7. Out of scope
 

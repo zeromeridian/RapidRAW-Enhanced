@@ -7,7 +7,13 @@ import { Invokes } from '../components/ui/AppProperties';
 import { useAiKeywordSuggestions } from '../hooks/useAiKeywordSuggestions';
 import Text from '../components/ui/Text';
 import { TextVariants } from '../types/typography';
-import { USER_TAG_PREFIX, formatKeyword, getActiveKeywordSet, parseKeywordInput } from '../utils/keywords';
+import {
+  USER_TAG_PREFIX,
+  formatKeyword,
+  getActiveKeywordSet,
+  isSameKeyword,
+  parseKeywordPath,
+} from '../utils/keywords';
 
 interface TaggingSubMenuProps {
   paths: string[];
@@ -42,14 +48,17 @@ export default function TaggingSubMenu({
     inputRef.current?.focus();
   }, []);
 
-  const handleAddTag = (input: string) => addKeyword(parseKeywordInput(input));
+  const handleAddTag = (input: string) => addKeyword(parseKeywordPath(input));
 
   const addKeyword = async (newTagValue: string) => {
-    if (newTagValue && !tags.some((t) => t.tag === newTagValue)) {
+    if (newTagValue && !tags.some((t) => t.isUser && isSameKeyword(t.tag, newTagValue))) {
       try {
-        const prefixedTag = `${USER_TAG_PREFIX}${newTagValue}`;
-        await invoke(Invokes.AddTagForPaths, { paths, tag: prefixedTag });
-        const newTags = [...tags, { tag: newTagValue, isUser: true }].sort((a, b) => a.tag.localeCompare(b.tag));
+        const storedTag = await invoke<string>(Invokes.AddTagForPaths, {
+          paths,
+          tag: `${USER_TAG_PREFIX}${newTagValue}`,
+        });
+        const newTag = { tag: storedTag.slice(USER_TAG_PREFIX.length), isUser: true };
+        const newTags = [...tags, newTag].sort((a, b) => a.tag.localeCompare(b.tag));
         setTags(newTags);
         onTagsChanged(paths, newTags);
         setInputValue('');

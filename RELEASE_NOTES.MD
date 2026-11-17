@@ -5,6 +5,21 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.85.1-fix-keyword-case — 2026-11-17
+
+### Keywords
+
+- Keywords keep the capitalisation you type them in, everywhere you add
+  them: the Tagging panel, Keyword Sets, the Metadata panel, the culling
+  view and the right-click Tagging menu. Before, every typed keyword was
+  turned into lowercase.
+- A keyword that already exists with different capitalisation is reused
+  as it is spelled in your library, so typing `Berlin` next to an existing
+  `berlin` no longer creates a second keyword. To change a keyword's
+  spelling everywhere, rename it in the Keyword List.
+- Keyword Set shortcuts recognise a keyword on a photo whatever its
+  capitalisation, so pressing the shortcut again removes it.
+
 ## 1.85.0-dev-gpu-compute-foundation — 2026-11-17
 
 ### Masks

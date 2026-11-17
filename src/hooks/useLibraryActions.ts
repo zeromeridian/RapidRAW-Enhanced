@@ -10,7 +10,7 @@ import { globalImageCache } from '../utils/ImageLRUCache';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { computeSortedLibrary } from './useSortedLibrary';
 import { ImageFlag, IMAGE_FLAG_PREFIX } from '../utils/imageFlags';
-import { USER_TAG_PREFIX } from '../utils/keywords';
+import { USER_TAG_PREFIX, isSameKeyword } from '../utils/keywords';
 
 export const clearLibrarySelection = () => {
   useLibraryStore.getState().setLibrary({
@@ -62,14 +62,25 @@ export const moveImageToStackTop = (path: string) =>
     return stack && stack.coverPath !== path ? moveImageToTopOfStack(stacks, stack.id, path) : stacks;
   });
 
-const persistTag = (tag: string, paths: string[], apply: boolean) =>
-  invoke(apply ? Invokes.AddTagForPaths : Invokes.RemoveTagForPaths, { paths, tag });
+// Whether two stored tags are the same tag: user keywords match apart from case (`is_same_tag` in Rust).
+const isSameTag = (left: string, right: string) =>
+  left === right ||
+  (left.startsWith(USER_TAG_PREFIX) && right.startsWith(USER_TAG_PREFIX) && isSameKeyword(left, right));
+
+// Saves a tag change and returns the tag as stored: an added user keyword takes the library's spelling.
+const persistTag = async (tag: string, paths: string[], apply: boolean) => {
+  if (apply) return invoke<string>(Invokes.AddTagForPaths, { paths, tag });
+  await invoke(Invokes.RemoveTagForPaths, { paths, tag });
+  return tag;
+};
 
 const setTagInLibrary = (tag: string, paths: string[], apply: boolean) => {
   const updatedPaths = new Set(paths);
   useLibraryStore.getState().setLibrary((state) => ({
     imageList: state.imageList.map((image) => {
       if (!updatedPaths.has(image.path)) return image;
+      // An image that has the keyword in another case keeps its own spelling, as the backend does.
+      if (apply && image.tags?.some((imageTag) => isSameTag(imageTag, tag))) return image;
       const otherTags = (image.tags || []).filter((imageTag) => imageTag !== tag);
       const tags = apply ? [...otherTags, tag].sort() : otherTags;
       return { ...image, tags: tags.length > 0 ? tags : null };
@@ -207,11 +218,23 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     const tag = `${USER_TAG_PREFIX}${keyword}`;
     const updatedPaths = new Set(pathsToUpdate);
     const targets = imageList.filter((image) => updatedPaths.has(image.path));
-    const isApplied = targets.length > 0 && targets.every((image) => image.tags?.includes(tag));
+    const isApplied =
+      targets.length > 0 && targets.every((image) => image.tags?.some((imageTag) => isSameTag(imageTag, tag)));
 
     try {
-      await persistTag(tag, pathsToUpdate, !isApplied);
-      applyWithAutoAdvance(pathsToUpdate, () => setTagInLibrary(tag, pathsToUpdate, !isApplied));
+      if (isApplied) {
+        // Removes the keyword in whatever case each image carries it.
+        const spellings = [
+          ...new Set(targets.flatMap((image) => (image.tags || []).filter((imageTag) => isSameTag(imageTag, tag)))),
+        ];
+        for (const spelling of spellings) await persistTag(spelling, pathsToUpdate, false);
+        applyWithAutoAdvance(pathsToUpdate, () =>
+          spellings.forEach((spelling) => setTagInLibrary(spelling, pathsToUpdate, false)),
+        );
+      } else {
+        const storedTag = await persistTag(tag, pathsToUpdate, true);
+        applyWithAutoAdvance(pathsToUpdate, () => setTagInLibrary(storedTag, pathsToUpdate, true));
+      }
     } catch (err) {
       toast.error(`Failed to update keyword: ${err}`);
     }
@@ -220,8 +243,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
   // Adds a stored tag to, or removes it from, the given images; throws when saving fails.
   const handleSetTag = useCallback(async (tag: string, paths: string[], apply: boolean) => {
     if (paths.length === 0) return;
-    await persistTag(tag, paths, apply);
-    setTagInLibrary(tag, paths, apply);
+    setTagInLibrary(await persistTag(tag, paths, apply), paths, apply);
   }, []);
 
   const handleTagsChanged = useCallback((changedPaths: string[], newTags: { tag: string; isUser: boolean }[]) => {

@@ -18,7 +18,13 @@ import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { getDisplayFilename } from '../../../utils/outputNaming';
 import { getImageDimensions } from '../../../utils/imageDimensions';
 import { isImageFlagTag } from '../../../utils/imageFlags';
-import { USER_TAG_PREFIX, formatKeyword, getActiveKeywordSet, parseKeywordInput } from '../../../utils/keywords';
+import {
+  USER_TAG_PREFIX,
+  formatKeyword,
+  getActiveKeywordSet,
+  isSameKeyword,
+  parseKeywordPath,
+} from '../../../utils/keywords';
 
 interface CameraSetting {
   format?(value: number): string | number;
@@ -414,13 +420,15 @@ export default function MetadataPanel({ onClose }: MetadataPanelProps) {
   const keywordSetShortcuts = getActiveKeywordSet(appSettings)?.keywords.filter(Boolean) ?? [];
 
   const handleAddTag = async (tagToAdd: string) => {
-    const newTagValue = parseKeywordInput(tagToAdd);
-    if (newTagValue && !currentTags.some((t) => t.tag === newTagValue)) {
+    const newTagValue = parseKeywordPath(tagToAdd);
+    if (newTagValue && !currentTags.some((t) => t.isUser && isSameKeyword(t.tag, newTagValue))) {
       try {
-        const prefixedTag = `${USER_TAG_PREFIX}${newTagValue}`;
-        await invoke(Invokes.AddTagForPaths, { paths: targetPaths, tag: prefixedTag });
+        const storedTag = await invoke<string>(Invokes.AddTagForPaths, {
+          paths: targetPaths,
+          tag: `${USER_TAG_PREFIX}${newTagValue}`,
+        });
 
-        const newTags = [...currentTags, { tag: newTagValue, isUser: true }];
+        const newTags = [...currentTags, { tag: storedTag.slice(USER_TAG_PREFIX.length), isUser: true }];
         handleTagsChanged(targetPaths, newTags);
         setTagInputValue('');
       } catch (err) {

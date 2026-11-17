@@ -345,6 +345,62 @@ pub fn get_keyword_index(app_handle: AppHandle) -> Result<KeywordIndex, String> 
     })
 }
 
+/// `tag` spelled as the library already spells it. A user keyword takes, for its longest leading
+/// path that matches an indexed keyword path apart from case, that keyword's spelling; its other
+/// levels stay as typed. Other tags are returned unchanged.
+pub fn existing_keyword_spelling(app_handle: &AppHandle, tag: &str) -> String {
+    if !tag.starts_with(USER_TAG_PREFIX) {
+        return tag.to_string();
+    }
+    match library_catalog::keyword_tag_counts(app_handle) {
+        Ok(counts) => spell_like_indexed(tag, &counts),
+        Err(error) => {
+            log::warn!("Could not read the keyword index to match a keyword's case: {error}");
+            tag.to_string()
+        }
+    }
+}
+
+/// `existing_keyword_spelling` over indexed `(tag, image count)` pairs. When an indexed path
+/// has several spellings, the one on the most images wins (then the first in code-point order),
+/// so a library-wide spelling beats a stray variant.
+fn spell_like_indexed(tag: &str, counts: &[(String, usize)]) -> String {
+    let Some(typed) = tag.strip_prefix(USER_TAG_PREFIX) else {
+        return tag.to_string();
+    };
+    let mut indexed: Vec<(&str, usize)> = counts
+        .iter()
+        .filter_map(|(tag, count)| Some((tag.strip_prefix(USER_TAG_PREFIX)?, *count)))
+        .collect();
+    indexed.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| left.0.cmp(right.0)));
+
+    // Every indexed keyword path and parent path, lowercased → its preferred spelling.
+    let mut spellings: HashMap<String, &str> = HashMap::new();
+    for (path, _) in indexed {
+        let ends = path
+            .match_indices(KEYWORD_PATH_SEPARATOR)
+            .map(|(index, _)| index)
+            .chain([path.len()]);
+        for end in ends {
+            spellings
+                .entry(path[..end].to_lowercase())
+                .or_insert(&path[..end]);
+        }
+    }
+
+    let ends = typed
+        .match_indices(KEYWORD_PATH_SEPARATOR)
+        .map(|(index, _)| index)
+        .chain([typed.len()]);
+    let matched = ends
+        .rev()
+        .find_map(|end| Some((end, *spellings.get(&typed[..end].to_lowercase())?)));
+    match matched {
+        Some((end, spelling)) => format!("{USER_TAG_PREFIX}{spelling}{}", &typed[end..]),
+        None => tag.to_string(),
+    }
+}
+
 /// The library images carrying a stored tag; a user keyword also matches its child keywords.
 #[tauri::command]
 pub fn get_keyword_image_paths(tag: String, app_handle: AppHandle) -> Result<Vec<String>, String> {
@@ -366,6 +422,35 @@ mod tests {
             entry_key("/photos/a.raw?vc=abc123&name=_select"),
             "/photos/a.raw?vc=abc123"
         );
+    }
+
+    #[test]
+    fn typed_keywords_take_the_spelling_the_library_already_uses() {
+        let counts = [
+            ("user:places|germany|Berlin", 3),
+            ("user:Places|Germany", 1),
+            ("user:Family", 5),
+            ("user:family", 2),
+            ("sky", 9),
+        ]
+        .map(|(tag, count)| (tag.to_string(), count));
+        let spell = |tag: &str| spell_like_indexed(tag, &counts);
+
+        // The most used spelling wins, for the keyword and for each of its parents.
+        assert_eq!(spell("user:FAMILY"), "user:Family");
+        assert_eq!(
+            spell("user:Places|Germany|berlin"),
+            "user:places|germany|Berlin"
+        );
+        // Unknown levels keep the case they were typed in, below a known parent.
+        assert_eq!(
+            spell("user:PLACES|Germany|Mitte"),
+            "user:places|germany|Mitte"
+        );
+        assert_eq!(spell("user:Holidays|Spain"), "user:Holidays|Spain");
+        // Only user keywords change; a parent name alone is not a whole-path match.
+        assert_eq!(spell("Sky"), "Sky");
+        assert_eq!(spell("user:Place"), "user:Place");
     }
 
     #[test]

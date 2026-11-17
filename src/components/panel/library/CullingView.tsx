@@ -28,7 +28,7 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { COLOR_LABELS, Color } from '../../../utils/adjustments';
 import { isImageFlagTag } from '../../../utils/imageFlags';
-import { USER_TAG_PREFIX, formatKeyword, parseKeywordInput } from '../../../utils/keywords';
+import { USER_TAG_PREFIX, formatKeyword, isSameKeyword, parseKeywordPath } from '../../../utils/keywords';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
 import { getDisplayFilename } from '../../../utils/outputNaming';
 import { lightsOutTarget } from '../../../utils/lightsOut';
@@ -164,12 +164,14 @@ function CullingPreview({
   const imageHeight = (image as any).height || image.exif?.ExifImageHeight || image.exif?.PixelYDimension;
 
   const handleAddTag = async (tagToAdd: string) => {
-    const newTagValue = parseKeywordInput(tagToAdd);
-    if (newTagValue && !currentTags.some((t) => t.tag === newTagValue)) {
+    const newTagValue = parseKeywordPath(tagToAdd);
+    if (newTagValue && !currentTags.some((t) => t.isUser && isSameKeyword(t.tag, newTagValue))) {
       try {
-        const prefixedTag = `${USER_TAG_PREFIX}${newTagValue}`;
-        await invoke(Invokes.AddTagForPaths, { paths: [image.path], tag: prefixedTag });
-        const newTags = [...currentTags, { tag: newTagValue, isUser: true }];
+        const storedTag = await invoke<string>(Invokes.AddTagForPaths, {
+          paths: [image.path],
+          tag: `${USER_TAG_PREFIX}${newTagValue}`,
+        });
+        const newTags = [...currentTags, { tag: storedTag.slice(USER_TAG_PREFIX.length), isUser: true }];
         handleTagsChanged([image.path], newTags);
         setTagInputValue('');
       } catch (err) {

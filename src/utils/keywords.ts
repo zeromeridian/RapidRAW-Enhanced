@@ -26,8 +26,11 @@ export const parseKeywordPath = (input: string) =>
     .filter(Boolean)
     .join(KEYWORD_PATH_SEPARATOR);
 
-/** Like `parseKeywordPath`, lowercased, as new keywords are stored: `Places > Germany` is `places|germany`. */
-export const parseKeywordInput = (input: string) => parseKeywordPath(input.toLowerCase());
+/**
+ * Whether two keyword paths are the same keyword: keywords match apart from case, and the
+ * backend gives a typed keyword the spelling the library already uses (`add_tag_for_paths`).
+ */
+export const isSameKeyword = (left: string, right: string) => left.toLowerCase() === right.toLowerCase();
 
 /** Displays a keyword path such as `places|germany` as `places › germany`; `' > '` gives editable text. */
 export const formatKeyword = (keyword: string, separator = ' › ') =>
@@ -115,9 +118,9 @@ export const filterKeywordTree = (nodes: KeywordTreeNode[], query: string): Keyw
 const isKeywordOrChild = (path: string, keywordPath: string) =>
   path === keywordPath || path.startsWith(`${keywordPath}${KEYWORD_PATH_SEPARATOR}`);
 
-/** True when `tags` has the typed keyword path (e.g. `places > germany`) or one of its child keywords. */
+/** True when `tags` has the typed keyword path (e.g. `places > germany`), in any case, or one of its child keywords. */
 export const hasKeywordOrChild = (tags: string[] | null | undefined, input: string) => {
-  const path = parseKeywordInput(input);
+  const path = parseKeywordPath(input).toLowerCase();
   return (
     !!path &&
     (tags || []).some(

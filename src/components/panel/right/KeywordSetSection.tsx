@@ -19,7 +19,7 @@ import {
   formatKeyword,
   getActiveKeywordSet,
   getKeywordSets,
-  parseKeywordInput,
+  parseKeywordPath,
 } from '../../../utils/keywords';
 
 const iconButtonClassName =
@@ -76,7 +76,7 @@ export default function KeywordSetSection({ targetPaths }: KeywordSetSectionProp
     const saved: KeywordSet = {
       id: draft.id,
       name: draft.name.trim() || existing?.name || t('editor.tagging.newKeywordSetName'),
-      keywords: draft.keywords.map(parseKeywordInput),
+      keywords: draft.keywords.map(parseKeywordPath),
     };
     saveKeywordSets(
       existing ? keywordSets.map((set) => (set.id === saved.id ? saved : set)) : [...keywordSets, saved],
