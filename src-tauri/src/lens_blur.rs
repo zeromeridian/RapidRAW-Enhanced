@@ -91,17 +91,6 @@ pub fn prepare(adjustments: &serde_json::Value, (w, h): (u32, u32)) -> Option<Le
     })
 }
 
-/// The lens blur of `adjustments` on the CPU.
-pub fn apply_lens_blur<'a>(
-    image: Cow<'a, DynamicImage>,
-    adjustments: &serde_json::Value,
-) -> Cow<'a, DynamicImage> {
-    match prepare(adjustments, image.dimensions()) {
-        Some(job) => job.apply_on_cpu(image),
-        None => image,
-    }
-}
-
 impl LensBlur {
     /// Identifies what this blur does, for `RenderSource::key`.
     pub fn hash_into(&self, hasher: &mut impl Hasher) {

@@ -5,6 +5,17 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.81.0-dev-gpu-compute-foundation — 2026-11-17
+
+### Develop
+
+- Fog now runs on the graphics card in the Develop preview, presets,
+  the uncropped crop view and exports, including Fog Feather. Moving a
+  Fog slider no longer recomputes Relight. Photos look the same. If the
+  graphics card cannot do it, the processor takes over as before.
+  Thumbnails and the Before view still apply Fog on the processor for
+  now.
+
 ## 1.80.0-dev-gpu-compute-foundation — 2026-11-17
 
 ### Develop

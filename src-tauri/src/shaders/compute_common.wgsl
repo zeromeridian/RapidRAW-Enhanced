@@ -24,6 +24,8 @@ struct Grid {
 
 // `gpu_compute::KEEP_ZW`.
 const KEEP_ZW: u32 = 1u;
+// `gpu_compute::RGB_MODE`.
+const RGB_MODE: u32 = 2u;
 
 // Four texels around a point and the bilinear weights between them.
 struct Tap {
@@ -73,6 +75,12 @@ fn tap_sample(t: texture_2d<f32>, tap: Tap) -> vec4<f32> {
     return top + (bot - top) * tap.w.y;
 }
 
+// A guided filter's value for `guide`: `model` holds its slope and offset
+// (`ComputeEncoder::guided_model`).
+fn guided(model: vec4<f32>, guide: f32) -> f32 {
+    return model.x * guide + model.y;
+}
+
 // One direction of `ComputeEncoder::blur`: the mean over `2 * radius + 1` texels, clamped at
 // the edges.
 fn box_pass(id: vec3<u32>, dir: vec2<i32>) {
@@ -99,4 +107,57 @@ fn box_h(@builtin(global_invocation_id) id: vec3<u32>) {
 @compute @workgroup_size(8, 8, 1)
 fn box_v(@builtin(global_invocation_id) id: vec3<u32>) {
     box_pass(id, vec2<i32>(0, 1));
+}
+
+// `ComputeEncoder::area_down`: the mean over each output texel's block of t0, of the RGB with
+// `RGB_MODE` (`fog::fog_downsample`), else of `sqrt_luma` into x (`relight::build_relight_guide`).
+@compute @workgroup_size(8, 8, 1)
+fn area_down(@builtin(global_invocation_id) id: vec3<u32>) {
+    if (outside(id)) { return; }
+    let dst = params.grid.dst;
+    let src = params.grid.src;
+    let sy0 = id.y * src.y / dst.y;
+    let sy1 = clamp((id.y + 1u) * src.y / dst.y, sy0 + 1u, src.y);
+    let sx0 = id.x * src.x / dst.x;
+    let sx1 = clamp((id.x + 1u) * src.x / dst.x, sx0 + 1u, src.x);
+    let rgb = (params.grid.flags & RGB_MODE) != 0u;
+    var acc = vec3<f32>(0.0);
+    var luma = 0.0;
+    for (var sy = sy0; sy < sy1; sy++) {
+        for (var sx = sx0; sx < sx1; sx++) {
+            let c = textureLoad(t0, vec2<u32>(sx, sy), 0).rgb;
+            if (rgb) {
+                acc += c;
+            } else {
+                luma += sqrt_luma(c);
+            }
+        }
+    }
+    let count = (sy1 - sy0) * (sx1 - sx0);
+    if (rgb) {
+        textureStore(out_f32, id.xy, vec4<f32>(acc * (1.0 / f32(count)), 1.0));
+    } else {
+        textureStore(out_f32, id.xy, vec4<f32>(luma / f32(count), 0.0, 0.0, 0.0));
+    }
+}
+
+// `ComputeEncoder::guided_model`, first pass: the guide (t0.x), the input (channel `channel`
+// of t1) and their products, which one box blur turns into the filter's local means.
+@compute @workgroup_size(8, 8, 1)
+fn gf_pack(@builtin(global_invocation_id) id: vec3<u32>) {
+    if (outside(id)) { return; }
+    let g = textureLoad(t0, id.xy, 0).x;
+    let p = textureLoad(t1, id.xy, 0)[params.grid.channel];
+    textureStore(out_f32, id.xy, vec4<f32>(g, p, g * g, g * p));
+}
+
+// `ComputeEncoder::guided_model`, second pass: the local slope and offset from the means (t0),
+// as `relight::build_guided_model_with` computes them.
+@compute @workgroup_size(8, 8, 1)
+fn gf_coeffs(@builtin(global_invocation_id) id: vec3<u32>) {
+    if (outside(id)) { return; }
+    let m = textureLoad(t0, id.xy, 0);
+    let var_i = max(m.z - m.x * m.x, 0.0);
+    let a = (m.w - m.x * m.y) / (var_i + params.grid.eps);
+    textureStore(out_f32, id.xy, vec4<f32>(a, m.y - a * m.x, 0.0, 0.0));
 }

@@ -1,8 +1,8 @@
 //! What a render starts from: an image prepared on the CPU plus the stages that turn it into
 //! the main shader's input on the GPU (upstream `15a9ff2e`; `docs/GPU_COMPUTE_PLAN.md`).
-//! The GPU runs lens blur, then the frame (orientation, flips, rotation, crop) and the output
-//! downscale; the geometry warp, relight and fog still run on the CPU before
-//! (`adjustment_utils::apply_warp_relight_and_fog`). The same stages run on the CPU when the
+//! The GPU runs fog and lens blur, then the frame (orientation, flips, rotation, crop) and the
+//! output downscale; the geometry warp and relight still run on the CPU before
+//! (`adjustment_utils::apply_warp_and_relight`). The same stages run on the CPU when the
 //! GPU ones fail (`render_on_cpu`), and are the reference the GPU stages are tested against.
 
 use std::borrow::Cow;
@@ -13,7 +13,8 @@ use std::sync::Arc;
 use image::{DynamicImage, GenericImageView};
 use serde_json::Value;
 
-use crate::gpu_compute::{Bind, Grid, Group, IMAGE_FORMAT, Out, Slot};
+use crate::fog::Fog;
+use crate::gpu_compute::{Bind, Grid, Group, IMAGE_FORMAT, Out, Slot, Tex};
 use crate::image_processing::{
     Crop, GpuContext, apply_coarse_rotation, apply_flip, apply_rotation, crop_rect,
     downscale_f32_image, fitted_size,
@@ -166,21 +167,27 @@ fn downscale(enc: &mut crate::gpu_compute::ComputeEncoder, src: &Slot, dst: &Slo
     );
 }
 
-/// The spatial effects the GPU runs before the frame, read from an edit for an image of one
-/// size (the effects scale with it).
+/// The spatial effects the GPU runs before the frame, fog then lens blur, read from an edit
+/// for an image of one size (the effects scale with it).
 #[derive(Clone, Default)]
 pub struct Effects {
+    fog: Option<Arc<Fog>>,
     lens_blur: Option<Arc<LensBlur>>,
 }
 
 impl Effects {
     pub fn prepare(adjustments: &Value, size: (u32, u32)) -> Self {
         Self {
+            fog: crate::fog::prepare(adjustments, size).map(Arc::new),
             lens_blur: crate::lens_blur::prepare(adjustments, size).map(Arc::new),
         }
     }
 
     fn hash_into(&self, hasher: &mut impl Hasher) {
+        self.fog.is_some().hash(hasher);
+        if let Some(job) = &self.fog {
+            job.hash_into(hasher);
+        }
         self.lens_blur.is_some().hash(hasher);
         if let Some(job) = &self.lens_blur {
             job.hash_into(hasher);
@@ -188,23 +195,36 @@ impl Effects {
     }
 
     fn encode(&self, enc: &mut crate::gpu_compute::ComputeEncoder, src: Slot) -> Slot {
+        let fogged = self.fog.as_ref().map(|job| {
+            let fogged = enc.texture("Fog Output", src.size, IMAGE_FORMAT);
+            crate::fog::encode(enc, job, &src, &fogged);
+            fogged
+        });
         let Some(job) = &self.lens_blur else {
-            return src;
+            return fogged.map_or(src, Tex::detach);
         };
+        let input = fogged.as_deref().unwrap_or(&src);
         let blurred = enc.texture("Lens Blur Output", src.size, IMAGE_FORMAT);
-        crate::lens_blur::encode(enc, job, &src, &blurred);
+        crate::lens_blur::encode(enc, job, input, &blurred);
+        // The fog output returns to the pool here.
         blurred.detach()
     }
 
-    fn apply_on_cpu<'a>(&self, image: Cow<'a, DynamicImage>) -> Cow<'a, DynamicImage> {
-        match &self.lens_blur {
+    /// The effects on the CPU: the fallback, and for the renders that never reach the GPU
+    /// stages (thumbnails, the Before view).
+    pub fn apply_on_cpu<'a>(&self, image: Cow<'a, DynamicImage>) -> Cow<'a, DynamicImage> {
+        let fogged = match &self.fog {
             Some(job) => job.apply_on_cpu(image),
             None => image,
+        };
+        match &self.lens_blur {
+            Some(job) => job.apply_on_cpu(fogged),
+            None => fogged,
         }
     }
 }
 
-/// An image for the main shader: `image` (already warped, relit and fogged), then `effects`,
+/// An image for the main shader: `image` (already warped and relit), then `effects`,
 /// then `frame`, then shrunk to fit `output_fit` when that is smaller.
 pub struct RenderSource<'a> {
     pub image: &'a DynamicImage,
@@ -330,20 +350,30 @@ mod tests {
     }
 
     #[test]
-    fn the_cpu_render_runs_lens_blur_before_the_frame() {
+    fn the_cpu_render_runs_fog_then_lens_blur_before_the_frame() {
         let image = scene(120, 90);
-        let adjustments = lens_blur(json!({ "orientationSteps": 1 }));
+        let adjustments = fog(lens_blur(json!({ "orientationSteps": 1 })));
         let source = RenderSource::edited(&image, 0, &adjustments);
-        let blurred = crate::lens_blur::apply_lens_blur(Cow::Borrowed(&image), &adjustments);
+        let fog = crate::fog::prepare(&adjustments, image.dimensions()).expect("fog on");
+        let fogged = fog.apply_on_cpu(Cow::Borrowed(&image));
+        let blur = crate::lens_blur::prepare(&adjustments, image.dimensions()).expect("blur on");
+        let blurred = blur.apply_on_cpu(fogged);
         assert!(
             matches!(blurred, Cow::Owned(_)),
-            "the test blur should change the image"
+            "the test effects should change the image"
         );
         let expected = Frame::from_adjustments(&adjustments).apply_on_cpu(blurred);
-        assert_eq!(
-            source.render_on_cpu().to_rgb32f().as_raw(),
-            expected.to_rgb32f().as_raw()
-        );
+        let rendered = source.render_on_cpu().to_rgb32f();
+        let expected = expected.to_rgb32f();
+        assert_eq!(rendered.dimensions(), expected.dimensions());
+        // Fog's colour is a parallel sum, whose order (and last bits) varies between runs.
+        let worst = rendered
+            .as_raw()
+            .iter()
+            .zip(expected.as_raw())
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0f32, f32::max);
+        assert!(worst <= 1e-5, "worst {worst}");
     }
 
     fn ramp(width: u32, height: u32) -> DynamicImage {
@@ -413,6 +443,22 @@ mod tests {
             RenderSource::edited(&image, 1, &lens_blur(json!({ "lensBlurAmount": 70 }))).key(),
             key
         );
+
+        let fogged = fog(json!({}));
+        let key = RenderSource::edited(&image, 1, &fogged).key();
+        assert_ne!(key, RenderSource::plain(&image, 1).key());
+        assert_eq!(RenderSource::edited(&image, 1, &fogged).key(), key);
+        for change in [
+            json!({ "fogFeather": 30 }),
+            json!({ "fogGlow": 0 }),
+            json!({ "flipVertical": true }),
+        ] {
+            assert_ne!(
+                RenderSource::edited(&image, 1, &fog(change.clone())).key(),
+                key,
+                "{change}"
+            );
+        }
     }
 
     /// A depth map as the AI depth tool stores it: far on the left, near on the right, and a
@@ -442,6 +488,24 @@ mod tests {
             "lensBlurDepthMap": depth_map_url(160, 105),
             "lensBlurMinDepth": 30,
             "lensBlurMaxDepth": 60,
+        });
+        for (key, value) in overrides.as_object().expect("an object") {
+            adjustments[key] = value.clone();
+        }
+        adjustments
+    }
+
+    /// Fog on, with `overrides` (an edit, so fog and lens blur can be combined).
+    fn fog(overrides: Value) -> Value {
+        let mut adjustments = json!({
+            "fogEnabled": true,
+            "fogAmount": 80,
+            "fogDepthMap": depth_map_url(96, 64),
+            "fogStart": 10,
+            "fogDensity": 60,
+            "fogHeight": 20,
+            "fogVariation": 40,
+            "fogGlow": 50,
         });
         for (key, value) in overrides.as_object().expect("an object") {
             adjustments[key] = value.clone();
@@ -557,6 +621,46 @@ mod tests {
                 eprintln!(
                     "lens blur {width}x{height} {overrides}: worst {worst:.2e}, mean {mean:.2e}"
                 );
+                assert!(
+                    worst <= 2e-3 && mean <= 2e-4,
+                    "{width}x{height} {overrides}: worst {worst}, mean {mean}"
+                );
+            }
+        }
+    }
+
+    /// Fog on the GPU renders what the CPU version does: Fog Feather (the fork's, not in
+    /// upstream's shader), with and without glow, height and patches, every orientation with
+    /// flips (noise and height follow the display), warm and tinted fog, a late start, a
+    /// low-resolution copy at full size (the small image), fog then lens blur, and a frame.
+    #[test]
+    fn gpu_fog_matches_the_cpu() {
+        let Some(context) = crate::gpu_processing::headless_gpu_context() else {
+            eprintln!("No GPU adapter; skipping the GPU fog comparison.");
+            return;
+        };
+        let cases = [
+            json!({}),
+            json!({ "fogFeather": 60 }),
+            json!({ "fogGlow": 0, "fogHeight": 0, "fogVariation": 0 }),
+            json!({ "fogHeight": 80, "fogVariation": 100, "fogDensity": 100 }),
+            json!({ "orientationSteps": 1, "flipHorizontal": true }),
+            json!({ "orientationSteps": 2, "fogFeather": 25 }),
+            json!({ "orientationSteps": 3, "flipVertical": true }),
+            json!({ "fogTemperature": 60, "fogTint": -40, "fogAmount": 100 }),
+            json!({ "fogStart": 70, "fogFeather": 100 }),
+            lens_blur(json!({ "lensBlurDiffusion": 30 })),
+            json!({ "rotation": -6.0,
+                    "crop": { "x": 10.0, "y": 20.0, "width": 300.0, "height": 200.0 } }),
+        ];
+        for (width, height) in [(640, 420), (203, 151)] {
+            let image = scene(width, height);
+            for overrides in &cases {
+                let adjustments = fog(overrides.clone());
+                let source = RenderSource::edited(&image, 0, &adjustments);
+                assert!(source.effects.fog.is_some(), "{overrides}");
+                let (worst, mean) = gpu_cpu_difference(&context, &source);
+                eprintln!("fog {width}x{height} {overrides}: worst {worst:.2e}, mean {mean:.2e}");
                 assert!(
                     worst <= 2e-3 && mean <= 2e-4,
                     "{width}x{height} {overrides}: worst {worst}, mean {mean}"

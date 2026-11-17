@@ -26,6 +26,8 @@ pub const F32X4: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;
 pub const R32: wgpu::TextureFormat = wgpu::TextureFormat::R32Float;
 /// `box_h`/`box_v` keep the input's third and fourth channels.
 pub const KEEP_ZW: u32 = 1;
+/// `area_down` averages the RGB instead of the square-root luma.
+pub const RGB_MODE: u32 = 2;
 const WORKGROUP: u32 = 8;
 /// Input textures a stage can read (`t0`–`t5`).
 const INPUTS: usize = 6;
@@ -78,18 +80,26 @@ impl Grid {
 pub enum Group {
     Common,
     Transform,
+    Fog,
     LensBlur,
 }
 
 impl Group {
-    const ALL: [Group; 3] = [Group::Common, Group::Transform, Group::LensBlur];
+    const ALL: [Group; 4] = [Group::Common, Group::Transform, Group::Fog, Group::LensBlur];
 
     fn source(self) -> (&'static str, &'static [&'static str]) {
         match self {
-            Group::Common => (COMMON_PARAMS, &["box_h", "box_v"]),
+            Group::Common => (
+                COMMON_PARAMS,
+                &["box_h", "box_v", "area_down", "gf_pack", "gf_coeffs"],
+            ),
             Group::Transform => (
                 include_str!("shaders/transform.wgsl"),
                 &["tf_frame", "tf_downscale", "tf_grain"],
+            ),
+            Group::Fog => (
+                include_str!("shaders/fog.wgsl"),
+                &["fog_noise_map", "fog_stats", "fog_bloom", "fog_apply"],
             ),
             Group::LensBlur => (
                 include_str!("shaders/lens_blur.wgsl"),
@@ -332,12 +342,14 @@ pub enum Out<'a> {
 }
 
 /// What else a stage binds: the textures it reads (`t0`, `t1`, … in order), the buffer it
-/// counts or writes results into (`scratch`) and the read-only values it takes (`data`).
+/// counts or writes results into (`scratch`) and the read-only values it takes (`data`), and
+/// how many workgroups it runs when not one per 8×8 pixels (`groups`).
 #[derive(Clone, Copy)]
 pub struct Bind<'a> {
     inputs: &'a [&'a wgpu::TextureView],
     scratch: Option<&'a wgpu::Buffer>,
     data: Option<&'a wgpu::Buffer>,
+    groups: Option<(u32, u32)>,
 }
 
 impl<'a> Bind<'a> {
@@ -350,6 +362,15 @@ impl<'a> Bind<'a> {
             inputs,
             scratch: None,
             data: None,
+            groups: None,
+        }
+    }
+
+    /// Runs `groups` workgroups, for a stage that is not one invocation per pixel.
+    pub fn with_groups(self, groups: (u32, u32)) -> Self {
+        Self {
+            groups: Some(groups),
+            ..self
         }
     }
 
@@ -681,7 +702,10 @@ impl<'a> ComputeEncoder<'a> {
         let mut pass = self.encoder.begin_compute_pass(&Default::default());
         pass.set_pipeline(pipes.pipeline(self.device, group, entry));
         pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(dst.0.div_ceil(WORKGROUP), dst.1.div_ceil(WORKGROUP), 1);
+        let groups = bind
+            .groups
+            .unwrap_or((dst.0.div_ceil(WORKGROUP), dst.1.div_ceil(WORKGROUP)));
+        pass.dispatch_workgroups(groups.0, groups.1, 1);
     }
 
     /// `passes` box blurs of `radius` (horizontal, then vertical, clamped at the edges) into
@@ -720,6 +744,52 @@ impl<'a> ComputeEncoder<'a> {
             current = out;
         }
         current
+    }
+
+    /// `src` shrunk to `size` by averaging blocks into an `F32X4` texture: the RGB with
+    /// `RGB_MODE`, else the square-root luma in the first channel.
+    pub fn area_down(&mut self, src: &Slot, size: (u32, u32), flags: u32) -> Tex {
+        let out = self.texture("Compute Area", size, F32X4);
+        self.run(
+            Group::Common,
+            "area_down",
+            &Grid::new(size).with_src(src.size).with_flags(flags),
+            size,
+            Out::F32(&out.view),
+            Bind::reading(&[&src.view]),
+        );
+        out
+    }
+
+    /// A guided filter of `p`'s first channel by `guide`'s (the same size): its slope and
+    /// offset per texel, which `guided` in WGSL applies. The CPU counterpart is
+    /// `relight::build_guided_model`.
+    pub fn guided_model(&mut self, guide: &Slot, p: &Slot, radius: u32, eps: f32) -> Tex {
+        let size = guide.size;
+        let grid = Grid {
+            eps,
+            ..Grid::new(size)
+        };
+        let packed = self.texture("Compute Guided", size, F32X4);
+        self.run(
+            Group::Common,
+            "gf_pack",
+            &grid,
+            size,
+            Out::F32(&packed.view),
+            Bind::reading(&[&guide.view, &p.view]),
+        );
+        let means = self.blur(packed, radius, 1, 0);
+        let coeffs = self.texture("Compute Guided", size, F32X4);
+        self.run(
+            Group::Common,
+            "gf_coeffs",
+            &grid,
+            size,
+            Out::F32(&coeffs.view),
+            Bind::reading(&[&means.view]),
+        );
+        self.blur(coeffs, radius, 1, 0)
     }
 }
 

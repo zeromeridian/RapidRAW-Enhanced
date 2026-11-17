@@ -70,15 +70,27 @@ fn hash_effects(
     }
 }
 
-/// Hashes every input of the spatial effects still on the CPU
-/// (`adjustment_utils::apply_relight_and_fog`).
-pub fn calculate_relight_and_fog_hash(adjustments: &serde_json::Value) -> u64 {
+/// Hashes every input of the spatial effect still on the CPU, relight
+/// (`adjustment_utils::apply_warp_and_relight`).
+pub fn calculate_relight_hash(adjustments: &serde_json::Value) -> u64 {
     let mut hasher = DefaultHasher::new();
     hash_effects(
         adjustments,
+        &[("relight", "relightEnabled", RELIGHT_KEYS)],
+        &mut hasher,
+    );
+    hasher.finish()
+}
+
+/// Hashes every input of the spatial effects: relight, fog and lens blur.
+pub fn calculate_effects_hash(adjustments: &serde_json::Value) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    calculate_relight_hash(adjustments).hash(&mut hasher);
+    hash_effects(
+        adjustments,
         &[
-            ("relight", "relightEnabled", RELIGHT_KEYS),
             ("fog", "fogEnabled", FOG_KEYS),
+            ("lensBlur", "lensBlurEnabled", LENS_BLUR_KEYS),
         ],
         &mut hasher,
     );
@@ -89,18 +101,6 @@ pub fn calculate_relight_and_fog_hash(adjustments: &serde_json::Value) -> u64 {
         adjustments["flipVertical"].as_bool().hash(&mut hasher);
     }
 
-    hasher.finish()
-}
-
-/// Hashes every input of the spatial effects: relight and fog, and lens blur.
-pub fn calculate_effects_hash(adjustments: &serde_json::Value) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    calculate_relight_and_fog_hash(adjustments).hash(&mut hasher);
-    hash_effects(
-        adjustments,
-        &[("lensBlur", "lensBlurEnabled", LENS_BLUR_KEYS)],
-        &mut hasher,
-    );
     hasher.finish()
 }
 

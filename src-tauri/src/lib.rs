@@ -101,7 +101,7 @@ use tokio::sync::Mutex as TokioMutex;
 
 use crate::cache_utils::{
     DecodedImageCache, GEOMETRY_KEYS, calculate_full_job_hash, calculate_geometry_hash,
-    calculate_relight_and_fog_hash, calculate_transform_hash, calculate_visual_hash,
+    calculate_relight_hash, calculate_transform_hash, calculate_visual_hash,
 };
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
@@ -285,14 +285,11 @@ pub fn prepare_preview_source(
     let mut hasher = DefaultHasher::new();
     warped_key.hash(&mut hasher);
     working.dimensions().hash(&mut hasher);
-    calculate_relight_and_fog_hash(adjustments).hash(&mut hasher);
+    calculate_relight_hash(adjustments).hash(&mut hasher);
     let effected_key = hasher.finish();
 
     let effected = get_or_compute_stage(&state.effects_cache, effected_key, || {
-        let effected = crate::adjustment_utils::apply_relight_and_fog(
-            Cow::Borrowed(working.as_ref()),
-            adjustments,
-        );
+        let effected = crate::relight::apply_relight(Cow::Borrowed(working.as_ref()), adjustments);
         Ok(into_stage_image(effected, &working))
     })?;
 
@@ -1050,7 +1047,7 @@ fn render_uncropped_preview(app_handle: &tauri::AppHandle, job: UncroppedPreview
     });
 
     let effected_image =
-        crate::adjustment_utils::apply_warp_relight_and_fog(patched_image, &adjustments_clone);
+        crate::adjustment_utils::apply_warp_and_relight(patched_image, &adjustments_clone);
 
     let settings = app_settings::settings_snapshot(app_handle).unwrap_or_default();
     let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
@@ -1182,10 +1179,11 @@ fn generate_original_transformed_preview_blocking(
 
     let image_for_preview = build_full_source_image(&loaded_image.image, loaded_image.is_raw);
 
-    // Shown as it is, without the main shader, so the frame runs on the CPU here (lens blur
-    // is off above, so nothing of `render_source::Effects` is missing).
-    let effected =
-        crate::adjustment_utils::apply_warp_relight_and_fog(image_for_preview, &adjustments_clone);
+    // Shown as it is, without the main shader, so the effects (fog; lens blur is off above)
+    // and the frame run on the CPU here.
+    let relit =
+        crate::adjustment_utils::apply_warp_and_relight(image_for_preview, &adjustments_clone);
+    let effected = Effects::prepare(&adjustments_clone, relit.dimensions()).apply_on_cpu(relit);
     let transformed_full_res = Frame::from_adjustments(&adjustments_clone).apply_on_cpu(effected);
 
     let settings = app_settings::settings_snapshot(app_handle).unwrap_or_default();
@@ -1604,7 +1602,7 @@ async fn generate_all_community_previews(
             let scaled_adjustments =
                 crate::image_processing::with_crop_scaled(js_adjustments, *base_scale);
 
-            let effected_image = crate::apply_warp_relight_and_fog(base_image, &scaled_adjustments);
+            let effected_image = crate::apply_warp_and_relight(base_image, &scaled_adjustments);
             let source = RenderSource::edited(
                 &effected_image,
                 preset_hash.wrapping_add(i as u64),
@@ -1898,7 +1896,7 @@ async fn generate_preview_for_path(
             }
         };
 
-        let effected_image = apply_warp_relight_and_fog(&base_image, &js_adjustments);
+        let effected_image = apply_warp_and_relight(&base_image, &js_adjustments);
         let source = RenderSource::edited(
             &effected_image,
             calculate_full_job_hash(&source_path_str, &js_adjustments),

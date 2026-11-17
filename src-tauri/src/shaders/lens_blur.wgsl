@@ -401,7 +401,7 @@ fn lb_bloom(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 
 // The sharp pixel, the far and near stacks and the diffusion bloom mixed at full size; the
-// pixel unchanged when too few pixels blur (`apply_lens_blur`'s early return).
+// pixel unchanged when too few pixels blur (`LensBlur::apply_on_cpu`'s early return).
 @compute @workgroup_size(8, 8, 1)
 fn lb_final(@builtin(global_invocation_id) id: vec3<u32>) {
     if (outside(id)) { return; }

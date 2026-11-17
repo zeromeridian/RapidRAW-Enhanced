@@ -157,31 +157,18 @@ pub fn is_tool_enabled(adjustments: &serde_json::Value, group: &str, enabled_key
     is_group_visible(adjustments, group) && adjustments[enabled_key].as_bool().unwrap_or(false)
 }
 
-/// The spatial effects still on the CPU, on the geometry-warped image; lens blur follows on
-/// the GPU (`render_source::Effects`).
-pub fn apply_relight_and_fog<'a>(
-    warped_image: Cow<'a, DynamicImage>,
-    adjustments: &serde_json::Value,
-) -> Cow<'a, DynamicImage> {
-    let relit_image = crate::relight::apply_relight(warped_image, adjustments);
-    crate::fog::apply_fog(relit_image, adjustments)
-}
-
-/// The CPU stages before the GPU ones: geometry warp, relight and fog. Lens blur,
+/// The CPU stages before the GPU ones: geometry warp and relight. Fog, lens blur,
 /// orientation, flips, rotation and crop follow on the GPU
 /// (`render_source::RenderSource::edited`).
-pub fn apply_warp_relight_and_fog<'a, I: IntoCowImage<'a>>(
+pub fn apply_warp_and_relight<'a, I: IntoCowImage<'a>>(
     image: I,
     adjustments: &serde_json::Value,
 ) -> Cow<'a, DynamicImage> {
     let start_time = std::time::Instant::now();
     let warped_image = apply_geometry_warp(image.into_cow(), adjustments);
-    let effected_image = apply_relight_and_fog(warped_image, adjustments);
-    log::info!(
-        "apply_warp_relight_and_fog took {:.2?}",
-        start_time.elapsed()
-    );
-    effected_image
+    let relit_image = crate::relight::apply_relight(warped_image, adjustments);
+    log::info!("apply_warp_and_relight took {:.2?}", start_time.elapsed());
+    relit_image
 }
 
 #[cfg(test)]
