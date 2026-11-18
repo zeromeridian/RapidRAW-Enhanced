@@ -1828,9 +1828,24 @@
       "title": "조정 표시"
     },
     "categories": {
-      "general": "일반",
+      "about": "정보",
+      "ai": "AI",
+      "editor": "편집기",
+      "export": "내보내기",
+      "interface": "인터페이스",
+      "library": "라이브러리",
       "processing": "처리",
-      "shortcuts": "컨트롤"
+      "shortcuts": "단축키",
+      "storage": "저장 공간",
+      "tagging": "태그 지정"
+    },
+    "search": {
+      "clear": "검색 지우기",
+      "noResults": "“{{query}}”와 일치하는 설정이 없습니다.",
+      "placeholder": "설정 검색"
+    },
+    "sections": {
+      "lightsOut": "Lights Out"
     },
     "controls": {
       "keyboardTitle": "키보드 컨트롤",
@@ -1845,6 +1860,7 @@
       "resetDefaults": "모두 기본값으로 초기화",
       "speed": "속도",
       "speedEdit": {
+        "keysTitle": "키와 제스처",
         "adjustments": "조정 항목",
         "gestures": {
           "doubleClick": "더블클릭하여 초기화",
@@ -2150,6 +2166,7 @@
           "title": "내장 AI"
         },
         "description": "ThisIsRAW의 AI는 유연성을 위해 설계되었습니다. 빠른 로컬 도구부터 강력한 셀프 호스팅까지, 이상적인 워크플로를 선택하세요.",
+        "provider": "AI 제공자",
         "providers": {
           "aiConnector": "AI 커넥터",
           "cloud": "클라우드",

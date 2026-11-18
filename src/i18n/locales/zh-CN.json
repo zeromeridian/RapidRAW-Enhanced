@@ -1828,9 +1828,24 @@
       "title": "调整可见性"
     },
     "categories": {
-      "general": "通用",
+      "about": "关于",
+      "ai": "AI",
+      "editor": "编辑器",
+      "export": "导出",
+      "interface": "界面",
+      "library": "图库",
       "processing": "处理",
-      "shortcuts": "控制"
+      "shortcuts": "快捷键",
+      "storage": "存储",
+      "tagging": "标签"
+    },
+    "search": {
+      "clear": "清除搜索",
+      "noResults": "没有与“{{query}}”匹配的设置。",
+      "placeholder": "搜索设置"
+    },
+    "sections": {
+      "lightsOut": "Lights Out"
     },
     "controls": {
       "keyboardTitle": "键盘控制",
@@ -1845,6 +1860,7 @@
       "resetDefaults": "全部重置为默认值",
       "speed": "速度",
       "speedEdit": {
+        "keysTitle": "按键与手势",
         "adjustments": "调整项",
         "gestures": {
           "doubleClick": "双击重置",
@@ -2150,6 +2166,7 @@
           "title": "内置 AI"
         },
         "description": "ThisIsRAW 的 AI 专为灵活性而设计。选择您理想的工作流程，从快速的本地工具到强大的自托管。",
+        "provider": "AI 提供方",
         "providers": {
           "aiConnector": "AI 连接器",
           "cloud": "云端",

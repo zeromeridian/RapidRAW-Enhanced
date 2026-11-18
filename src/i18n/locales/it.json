@@ -1874,9 +1874,24 @@
       "title": "Visibilità Regolazioni"
     },
     "categories": {
-      "general": "Generale",
+      "about": "Informazioni",
+      "ai": "AI",
+      "editor": "Editor",
+      "export": "Esporta",
+      "interface": "Interfaccia",
+      "library": "Libreria",
       "processing": "Elaborazione",
-      "shortcuts": "Controlli"
+      "shortcuts": "Scorciatoie",
+      "storage": "Archiviazione",
+      "tagging": "Tagging"
+    },
+    "search": {
+      "clear": "Cancella ricerca",
+      "noResults": "Nessuna impostazione corrisponde a “{{query}}”.",
+      "placeholder": "Cerca nelle impostazioni"
+    },
+    "sections": {
+      "lightsOut": "Lights Out"
     },
     "controls": {
       "keyboardTitle": "Controlli da Tastiera",
@@ -1891,6 +1906,7 @@
       "resetDefaults": "Ripristina Tutto ai Valori Predefiniti",
       "speed": "Velocità",
       "speedEdit": {
+        "keysTitle": "Tasti e gesti",
         "adjustments": "Regolazioni",
         "gestures": {
           "doubleClick": "Doppio clic per reimpostare",
@@ -2199,6 +2215,7 @@
           "title": "AI Integrata"
         },
         "description": "L'AI di ThisIsRAW è concepita per essere flessibile. Scegli il tuo flusso di lavoro ideale, da strumenti locali veloci a un potente self-hosting.",
+        "provider": "Provider AI",
         "providers": {
           "aiConnector": "Connettore AI",
           "cloud": "Cloud",

@@ -340,6 +340,12 @@ export interface AppSettings {
   adjustmentVisibility?: { [key: string]: boolean };
   adjustmentLayout?: AdjustmentLayout;
   rawHighlightCompression?: number;
+  rawPreprocessingColorNr?: number;
+  rawPreprocessingSharpening?: number;
+  applyPreprocessingToNonRaws?: boolean;
+  thumbnailResolution?: number;
+  thumbnailWorkerThreads?: number;
+  imageCacheSize?: number;
   processingBackend?: string;
   linuxGpuOptimization?: boolean;
   exportPresets?: ExportPreset[];

@@ -1874,9 +1874,24 @@
       "title": "Visibilidad de ajustes"
     },
     "categories": {
-      "general": "General",
+      "about": "Acerca de",
+      "ai": "IA",
+      "editor": "Editor",
+      "export": "Exportar",
+      "interface": "Interfaz",
+      "library": "Biblioteca",
       "processing": "Procesamiento",
-      "shortcuts": "Controles"
+      "shortcuts": "Atajos",
+      "storage": "Almacenamiento",
+      "tagging": "Etiquetado"
+    },
+    "search": {
+      "clear": "Borrar búsqueda",
+      "noResults": "Ningún ajuste coincide con «{{query}}».",
+      "placeholder": "Buscar ajustes"
+    },
+    "sections": {
+      "lightsOut": "Lights Out"
     },
     "controls": {
       "keyboardTitle": "Controles del teclado",
@@ -1891,6 +1906,7 @@
       "resetDefaults": "Restablecer todo a los valores predeterminados",
       "speed": "Velocidad",
       "speedEdit": {
+        "keysTitle": "Teclas y gestos",
         "adjustments": "Ajustes",
         "gestures": {
           "doubleClick": "Doble clic para restablecer",
@@ -2199,6 +2215,7 @@
           "title": "IA integrada"
         },
         "description": "La IA de ThisIsRAW está diseñada para la flexibilidad. Elige tu flujo de trabajo ideal, desde herramientas locales rápidas hasta un potente autoalojamiento.",
+        "provider": "Proveedor de IA",
         "providers": {
           "aiConnector": "AI Connector",
           "cloud": "Nube",

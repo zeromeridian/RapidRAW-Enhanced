@@ -5,6 +5,25 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.91.0-dev-settings-streamline — 2026-11-18
+
+### Settings
+
+- The Settings window is reorganised into ten smaller pages, listed down
+  the left side: Interface, Library, Editor, Tagging, Processing, AI,
+  Export, Storage, Shortcuts and About. Mouse and trackpad controls are
+  now under Editor, Speed Edit and the keyboard shortcuts under
+  Shortcuts.
+- A search field above the page list finds settings on every page by
+  name or description, including keyboard shortcuts; clear it or press
+  Escape to return to the page you were on.
+- Each setting now takes one line: its name and description on the left,
+  its control on the right, so the pages are much shorter.
+- A setting that needs a relaunch shows "Save & Relaunch" at the top of
+  the window, so it stays visible while you look at other pages.
+- The preview strategy switch now shows the strategy actually in use for
+  installations that never changed it (Dynamic).
+
 ## 1.90.1-dev-heif-support — 2026-11-18
 
 ### Library

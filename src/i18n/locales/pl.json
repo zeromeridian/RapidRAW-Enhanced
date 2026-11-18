@@ -1918,9 +1918,24 @@
       "title": "Widoczność narzędzi"
     },
     "categories": {
-      "general": "Ogólne",
+      "about": "O programie",
+      "ai": "AI",
+      "editor": "Edytor",
+      "export": "Eksport",
+      "interface": "Interfejs",
+      "library": "Biblioteka",
       "processing": "Przetwarzanie",
-      "shortcuts": "Sterowanie"
+      "shortcuts": "Skróty",
+      "storage": "Pamięć",
+      "tagging": "Tagowanie"
+    },
+    "search": {
+      "clear": "Wyczyść wyszukiwanie",
+      "noResults": "Żadne ustawienie nie pasuje do „{{query}}”.",
+      "placeholder": "Szukaj w ustawieniach"
+    },
+    "sections": {
+      "lightsOut": "Lights Out"
     },
     "controls": {
       "keyboardTitle": "Sterowanie klawiaturą",
@@ -1935,6 +1950,7 @@
       "resetDefaults": "Przywróć wszystkie domyślne",
       "speed": "Prędkość",
       "speedEdit": {
+        "keysTitle": "Klawisze i gesty",
         "adjustments": "Korekty",
         "gestures": {
           "doubleClick": "Dwuklik, aby zresetować",
@@ -2246,6 +2262,7 @@
           "title": "Wbudowane AI"
         },
         "description": "AI w ThisIsRAW została zbudowana z myślą o elastyczności. Wybierz swój idealny przepływ pracy, od szybkich lokalnych narzędzi po potężne rozwiązania serwerowe.",
+        "provider": "Dostawca AI",
         "providers": {
           "aiConnector": "Złącze AI",
           "cloud": "Chmura",

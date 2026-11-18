@@ -1983,9 +1983,24 @@
       "title": "Adjustments Visibility"
     },
     "categories": {
-      "general": "General",
+      "about": "About",
+      "ai": "AI",
+      "editor": "Editor",
+      "export": "Export",
+      "interface": "Interface",
+      "library": "Library",
       "processing": "Processing",
-      "shortcuts": "Controls"
+      "shortcuts": "Shortcuts",
+      "storage": "Storage",
+      "tagging": "Tagging"
+    },
+    "search": {
+      "clear": "Clear search",
+      "noResults": "No settings match “{{query}}”.",
+      "placeholder": "Search settings"
+    },
+    "sections": {
+      "lightsOut": "Lights Out"
     },
     "controls": {
       "keyboardTitle": "Keyboard Controls",
@@ -2000,6 +2015,7 @@
       "resetDefaults": "Reset All to Defaults",
       "speed": "Speed",
       "speedEdit": {
+        "keysTitle": "Keys and gestures",
         "adjustments": "Adjustments",
         "gestures": {
           "doubleClick": "Double-click to reset",
@@ -2326,6 +2342,7 @@
           "title": "Built-in AI"
         },
         "description": "ThisIsRAW's AI is built for flexibility. Choose your ideal workflow, from fast local tools to powerful self-hosting.",
+        "provider": "AI provider",
         "providers": {
           "aiConnector": "AI Connector",
           "cloud": "Cloud",

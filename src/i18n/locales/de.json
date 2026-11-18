@@ -1830,9 +1830,24 @@
       "title": "Sichtbarkeit von Anpassungen"
     },
     "categories": {
-      "general": "Allgemein",
+      "about": "Über",
+      "ai": "KI",
+      "editor": "Editor",
+      "export": "Export",
+      "interface": "Oberfläche",
+      "library": "Bibliothek",
       "processing": "Verarbeitung",
-      "shortcuts": "Steuerung"
+      "shortcuts": "Tastenkürzel",
+      "storage": "Speicher",
+      "tagging": "Tagging"
+    },
+    "search": {
+      "clear": "Suche löschen",
+      "noResults": "Keine Einstellung passt zu „{{query}}“.",
+      "placeholder": "Einstellungen durchsuchen"
+    },
+    "sections": {
+      "lightsOut": "Lights Out"
     },
     "controls": {
       "keyboardTitle": "Tastatursteuerung",
@@ -1847,6 +1862,7 @@
       "resetDefaults": "Alles auf Standard zurücksetzen",
       "speed": "Geschwindigkeit",
       "speedEdit": {
+        "keysTitle": "Tasten und Gesten",
         "adjustments": "Anpassungen",
         "gestures": {
           "doubleClick": "Doppelklick zum Zurücksetzen",
@@ -2152,6 +2168,7 @@
           "title": "Integrierte KI"
         },
         "description": "Die KI von ThisIsRAW ist auf Flexibilität ausgelegt. Wählen Sie Ihren idealen Workflow.",
+        "provider": "KI-Anbieter",
         "providers": {
           "aiConnector": "AI Connector",
           "cloud": "Cloud",

@@ -1828,9 +1828,24 @@
       "title": "調整項目の表示/非表示"
     },
     "categories": {
-      "general": "一般",
+      "about": "情報",
+      "ai": "AI",
+      "editor": "エディター",
+      "export": "エクスポート",
+      "interface": "インターフェース",
+      "library": "ライブラリ",
       "processing": "画像処理",
-      "shortcuts": "操作設定"
+      "shortcuts": "ショートカット",
+      "storage": "ストレージ",
+      "tagging": "タグ付け"
+    },
+    "search": {
+      "clear": "検索をクリア",
+      "noResults": "「{{query}}」に一致する設定はありません。",
+      "placeholder": "設定を検索"
+    },
+    "sections": {
+      "lightsOut": "Lights Out"
     },
     "controls": {
       "keyboardTitle": "キーボードショートカット",
@@ -1845,6 +1860,7 @@
       "resetDefaults": "すべてデフォルトに戻す",
       "speed": "速度",
       "speedEdit": {
+        "keysTitle": "キーとジェスチャー",
         "adjustments": "調整項目",
         "gestures": {
           "doubleClick": "ダブルクリックでリセット",
@@ -2150,6 +2166,7 @@
           "title": "内蔵AI"
         },
         "description": "ThisIsRAWのAIは、優れた柔軟性を備えています。高速なローカル処理から本格的なセルフホストまで、最適なワークフローを選択してください。",
+        "provider": "AI プロバイダー",
         "providers": {
           "aiConnector": "AI Connector",
           "cloud": "クラウド",

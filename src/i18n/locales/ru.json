@@ -1918,9 +1918,24 @@
       "title": "Отображение инструментов"
     },
     "categories": {
-      "general": "Общие",
+      "about": "О программе",
+      "ai": "ИИ",
+      "editor": "Редактор",
+      "export": "Экспорт",
+      "interface": "Интерфейс",
+      "library": "Библиотека",
       "processing": "Обработка",
-      "shortcuts": "Управление"
+      "shortcuts": "Сочетания клавиш",
+      "storage": "Хранилище",
+      "tagging": "Тегирование"
+    },
+    "search": {
+      "clear": "Очистить поиск",
+      "noResults": "Нет настроек, подходящих под «{{query}}».",
+      "placeholder": "Поиск настроек"
+    },
+    "sections": {
+      "lightsOut": "Lights Out"
     },
     "controls": {
       "keyboardTitle": "Управление клавиатурой",
@@ -1935,6 +1950,7 @@
       "resetDefaults": "Сбросить настройки управления",
       "speed": "Скорость",
       "speedEdit": {
+        "keysTitle": "Клавиши и жесты",
         "adjustments": "Параметры",
         "gestures": {
           "doubleClick": "Двойной щелчок — сброс",
@@ -2246,6 +2262,7 @@
           "title": "Встроенный ИИ"
         },
         "description": "Возможности ИИ в ThisIsRAW спроектированы с упором на гибкость. Выберите оптимальный режим вычислений: от локальных инструментов до высокопроизводительного ИИ-сервера.",
+        "provider": "Поставщик ИИ",
         "providers": {
           "aiConnector": "AI Connector",
           "cloud": "Облако",

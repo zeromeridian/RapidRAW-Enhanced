@@ -8,6 +8,8 @@ interface SwitchProps {
   checked: boolean;
   className?: string;
   disabled?: boolean;
+  /** Keeps the label for screen readers only, where a heading beside the switch already names it. */
+  hideLabel?: boolean;
   id?: string;
   label: string;
   onChange(val: boolean): any;
@@ -29,6 +31,7 @@ const Switch = ({
   checked,
   className = '',
   disabled = false,
+  hideLabel = false,
   id,
   label,
   onChange,
@@ -54,7 +57,7 @@ const Switch = ({
       htmlFor={uniqueId}
       data-tooltip={tooltip}
     >
-      <Text variant={TextVariants.label} className="select-none compact:text-xs">
+      <Text variant={TextVariants.label} className={clsx('select-none compact:text-xs', hideLabel && 'sr-only')}>
         {label}
       </Text>
       <div className="relative w-10 h-5">

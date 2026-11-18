@@ -6,7 +6,7 @@ details are in `RELEASE_NOTES.MD`.
 
 ## Library and workflow
 
-- **Panel Density** (Settings → General): **Compact**, the default, tightens
+- **Panel Density** (Settings → Interface): **Compact**, the default, tightens
   the left and right panels and the Library and Develop top bars to a
   Lightroom Classic-like density, with one-row sliders, flat section bars, and
   smaller headers; **Comfortable** keeps the original roomier layout. The
@@ -31,7 +31,7 @@ details are in `RELEASE_NOTES.MD`.
   ready; in the Library Grid or List every thumbnail stays lit unless two
   or more photos are selected, in which case only those do; in Culling the
   compared photos stay lit. Dim keeps the interface usable; Lights Out blocks
-  clicks outside the photo. Settings → General sets the **Lights Dim level**
+  clicks outside the photo. Settings → Interface sets the **Lights Dim level**
   (50/70/80/90 %), the **Lights Out screen color** (black, three greys, white),
   and an optional **Lights Out border** around the photo in Develop (1–128 px, same
   colors; Fit zoom leaves room for it).
@@ -85,8 +85,8 @@ details are in `RELEASE_NOTES.MD`.
   once they are edited, rated, tagged or stacked. Viewing a photo in
   Develop writes nothing until something changes.
 - Configurable external-editor round trip, like Lightroom's Edit In: add
-  Photoshop, Pixelmator Pro, or any desktop editor executable in General
-  Settings (an installed Photo Craft is found and offered automatically),
+  Photoshop, Pixelmator Pro, or any desktop editor executable in Settings →
+  Export (an installed Photo Craft is found and offered automatically),
   choose TIFF, JPEG, or ask-each-time per editor, then right-click one image
   in the Library or the image being edited in Develop (**Open in**) to open a
   16-bit TIFF or JPEG copy in that editor. The copy appears beside the original as `<name>-Edit` only
@@ -98,7 +98,7 @@ details are in `RELEASE_NOTES.MD`.
   picked up on the next launch. A save into a subfolder of the editor's
   working folder counts too, and an editor that quits with an error right
   after starting is reported instead of being waited for. Unsaved working
-  copies are removed after 7 days or from Settings → Data Management.
+  copies are removed after 7 days or from Settings → Storage.
   **Open in → Original File** opens a non-RAW file itself and refreshes its
   thumbnail when it is saved.
 - Rejected, Selected, Deferred, and Unflagged states with keyboard shortcuts,
@@ -159,7 +159,12 @@ details are in `RELEASE_NOTES.MD`.
   name is `{filename}_edited`; a photo imported under a new name
   remembers its camera name.
 - Caps Lock auto-advance after applying ratings, color labels, or flags.
-- Main Settings access from both Library and Develop.
+- Main Settings access from both Library and Develop. The Settings window
+  has ten pages listed down the left (Interface, Library, Editor, Tagging,
+  Processing, AI, Export, Storage, Shortcuts, About), one line per setting
+  (name and description left, control right), and a search field that
+  shows the matching settings and shortcuts from every page; a setting
+  that needs a relaunch shows Save & Relaunch at the top of the window.
 - Optional launch directly into the last library, bypassing the splash screen.
 - Proprietary `.tirdata` sidecars keep ThisIsRAW edits, metadata, and virtual
   copies separate from RapidRAW. Settings provides an explicit non-destructive
@@ -194,7 +199,7 @@ details are in `RELEASE_NOTES.MD`.
   indexing yields to visible thumbnails and cannot refresh an unrelated folder.
   Files, `.tirdata`, and XMP remain authoritative; the bundled SQLite catalog
   requires no server.
-- The library catalog location is visible and customizable in General Settings;
+- The library catalog location is visible and customizable in Settings → Library;
   changing it safely moves the existing catalog, with an option to restore the
   platform-default location.
 - Thumbnail-prioritized cold-folder loading with delayed, bounded, cancelable
@@ -254,7 +259,7 @@ details are in `RELEASE_NOTES.MD`.
   corner has that room.
 - **Speed Edit**: hold W (or tap it to keep it on) and drag anywhere on the
   photo to change the last-used slider; Shift drags finely and a double-click
-  resets. A and D switch between the sliders chosen in Settings → Controls,
+  resets. A and D switch between the sliders chosen in Settings → Shortcuts,
   the arrow keys nudge, R resets, C and V copy and paste a value, and Q and E
   change photos. A small display at the pointer shows the slider and value.
 - **Favorites** view of the Adjustments panel (its All / ★ Favorites
@@ -345,7 +350,7 @@ details are in `RELEASE_NOTES.MD`.
   lens of fixed-lens cameras (Ricoh GR, Fujifilm X100) through the camera's
   mount; **Auto Lens Correction** in the right-click Productivity menu turns
   it on for the photo or a whole selection.
-- **Apply Lens Profile Automatically** (Settings → My Lenses, on by default)
+- **Apply Lens Profile Automatically** (Settings → Editor → My Lenses, on by default)
   starts unedited RAW images in Auto lens correction with the profile detected
   from EXIF, in Develop, exports, and thumbnails. Images without a matching
   profile stay in Manual mode, edited images keep their own lens settings,
