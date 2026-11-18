@@ -244,7 +244,7 @@
       "presets": {
         "deleteMessage": "ゾーンプリセット「{{name}}」を削除しますか？この操作は元に戻せません。",
         "deleteTitle": "ゾーンプリセットを削除",
-        "fileName": "ゾーンカラーグレーディングのプリセット",
+        "fileName": "ゾーンエディターのプリセット",
         "importNone": "このファイルに使用できるゾーンプリセットはありません。",
         "imported": "ゾーンプリセットを読み込みました: {{count}}",
         "nameConflict": "同じ名前のゾーンプリセットが既にあります。",
@@ -465,7 +465,7 @@
         "lensGeometry": "レンズとジオメトリ",
         "lightAtmosphere": "光と雰囲気",
         "look": "ルック",
-        "zoneTint": "ゾーンカラーグレーディング"
+        "zoneTint": "ゾーンエディター"
       },
       "title": "補正",
       "tooltips": {
@@ -1219,8 +1219,8 @@
       "fileType": {
         "heif": "HEIF/HEICファイル",
         "jpeg": "JPEGファイル",
-        "other": "その他のファイル（TIFF、PNG、WebPなど）",
-        "raw": "RAWファイル"
+        "raw": "RAWファイル",
+        "tiff": "TIFFファイル"
       },
       "noMatch": "フィルターに一致する画像が見つかりません。",
       "rating": {
@@ -1297,6 +1297,7 @@
         "filterByEdited": "編集状態でフィルター",
         "filterByFileType": "ファイル形式でフィルター",
         "filterByRating": "評価でフィルター",
+        "groupByFolder": "フォルダーごとにグループ化",
         "groupEditedFiles": "Include edited files in groups",
         "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
         "groupOff": "Off",

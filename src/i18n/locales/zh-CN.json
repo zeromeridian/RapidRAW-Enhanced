@@ -244,7 +244,7 @@
       "presets": {
         "deleteMessage": "删除区域预设“{{name}}”？此操作无法撤销。",
         "deleteTitle": "删除区域预设",
-        "fileName": "区域色彩分级预设",
+        "fileName": "区域编辑器预设",
         "importNone": "此文件中没有可用的区域预设。",
         "imported": "已导入区域预设：{{count}}",
         "nameConflict": "已存在同名的区域预设。",
@@ -465,7 +465,7 @@
         "lensGeometry": "镜头与几何",
         "lightAtmosphere": "光线与氛围",
         "look": "风格",
-        "zoneTint": "区域颜色分级"
+        "zoneTint": "区域编辑器"
       },
       "title": "调整",
       "tooltips": {
@@ -1219,8 +1219,8 @@
       "fileType": {
         "heif": "HEIF/HEIC 文件",
         "jpeg": "JPEG 文件",
-        "other": "其他文件（TIFF、PNG、WebP 等）",
-        "raw": "RAW 文件"
+        "raw": "RAW 文件",
+        "tiff": "TIFF 文件"
       },
       "noMatch": "未找到匹配过滤条件的图像。",
       "rating": {
@@ -1297,6 +1297,7 @@
         "filterByEdited": "按编辑状态过滤",
         "filterByFileType": "按文件类型过滤",
         "filterByRating": "按评分过滤",
+        "groupByFolder": "按文件夹分组",
         "groupEditedFiles": "Include edited files in groups",
         "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
         "groupOff": "Off",

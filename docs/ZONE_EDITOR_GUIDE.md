@@ -1,16 +1,17 @@
-# Zone Color Grading: How It Works
+# Zone Editor: How It Works
 
-This guide explains everything Zone Color Grading does, in plain words
+This guide explains everything the Zone Editor does, in plain words
 with worked examples. It describes ThisIsRAW `1.59.0`. The tool has its
 own panel in Develop's right toolbar (the **Blend** icon, below the
-Orbit Blend Pad). Inside the code and in saved edits it is still called
-Zone Tint (`zoneTint`).
+Orbit Blend Pad). Up to `1.91.x` it was called Zone Color Grading.
+Inside the code and in saved edits it is still called Zone Tint
+(`zoneTint`).
 
 ## The idea in one paragraph
 
 Ansel Adams' Zone System splits the tones of a photo into eleven zones,
 from Zone 0 (pure black) to Zone X (pure white), with Zone V as middle
-grey. Zone Color Grading lets you give zones a colour and a brightness
+grey. The Zone Editor lets you give zones a colour and a brightness
 shift. On a Black & White photo that tones it, like a darkroom toner:
 cool shadows, warm highlights, a selenium or sepia look. On a colour
 photo it grades by tone: it pushes the colours already in the shadows,
@@ -424,15 +425,15 @@ Advanced off: the look stays and Zone VIII shows its tick.
 
 ## Presets
 
-The bar at the top of the panel keeps named Zone Color Grading looks,
+The bar at the top of the panel keeps named Zone Editor looks,
 like the Orbit Blend Pad's presets.
 
 - **What a preset holds:** the whole panel: every grade (hidden ones
   stay hidden), Softness, Protect, Smoothing, Amount, and each zone's
   Advanced centre and width. A preset saved before `1.65.0` has none,
   so loading it puts every zone back in its standard place.
-- **Loading** one from the list **replaces** the photo's Zone Color
-  Grading with it, in one undo step, and switches the panel's eye on so
+- **Loading** one from the list **replaces** the photo's Zone Editor
+  grading with it, in one undo step, and switches the panel's eye on so
   you see the result. Fine-tune it afterwards like any grading.
 - **Save** (disk icon) saves the current look as a new preset. Once you
   change a loaded look, the list shows a red **\*** and the button
@@ -448,7 +449,7 @@ like the Orbit Blend Pad's presets.
   Change, rename or delete them like your own; once deleted they do not
   come back.
 - These presets are kept in the app settings, not with the photo. The
-  regular **Presets** panel saves Zone Color Grading too, together with
+  regular **Presets** panel saves the Zone Editor too, together with
   the rest of an edit.
 
 ## Switching off, resetting, saving
@@ -460,7 +461,7 @@ like the Orbit Blend Pad's presets.
 - Switching Black & White off keeps the grading; it then grades the
   colour photo.
 - The grading saves with the edit and travels with it: XMP sidecars,
-  copy and paste (its own group, "Zone Color Grading"), presets, export
+  copy and paste (its own group, "Zone Editor"), presets, export
   and other ThisIsRAW installations.
 - Masks in a blend mode other than Normal keep the grading in the
   backdrop they blend against. The tool is not available inside masks

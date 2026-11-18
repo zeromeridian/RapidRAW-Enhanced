@@ -37,8 +37,19 @@ interface UseAppInitializationProps {
 /** The file types a filter saved before 1.89.0 (`rawStatus`) showed. */
 const LEGACY_RAW_STATUS_FILE_TYPES: Record<string, ImageFileType[]> = {
   rawOnly: [ImageFileType.Raw],
-  nonRawOnly: [ImageFileType.Jpeg, ImageFileType.Heif, ImageFileType.Other],
+  nonRawOnly: [ImageFileType.Jpeg, ImageFileType.Heif, ImageFileType.Tiff],
 };
+
+/** Saved file types as the current types: OTHER (1.89.0–1.91.x) became TIFF; unknown values go. */
+const toCurrentFileTypes = (fileTypes: string[]): ImageFileType[] => [
+  ...new Set(
+    fileTypes
+      .map((fileType) => (fileType === 'other' ? ImageFileType.Tiff : fileType))
+      .filter((fileType): fileType is ImageFileType =>
+        Object.values(ImageFileType).includes(fileType as ImageFileType),
+      ),
+  ),
+];
 
 const getDefaultLanguage = (i18nInstance: any): string => {
   const browserLang = navigator.language || (navigator as any).userLanguage || 'en';
@@ -167,7 +178,9 @@ export const useAppInitialization = ({
           const { rawStatus, ...savedFilter } = settings.filterCriteria as FilterCriteria & { rawStatus?: string };
           settings.filterCriteria = {
             ...savedFilter,
-            fileTypes: savedFilter.fileTypes ?? LEGACY_RAW_STATUS_FILE_TYPES[rawStatus ?? ''] ?? [],
+            fileTypes: savedFilter.fileTypes
+              ? toCurrentFileTypes(savedFilter.fileTypes)
+              : (LEGACY_RAW_STATUS_FILE_TYPES[rawStatus ?? ''] ?? []),
           };
           if (rawStatus === 'groupVariants' || rawStatus === 'rawOverNonRaw') {
             const legacyPref = settings?.groupPreferredType === 'jpeg' ? 'jpeg' : 'raw';

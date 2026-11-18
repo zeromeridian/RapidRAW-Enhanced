@@ -296,7 +296,7 @@ function GradeValues({ grade }: { grade: ZoneTintGrade }) {
 }
 
 /**
- * Zone Color Grading (internally Zone Tint): colours by Zone System zone (`zone_tint.rs`),
+ * Zone Editor (internally Zone Tint; formerly Zone Color Grading): colours by Zone System zone (`zone_tint.rs`),
  * toning a Black & White photo or grading a colour one. Each coloured selection is a grade;
  * grades that share zones add up there.
  */

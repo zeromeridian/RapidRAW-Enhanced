@@ -244,7 +244,7 @@
       "presets": {
         "deleteMessage": "Удалить пресет зон «{{name}}»? Это действие нельзя отменить.",
         "deleteTitle": "Удалить пресет зон",
-        "fileName": "Пресеты цветокоррекции по зонам",
+        "fileName": "Пресеты редактора зон",
         "importNone": "В этом файле нет подходящих пресетов зон.",
         "imported": "Импортировано пресетов зон: {{count}}",
         "nameConflict": "Пресет зон с таким именем уже существует.",
@@ -503,7 +503,7 @@
         "lensGeometry": "Объектив и геометрия",
         "lightAtmosphere": "Свет и атмосфера",
         "look": "Стиль",
-        "zoneTint": "Цветокоррекция по зонам"
+        "zoneTint": "Редактор зон"
       },
       "title": "Настройки",
       "tooltips": {
@@ -1275,8 +1275,8 @@
       "fileType": {
         "heif": "Файлы HEIF/HEIC",
         "jpeg": "Файлы JPEG",
-        "other": "Другие файлы (TIFF, PNG, WebP…)",
-        "raw": "Файлы RAW"
+        "raw": "Файлы RAW",
+        "tiff": "Файлы TIFF"
       },
       "noMatch": "Нет изображений, соответствующих фильтру.",
       "rating": {
@@ -1353,6 +1353,7 @@
         "filterByEdited": "Фильтр по редактированию",
         "filterByFileType": "Фильтр по формату",
         "filterByRating": "Фильтр по рейтингу",
+        "groupByFolder": "Группировать по папкам",
         "groupEditedFiles": "Include edited files in groups",
         "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
         "groupOff": "Off",

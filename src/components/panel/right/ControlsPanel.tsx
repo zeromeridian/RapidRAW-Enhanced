@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { ADJUSTMENT_SECTION_COMPONENTS } from '../../adjustments/sectionComponents';
-import { CustomizePanelsButton, customizePanelsMenuOption } from './AdjustmentSectionsSubMenu';
+import { CustomizePanelsButton, customizePanelsMenuOption, focusModeMenuOption } from './AdjustmentSectionsSubMenu';
 import { AdjustmentPanelContext, FavoriteStar } from '../../adjustments/AdjustmentTool';
 import CollapsibleSection from '../../ui/CollapsibleSection';
 import SegmentedSwitch from '../../ui/SegmentedSwitch';
@@ -205,6 +205,7 @@ export default function Controls() {
       ...getFavoriteMenuOptions(event.target, sectionName),
       { type: OPTION_SEPARATOR },
       customizePanelsMenuOption(t('editor.adjustments.actions.customizePanels')),
+      focusModeMenuOption(t('settings.general.focusMode')),
     ];
 
     showContextMenu(event.clientX, event.clientY, options);

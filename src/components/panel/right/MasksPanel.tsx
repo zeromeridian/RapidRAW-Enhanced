@@ -45,7 +45,7 @@ import Dropdown from '../../ui/Dropdown';
 import Input from '../../ui/Input';
 import Button from '../../ui/Button';
 import { ADJUSTMENT_SECTION_COMPONENTS } from '../../adjustments/sectionComponents';
-import { customizePanelsMenuOption } from './AdjustmentSectionsSubMenu';
+import { customizePanelsMenuOption, focusModeMenuOption } from './AdjustmentSectionsSubMenu';
 import Waveform from '../editor/Waveform';
 import Resizer from '../../ui/Resizer';
 import { type DepthRange, DepthRangePicker, RangePicker, type RangeValues } from '../../ui/RangePicker';
@@ -1793,6 +1793,7 @@ function SettingsPanel({
       },
       { type: OPTION_SEPARATOR },
       customizePanelsMenuOption(t('editor.adjustments.actions.customizePanels')),
+      focusModeMenuOption(t('settings.general.focusMode')),
     ]);
   };
 

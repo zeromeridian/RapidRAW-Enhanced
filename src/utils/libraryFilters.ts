@@ -4,14 +4,16 @@ import { getFileExtension } from './imageGrouping';
 
 const JPEG_EXTENSIONS = new Set(['jpg', 'jpeg']);
 const HEIF_EXTENSIONS = new Set(['heic', 'heif', 'hif']);
+const TIFF_EXTENSIONS = new Set(['tif', 'tiff']);
 
-/** The file type the Quick Filter and Select By sort an image under. */
-export function getImageFileType(image: ImageFile): ImageFileType {
+/** The file type the Quick Filter and Select By sort an image under; null for a format without one. */
+export function getImageFileType(image: ImageFile): ImageFileType | null {
   if (image.is_raw) return ImageFileType.Raw;
   const extension = getFileExtension(image.path);
   if (JPEG_EXTENSIONS.has(extension)) return ImageFileType.Jpeg;
   if (HEIF_EXTENSIONS.has(extension)) return ImageFileType.Heif;
-  return ImageFileType.Other;
+  if (TIFF_EXTENSIONS.has(extension)) return ImageFileType.Tiff;
+  return null;
 }
 
 export function matchesLibraryFilter(
@@ -30,7 +32,10 @@ export function matchesLibraryFilter(
     }
   }
 
-  if (filterCriteria.fileTypes?.length && !filterCriteria.fileTypes.includes(getImageFileType(image))) return false;
+  if (filterCriteria.fileTypes?.length) {
+    const fileType = getImageFileType(image);
+    if (!fileType || !filterCriteria.fileTypes.includes(fileType)) return false;
+  }
 
   if (filterCriteria.editedStatus && filterCriteria.editedStatus !== EditedStatus.All) {
     if (filterCriteria.editedStatus === EditedStatus.EditedOnly && !image.is_edited) return false;

@@ -304,7 +304,8 @@ impl ZoneWeights {
     }
 }
 
-/// Marks a file of exported Zone Color Grading presets.
+/// Marks a file of exported Zone Editor presets. It keeps the tool's former name, Zone Color
+/// Grading, so files exported before the rename still load.
 const PRESET_FILE_FORMAT: &str = "ThisIsRAW Zone Color Grading presets";
 
 /// Writes Zone Color Grading presets to a JSON file (`preset_file`); the panel builds and

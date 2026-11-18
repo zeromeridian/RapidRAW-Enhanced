@@ -245,7 +245,7 @@
       "presets": {
         "deleteMessage": "Delete zone preset \"{{name}}\"? This cannot be undone.",
         "deleteTitle": "Delete Zone Preset",
-        "fileName": "Zone Color Grading presets",
+        "fileName": "Zone Editor presets",
         "importNone": "No usable zone presets in this file.",
         "imported": "Zone presets imported: {{count}}",
         "nameConflict": "A zone preset with this name already exists.",
@@ -491,7 +491,7 @@
         "lensGeometry": "Lens & Geometry",
         "lightAtmosphere": "Light & Atmosphere",
         "look": "Look",
-        "zoneTint": "Zone Color Grading"
+        "zoneTint": "Zone Editor"
       },
       "title": "Adjustments",
       "tooltips": {
@@ -1331,8 +1331,8 @@
       "fileType": {
         "heif": "HEIF/HEIC files",
         "jpeg": "JPEG files",
-        "other": "Other files (TIFF, PNG, WebP…)",
-        "raw": "RAW files"
+        "raw": "RAW files",
+        "tiff": "TIFF files"
       },
       "noMatch": "No images found that match your filter.",
       "rating": {
@@ -1419,6 +1419,7 @@
         "filterByFlag": "Filter by Flag",
         "filterByFileType": "Filter by File Type",
         "filterByRating": "Filter by Rating",
+        "groupByFolder": "Group by folder",
         "groupEditedFiles": "Include edited files in groups",
         "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
         "groupOff": "Off",

@@ -244,7 +244,7 @@
       "presets": {
         "deleteMessage": "Zonen-Preset „{{name}}“ löschen? Dies kann nicht rückgängig gemacht werden.",
         "deleteTitle": "Zonen-Preset löschen",
-        "fileName": "Zonen-Color-Grading-Presets",
+        "fileName": "Zonen-Editor-Presets",
         "importNone": "Keine verwendbaren Zonen-Presets in dieser Datei.",
         "imported": "Zonen-Presets importiert: {{count}}",
         "nameConflict": "Ein Zonen-Preset mit diesem Namen existiert bereits.",
@@ -465,7 +465,7 @@
         "lensGeometry": "Objektiv & Geometrie",
         "lightAtmosphere": "Licht & Atmosphäre",
         "look": "Look",
-        "zoneTint": "Zonen-Color-Grading"
+        "zoneTint": "Zonen-Editor"
       },
       "title": "Anpassungen",
       "tooltips": {
@@ -1221,8 +1221,8 @@
       "fileType": {
         "heif": "HEIF/HEIC-Dateien",
         "jpeg": "JPEG-Dateien",
-        "other": "Andere Dateien (TIFF, PNG, WebP …)",
-        "raw": "RAW-Dateien"
+        "raw": "RAW-Dateien",
+        "tiff": "TIFF-Dateien"
       },
       "noMatch": "Keine Bilder gefunden, die Ihrem Filter entsprechen.",
       "rating": {
@@ -1299,6 +1299,7 @@
         "filterByEdited": "Nach Bearbeitungsstatus filtern",
         "filterByFileType": "Nach Dateityp filtern",
         "filterByRating": "Nach Bewertung filtern",
+        "groupByFolder": "Nach Ordner gruppieren",
         "groupEditedFiles": "Include edited files in groups",
         "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
         "groupOff": "Off",

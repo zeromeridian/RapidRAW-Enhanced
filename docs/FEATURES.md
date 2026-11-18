@@ -49,7 +49,7 @@ details are in `RELEASE_NOTES.MD`.
   the active photo. Develop: Info, Tagging, and Export show that panel for
   the edited photo only, and Develop returns to the last editing tool; the
   tool bar above the right sidebar keeps only the editing tools (Adjust,
-  Crop, Lens & Geometry; Blend Pad, Zone Color Grading; Masks, Inpaint;
+  Crop, Lens & Geometry; Blend Pad, Zone Editor; Masks, Inpaint;
   Presets), with large icons sharing its
   width; clicking the highlighted tool keeps it open. The top bar also stays in
   fullscreen and with native window decorations (without its window
@@ -59,7 +59,7 @@ details are in `RELEASE_NOTES.MD`.
   the window is wide enough and collapse to click-to-open icons only when it
   is too narrow; only on Android, which has no top bar, they remain in the
   bottom toolbar. Select by replaces the current selection
-  using any rating, DNG/other-RAW/JPEG/HEIF/other file type, edit-status, color-label, or flag criterion
+  using any rating, DNG/other-RAW/JPEG/HEIF/TIFF file type, edit-status, color-label, or flag criterion
   without changing active filters. It follows the Quick Filter inline design,
   exposes match counts in tooltips, and provides an in-place clear-selection
   action. The chosen criterion remains visibly active and acts as a toggle;
@@ -105,14 +105,16 @@ details are in `RELEASE_NOTES.MD`.
   thumbnail badges, rejected-image dimming, filtering, and rejected-file
   deletion for the currently loaded folder view.
 - Unified **Quick Filter** controls for unrated and rating thresholds,
-  file types (RAW, JPEG, HEIF incl. `.hif` and Other buttons that combine; none on shows
-  every type), edited/original status, color labels, and flags, with an
+  file types (RAW, JPEG, HEIF incl. `.hif` and TIFF buttons that combine; none on shows
+  every type, including PNG, WebP and other formats without a button), edited/original status, color labels, and flags, with an
   in-place clear-all action and a persistent active-filter indicator. Rating
   filters and rating-based selection provide explicit **up to (≤)** and **and
   up (≥)** comparisons, with star highlights matching the selected range. The
   top **View Options** menu remains focused on display, sorting, metadata, and
   grouping controls, while the Library header retains its compact active-filter
-  summary.
+  summary. In the Recursive view its **Group by folder** switch (on by
+  default, remembered) turns the per-folder headers off for one flat grid
+  in the sort order.
 - Compact neutral file-type badges in Library grid and list metadata, using a
   shared `RAW` label for camera formats and normalized labels such as `JPG` and
   `TIF` for rendered files. Grid metadata also shows the image pixel
@@ -298,6 +300,9 @@ details are in `RELEASE_NOTES.MD`.
   menu): drag the adjustment sections and the tools inside each into a new
   order, shared by the photo's and the masks' adjustments, with Reset to
   Default. Open sections are remembered across restarts.
+- **Focus Mode** (Lightroom Classic's Solo Mode) on the same section
+  right-click menus (photo and masks), with a check mark when on, as well
+  as in Settings → Interface: opening a section closes the others.
 - Readable **edit history** (right-click Undo/Redo): each step is named when
   it is made, with the changed controls and their values, mask, HSL, curve,
   and crop details; presets, Paste, Reset, and Auto Adjust are separate,
@@ -394,8 +399,8 @@ details are in `RELEASE_NOTES.MD`.
   Variance, a hue–saturation field and luminance strip to refine the picked
   colour, before/after swatches, Hue/Saturation/Luminance range bars, and
   Visualize Range. Points travel with the edit (XMP, copy/paste, presets).
-- **Zone Color Grading** panel in the Develop tool bar (whole photo; formerly
-  Zone Tint): a colour and a luminance for each of the 11 Zone System
+- **Zone Editor** panel in the Develop tool bar (whole photo; formerly
+  Zone Color Grading, internally Zone Tint): a colour and a luminance for each of the 11 Zone System
   zones (0–X), toning a Black & White photo or grading a colour one by
   tonal zone (the zone's colour shifts the colours there). The colour never
   changes a tone; Luminance (−100 to 100) shifts a zone by up to 1.5
@@ -442,7 +447,7 @@ details are in `RELEASE_NOTES.MD`.
   Soft, Ease in), replacing other grades there. Masks in a blend mode
   keep the grade. The panel's eye switches it off and its reset clears
   it. It travels with the edit (XMP, copy/paste, presets); older edits
-  open as grades. Guide: `ZONE_COLOR_GRADING_GUIDE.md`.
+  open as grades. Guide: `ZONE_EDITOR_GUIDE.md`.
 - **Targeted adjustment pipettes**, as in Lightroom Classic: drag up or down
   on the photo to change what is under the cursor, double-click to reset it.
   The **Color Mixer** pipette (from RapidRAW) moves every colour band found

@@ -5,6 +5,26 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.92.0-dev-small-library-editor-tweaks — 2026-11-18
+
+### Library
+
+- The Quick Filter and Select By have a TIFF button in place of OTHER: it
+  finds `.tif` and `.tiff` files only. PNG, WebP and other formats show
+  while no file-type button is on. A saved filter with OTHER on now
+  shows TIFF.
+- In the Recursive view, a new "Group by folder" switch in View Options
+  turns the folder headers off, so all photos show as one grid in the
+  chosen sort order. It is on by default and remembered.
+
+### Develop
+
+- Zone Color Grading is now called the Zone Editor. Edits, presets and
+  exported preset files are unchanged and keep loading.
+- Right-click an Adjustments or mask section header to switch Focus Mode
+  on or off (opening a section closes the others, like Lightroom
+  Classic's Solo Mode); a check mark shows when it is on.
+
 ## 1.91.0-dev-settings-streamline — 2026-11-18
 
 ### Settings

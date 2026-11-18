@@ -200,6 +200,8 @@ export default function LibraryGrid(props: any) {
   const requestTimeoutRef = useRef<any>(null);
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
   const showExifCols = exifOverlay !== ExifOverlay.Off;
+  const groupRecursiveByFolder = useSettingsStore((s) => s.appSettings?.groupRecursiveByFolder ?? true);
+  const isGroupedByFolder = libraryViewMode === LibraryViewMode.Recursive && groupRecursiveByFolder;
 
   useEffect(() => {
     const el = libraryContainerRef.current;
@@ -315,7 +317,7 @@ export default function LibraryGrid(props: any) {
 
     const rows: any[] = [];
 
-    if (libraryViewMode === LibraryViewMode.Recursive) {
+    if (isGroupedByFolder) {
       const groups = groupImagesByFolder(imageList, currentFolderPath);
       groups.forEach((group) => {
         if (group.images.length === 0) return;
@@ -359,7 +361,7 @@ export default function LibraryGrid(props: any) {
   }, [
     gridSize.width,
     imageList,
-    libraryViewMode,
+    isGroupedByFolder,
     libraryDisplayMode,
     collapsedRecursiveFolders,
     thumbnailSize,
@@ -395,7 +397,7 @@ export default function LibraryGrid(props: any) {
     let targetTop = 0;
     let found = false;
 
-    if (libraryViewMode === LibraryViewMode.Recursive) {
+    if (isGroupedByFolder) {
       const groups = groupImagesByFolder(imageList, currentFolderPath);
       for (const group of groups) {
         if (group.images.length === 0) continue;
@@ -440,7 +442,7 @@ export default function LibraryGrid(props: any) {
         });
       }
     }
-  }, [activePath, gridData, multiSelectedPaths.length, listHandle, currentFolderPath, imageList, libraryViewMode]);
+  }, [activePath, gridData, multiSelectedPaths.length, listHandle, currentFolderPath, imageList, isGroupedByFolder]);
 
   useEffect(() => {
     if (!gridData) {
@@ -553,7 +555,7 @@ export default function LibraryGrid(props: any) {
           />
         )}
         <div
-          key={`${gridSize.width}-${thumbnailSize}-${libraryViewMode}-${sortCriteria.key}-${sortCriteria.order}-${thumbnailAspectRatio}`}
+          key={`${gridSize.width}-${thumbnailSize}-${libraryViewMode}-${isGroupedByFolder}-${sortCriteria.key}-${sortCriteria.order}-${thumbnailAspectRatio}`}
           style={{ height: gridData.isListView ? gridSize.height - 36 : gridSize.height, width: gridSize.width }}
           {...lightsOutClip}
         >

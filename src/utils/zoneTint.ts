@@ -1,5 +1,5 @@
 /**
- * Zone Tint (Zone Color Grading) helpers shared by its panel and its pickers on the photo:
+ * Zone Tint (shown as Zone Editor, formerly Zone Color Grading) helpers shared by its panel and its pickers on the photo:
  * the zone selection and the zones read from the `zoneTint` probe (OKLab L in red, the
  * lightness `apply_zone_tint` in `shader.wgsl` picks its zones by).
  */

@@ -214,19 +214,22 @@ export enum Panel {
   ZoneTint = 'zoneTint',
 }
 
-/** The file types the Library's Quick Filter and Select By tell apart. */
+/**
+ * The file types the Library's Quick Filter and Select By tell apart. Other
+ * formats (PNG, WebP, …) have none and show only while no type is chosen.
+ */
 export enum ImageFileType {
   Raw = 'raw',
   Jpeg = 'jpeg',
   Heif = 'heif',
-  Other = 'other',
+  Tiff = 'tiff',
 }
 
 export const IMAGE_FILE_TYPES: ImageFileType[] = [
   ImageFileType.Raw,
   ImageFileType.Jpeg,
   ImageFileType.Heif,
-  ImageFileType.Other,
+  ImageFileType.Tiff,
 ];
 
 /** Short button labels, untranslated like the other filter pills (EDIT, ORIG). */
@@ -234,7 +237,7 @@ export const IMAGE_FILE_TYPE_LABELS: Record<ImageFileType, string> = {
   [ImageFileType.Raw]: 'RAW',
   [ImageFileType.Jpeg]: 'JPEG',
   [ImageFileType.Heif]: 'HEIF',
-  [ImageFileType.Other]: 'OTHER',
+  [ImageFileType.Tiff]: 'TIFF',
 };
 
 export enum SortDirection {
@@ -332,6 +335,8 @@ export interface AppSettings {
   lastRootPath: string | null;
   rootFolders?: string[];
   libraryViewMode?: LibraryViewMode;
+  /** Whether the Recursive view shows a header per subfolder; absent means on. */
+  groupRecursiveByFolder?: boolean;
   sortCriteria?: SortCriteria;
   theme: Theme;
   thumbnailSize?: string;

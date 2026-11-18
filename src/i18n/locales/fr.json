@@ -244,7 +244,7 @@
       "presets": {
         "deleteMessage": "Supprimer le préréglage de zones « {{name}} » ? Cette action est irréversible.",
         "deleteTitle": "Supprimer le préréglage de zones",
-        "fileName": "Préréglages d'étalonnage par zones",
+        "fileName": "Préréglages de l'Éditeur de zones",
         "importNone": "Aucun préréglage de zones utilisable dans ce fichier.",
         "imported": "Préréglages de zones importés : {{count}}",
         "nameConflict": "Un préréglage de zones porte déjà ce nom.",
@@ -484,7 +484,7 @@
         "lensGeometry": "Objectif et géométrie",
         "lightAtmosphere": "Lumière et atmosphère",
         "look": "Rendu",
-        "zoneTint": "Colorimétrie par zones"
+        "zoneTint": "Éditeur de zones"
       },
       "title": "Ajustements",
       "tooltips": {
@@ -1248,8 +1248,8 @@
       "fileType": {
         "heif": "Fichiers HEIF/HEIC",
         "jpeg": "Fichiers JPEG",
-        "other": "Autres fichiers (TIFF, PNG, WebP…)",
-        "raw": "Fichiers RAW"
+        "raw": "Fichiers RAW",
+        "tiff": "Fichiers TIFF"
       },
       "noMatch": "Aucune image ne correspond à votre filtre.",
       "rating": {
@@ -1326,6 +1326,7 @@
         "filterByEdited": "Filtrer par statut de modification",
         "filterByFileType": "Filtrer par type de fichier",
         "filterByRating": "Filtrer par note",
+        "groupByFolder": "Grouper par dossier",
         "groupEditedFiles": "Include edited files in groups",
         "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
         "groupOff": "Off",

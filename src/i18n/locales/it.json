@@ -244,7 +244,7 @@
       "presets": {
         "deleteMessage": "Eliminare il predefinito di zone \"{{name}}\"? L'operazione non può essere annullata.",
         "deleteTitle": "Elimina predefinito di zone",
-        "fileName": "Predefiniti di color grading per zone",
+        "fileName": "Predefiniti dell'Editor di zone",
         "importNone": "Nessun predefinito di zone utilizzabile in questo file.",
         "imported": "Predefiniti di zone importati: {{count}}",
         "nameConflict": "Esiste già un predefinito di zone con questo nome.",
@@ -484,7 +484,7 @@
         "lensGeometry": "Obiettivo e geometria",
         "lightAtmosphere": "Luce e atmosfera",
         "look": "Look",
-        "zoneTint": "Color Grading per zone"
+        "zoneTint": "Editor di zone"
       },
       "title": "Regolazioni",
       "tooltips": {
@@ -1248,8 +1248,8 @@
       "fileType": {
         "heif": "File HEIF/HEIC",
         "jpeg": "File JPEG",
-        "other": "Altri file (TIFF, PNG, WebP…)",
-        "raw": "File RAW"
+        "raw": "File RAW",
+        "tiff": "File TIFF"
       },
       "noMatch": "Nessuna immagine trovata corrispondente al tuo filtro.",
       "rating": {
@@ -1326,6 +1326,7 @@
         "filterByEdited": "Filtra per Stato Modifica",
         "filterByFileType": "Filtra per Tipo di File",
         "filterByRating": "Filtra per Valutazione",
+        "groupByFolder": "Raggruppa per cartella",
         "groupEditedFiles": "Include edited files in groups",
         "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
         "groupOff": "Off",

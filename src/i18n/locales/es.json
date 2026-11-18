@@ -244,7 +244,7 @@
       "presets": {
         "deleteMessage": "¿Eliminar el ajuste de zonas «{{name}}»? No se puede deshacer.",
         "deleteTitle": "Eliminar ajuste de zonas",
-        "fileName": "Ajustes de gradación por zonas",
+        "fileName": "Ajustes del Editor de zonas",
         "importNone": "No hay ajustes de zonas utilizables en este archivo.",
         "imported": "Ajustes de zonas importados: {{count}}",
         "nameConflict": "Ya existe un ajuste de zonas con este nombre.",
@@ -484,7 +484,7 @@
         "lensGeometry": "Objetivo y geometría",
         "lightAtmosphere": "Luz y atmósfera",
         "look": "Estilo",
-        "zoneTint": "Gradación de color por zonas"
+        "zoneTint": "Editor de zonas"
       },
       "title": "Ajustes",
       "tooltips": {
@@ -1248,8 +1248,8 @@
       "fileType": {
         "heif": "Archivos HEIF/HEIC",
         "jpeg": "Archivos JPEG",
-        "other": "Otros archivos (TIFF, PNG, WebP…)",
-        "raw": "Archivos RAW"
+        "raw": "Archivos RAW",
+        "tiff": "Archivos TIFF"
       },
       "noMatch": "No se encontraron imágenes que coincidan con tu filtro.",
       "rating": {
@@ -1326,6 +1326,7 @@
         "filterByEdited": "Filtrar por estado de edición",
         "filterByFileType": "Filtrar por tipo de archivo",
         "filterByRating": "Filtrar por puntuación",
+        "groupByFolder": "Agrupar por carpeta",
         "groupEditedFiles": "Include edited files in groups",
         "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
         "groupOff": "Off",

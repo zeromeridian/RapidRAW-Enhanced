@@ -853,6 +853,9 @@ pub struct AppSettings {
     pub linux_gpu_optimization_migrated_v1: Option<bool>,
     #[serde(default)]
     pub library_view_mode: Option<String>,
+    /// Whether the Recursive view shows a header per subfolder; absent means on.
+    #[serde(default)]
+    pub group_recursive_by_folder: Option<bool>,
     #[serde(default = "default_export_presets")]
     pub export_presets: Vec<ExportPreset>,
     #[serde(default)]
@@ -1068,6 +1071,7 @@ impl Default for AppSettings {
             linux_gpu_optimization: Some(false),
             linux_gpu_optimization_migrated_v1: Some(true),
             library_view_mode: Some("flat".to_string()),
+            group_recursive_by_folder: Some(true),
             export_presets: default_export_presets(),
             my_lenses: Some(Vec::new()),
             auto_apply_lens_profile: true,

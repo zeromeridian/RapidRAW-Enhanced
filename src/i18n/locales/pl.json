@@ -244,7 +244,7 @@
       "presets": {
         "deleteMessage": "Usunąć ustawienie stref „{{name}}”? Tej operacji nie można cofnąć.",
         "deleteTitle": "Usuń ustawienie stref",
-        "fileName": "Ustawienia gradacji kolorów strefowej",
+        "fileName": "Ustawienia edytora stref",
         "importNone": "Brak użytecznych ustawień stref w tym pliku.",
         "imported": "Zaimportowane ustawienia stref: {{count}}",
         "nameConflict": "Ustawienie stref o tej nazwie już istnieje.",
@@ -503,7 +503,7 @@
         "lensGeometry": "Obiektyw i geometria",
         "lightAtmosphere": "Światło i atmosfera",
         "look": "Styl",
-        "zoneTint": "Gradacja kolorów stref"
+        "zoneTint": "Edytor stref"
       },
       "title": "Ustawienia",
       "tooltips": {
@@ -1275,8 +1275,8 @@
       "fileType": {
         "heif": "Pliki HEIF/HEIC",
         "jpeg": "Pliki JPEG",
-        "other": "Inne pliki (TIFF, PNG, WebP…)",
-        "raw": "Pliki RAW"
+        "raw": "Pliki RAW",
+        "tiff": "Pliki TIFF"
       },
       "noMatch": "Nie znaleziono obrazów pasujących do twojego filtra.",
       "rating": {
@@ -1353,6 +1353,7 @@
         "filterByEdited": "Filtruj według Statusu edycji",
         "filterByFileType": "Filtruj według Typu pliku",
         "filterByRating": "Filtruj według Oceny",
+        "groupByFolder": "Grupuj według folderu",
         "groupEditedFiles": "Include edited files in groups",
         "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
         "groupOff": "Off",

@@ -475,6 +475,28 @@ export function ViewOptionsDropdown({
                 value={libraryViewMode}
                 onChange={setLibraryViewMode}
               />
+              <AnimatePresence initial={false}>
+                {libraryViewMode === LibraryViewMode.Recursive && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pt-2 px-1">
+                      <Switch
+                        checked={appSettings?.groupRecursiveByFolder ?? true}
+                        id="group-recursive-by-folder-toggle"
+                        label={t('library.header.viewOptions.groupByFolder')}
+                        onChange={(checked) => {
+                          if (appSettings) handleSettingsChange({ ...appSettings, groupRecursiveByFolder: checked });
+                        }}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 

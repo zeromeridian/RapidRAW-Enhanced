@@ -1,7 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, DragControls, motion, Reorder, useDragControls } from 'framer-motion';
-import { ChevronDown, GripVertical, LayoutList, RotateCcw } from 'lucide-react';
+import { Check, ChevronDown, GripVertical, LayoutList, RotateCcw } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import type { ParseKeys } from 'i18next';
@@ -204,6 +204,21 @@ export const customizePanelsMenuOption = (label: string) => ({
   icon: LayoutList,
   submenu: [{ customComponent: MemoizedAdjustmentSectionsSubMenu }],
 });
+
+/**
+ * The section context menu's Focus Mode entry (photo and masks), Lightroom Classic's Solo Mode:
+ * switches the Settings → Interface option that closes the other sections when one opens; ✓ when on.
+ */
+export const focusModeMenuOption = (label: string) => {
+  const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+  const isOn = appSettings?.enableFocusMode ?? false;
+  return {
+    label,
+    icon: isOn ? Check : undefined,
+    disabled: !appSettings,
+    onClick: () => appSettings && handleSettingsChange({ ...appSettings, enableFocusMode: !isOn }),
+  };
+};
 
 /** The Adjustments header button that opens Customize Panels below it. */
 export function CustomizePanelsButton() {
