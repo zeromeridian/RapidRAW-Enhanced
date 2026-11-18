@@ -1215,6 +1215,12 @@
         "editedOnly": "편집된 항목만",
         "uneditedOnly": "편집되지 않은 항목만"
       },
+      "fileType": {
+        "heif": "HEIF/HEIC 파일",
+        "jpeg": "JPEG 파일",
+        "other": "기타 파일 (TIFF, PNG, WebP 등)",
+        "raw": "RAW 파일"
+      },
       "noMatch": "필터와 일치하는 이미지를 찾을 수 없습니다.",
       "rating": {
         "all": "모두 표시",
@@ -1226,11 +1232,6 @@
         "threeAndUp": "3점 이상",
         "twoAndUp": "2점 이상",
         "unrated": "미평가 항목만"
-      },
-      "raw": {
-        "all": "모든 유형",
-        "nonRawOnly": "RAW가 아닌 항목만",
-        "rawOnly": "RAW만"
       }
     },
     "folders": {

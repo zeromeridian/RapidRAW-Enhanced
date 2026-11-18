@@ -1271,6 +1271,12 @@
         "editedOnly": "Tylko edytowane",
         "uneditedOnly": "Tylko nieedytowane"
       },
+      "fileType": {
+        "heif": "Pliki HEIF/HEIC",
+        "jpeg": "Pliki JPEG",
+        "other": "Inne pliki (TIFF, PNG, WebP…)",
+        "raw": "Pliki RAW"
+      },
       "noMatch": "Nie znaleziono obrazów pasujących do twojego filtra.",
       "rating": {
         "all": "Pokaż wszystko",
@@ -1282,11 +1288,6 @@
         "threeAndUp": "3 i więcej",
         "twoAndUp": "2 i więcej",
         "unrated": "Tylko bez oceny"
-      },
-      "raw": {
-        "all": "Wszystkie typy",
-        "nonRawOnly": "Tylko nie-RAW",
-        "rawOnly": "Tylko RAW"
       }
     },
     "folders": {

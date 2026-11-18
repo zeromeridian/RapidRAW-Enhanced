@@ -59,7 +59,7 @@ details are in `RELEASE_NOTES.MD`.
   the window is wide enough and collapse to click-to-open icons only when it
   is too narrow; only on Android, which has no top bar, they remain in the
   bottom toolbar. Select by replaces the current selection
-  using any rating, DNG/other-RAW/non-RAW, edit-status, color-label, or flag criterion
+  using any rating, DNG/other-RAW/JPEG/HEIF/other file type, edit-status, color-label, or flag criterion
   without changing active filters. It follows the Quick Filter inline design,
   exposes match counts in tooltips, and provides an in-place clear-selection
   action. The chosen criterion remains visibly active and acts as a toggle;
@@ -105,7 +105,8 @@ details are in `RELEASE_NOTES.MD`.
   thumbnail badges, rejected-image dimming, filtering, and rejected-file
   deletion for the currently loaded folder view.
 - Unified **Quick Filter** controls for unrated and rating thresholds,
-  RAW/non-RAW files, edited/original status, color labels, and flags, with an
+  file types (RAW, JPEG, HEIF and Other buttons that combine; none on shows
+  every type), edited/original status, color labels, and flags, with an
   in-place clear-all action and a persistent active-filter indicator. Rating
   filters and rating-based selection provide explicit **up to (≤)** and **and
   up (≥)** comparisons, with star highlights matching the selected range. The

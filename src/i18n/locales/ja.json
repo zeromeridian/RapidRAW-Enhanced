@@ -1215,6 +1215,12 @@
         "editedOnly": "編集済みのみ",
         "uneditedOnly": "未編集のみ"
       },
+      "fileType": {
+        "heif": "HEIF/HEICファイル",
+        "jpeg": "JPEGファイル",
+        "other": "その他のファイル（TIFF、PNG、WebPなど）",
+        "raw": "RAWファイル"
+      },
       "noMatch": "フィルターに一致する画像が見つかりません。",
       "rating": {
         "all": "すべて表示",
@@ -1226,11 +1232,6 @@
         "threeAndUp": "3以上",
         "twoAndUp": "2以上",
         "unrated": "未評価のみ"
-      },
-      "raw": {
-        "all": "すべての種類",
-        "nonRawOnly": "非RAWのみ",
-        "rawOnly": "RAWのみ"
       }
     },
     "folders": {

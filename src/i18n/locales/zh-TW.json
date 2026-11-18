@@ -1215,6 +1215,12 @@
         "editedOnly": "僅已編輯",
         "uneditedOnly": "僅未編輯"
       },
+      "fileType": {
+        "heif": "HEIF/HEIC 檔案",
+        "jpeg": "JPEG 檔案",
+        "other": "其他檔案（TIFF、PNG、WebP 等）",
+        "raw": "RAW 檔案"
+      },
       "noMatch": "未找到匹配過濾條件的影像。",
       "rating": {
         "all": "顯示全部",
@@ -1226,11 +1232,6 @@
         "threeAndUp": "3 星及以上",
         "twoAndUp": "2 星及以上",
         "unrated": "僅未評分"
-      },
-      "raw": {
-        "all": "所有型別",
-        "nonRawOnly": "僅非 RAW",
-        "rawOnly": "僅 RAW"
       }
     },
     "folders": {

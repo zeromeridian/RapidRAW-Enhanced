@@ -7,11 +7,13 @@ import { useTranslation } from 'react-i18next';
 import {
   EditedStatus,
   FilterCriteria,
+  IMAGE_FILE_TYPE_LABELS,
+  IMAGE_FILE_TYPES,
   ImageFile,
+  ImageFileType,
   RATING_COMPARISON_SYMBOLS,
   RATING_COMPARISONS,
   RatingComparison,
-  RawStatus,
 } from '../ui/AppProperties';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -49,7 +51,7 @@ const matchesSelectByCriteria = (
     flags: [],
     rating: 0,
     ratingComparison: 'atLeast',
-    rawStatus: RawStatus.All,
+    fileTypes: [],
     editedStatus: EditedStatus.All,
     ...libraryCriteria,
   });
@@ -130,7 +132,7 @@ export function QuickFilterControl({ forceExpanded = false, onExpandedWidthChang
 
   const hasActiveFilters =
     filterCriteria.rating !== 0 ||
-    filterCriteria.rawStatus !== RawStatus.All ||
+    (filterCriteria.fileTypes || []).length > 0 ||
     filterCriteria.editedStatus !== EditedStatus.All ||
     (filterCriteria.colors || []).length > 0 ||
     (filterCriteria.flags || []).length > 0;
@@ -139,7 +141,7 @@ export function QuickFilterControl({ forceExpanded = false, onExpandedWidthChang
       ...previous,
       rating: 0,
       ratingComparison: 'atLeast',
-      rawStatus: RawStatus.All,
+      fileTypes: [],
       editedStatus: EditedStatus.All,
       colors: [],
       flags: [],
@@ -265,30 +267,35 @@ export function QuickFilterControl({ forceExpanded = false, onExpandedWidthChang
           <div className="h-4 w-px bg-border-color"></div>
 
           <div className="flex items-center gap-1">
-            {[
-              { status: RawStatus.RawOnly, label: 'RAW', tooltip: t('library.filters.raw.rawOnly') },
-              { status: RawStatus.NonRawOnly, label: 'IMG', tooltip: t('library.filters.raw.nonRawOnly') },
-            ].map(({ status, label, tooltip }) => (
-              <button
-                key={status}
-                type="button"
-                onClick={() =>
-                  setFilterCriteria((prev) => ({
-                    ...prev,
-                    rawStatus: prev.rawStatus === status ? RawStatus.All : status,
-                  }))
-                }
-                className={clsx(
-                  'h-6 rounded-sm px-1.5 text-[10px] font-semibold transition-colors',
-                  filterCriteria.rawStatus === status
-                    ? 'bg-card-active text-accent'
-                    : 'text-text-secondary hover:bg-card-active hover:text-text-primary',
-                )}
-                data-tooltip={tooltip}
-              >
-                {label}
-              </button>
-            ))}
+            {IMAGE_FILE_TYPES.map((fileType) => {
+              const isSelected = (filterCriteria.fileTypes || []).includes(fileType);
+              return (
+                <button
+                  key={fileType}
+                  type="button"
+                  onClick={() =>
+                    setFilterCriteria((prev) => {
+                      const fileTypes = prev.fileTypes || [];
+                      return {
+                        ...prev,
+                        fileTypes: fileTypes.includes(fileType)
+                          ? fileTypes.filter((type) => type !== fileType)
+                          : [...fileTypes, fileType],
+                      };
+                    })
+                  }
+                  className={clsx(
+                    'h-6 rounded-sm px-1.5 text-[10px] font-semibold transition-colors',
+                    isSelected
+                      ? 'bg-card-active text-accent'
+                      : 'text-text-secondary hover:bg-card-active hover:text-text-primary',
+                  )}
+                  data-tooltip={t(`library.filters.fileType.${fileType}`)}
+                >
+                  {IMAGE_FILE_TYPE_LABELS[fileType]}
+                </button>
+              );
+            })}
           </div>
 
           <div className="h-4 w-px bg-border-color"></div>
@@ -424,23 +431,23 @@ export function SelectByControl({ forceExpanded = false, onExpandedWidthChange }
   >(
     () => [
       {
-        criteria: { rawKind: 'dng', rawStatus: RawStatus.RawOnly },
+        criteria: { rawKind: 'dng', fileTypes: [ImageFileType.Raw] },
         id: 'dng',
         label: t('ui.bottomBar.selectBy.dngOnly'),
         shortLabel: 'DNG',
       },
       {
-        criteria: { rawKind: 'otherRaw', rawStatus: RawStatus.RawOnly },
+        criteria: { rawKind: 'otherRaw', fileTypes: [ImageFileType.Raw] },
         id: 'other-raw',
         label: t('ui.bottomBar.selectBy.otherRawOnly'),
-        shortLabel: 'RAW',
+        shortLabel: IMAGE_FILE_TYPE_LABELS[ImageFileType.Raw],
       },
-      {
-        criteria: { rawStatus: RawStatus.NonRawOnly },
-        id: 'non-raw',
-        label: t('library.filters.raw.nonRawOnly'),
-        shortLabel: 'IMG',
-      },
+      ...IMAGE_FILE_TYPES.filter((fileType) => fileType !== ImageFileType.Raw).map((fileType) => ({
+        criteria: { fileTypes: [fileType] },
+        id: fileType,
+        label: t(`library.filters.fileType.${fileType}`),
+        shortLabel: IMAGE_FILE_TYPE_LABELS[fileType],
+      })),
     ],
     [t],
   );
@@ -542,7 +549,7 @@ export function SelectByControl({ forceExpanded = false, onExpandedWidthChange }
       flags: [],
       rating: 0,
       ratingComparison: 'atLeast',
-      rawStatus: RawStatus.All,
+      fileTypes: [],
       editedStatus: EditedStatus.All,
       ...criteriaOverrides,
     };

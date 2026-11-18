@@ -1,5 +1,18 @@
-import { EditedStatus, FilterCriteria, ImageFile, RawStatus } from '../components/ui/AppProperties';
+import { EditedStatus, FilterCriteria, ImageFile, ImageFileType } from '../components/ui/AppProperties';
 import { matchesImageFlagFilter } from './imageFlags';
+import { getFileExtension } from './imageGrouping';
+
+const JPEG_EXTENSIONS = new Set(['jpg', 'jpeg']);
+const HEIF_EXTENSIONS = new Set(['heic', 'heif']);
+
+/** The file type the Quick Filter and Select By sort an image under. */
+export function getImageFileType(image: ImageFile): ImageFileType {
+  if (image.is_raw) return ImageFileType.Raw;
+  const extension = getFileExtension(image.path);
+  if (JPEG_EXTENSIONS.has(extension)) return ImageFileType.Jpeg;
+  if (HEIF_EXTENSIONS.has(extension)) return ImageFileType.Heif;
+  return ImageFileType.Other;
+}
 
 export function matchesLibraryFilter(
   image: ImageFile,
@@ -17,10 +30,7 @@ export function matchesLibraryFilter(
     }
   }
 
-  if (filterCriteria.rawStatus && filterCriteria.rawStatus !== RawStatus.All) {
-    if (filterCriteria.rawStatus === RawStatus.RawOnly && !image.is_raw) return false;
-    if (filterCriteria.rawStatus === RawStatus.NonRawOnly && image.is_raw) return false;
-  }
+  if (filterCriteria.fileTypes?.length && !filterCriteria.fileTypes.includes(getImageFileType(image))) return false;
 
   if (filterCriteria.editedStatus && filterCriteria.editedStatus !== EditedStatus.All) {
     if (filterCriteria.editedStatus === EditedStatus.EditedOnly && !image.is_edited) return false;

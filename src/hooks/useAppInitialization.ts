@@ -13,8 +13,8 @@ import {
   DEFAULT_PANEL_DENSITY,
   FilterCriteria,
   Invokes,
+  ImageFileType,
   LibraryViewMode,
-  RawStatus,
   EditedStatus,
   Theme,
   ThumbnailSize,
@@ -33,6 +33,12 @@ interface UseAppInitializationProps {
   libraryViewMode: LibraryViewMode;
   setLibraryViewMode: (mode: LibraryViewMode) => void;
 }
+
+/** The file types a filter saved before 1.89.0 (`rawStatus`) showed. */
+const LEGACY_RAW_STATUS_FILE_TYPES: Record<string, ImageFileType[]> = {
+  rawOnly: [ImageFileType.Raw],
+  nonRawOnly: [ImageFileType.Jpeg, ImageFileType.Heif, ImageFileType.Other],
+};
 
 const getDefaultLanguage = (i18nInstance: any): string => {
   const browserLang = navigator.language || (navigator as any).userLanguage || 'en';
@@ -156,13 +162,18 @@ export const useAppInitialization = ({
           handleSettingsChange(settings);
         }
 
-        // legacy
-        const savedRawStatus = settings?.filterCriteria?.rawStatus as string | undefined;
-        if (savedRawStatus === 'groupVariants' || savedRawStatus === 'rawOverNonRaw') {
-          const legacyPref = settings?.groupPreferredType === 'jpeg' ? 'jpeg' : 'raw';
-          settings.grouping = legacyPref;
-          settings.filterCriteria = { ...settings.filterCriteria, rawStatus: 'all' };
-          handleSettingsChange(settings);
+        // legacy: before 1.89.0 the file-type filter was the single choice `rawStatus`.
+        if (settings?.filterCriteria) {
+          const { rawStatus, ...savedFilter } = settings.filterCriteria as FilterCriteria & { rawStatus?: string };
+          settings.filterCriteria = {
+            ...savedFilter,
+            fileTypes: savedFilter.fileTypes ?? LEGACY_RAW_STATUS_FILE_TYPES[rawStatus ?? ''] ?? [],
+          };
+          if (rawStatus === 'groupVariants' || rawStatus === 'rawOverNonRaw') {
+            const legacyPref = settings?.groupPreferredType === 'jpeg' ? 'jpeg' : 'raw';
+            settings.grouping = legacyPref;
+            handleSettingsChange(settings);
+          }
         }
 
         setAppSettings(settings);
@@ -182,7 +193,6 @@ export const useAppInitialization = ({
           setFilterCriteria((prev: FilterCriteria) => ({
             ...prev,
             ...settings.filterCriteria,
-            rawStatus: settings.filterCriteria.rawStatus || RawStatus.All,
             editedStatus: settings.filterCriteria.editedStatus || EditedStatus.All,
             colors: settings.filterCriteria.colors || [],
           }));

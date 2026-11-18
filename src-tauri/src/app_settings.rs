@@ -22,7 +22,15 @@ pub struct FilterCriteria {
     pub rating: i8,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rating_comparison: Option<String>,
+    /// The file-type filter before 1.89.0. The frontend reads it once to fill
+    /// `file_types`; it is still written ("all" by default) because older builds
+    /// require it and would otherwise drop every setting.
+    #[serde(default = "default_raw_status")]
     pub raw_status: String,
+    /// The file types shown (`raw`, `jpeg`, `heif`, `other`); empty shows all.
+    /// Absent in settings saved before 1.89.0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_types: Option<Vec<String>>,
     #[serde(default)]
     pub edited_status: Option<String>,
     #[serde(default)]
@@ -36,12 +44,17 @@ impl Default for FilterCriteria {
         Self {
             rating: 0,
             rating_comparison: None,
-            raw_status: "all".to_string(),
+            raw_status: default_raw_status(),
+            file_types: None,
             edited_status: Some("all".to_string()),
             colors: Vec::new(),
             flags: Vec::new(),
         }
     }
+}
+
+fn default_raw_status() -> String {
+    "all".to_string()
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1450,6 +1463,21 @@ mod tests {
 
         let restored = serde_json::to_value(&settings).expect("settings should serialize");
         assert_eq!(restored["filterCriteria"], filter);
+    }
+
+    #[test]
+    fn file_type_filter_keeps_the_old_raw_status_for_older_builds() {
+        let settings: AppSettings = serde_json::from_value(json!({
+            "filterCriteria": { "rating": 0, "fileTypes": ["raw", "jpeg"] }
+        }))
+        .expect("a filter without rawStatus should deserialize");
+
+        let restored = serde_json::to_value(&settings).expect("settings should serialize");
+        assert_eq!(
+            restored["filterCriteria"]["fileTypes"],
+            json!(["raw", "jpeg"])
+        );
+        assert_eq!(restored["filterCriteria"]["rawStatus"], "all");
     }
 
     #[test]

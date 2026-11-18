@@ -29,7 +29,8 @@ import {
   Progress,
   ThumbnailSize,
   ThumbnailAspectRatio,
-  RawStatus,
+  IMAGE_FILE_TYPE_LABELS,
+  IMAGE_FILE_TYPES,
   EditedStatus,
   LibraryDisplayMode,
   RATING_COMPARISON_SYMBOLS,
@@ -232,15 +233,6 @@ export default function MainLibrary(props: MainLibraryProps) {
     [t],
   );
 
-  const translatedRawStatusOptions = useMemo(
-    () => [
-      { key: RawStatus.All, label: t('library.filters.raw.all') },
-      { key: RawStatus.RawOnly, label: t('library.filters.raw.rawOnly') },
-      { key: RawStatus.NonRawOnly, label: t('library.filters.raw.nonRawOnly') },
-    ],
-    [t],
-  );
-
   const translatedEditedStatusOptions = useMemo(
     () => [
       { key: EditedStatus.All, label: t('library.filters.edited.all') },
@@ -266,14 +258,14 @@ export default function MainLibrary(props: MainLibraryProps) {
       }
     }
 
-    if (filterCriteria.rawStatus && filterCriteria.rawStatus !== RawStatus.All) {
-      const fileType = translatedRawStatusOptions.find((option) => option.key === filterCriteria.rawStatus)?.label;
-      if (fileType) {
-        filters.push({
-          key: 'file-type',
-          label: t('library.header.activeFilters.fileType', { value: fileType }),
-        });
-      }
+    const fileTypes = IMAGE_FILE_TYPES.filter((fileType) => filterCriteria.fileTypes?.includes(fileType));
+    if (fileTypes.length > 0) {
+      filters.push({
+        key: 'file-type',
+        label: t('library.header.activeFilters.fileType', {
+          value: fileTypes.map((fileType) => IMAGE_FILE_TYPE_LABELS[fileType]).join(', '),
+        }),
+      });
     }
 
     if (filterCriteria.editedStatus && filterCriteria.editedStatus !== EditedStatus.All) {
@@ -307,7 +299,7 @@ export default function MainLibrary(props: MainLibraryProps) {
     }
 
     return filters;
-  }, [filterCriteria, t, translatedEditedStatusOptions, translatedRatingFilterOptions, translatedRawStatusOptions]);
+  }, [filterCriteria, t, translatedEditedStatusOptions, translatedRatingFilterOptions]);
 
   const translatedThumbnailAspectRatioOptions = useMemo(
     () => [

@@ -1271,6 +1271,12 @@
         "editedOnly": "Только измененные",
         "uneditedOnly": "Только исходные"
       },
+      "fileType": {
+        "heif": "Файлы HEIF/HEIC",
+        "jpeg": "Файлы JPEG",
+        "other": "Другие файлы (TIFF, PNG, WebP…)",
+        "raw": "Файлы RAW"
+      },
       "noMatch": "Нет изображений, соответствующих фильтру.",
       "rating": {
         "all": "Показать все",
@@ -1282,11 +1288,6 @@
         "threeAndUp": "3 и выше",
         "twoAndUp": "2 и выше",
         "unrated": "Без рейтинга"
-      },
-      "raw": {
-        "all": "Все типы файлов",
-        "nonRawOnly": "Только не-RAW",
-        "rawOnly": "Только RAW"
       }
     },
     "folders": {

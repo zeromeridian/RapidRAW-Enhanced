@@ -5,6 +5,16 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.89.0-dev-library-type-filter — 2026-11-18
+
+### Library
+
+- The Quick Filter's file-type buttons are now RAW, JPEG, HEIF and Other,
+  and they combine: turn on RAW and JPEG to see both, or none to see every
+  file. The IMG button is gone; a saved non-RAW filter becomes JPEG, HEIF
+  and Other. HEIF finds files once HEIF/HEIC photos can be opened.
+- Select by offers the same file types: DNG, RAW, JPEG, HEIF and Other.
+
 ## 1.88.1-dev-zone-luminance-strength — 2026-11-18
 
 ### Develop

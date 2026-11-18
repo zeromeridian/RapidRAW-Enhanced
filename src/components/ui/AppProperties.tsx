@@ -214,11 +214,28 @@ export enum Panel {
   ZoneTint = 'zoneTint',
 }
 
-export enum RawStatus {
-  All = 'all',
-  NonRawOnly = 'nonRawOnly',
-  RawOnly = 'rawOnly',
+/** The file types the Library's Quick Filter and Select By tell apart. */
+export enum ImageFileType {
+  Raw = 'raw',
+  Jpeg = 'jpeg',
+  Heif = 'heif',
+  Other = 'other',
 }
+
+export const IMAGE_FILE_TYPES: ImageFileType[] = [
+  ImageFileType.Raw,
+  ImageFileType.Jpeg,
+  ImageFileType.Heif,
+  ImageFileType.Other,
+];
+
+/** Short button labels, untranslated like the other filter pills (EDIT, ORIG). */
+export const IMAGE_FILE_TYPE_LABELS: Record<ImageFileType, string> = {
+  [ImageFileType.Raw]: 'RAW',
+  [ImageFileType.Jpeg]: 'JPEG',
+  [ImageFileType.Heif]: 'HEIF',
+  [ImageFileType.Other]: 'OTHER',
+};
 
 export enum SortDirection {
   Ascending = 'asc',
@@ -458,7 +475,8 @@ export interface FilterCriteria {
   flags?: Array<'rejected' | 'selected' | 'deferred' | 'unflagged'>;
   rating: number;
   ratingComparison?: RatingComparison;
-  rawStatus: RawStatus;
+  /** The file types shown; empty shows every type. */
+  fileTypes: ImageFileType[];
   editedStatus?: EditedStatus;
 }
 

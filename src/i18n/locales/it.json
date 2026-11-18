@@ -1244,6 +1244,12 @@
         "editedOnly": "Solo Modificate",
         "uneditedOnly": "Solo Non Modificate"
       },
+      "fileType": {
+        "heif": "File HEIF/HEIC",
+        "jpeg": "File JPEG",
+        "other": "Altri file (TIFF, PNG, WebP…)",
+        "raw": "File RAW"
+      },
       "noMatch": "Nessuna immagine trovata corrispondente al tuo filtro.",
       "rating": {
         "all": "Mostra Tutto",
@@ -1255,11 +1261,6 @@
         "threeAndUp": "3 e superiori",
         "twoAndUp": "2 e superiori",
         "unrated": "Solo Non Valutate"
-      },
-      "raw": {
-        "all": "Tutti i Tipi",
-        "nonRawOnly": "Solo non RAW",
-        "rawOnly": "Solo RAW"
       }
     },
     "folders": {

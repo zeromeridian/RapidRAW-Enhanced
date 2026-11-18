@@ -1,12 +1,5 @@
 import { create } from 'zustand';
-import {
-  FilterCriteria,
-  ImageFile,
-  RawStatus,
-  SortCriteria,
-  SortDirection,
-  AlbumItem,
-} from '../components/ui/AppProperties';
+import { FilterCriteria, ImageFile, SortCriteria, SortDirection, AlbumItem } from '../components/ui/AppProperties';
 import { Adjustments, INITIAL_ADJUSTMENTS } from '../utils/adjustments';
 import { ColumnWidths } from '../components/panel/MainLibrary';
 
@@ -97,7 +90,7 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   libraryActiveAdjustments: INITIAL_ADJUSTMENTS,
 
   sortCriteria: { key: 'name', order: SortDirection.Ascending },
-  filterCriteria: { colors: [], flags: [], rating: 0, ratingComparison: 'atLeast', rawStatus: RawStatus.All },
+  filterCriteria: { colors: [], flags: [], rating: 0, ratingComparison: 'atLeast', fileTypes: [] },
   searchCriteria: { tags: [], text: '', mode: 'OR' },
 
   isTreeLoading: false,
