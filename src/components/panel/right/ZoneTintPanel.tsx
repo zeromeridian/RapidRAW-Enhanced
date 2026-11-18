@@ -1,6 +1,16 @@
 import { MouseEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Eye, EyeOff, Layers, Pipette, RotateCcw, SquareDashedMousePointer, X } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  EyeOff,
+  Layers,
+  Pipette,
+  RotateCcw,
+  SquareDashedMousePointer,
+  X,
+} from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
@@ -93,6 +103,16 @@ const tintColor = (hue: number, strength: number) => `hsl(${hue} 100% 50% / ${0.
 const gradeZoneColor = (settings: ZoneTintZone, zone: number) =>
   settings.strength > 0 ? tintColor(settings.hue, settings.strength) : zoneGrey(zone, luminanceOf(settings));
 
+/**
+ * A grade's band on the scale: its tint, or for a luminance-only grade white (lighter) or black
+ * (darker), since the zone's own grey would not stand out against the zone it lies on.
+ */
+const gradeBandColor = (settings: ZoneTintZone) =>
+  settings.strength > 0 ? tintColor(settings.hue, settings.strength) : luminanceOf(settings) > 0 ? '#fff' : '#000';
+
+/** A signed luminance as the grade list shows it: "+60", "−25". */
+const formatLuminance = (luminance: number) => `${luminance > 0 ? '+' : ''}${Math.round(luminance)}`;
+
 /** Sorted zones as their names, with neighbouring zones joined into ranges: "II, IV–VII". */
 const formatZones = (zones: number[]) => {
   const runs: Array<[number, number]> = [];
@@ -145,9 +165,17 @@ function ZoneScale({ grades, hovered, onZoneClick, onPreviewTarget, selected, zo
         const bands = grades.flatMap((grade) => {
           const settings = grade.zones[zone];
           return settings && (settings.strength > 0 || luminanceOf(settings) !== 0)
-            ? [{ id: grade.id, color: gradeZoneColor(settings, zone), isShown: isGradeShown(grade) }]
+            ? [
+                {
+                  id: grade.id,
+                  color: gradeBandColor(settings),
+                  isLuminanceOnly: settings.strength <= 0,
+                  isShown: isGradeShown(grade),
+                },
+              ]
             : [];
         });
+        const luminance = luminanceOf(combined);
         const shownCount = bands.filter((band) => band.isShown).length;
         const isOverlap = shownCount > 1;
         const isSideBySide = bands.length > 1;
@@ -157,9 +185,11 @@ function ZoneScale({ grades, hovered, onZoneClick, onPreviewTarget, selected, zo
         const isReshaped = !isStandardZoneShape(shape);
         const centre = zoneCentre(zoneTint, zone);
         const tooltips = [
+          luminance !== 0 && `${t('ui.colorWheel.luminanceAbbreviation')} ${formatLuminance(luminance)}`,
           isOverlap && t('adjustments.zoneTint.overlapCount', { count: shownCount }),
           isReshaped && t('adjustments.zoneTint.reshaped'),
         ].filter(Boolean);
+        const LuminanceArrow = luminance > 0 ? ChevronUp : ChevronDown;
         return (
           <button
             aria-label={t('adjustments.zoneTint.zone', { zone: name })}
@@ -188,7 +218,7 @@ function ZoneScale({ grades, hovered, onZoneClick, onPreviewTarget, selected, zo
                 zone === ZONE_NAMES.length - 1 && 'rounded-t-md',
                 zone > 0 && 'border-b border-white/5',
               )}
-              style={{ backgroundColor: zoneGrey(zone, luminanceOf(combined), centre) }}
+              style={{ backgroundColor: zoneGrey(zone, luminance, centre) }}
             >
               {isReshaped && (
                 // Up for a lighter centre, since X is at the top; ±half a zone spans the row.
@@ -201,12 +231,24 @@ function ZoneScale({ grades, hovered, onZoneClick, onPreviewTarget, selected, zo
                 <span className="absolute inset-y-0 right-0 flex">
                   {bands.map((band) => (
                     <span
-                      className={clsx(isSideBySide ? 'w-1.5' : 'w-2.5', !band.isShown && 'opacity-30')}
+                      className={clsx(
+                        isSideBySide ? 'w-1.5' : 'w-2.5',
+                        band.isLuminanceOnly && 'shadow-[inset_0_0_0_1px_rgba(128,128,128,0.9)]',
+                        !band.isShown && 'opacity-30',
+                      )}
                       key={band.id}
                       style={{ backgroundColor: band.color }}
                     />
                   ))}
                 </span>
+              )}
+              {luminance !== 0 && (
+                // The shown grades' summed brightness change: up for lighter, down for darker.
+                <LuminanceArrow
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white drop-shadow-[0_0_1px_rgba(0,0,0,0.9)] pointer-events-none"
+                  size={12}
+                  strokeWidth={3}
+                />
               )}
               {isHovered && (
                 <span className="absolute inset-0 border-2 border-accent pointer-events-none rounded-[inherit]" />
@@ -246,8 +288,7 @@ function GradeValues({ grade }: { grade: ZoneTintGrade }) {
       )}
       {luminance !== 0 && (
         <span>
-          <span className="font-bold">{t('ui.colorWheel.luminanceAbbreviation')}</span> {luminance > 0 ? '+' : ''}
-          {Math.round(luminance)}
+          <span className="font-bold">{t('ui.colorWheel.luminanceAbbreviation')}</span> {formatLuminance(luminance)}
         </span>
       )}
     </>

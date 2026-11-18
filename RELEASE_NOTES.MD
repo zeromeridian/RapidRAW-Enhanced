@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.88.1-dev-zone-luminance-strength — 2026-11-18
+
+### Develop
+
+- Zone Color Grading's zone scale shows brightness changes: a ▲ or ▼
+  marks every zone that is brightened or darkened, and a grade that only
+  changes brightness gets a visible white or black band. Hover a zone to
+  see its luminance value.
+
 ## 1.88.0-dev-zone-luminance-strength — 2026-11-18
 
 ### Develop

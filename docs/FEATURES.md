@@ -395,7 +395,9 @@ details are in `RELEASE_NOTES.MD`.
   changes a tone; Luminance (−100 to 100) shifts a zone by up to 1.5
   zones, spread wider than the colour so it reaches into the neighbouring
   zones (a lone zone's tones move most of a zone, a run of zones the full
-  1.5), and keeps them in order. Select a zone, or a range
+  1.5), and keeps them in order; the scale marks such zones with a ▲/▼
+  arrow (and brightness-only grades with a white or black band). Select
+  a zone, or a range
   with Shift-click (Cmd/Ctrl-click adds or removes one), on an upright
   grey scale (X at the top) or from the photo: a pipette selects the zone
   under a click (same modifiers), a rectangle picker selects every zone

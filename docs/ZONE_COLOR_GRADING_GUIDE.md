@@ -28,7 +28,8 @@ it, then move the colour wheel. Each coloured selection becomes a
 | **Zone scale** | The eleven zones as an upright grey ramp, X at the top, 0 at the bottom. The names are on the left; an accent bar marks the selected zones, and an outline the zone under the cursor on the photo. |
 | **Hover readout** | Beside the cursor on the photo: the zone under it and its lightness, e.g. "Zone VI · L 0.62". |
 | **Alt/Option preview** | Hold Alt (Option on macOS) over a zone or a grade: the photo shows in red where it colours. |
-| **Colour bands** | On the scale's right edge, each grade's colour in the zones it covers. Where two or more grades share a zone, their colours sit side by side and a small layers icon appears (shown grades only). A hidden grade's band is faded. |
+| **Colour bands** | On the scale's right edge, each grade's colour in the zones it covers. A grade that only changes brightness (no colour) has a white band when it brightens and a black one when it darkens, both with a thin grey edge. Where two or more grades share a zone, their bands sit side by side and a small layers icon appears (shown grades only). A hidden grade's band is faded. |
+| **Brightness arrows** | A white ▲ in the middle of a zone whose shown grades brighten it, a ▼ where they darken it, with or without a colour. Hover the zone for its value, e.g. "L +60". The zone's grey also shows the new brightness. |
 | **Colour wheel** | Hue (angle), strength (distance from the centre) and Luminance (slider under the wheel) for the selection. Its title names the selected zones, e.g. "Zones II–IV". |
 | **Fill between** | A curve (Linear, Soft, Ease in) and a button that fills the zones between the first and last selected zone with a smooth ramp. |
 | **Amount** | Scales the whole tool, 0–200 %. |
@@ -275,9 +276,11 @@ Where grades share a zone, their settings add up in that zone:
 | Hue 30° strength 80, plus hue 30° strength 60 | Hue 30°, strength 100 (capped) |
 | Luminance +30, plus luminance +20 | Luminance +50 |
 
-The scale's grey shows the summed luminance; its bands show each
-grade's own colour side by side, with a layers icon on shared zones, and
-hovering such a zone says how many grades overlap there.
+The scale's grey and its ▲/▼ arrow show the summed luminance (so +30
+and −30 on one zone show no arrow); its bands show each grade's own
+colour side by side, with a layers icon on shared zones, and hovering
+such a zone says how many grades overlap there and its summed "L"
+value.
 
 ### Example 5: a split tone with an overlap
 
