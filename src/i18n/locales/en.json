@@ -1109,7 +1109,8 @@
       "updatingKeywordList": "Updating the keyword list…"
     },
     "toasts": {
-      "embeddedPreview": "ThisIsRAW couldn't decode this RAW file, so you're seeing and editing the camera's embedded JPEG preview. Expect lower quality and less editing headroom than a real RAW."
+      "embeddedPreview": "ThisIsRAW couldn't decode this RAW file, so you're seeing and editing the camera's embedded JPEG preview. Expect lower quality and less editing headroom than a real RAW.",
+      "hdrHeif": "This HEIF image uses an HDR curve (PQ or HLG), which ThisIsRAW can't decode yet, so it looks flat. You can edit it, but its tones won't match how it looks in HDR."
     },
     "toolbar": {
       "switchToVariant": "Switch to {{label}}",

@@ -5,6 +5,34 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.90.1-dev-heif-support — 2026-11-18
+
+### Library
+
+- 10-bit HEIF photos from cameras such as the Fujifilm X-M5 and Sony
+  Alpha 7C II open on macOS instead of failing with "Unsupported HEIF
+  pixel layout".
+
+## 1.90.0-dev-heif-support — 2026-11-18
+
+### Library
+
+- HEIF photos open: iPhone `.heic` and `.heif` files and the `.hif`
+  files of Canon, Sony and Fujifilm cameras show in the library with
+  thumbnails, open in Develop and export like other photos. The HEIF
+  Quick Filter button now finds them.
+- HEIF photos are decoded by your computer's own decoder. On Linux this
+  needs libheif with its HEVC plugin (for example `libheif1` and
+  `libheif-plugin-libde265`); on Windows the "HEIF Image Extensions" and
+  "HEVC Video Extensions" from the Microsoft Store. Without them the
+  error message says what to install.
+- Colours follow the photo's own colour profile: wide-gamut Display P3
+  colours are converted into sRGB, and 10-bit camera files keep their
+  full precision. HEIF photos can be opened but not yet exported as HEIF.
+- HDR HEIF files (HDR PQ or HLG) open with a notice: their HDR curve is
+  not decoded yet, so they look flat. The HDR gain map of newer iPhone
+  photos is ignored for now; the normal photo opens.
+
 ## 1.89.0-dev-library-type-filter — 2026-11-18
 
 ### Library

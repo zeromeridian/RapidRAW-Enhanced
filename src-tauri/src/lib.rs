@@ -35,6 +35,7 @@ mod gpu_compute;
 mod gpu_processing;
 mod guided_perspective;
 mod hdr_deghosting;
+mod heif;
 mod identifier_migration;
 mod image_loader;
 mod image_preload;

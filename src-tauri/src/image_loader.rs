@@ -1,10 +1,10 @@
 use crate::Cursor;
 use crate::app_settings::{AppSettings, load_settings};
 use crate::app_state::{AppState, LoadedImage};
-use crate::cache_utils::{DecodeFingerprint, DecodedImage};
+use crate::cache_utils::{DecodeFingerprint, DecodeNotice, DecodedImage};
 use crate::exif_processing;
 use crate::file_management::{parse_virtual_path, read_file_mapped};
-use crate::formats::is_raw_file;
+use crate::formats::{is_heif_file, is_raw_file};
 use crate::image_processing::ImageMetadata;
 use crate::image_processing::{
     apply_orientation, apply_srgb_to_linear, remove_raw_artifacts_and_enhance,
@@ -38,7 +38,7 @@ pub struct LoadImageResult {
     pub metadata: ImageMetadata,
     pub exif: HashMap<String, String>,
     pub is_raw: bool,
-    pub is_embedded_preview: bool,
+    pub decode_notice: Option<DecodeNotice>,
 }
 
 #[derive(Deserialize)]
@@ -139,15 +139,15 @@ pub fn load_base_image_from_bytes(
     .map(|(image, _)| image)
 }
 
-/// Like `load_base_image_from_bytes`, and also says whether a RAW that could not be decoded
-/// was replaced by its embedded preview.
+/// Like `load_base_image_from_bytes`, and also says what the user should be told about the
+/// decode (a RAW replaced by its embedded preview, an HDR HEIF image).
 fn decode_base_image(
     bytes: &[u8],
     path_for_ext_check: &str,
     use_fast_raw_dev: bool,
     settings: &AppSettings,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
-) -> Result<(DynamicImage, bool)> {
+) -> Result<(DynamicImage, Option<DecodeNotice>)> {
     let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
     let linear_mode = settings.linear_raw_mode.clone();
     let color_nr_setting = settings.raw_preprocessing_color_nr.unwrap_or(0.5);
@@ -191,7 +191,7 @@ fn decode_base_image(
                         duration
                     );
                 }
-                Ok((image, false))
+                Ok((image, None))
             }
             Ok(Err(e)) => {
                 let classified = classify_raw_develop_error(path_for_ext_check, e);
@@ -206,18 +206,35 @@ fn decode_base_image(
                     classified
                 );
                 embedded_preview_instead(bytes, path_for_ext_check)
-                    .map(|preview| (preview, true))
+                    .map(|preview| (preview, Some(DecodeNotice::EmbeddedPreview)))
                     .ok_or(classified)
             }
             Err(_) => {
                 log::error!("Panic while processing RAW file: {}", path_for_ext_check);
                 embedded_preview_instead(bytes, path_for_ext_check)
-                    .map(|preview| (preview, true))
+                    .map(|preview| (preview, Some(DecodeNotice::EmbeddedPreview)))
                     .ok_or_else(|| anyhow!("Failed to process RAW file: {}", path_for_ext_check))
             }
         }
     } else {
-        let mut image = load_image_with_orientation(bytes, cancel_token)?;
+        let (mut image, notice) = if is_heif_file(path_for_ext_check) {
+            let decoded = crate::heif::decode(bytes)?;
+            if is_cancelled(&cancel_token) {
+                return Err(anyhow!("Load cancelled"));
+            }
+            if decoded.is_hdr {
+                log::warn!(
+                    "'{}' is an HDR HEIF image; its HDR curve is not decoded",
+                    path_for_ext_check
+                );
+            }
+            (
+                decoded.image,
+                decoded.is_hdr.then_some(DecodeNotice::HdrHeif),
+            )
+        } else {
+            (load_image_with_orientation(bytes, cancel_token)?, None)
+        };
 
         if apply_to_non_raws
             && !use_fast_raw_dev
@@ -233,7 +250,7 @@ fn decode_base_image(
             );
         }
 
-        Ok((image, false))
+        Ok((image, notice))
     }
 }
 
@@ -832,13 +849,12 @@ pub fn decode_pristine(
         if is_cancelled(&cancel_token) {
             return Err("Load cancelled".to_string());
         }
-        let (image, is_embedded_preview) =
-            decode_base_image(bytes, path, false, settings, cancel_token.clone())
-                .map_err(|e| e.to_string())?;
+        let (image, notice) = decode_base_image(bytes, path, false, settings, cancel_token.clone())
+            .map_err(|e| e.to_string())?;
         Ok(DecodedImage {
             image: Arc::new(image),
             exif: exif_processing::read_exif_data(path, bytes),
-            is_embedded_preview,
+            notice,
         })
     };
     match read_file_mapped(Path::new(path)) {
@@ -968,6 +984,6 @@ pub async fn load_image(
         metadata,
         exif: decoded.exif,
         is_raw,
-        is_embedded_preview: decoded.is_embedded_preview,
+        decode_notice: decoded.notice,
     })
 }

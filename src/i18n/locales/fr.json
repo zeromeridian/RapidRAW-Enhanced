@@ -1016,7 +1016,8 @@
       }
     },
     "toasts": {
-      "embeddedPreview": "ThisIsRAW n'a pas pu décoder ce fichier RAW : vous voyez et modifiez l'aperçu JPEG intégré de l'appareil. Attendez-vous à une qualité inférieure et à moins de latitude d'édition qu'avec un vrai RAW."
+      "embeddedPreview": "ThisIsRAW n'a pas pu décoder ce fichier RAW : vous voyez et modifiez l'aperçu JPEG intégré de l'appareil. Attendez-vous à une qualité inférieure et à moins de latitude d'édition qu'avec un vrai RAW.",
+      "hdrHeif": "Cette image HEIF utilise une courbe HDR (PQ ou HLG) que ThisIsRAW ne sait pas encore décoder : elle paraît terne. Vous pouvez la modifier, mais les tons ne correspondront pas à l'affichage HDR."
     },
     "toolbar": {
       "switchToVariant": "Switch to {{label}}",

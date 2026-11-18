@@ -12,7 +12,7 @@ import { Invokes, LibraryViewMode, ImageFile } from '../components/ui/AppPropert
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { debouncedSave, debouncedSetHistory } from './useEditorActions';
-import { notifyEmbeddedPreview } from './useImageLoader';
+import { notifyDecodeNotice } from './useImageLoader';
 import { clearLibrarySelection } from './useLibraryActions';
 import { computeSortedLibrary } from './useSortedLibrary';
 import { mergeXmpImageStacks } from '../utils/imageStacks';
@@ -308,7 +308,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
         invoke(Invokes.LoadImage, { path })
           .then((_result: any) => {
             if (selectedImagePathRef.current !== path) return;
-            notifyEmbeddedPreview(_result);
+            notifyDecodeNotice(_result);
             isBackendReadyRef.current = true;
             currentResRef.current = 0;
             setEditor({ originalSize: { width: _result.width, height: _result.height } });

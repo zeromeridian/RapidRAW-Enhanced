@@ -1041,7 +1041,8 @@
       }
     },
     "toasts": {
-      "embeddedPreview": "ThisIsRAW nie mógł zdekodować tego pliku RAW, więc widzisz i edytujesz osadzony podgląd JPEG z aparatu. Spodziewaj się niższej jakości i mniejszego zapasu do edycji niż w prawdziwym pliku RAW."
+      "embeddedPreview": "ThisIsRAW nie mógł zdekodować tego pliku RAW, więc widzisz i edytujesz osadzony podgląd JPEG z aparatu. Spodziewaj się niższej jakości i mniejszego zapasu do edycji niż w prawdziwym pliku RAW.",
+      "hdrHeif": "Ten obraz HEIF używa krzywej HDR (PQ lub HLG), której ThisIsRAW nie potrafi jeszcze dekodować, dlatego wygląda płasko. Możesz go edytować, ale tony nie będą odpowiadać wyświetlaniu HDR."
     },
     "toolbar": {
       "switchToVariant": "Switch to {{label}}",

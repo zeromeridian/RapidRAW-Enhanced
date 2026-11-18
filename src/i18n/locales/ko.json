@@ -989,7 +989,8 @@
       }
     },
     "toasts": {
-      "embeddedPreview": "ThisIsRAW가 이 RAW 파일을 디코딩하지 못해 카메라에 포함된 JPEG 미리보기를 표시하고 편집하고 있습니다. 실제 RAW보다 화질이 낮고 편집 여유도 적습니다."
+      "embeddedPreview": "ThisIsRAW가 이 RAW 파일을 디코딩하지 못해 카메라에 포함된 JPEG 미리보기를 표시하고 편집하고 있습니다. 실제 RAW보다 화질이 낮고 편집 여유도 적습니다.",
+      "hdrHeif": "이 HEIF 이미지는 ThisIsRAW가 아직 디코딩할 수 없는 HDR 커브(PQ 또는 HLG)를 사용하므로 밋밋하게 보입니다. 편집은 가능하지만 톤이 HDR 표시와 일치하지 않습니다."
     },
     "toolbar": {
       "switchToVariant": "Switch to {{label}}",

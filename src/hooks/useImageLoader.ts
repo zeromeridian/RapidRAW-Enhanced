@@ -9,10 +9,17 @@ import { Invokes } from '../components/ui/AppProperties';
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import type { AdjustmentsBaseline } from './useImageProcessing';
 
-/** Warns, each time a photo opens in Develop, that a RAW the decoder failed on shows its embedded JPEG. */
-export function notifyEmbeddedPreview(loadImageResult: { is_embedded_preview?: boolean }) {
-  if (loadImageResult?.is_embedded_preview) {
-    toast.warning(i18n.t('editor.toasts.embeddedPreview'), { toastId: 'embedded-preview' });
+/** What `load_image` reports about the decode (Rust `DecodeNotice`). */
+type DecodeNotice = 'embeddedPreview' | 'hdrHeif';
+
+/**
+ * Warns, each time a photo opens in Develop, about how it was decoded: a RAW the decoder failed on
+ * shows its embedded JPEG; an HDR HEIF image is shown with its HDR curve not decoded.
+ */
+export function notifyDecodeNotice(loadImageResult: { decode_notice?: DecodeNotice | null }) {
+  const notice = loadImageResult?.decode_notice;
+  if (notice) {
+    toast.warning(i18n.t(`editor.toasts.${notice}`), { toastId: notice });
   }
 }
 
@@ -72,7 +79,7 @@ export function useImageLoader(
         try {
           const loadImageResult: any = await invoke(Invokes.LoadImage, { path: selectedImage.path });
           if (!isEffectActive) return;
-          notifyEmbeddedPreview(loadImageResult);
+          notifyDecodeNotice(loadImageResult);
 
           const { width, height } = loadImageResult;
           setEditor({ originalSize: { width, height } });

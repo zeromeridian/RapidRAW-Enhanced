@@ -3,7 +3,7 @@ import { matchesImageFlagFilter } from './imageFlags';
 import { getFileExtension } from './imageGrouping';
 
 const JPEG_EXTENSIONS = new Set(['jpg', 'jpeg']);
-const HEIF_EXTENSIONS = new Set(['heic', 'heif']);
+const HEIF_EXTENSIONS = new Set(['heic', 'heif', 'hif']);
 
 /** The file type the Quick Filter and Select By sort an image under. */
 export function getImageFileType(image: ImageFile): ImageFileType {

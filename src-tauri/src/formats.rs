@@ -78,6 +78,22 @@ pub const NON_RAW_EXTENSIONS: &[&str] = &[
     "pnm", "pbm", "pgm", "ppm", "pam", // Netpbm family
 ];
 
+/// Non-RAW extensions decoded by the operating system's HEIF decoder (`crate::heif`), not
+/// the `image` crate; `hif` is the extension of Canon, Sony and Fujifilm cameras.
+pub const HEIF_EXTENSIONS: &[&str] = &["heic", "heif", "hif"];
+
+/// Every non-RAW extension ThisIsRAW opens.
+pub fn non_raw_extensions() -> impl Iterator<Item = &'static str> {
+    NON_RAW_EXTENSIONS.iter().chain(HEIF_EXTENSIONS).copied()
+}
+
+pub fn is_heif_file<P: AsRef<Path>>(path: P) -> bool {
+    path.as_ref()
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| HEIF_EXTENSIONS.iter().any(|h| h.eq_ignore_ascii_case(ext)))
+}
+
 pub fn is_raw_file<P: AsRef<Path>>(path: P) -> bool {
     let ext = match path.as_ref().extension().and_then(|s| s.to_str()) {
         Some(e) => e,
@@ -117,14 +133,22 @@ pub fn is_supported_image_file<P: AsRef<Path>>(path: P) -> bool {
         return true;
     }
 
-    NON_RAW_EXTENSIONS
-        .iter()
-        .any(|non_raw_ext| non_raw_ext.eq_ignore_ascii_case(ext))
+    non_raw_extensions().any(|non_raw_ext| non_raw_ext.eq_ignore_ascii_case(ext))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::is_supported_image_file;
+    use super::{is_heif_file, is_supported_image_file};
+
+    #[test]
+    fn heif_files_are_supported_in_any_case() {
+        for name in ["/photos/IMG_0001.HEIC", "a.heif", "R5_0001.HIF"] {
+            assert!(is_heif_file(name), "{name}");
+            assert!(is_supported_image_file(name), "{name}");
+        }
+        assert!(!is_heif_file("a.jpg"));
+        assert!(!is_heif_file("heic"));
+    }
 
     #[test]
     fn apple_double_files_are_not_images() {

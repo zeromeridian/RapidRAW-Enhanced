@@ -1016,7 +1016,8 @@
       }
     },
     "toasts": {
-      "embeddedPreview": "ThisIsRAW no pudo decodificar este archivo RAW, así que estás viendo y editando la vista previa JPEG incrustada de la cámara. Espera menor calidad y menos margen de edición que con un RAW real."
+      "embeddedPreview": "ThisIsRAW no pudo decodificar este archivo RAW, así que estás viendo y editando la vista previa JPEG incrustada de la cámara. Espera menor calidad y menos margen de edición que con un RAW real.",
+      "hdrHeif": "Esta imagen HEIF usa una curva HDR (PQ o HLG) que ThisIsRAW aún no puede decodificar, por eso se ve apagada. Puedes editarla, pero los tonos no coincidirán con la vista HDR."
     },
     "toolbar": {
       "switchToVariant": "Switch to {{label}}",

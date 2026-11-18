@@ -105,7 +105,7 @@ details are in `RELEASE_NOTES.MD`.
   thumbnail badges, rejected-image dimming, filtering, and rejected-file
   deletion for the currently loaded folder view.
 - Unified **Quick Filter** controls for unrated and rating thresholds,
-  file types (RAW, JPEG, HEIF and Other buttons that combine; none on shows
+  file types (RAW, JPEG, HEIF incl. `.hif` and Other buttons that combine; none on shows
   every type), edited/original status, color labels, and flags, with an
   in-place clear-all action and a persistent active-filter indicator. Rating
   filters and rating-based selection provide explicit **up to (≤)** and **and
@@ -560,6 +560,13 @@ details are in `RELEASE_NOTES.MD`.
 
 ## Files, export, and metadata
 
+- HEIF photos (`.heic`, `.heif`, and cameras' `.hif`) open, edit and get
+  thumbnails like other non-RAW images, read-only, decoded by the operating
+  system (macOS ImageIO, Linux libheif, Windows' HEIF/HEVC extensions; a
+  missing decoder says what to install). Embedded colour profiles such as
+  Display P3 convert into sRGB, 10-bit files keep their precision, and
+  rotation follows the file; HDR gain maps are ignored and HDR (PQ/HLG)
+  files open with a notice that their HDR curve is not decoded.
 - A versioned ThisIsRAW XMP payload carries the complete editable adjustment
   document between installations, including ordered masks and blend modes.
 

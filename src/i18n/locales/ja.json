@@ -989,7 +989,8 @@
       }
     },
     "toasts": {
-      "embeddedPreview": "ThisIsRAW はこの RAW ファイルをデコードできなかったため、カメラに埋め込まれた JPEG プレビューを表示・編集しています。本来の RAW より画質が低く、編集の余裕も少なくなります。"
+      "embeddedPreview": "ThisIsRAW はこの RAW ファイルをデコードできなかったため、カメラに埋め込まれた JPEG プレビューを表示・編集しています。本来の RAW より画質が低く、編集の余裕も少なくなります。",
+      "hdrHeif": "この HEIF 画像は ThisIsRAW がまだデコードできない HDR カーブ（PQ または HLG）を使っているため、眠い見た目になります。編集はできますが、トーンは HDR 表示と一致しません。"
     },
     "toolbar": {
       "switchToVariant": "Switch to {{label}}",

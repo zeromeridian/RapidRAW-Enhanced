@@ -3991,7 +3991,7 @@ pub fn get_supported_file_types() -> Result<serde_json::Value, String> {
         .iter()
         .map(|(ext, _)| *ext)
         .collect();
-    let non_raw_extensions: Vec<&str> = crate::formats::NON_RAW_EXTENSIONS.to_vec();
+    let non_raw_extensions: Vec<&str> = crate::formats::non_raw_extensions().collect();
 
     Ok(serde_json::json!({
         "raw": raw_extensions,

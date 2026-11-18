@@ -989,7 +989,8 @@
       }
     },
     "toasts": {
-      "embeddedPreview": "ThisIsRAW 无法解码此 RAW 文件，因此您看到和编辑的是相机内嵌的 JPEG 预览。画质会低于真正的 RAW，可调整的空间也更小。"
+      "embeddedPreview": "ThisIsRAW 无法解码此 RAW 文件，因此您看到和编辑的是相机内嵌的 JPEG 预览。画质会低于真正的 RAW，可调整的空间也更小。",
+      "hdrHeif": "此 HEIF 图像使用 ThisIsRAW 尚无法解码的 HDR 曲线（PQ 或 HLG），因此看起来发灰。您可以编辑它，但色调不会与 HDR 显示一致。"
     },
     "toolbar": {
       "switchToVariant": "Switch to {{label}}",

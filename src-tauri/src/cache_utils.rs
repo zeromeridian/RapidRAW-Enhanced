@@ -301,13 +301,22 @@ impl DecodeFingerprint {
     }
 }
 
+/// What the user is told about a decoded file each time it opens in Develop.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DecodeNotice {
+    /// The RAW could not be decoded, so this is the camera's embedded JPEG preview.
+    EmbeddedPreview,
+    /// A HEIF image with an HDR curve (PQ or HLG), shown with the curve not decoded.
+    HdrHeif,
+}
+
 /// A source file decoded at full size for Develop.
 #[derive(Clone)]
 pub struct DecodedImage {
     pub image: Arc<DynamicImage>,
     pub exif: HashMap<String, String>,
-    /// The RAW could not be decoded, so this is the camera's embedded JPEG preview.
-    pub is_embedded_preview: bool,
+    pub notice: Option<DecodeNotice>,
 }
 
 struct DecodedEntry {
@@ -444,7 +453,7 @@ mod tests {
             DecodedImage {
                 image: Arc::new(DynamicImage::new_rgb8(1, 1)),
                 exif: HashMap::new(),
-                is_embedded_preview: true,
+                notice: Some(DecodeNotice::EmbeddedPreview),
             },
         );
 
@@ -452,7 +461,7 @@ mod tests {
         assert!(
             cache
                 .get("a.raf", &fingerprint(1))
-                .is_some_and(|decoded| decoded.is_embedded_preview)
+                .is_some_and(|decoded| decoded.notice == Some(DecodeNotice::EmbeddedPreview))
         );
         assert!(!cache.contains("a.raf", &fingerprint(2)));
         assert!(cache.get("a.raf", &fingerprint(2)).is_none());

@@ -73,6 +73,8 @@ imgref = "1.12.2"
 sysinfo = "0.39.5"
 rusqlite = { version = "0.38", features = ["bundled"] }
 zstd = "0.13"
+# Colour profiles of HEIF images (already a dependency of `image`).
+moxcms = "0.8.1"
 
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 trash = "5.2.6"
@@ -80,10 +82,20 @@ tauri-plugin-single-instance = "2.4.2"
 reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "rustls"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.62", features = ["Win32_System_Threading"] }
+windows = { version = "0.62", features = ["Win32_System_Threading", "Win32_Foundation", "Win32_Graphics_Imaging", "Win32_System_Com"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"
+# HEIF decoding through ImageIO (src/heif/image_io.rs).
+objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["std", "CFData"] }
+objc2-core-graphics = { version = "0.3.2", default-features = false, features = ["std", "CGImage", "CGDataProvider"] }
+objc2-image-io = { version = "0.3.2", default-features = false, features = ["std", "CGImageSource", "objc2-core-graphics"] }
+
+# The HEIF tests encode real HEIC files with ImageIO.
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["CFDictionary", "CFNumber"] }
+objc2-core-graphics = { version = "0.3.2", default-features = false, features = ["CGColorSpace", "CGContext", "CGBitmapContext"] }
+objc2-image-io = { version = "0.3.2", default-features = false, features = ["CGImageDestination", "CGImageProperties"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-context = "0.1"
@@ -97,6 +109,8 @@ include_dir = "0.7.4"
 gtk = "0.18.2"
 webkit2gtk = "=2.0.2"
 tauri-plugin-wayland-nvidia-quirk = "0.1.0"
+# HEIF decoding through the system's libheif, loaded at run time (src/heif/libheif.rs).
+libloading = "0.8"
 
 [build-dependencies]
 tauri-build = { version = "2.6", features = [] }

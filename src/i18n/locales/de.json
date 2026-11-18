@@ -991,7 +991,8 @@
       }
     },
     "toasts": {
-      "embeddedPreview": "ThisIsRAW konnte diese RAW-Datei nicht dekodieren, daher siehst und bearbeitest du die eingebettete JPEG-Vorschau der Kamera. Rechne mit geringerer Qualität und weniger Bearbeitungsspielraum als bei einem echten RAW."
+      "embeddedPreview": "ThisIsRAW konnte diese RAW-Datei nicht dekodieren, daher siehst und bearbeitest du die eingebettete JPEG-Vorschau der Kamera. Rechne mit geringerer Qualität und weniger Bearbeitungsspielraum als bei einem echten RAW.",
+      "hdrHeif": "Dieses HEIF-Bild nutzt eine HDR-Kurve (PQ oder HLG), die ThisIsRAW noch nicht dekodieren kann, daher wirkt es flau. Du kannst es bearbeiten, aber die Tonwerte entsprechen nicht der HDR-Darstellung."
     },
     "toolbar": {
       "switchToVariant": "Switch to {{label}}",
