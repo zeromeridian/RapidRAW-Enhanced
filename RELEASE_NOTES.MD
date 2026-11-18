@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.87.0-dev-blend-pad-compact-list — 2026-11-17
+
+### Develop
+
+- The Orbit Blend Pad's tool list is compact: each tool is one line with
+  its name and value at the dot, and only the selected tool opens to show
+  its slider, curve and Reverse. Click a line or a tool's dot on the pad
+  to open it; the eye and bin work without opening the line.
+
 ## 1.86.1-dev-relight-light-visibility — 2026-11-17
 
 ### Develop

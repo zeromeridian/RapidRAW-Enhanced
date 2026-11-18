@@ -269,7 +269,8 @@ details are in `RELEASE_NOTES.MD`.
   its reverse on the opposite side, nothing at the centre. Add tools (21
   global sliders, including Gaussian Blur, Glow, Light Flare and Grain),
   drag them along the edge, set target, curve, mute or remove (switching
-  a card's tool back restores its earlier target); Amount,
+  a card's tool back restores its earlier target; one line per tool,
+  only the selected tool opens into its card); Amount,
   on/off, Shift for finer drags, arrow keys, double-click to centre.
   Bake writes the values into the sliders; sliders show a mark and the
   combined value in brackets where the pad moves them. Six shapes

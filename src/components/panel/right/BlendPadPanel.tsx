@@ -636,27 +636,51 @@ export default function BlendPadPanel() {
           const parameter = parametersById[anchor.param];
           if (!parameter) return null;
           const reach = Math.max(Math.abs(parameter.min), Math.abs(parameter.max));
+          // One tool at a time is open (the selected one); the others are a single line.
+          const isOpen = anchor.id === selectedId;
           return (
             <div
               className={clsx(
-                'flex flex-col gap-2 p-3 compact:p-2 rounded-md border bg-surface transition-colors',
-                anchor.id === selectedId ? 'border-accent' : 'border-transparent',
+                'flex flex-col rounded-md border bg-surface transition-colors',
+                isOpen ? 'gap-2 p-3 compact:p-2 border-accent' : 'px-2 py-1 border-transparent',
                 anchor.muted && 'opacity-60',
               )}
               key={anchor.id}
               onPointerDown={() => setSelectedId(anchor.id)}
             >
               <div className="flex items-center gap-1">
-                <Dropdown
-                  className="grow min-w-0"
-                  onChange={(param: string) => handleToolChange(anchor, param)}
-                  options={toolOptions}
-                  value={anchor.param}
-                />
+                {isOpen ? (
+                  <Dropdown
+                    className="grow min-w-0"
+                    onChange={(param: string) => handleToolChange(anchor, param)}
+                    options={toolOptions}
+                    value={anchor.param}
+                  />
+                ) : (
+                  <button
+                    aria-expanded={false}
+                    className="grow min-w-0 flex items-center gap-2 py-1 text-left"
+                    onClick={() => setSelectedId(anchor.id)}
+                  >
+                    {/* The tool's colour on the pad: warm toward a positive target, cool toward a negative one. */}
+                    <span
+                      className="w-2.5 h-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: anchor.target >= 0 ? WARM : COOL }}
+                    />
+                    <Text as="span" className="grow min-w-0 truncate">
+                      {getLabel(anchor)}
+                    </Text>
+                    <span className="shrink-0 text-xs font-mono text-text-secondary">
+                      {formatSigned(anchor.target, parameter.step)}
+                    </span>
+                  </button>
+                )}
                 <button
                   className="p-1.5 rounded-full hover:bg-bg-primary transition-colors text-text-secondary"
                   data-tooltip={t(anchor.muted ? 'editor.blendPad.unmute' : 'editor.blendPad.mute')}
                   onClick={() => updateAnchor(anchor.id, { muted: !anchor.muted })}
+                  // Muting or removing a closed tool does not open it.
+                  onPointerDown={(event) => event.stopPropagation()}
                 >
                   {anchor.muted ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -665,46 +689,51 @@ export default function BlendPadPanel() {
                   data-tooltip={t('editor.blendPad.remove')}
                   disabled={pad.anchors.length <= 1}
                   onClick={() => handleRemove(anchor.id)}
+                  onPointerDown={(event) => event.stopPropagation()}
                 >
                   <Trash2 size={16} />
                 </button>
               </div>
-              <Slider
-                defaultValue={targetWithShare(NEW_TOOL_SHARE, parameter)}
-                label={t('editor.blendPad.atTheDot')}
-                labelAddon={
-                  <span className="text-xs font-mono text-accent">
-                    {t('editor.blendPad.now', {
-                      value: formatSigned(currentValues[anchor.id] ?? 0, parameter.step),
-                    })}
-                  </span>
-                }
-                max={reach}
-                min={-reach}
-                onChange={(event) => updateAnchor(anchor.id, { target: Number(event.target.value) })}
-                onDragStateChange={handleDragStateChange}
-                step={parameter.step}
-                value={anchor.target}
-              />
-              <div className="flex items-center gap-2">
-                <Text variant={TextVariants.label} className="w-16 shrink-0 text-text-secondary">
-                  {t('editor.blendPad.curve')}
-                </Text>
-                <Dropdown
-                  className="grow min-w-0"
-                  onChange={(curve: BlendPadCurve) => updateAnchor(anchor.id, { curve })}
-                  options={curveOptions}
-                  value={anchor.curve}
-                />
-              </div>
-              {isAxis && (
-                <Switch
-                  checked={anchor.reverse !== false}
-                  id={`blend-pad-reverse-${anchor.id}`}
-                  label={t('editor.blendPad.reverse')}
-                  onChange={(reverse: boolean) => updateAnchor(anchor.id, { reverse })}
-                  tooltip={t('editor.blendPad.reverseHint')}
-                />
+              {isOpen && (
+                <>
+                  <Slider
+                    defaultValue={targetWithShare(NEW_TOOL_SHARE, parameter)}
+                    label={t('editor.blendPad.atTheDot')}
+                    labelAddon={
+                      <span className="text-xs font-mono text-accent">
+                        {t('editor.blendPad.now', {
+                          value: formatSigned(currentValues[anchor.id] ?? 0, parameter.step),
+                        })}
+                      </span>
+                    }
+                    max={reach}
+                    min={-reach}
+                    onChange={(event) => updateAnchor(anchor.id, { target: Number(event.target.value) })}
+                    onDragStateChange={handleDragStateChange}
+                    step={parameter.step}
+                    value={anchor.target}
+                  />
+                  <div className="flex items-center gap-2">
+                    <Text variant={TextVariants.label} className="w-16 shrink-0 text-text-secondary">
+                      {t('editor.blendPad.curve')}
+                    </Text>
+                    <Dropdown
+                      className="grow min-w-0"
+                      onChange={(curve: BlendPadCurve) => updateAnchor(anchor.id, { curve })}
+                      options={curveOptions}
+                      value={anchor.curve}
+                    />
+                  </div>
+                  {isAxis && (
+                    <Switch
+                      checked={anchor.reverse !== false}
+                      id={`blend-pad-reverse-${anchor.id}`}
+                      label={t('editor.blendPad.reverse')}
+                      onChange={(reverse: boolean) => updateAnchor(anchor.id, { reverse })}
+                      tooltip={t('editor.blendPad.reverseHint')}
+                    />
+                  )}
+                </>
               )}
             </div>
           );

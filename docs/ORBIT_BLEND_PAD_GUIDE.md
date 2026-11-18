@@ -92,6 +92,14 @@ tool to do the reverse, switch its **Reverse** off (see below).
 
 ## Tool settings (one card per tool)
 
+Below the pad, every tool has a line: a coloured dot (warm when its value at
+the dot is positive, cool when negative, like its glow on the pad), its name,
+its value at the dot, the eye and the bin. Only the **selected** tool opens
+into a full card with the settings below; selecting another tool (its line
+or its dot on the pad) closes the first. With nothing selected, all tools are
+single lines. The eye and the bin work on a closed line without opening it.
+Adding a tool selects it, so its card opens.
+
 | Setting | What it does |
 |---|---|
 | **Tool** | Which slider the tool moves. Each tool card **remembers the value at the dot for every tool it has had**: switching back restores it (see Example 4). A tool the card never had starts with the same *share* of the slider's range: Contrast +60 (60 % of 100) becomes Exposure +3.00 (60 % of 5 EV). |
@@ -275,7 +283,7 @@ pad adds 0. Bake is one undo step.
 | Click the pad, then press the **arrow keys** | The puck moves a small step (Shift: a smaller one). |
 | **Double-click** the puck, or click the **crosshair** in the header | The puck returns to the centre. |
 | Press on a tool's **dot** and drag | The tool moves along the edge, round corners too. |
-| Click a tool's dot or its card | The tool is selected: its dot gets a ring, its card a border, and its line is drawn dashed from the dot to its opposite ring, with the value at the far end (its reverse, or 0 when Reverse is off). |
+| Click a tool's dot or its line in the list | The tool is selected: its dot gets a ring, its line opens into a card with a border (any other open card closes), and its line on the pad is drawn dashed from the dot to its opposite ring, with the value at the far end (its reverse, or 0 when Reverse is off). |
 
 A whole drag is **one undo step**, like dragging a slider.
 
