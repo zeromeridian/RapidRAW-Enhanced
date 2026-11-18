@@ -5,6 +5,17 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.88.0-dev-zone-luminance-strength — 2026-11-18
+
+### Develop
+
+- Zone Color Grading's Luminance is much stronger: ±100 now shifts a
+  zone by 1.5 zones instead of half a zone. Luminance spreads gently
+  into the neighbouring zones, so a single zone moves most of a zone and
+  a range of zones the full 1.5 zones, with smooth transitions and tones
+  kept in order. Photos already graded with Luminance open brighter or
+  darker than before; colour is unchanged.
+
 ## 1.87.0-dev-blend-pad-compact-list — 2026-11-17
 
 ### Develop

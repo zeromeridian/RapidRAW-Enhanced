@@ -392,8 +392,10 @@ details are in `RELEASE_NOTES.MD`.
   Zone Tint): a colour and a luminance for each of the 11 Zone System
   zones (0–X), toning a Black & White photo or grading a colour one by
   tonal zone (the zone's colour shifts the colours there). The colour never
-  changes a tone; Luminance (−100 to 100) moves the zone's tones by up to
-  half a zone and keeps them in order. Select a zone, or a range
+  changes a tone; Luminance (−100 to 100) shifts a zone by up to 1.5
+  zones, spread wider than the colour so it reaches into the neighbouring
+  zones (a lone zone's tones move most of a zone, a run of zones the full
+  1.5), and keeps them in order. Select a zone, or a range
   with Shift-click (Cmd/Ctrl-click adds or removes one), on an upright
   grey scale (X at the top) or from the photo: a pipette selects the zone
   under a click (same modifiers), a rectangle picker selects every zone

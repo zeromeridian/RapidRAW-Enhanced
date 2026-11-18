@@ -2832,7 +2832,8 @@ mod tests {
             "moved apart",
         );
 
-        // Zone V alone at +100 lifts its centre by about half a zone.
+        // Zone V alone at +100 lifts its centre by about 0.08: the 1.5-zone shift, shared with
+        // its neighbours by the luminance spread (σ 0.075).
         let mut zones = vec![serde_json::json!({}); 11];
         zones[5] = serde_json::json!({ "luminance": 100 });
         let moved_pixels = render(serde_json::json!({ "softness": 0.02, "zones": zones }));
@@ -2847,7 +2848,7 @@ mod tests {
                 "luminance alone stays neutral at L {l}"
             );
             if (l - 0.5).abs() < 0.005 {
-                assert!((moved[0] - l - 0.05).abs() < 0.01, "Zone V lifted at L {l}");
+                assert!((moved[0] - l - 0.08).abs() < 0.01, "Zone V lifted at L {l}");
                 checked_centre += 1;
             }
         }

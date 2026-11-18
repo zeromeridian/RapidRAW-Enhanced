@@ -19,12 +19,15 @@ const VERSION: u32 = 1;
 /// OKLab chroma of a zone at strength 100.
 const MAX_CHROMA: f32 = 0.10;
 const MAX_STRENGTH: f32 = 100.0;
-/// A zone's Luminance runs −100 to 100; at ±100 it moves the zone's tones by half a zone.
+/// A zone's Luminance runs −100 to 100; at ±100 it moves the zone's tones by 1.5 zones
+/// (owner 2026-11-18; half a zone before).
 const MAX_LUMINANCE: f32 = 100.0;
-const MAX_LUMINANCE_SHIFT: f32 = 0.05;
+const MAX_LUMINANCE_SHIFT: f32 = 0.15;
 /// Luminance spreads at least this wide (σ in L), whatever the softness, passed to the shader
-/// as the largest 1 / (2σ²) it weighs zones with.
-const MIN_LUMINANCE_SOFTNESS: f32 = DEFAULT_SOFTNESS;
+/// as the largest 1 / (2σ²) it weighs zones with. Wide enough that one zone, or a run of zones,
+/// at ±100 keeps every tone in order on its own; at the colour's σ 0.04 the tone-order scale
+/// would cut a lone zone at +100 to ≈ 0.06 (owner 2026-11-18, `docs/ZONE_TINT_PLAN.md`).
+const MIN_LUMINANCE_SOFTNESS: f32 = 0.075;
 const LUMINANCE_WEIGHT_CAP: f32 = 1.0 / (2.0 * MIN_LUMINANCE_SOFTNESS * MIN_LUMINANCE_SOFTNESS);
 /// The tone map L → L + shift must rise at least this steeply everywhere, so darker tones stay
 /// below lighter ones. Opposite shifts on close zones (neighbours at +100 and −100, or zones
@@ -32,7 +35,7 @@ const LUMINANCE_WEIGHT_CAP: f32 = 1.0 / (2.0 * MIN_LUMINANCE_SOFTNESS * MIN_LUMI
 /// enough (owner 2026-11-15), and every other edit renders exactly as set.
 const MIN_TONE_SLOPE: f32 = 0.1;
 /// Where the tone map's slope is checked: this many even steps over L 0–1, far finer than the
-/// narrowest luminance weighing (σ 0.04).
+/// narrowest luminance weighing (`MIN_LUMINANCE_SOFTNESS`).
 const TONE_SLOPE_SAMPLES: usize = 1024;
 /// The overall Amount scales every zone's strength and luminance, up to double; the product
 /// still stops at `MAX_STRENGTH` and `MAX_LUMINANCE`.
@@ -495,9 +498,9 @@ mod tests {
         // Out of range, a zone's luminance is clamped to ±100.
         assert!((shift(10) - MAX_LUMINANCE_SHIFT).abs() < 1e-6);
         assert_eq!(shift(0), 0.0);
-        // Luminance alone tints nothing and spreads at least as wide as the default softness.
+        // Luminance alone tints nothing and spreads at least σ 0.075, wider than the colour.
         assert!(tint.zones.iter().all(|zone| zone[..2] == [0.0, 0.0]));
-        assert!((tint.luminance_weight_cap - 312.5).abs() < 1e-3);
+        assert!((tint.luminance_weight_cap - 1.0 / (2.0 * 0.075 * 0.075)).abs() < 1e-3);
 
         // The Amount scales the shift too; a colour alone moves no tone.
         let halved = settings(json!({ "amount": 0.5, "zones": [{ "luminance": 100 }] }));
@@ -545,7 +548,8 @@ mod tests {
 
     #[test]
     fn opposite_luminance_on_close_zones_keeps_every_tone_in_order() {
-        // Neighbours at +100 and −100 reversed tones before the scale (slope ≈ −0.56).
+        // Neighbours at +100 and −100 reverse tones without the scale (slope ≈ −0.14), which
+        // keeps them at ≈ 0.12 each.
         let mut zones = vec![json!({}); ZONE_COUNT];
         zones[5] = json!({ "luminance": 100 });
         zones[6] = json!({ "luminance": -100 });
@@ -553,7 +557,7 @@ mod tests {
         assert!(min_tone_slope(&neighbours) >= MIN_TONE_SLOPE - 0.01);
         // Scaled together: Zone V still rises and Zone VI falls by as much.
         let shift = |tint: &ZoneTintSettings, zone: usize| tint.luminance[zone / 4][zone % 4];
-        assert!(shift(&neighbours, 5) > 0.02 && shift(&neighbours, 5) < MAX_LUMINANCE_SHIFT);
+        assert!(shift(&neighbours, 5) > 0.11 && shift(&neighbours, 5) < MAX_LUMINANCE_SHIFT);
         assert!((shift(&neighbours, 5) + shift(&neighbours, 6)).abs() < 1e-6);
 
         // Advanced mode: the same zones moved apart, the steepest case, and every mix of moves,
@@ -579,8 +583,9 @@ mod tests {
 
     #[test]
     fn luminance_that_keeps_tones_in_order_renders_as_set() {
-        // Zone V alone at +100, and neighbours at ±50, already rise steeply enough.
-        for (five, six) in [(100.0, 0.0), (50.0, -50.0)] {
+        // Zone V alone at +100 or −100, Zones V and VI both at +100, and neighbours at ±50
+        // already rise steeply enough, so they get the full 1.5 zones (or half of it).
+        for (five, six) in [(100.0, 0.0), (-100.0, 0.0), (100.0, 100.0), (50.0, -50.0)] {
             let mut zones = vec![json!({}); ZONE_COUNT];
             zones[5] = json!({ "luminance": five });
             zones[6] = json!({ "luminance": six });
@@ -592,6 +597,22 @@ mod tests {
                 (tint.luminance[1][2] - six / MAX_LUMINANCE * MAX_LUMINANCE_SHIFT).abs() < 1e-6
             );
         }
+    }
+
+    #[test]
+    fn luminance_at_full_strength_lifts_one_zone_by_most_of_a_zone_and_a_run_by_one_and_a_half() {
+        let lift = |zones: &[usize], l: f32| {
+            let mut block = vec![json!({}); ZONE_COUNT];
+            for &zone in zones {
+                block[zone] = json!({ "luminance": 100 });
+            }
+            tone_map(&settings(json!({ "zones": block })), l) - l
+        };
+        // One zone: its centre rises ≈ 0.08 and takes its neighbours part of the way along.
+        assert!((lift(&[5], 0.5) - 0.080).abs() < 2e-3);
+        assert!((lift(&[5], 0.4) - 0.033).abs() < 2e-3);
+        // A run of zones: its middle rises the full 1.5 zones (just under, from the run's ends).
+        assert!((lift(&[4, 5, 6], 0.5) - 0.145).abs() < 2e-3);
     }
 
     #[test]

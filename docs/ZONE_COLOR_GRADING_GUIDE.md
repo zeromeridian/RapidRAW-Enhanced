@@ -78,7 +78,9 @@ Each grade gives its zones three values:
 - **Strength** (0–100, the distance from the wheel's centre): how much
   colour. 0 is none.
 - **Luminance** (−100 to +100, the slider under the wheel): brightens or
-  darkens that zone's tones by up to half a zone (±0.05 L).
+  darkens that zone's tones. At ±100 a zone is shifted by 1.5 zones
+  (±0.15 L), shared with its neighbours, so how far its tones really
+  move depends on what the neighbours do (Example 3).
 
 The colour **never changes a tone**: a pixel keeps exactly its
 lightness, only its colour moves. Only Luminance changes brightness. A
@@ -105,22 +107,40 @@ in a zone tinted orange moves towards neutral.
 
 ### Example 3: luminance
 
-Select Zone 0, move Luminance to +60. The deepest blacks lift by 0.03 L
-(three tenths of a zone): a faded, matte look. Protect does not hold
-luminance back, so even pure black lifts.
+Select Zone 0, move Luminance to +60. The deepest blacks lift by about
+0.06 L (six tenths of a zone) and the tones of Zone I by 0.02 L: a
+faded, matte look. Protect does not hold luminance back, so even pure
+black lifts.
 
-Tones always keep their order: a darker grey never comes out brighter
-than a lighter one. Opposite shifts on close zones would break that,
-for example Zone V at +100 right next to Zone VI at −100: the top of
-Zone V would be pushed above the bottom of Zone VI. Then every
-luminance shift of the photo is reduced together, just enough that the
-tones stay in order (from `1.65.0`; earlier builds let such a pair
-reverse slightly). In this example both end up at about 58 % of their
-setting: Zone V still rises and Zone VI still falls, by the same
-amount, but less than the sliders say. Settings that keep the order on
-their own, such as V +50 next to VI −50, or V +100 with VI unchanged,
+**Luminance spreads wider than colour.** A zone's colour stays close to
+its own tones (Softness), but its luminance always reaches into the
+neighbouring zones as if the Softness were at least 7.5. That keeps
+the tones in order (see below) and makes brightness changes smooth.
+How far tones move at +100 (−100 moves them down by as much):
+
+| What is set to +100 | How far the tones move |
+|---|---|
+| Zone V alone | Zone V 0.08 L (most of a zone), IV and VI 0.03 L, III and VII almost nothing |
+| Zones IV, V and VI | Zone V 0.145 L (the full 1.5 zones), IV and VI 0.115 L, III and VII 0.035 L |
+| Zones 0 to III | the deep shadows up to Zone II about 0.15 L |
+
+A single zone cannot move by 1.5 zones on its own: Zone V's tones would
+end up brighter than Zone VI's. To brighten a range of tones strongly,
+select every zone of the range.
+
+**Tones always keep their order:** a darker grey never comes out
+brighter than a lighter one. Opposite shifts on neighbouring zones
+would break that, for example Zone V at +100 right next to Zone VI at
+−100: the top of Zone V would be pushed above the bottom of Zone VI.
+Then every luminance shift of the photo is reduced together, just
+enough that the tones stay in order. In this example both end up at
+about 79 % of their setting: Zone V's tones rise and Zone VI's fall by
+the same amount, about 0.04 L, because the two pull against each
+other. Settings that keep the order on their own, such as V +50 next
+to VI −50, any single zone at ±100, or a run of zones all at +100,
 render exactly as set. Zones moved apart with Advanced (see below) make
-the reduction start sooner.
+the reduction start sooner: V +100 and VI −100 moved apart by the full
+Centre end up at about 45 %.
 
 ## Selecting zones
 
@@ -329,7 +349,8 @@ These apply to the whole tool, all grades together.
 - **Softness** (2–8, default 4) is how far a zone's colour reaches: at
   2, Zone V's colour stays close to Zone V's tones; at 8 it spreads well
   into IV and VI and neighbouring colours blend more. Luminance never
-  spreads narrower than the default (4).
+  spreads narrower than 7.5 (Example 3), so Softness changes the
+  luminance only above that.
 - **Protect** (0–20, default 8) fades the colour out towards pure black
   and pure white, so Zone 0 stays black and Zone X stays paper white
   even with Zones 0 and X coloured. At 0 a coloured paper white is
@@ -376,8 +397,8 @@ With several zones selected, the sliders show the zone the selection
 started from (the one the wheel shows) and a change is written into
 every selected zone. The colours, grades and luminance of those zones
 stay as they are; only where they apply moves. Luminance still never
-spreads narrower than a width of 4, and the tones keep their order (see
-Example 3).
+spreads narrower than a width of 7.5, so a narrower Width narrows only
+the colour, and the tones keep their order (see Example 3).
 
 On the scale, a changed zone gets a small accent tick at its centre:
 above the middle of its row when moved lighter, below when moved darker,
@@ -443,6 +464,16 @@ like the Orbit Blend Pad's presets.
   yet.
 
 ## Edits made with earlier versions
+
+**Luminance is stronger from `1.88.0`.** Before, ±100 shifted a zone by
+half a zone and luminance spread like the colour (at least 4), so a
+single zone at +100 moved its tones about 0.05 L. Edits with a
+Luminance set open with the new, stronger look, also on another
+installation with `1.88.0` or later; the saved values are the same.
+Lower a zone's Luminance or the Amount to bring such a photo back
+towards its earlier brightness (one zone: roughly 60 % of its old
+value; a run of zones with the same Luminance: about a third). Colour
+is unchanged.
 
 Edits from before grades (`1.57.x`, `1.58.0`) open unchanged. Each run
 of neighbouring zones with the same settings becomes one grade. A ramp

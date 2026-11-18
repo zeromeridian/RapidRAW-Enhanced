@@ -69,8 +69,8 @@ import NamedPresetBar from './NamedPresetBar';
  */
 const SLIDER_SCALE = 100;
 const NEUTRAL: HueSatLum = { hue: 0, saturation: 0, luminance: 0 };
-/** `zone_tint::MAX_LUMINANCE_SHIFT`: luminance ±100 moves a zone's tones by half a zone. */
-const MAX_LUMINANCE_SHIFT = 0.05;
+/** `zone_tint::MAX_LUMINANCE_SHIFT`: luminance ±100 moves a zone's tones by 1.5 zones. */
+const MAX_LUMINANCE_SHIFT = 0.15;
 /** One zone's span in OKLab L, so a centre's offset can be drawn within its row on the scale. */
 const ZONE_SPAN = 1 / (ZONE_TINT_ZONE_COUNT - 1);
 
