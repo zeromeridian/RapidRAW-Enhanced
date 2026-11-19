@@ -647,19 +647,67 @@ fn interpolate_cubic_hermite(x: f32, p1: Point, p2: Point, m1: f32, m2: f32) -> 
     return h00 * p1.y + h10 * m1 * dx + h01 * p2.y + h11 * m2 * dx;
 }
 
-fn apply_curve(val: f32, points: array<Point, 16>, count: u32) -> f32 {
+// Curves are read where they are, in the uniform buffer: passed by value, each 16-point curve
+// was copied into slow per-thread memory for every pixel. A curve is named by its owner (the
+// photo, `CURVE_OWNER_PHOTO`, or a mask's index) and its channel.
+const CURVE_OWNER_PHOTO: u32 = 0xffffffffu;
+const CURVE_LUMA: u32 = 0u;
+const CURVE_RED: u32 = 1u;
+const CURVE_GREEN: u32 = 2u;
+const CURVE_BLUE: u32 = 3u;
+
+fn curve_point(owner: u32, channel: u32, index: u32) -> Point {
+    if (owner == CURVE_OWNER_PHOTO) {
+        switch channel {
+            case 0u: { return adjustments.global.luma_curve[index]; }
+            case 1u: { return adjustments.global.red_curve[index]; }
+            case 2u: { return adjustments.global.green_curve[index]; }
+            default: { return adjustments.global.blue_curve[index]; }
+        }
+    }
+    let mask = &adjustments.mask_adjustments[owner];
+    switch channel {
+        case 0u: { return mask.luma_curve[index]; }
+        case 1u: { return mask.red_curve[index]; }
+        case 2u: { return mask.green_curve[index]; }
+        default: { return mask.blue_curve[index]; }
+    }
+}
+
+fn curve_count(owner: u32, channel: u32) -> u32 {
+    if (owner == CURVE_OWNER_PHOTO) {
+        switch channel {
+            case 0u: { return adjustments.global.luma_curve_count; }
+            case 1u: { return adjustments.global.red_curve_count; }
+            case 2u: { return adjustments.global.green_curve_count; }
+            default: { return adjustments.global.blue_curve_count; }
+        }
+    }
+    let mask = &adjustments.mask_adjustments[owner];
+    switch channel {
+        case 0u: { return mask.luma_curve_count; }
+        case 1u: { return mask.red_curve_count; }
+        case 2u: { return mask.green_curve_count; }
+        default: { return mask.blue_curve_count; }
+    }
+}
+
+fn apply_curve(val: f32, owner: u32, channel: u32) -> f32 {
+    let count = curve_count(owner, channel);
     if (count < 2u) { return val; }
-    var local_points = points;
     let x = val * 255.0;
-    if (x <= local_points[0].x) { return local_points[0].y / 255.0; }
-    if (x >= local_points[count - 1u].x) { return local_points[count - 1u].y / 255.0; }
+    let first = curve_point(owner, channel, 0u);
+    if (x <= first.x) { return first.y / 255.0; }
+    let last = curve_point(owner, channel, count - 1u);
+    if (x >= last.x) { return last.y / 255.0; }
     for (var i = 0u; i < 15u; i = i + 1u) {
         if (i >= count - 1u) { break; }
-        let p1 = local_points[i];
-        let p2 = local_points[i + 1u];
+        let p1 = curve_point(owner, channel, i);
+        let p2 = curve_point(owner, channel, i + 1u);
         if (x <= p2.x) {
-            let p0 = local_points[max(0u, i - 1u)];
-            let p3 = local_points[min(count - 1u, i + 2u)];
+            // p0 is read only for i > 0 (the first segment's tangent ignores it).
+            let p0 = curve_point(owner, channel, select(i - 1u, 0u, i == 0u));
+            let p3 = curve_point(owner, channel, min(count - 1u, i + 2u));
             let delta_before = (p1.y - p0.y) / max(0.001, p1.x - p0.x);
             let delta_current = (p2.y - p1.y) / max(0.001, p2.x - p1.x);
             let delta_after = (p3.y - p2.y) / max(0.001, p3.x - p2.x);
@@ -684,7 +732,7 @@ fn apply_curve(val: f32, points: array<Point, 16>, count: u32) -> f32 {
             return clamp(result_y / 255.0, 0.0, 1.0);
         }
     }
-    return local_points[count - 1u].y / 255.0;
+    return last.y / 255.0;
 }
 
 fn apply_tonal_adjustments(
@@ -1646,37 +1694,40 @@ fn no_tonemap(c: vec3<f32>) -> vec3<f32> {
     return c;
 }
 
-fn is_default_curve(points: array<Point, 16>, count: u32) -> bool {
+fn is_default_curve(owner: u32, channel: u32) -> bool {
+    let count = curve_count(owner, channel);
     if (count < 2u) {
         return false;
     }
 
     var is_identity = true;
     for (var i = 0u; i < count; i = i + 1u) {
-        if (abs(points[i].x - points[i].y) > 0.5) {
+        let point = curve_point(owner, channel, i);
+        if (abs(point.x - point.y) > 0.5) {
             is_identity = false;
             break;
         }
     }
 
-    let p0 = points[0];
-    let p_last = points[count - 1u];
+    let p0 = curve_point(owner, channel, 0u);
+    let p_last = curve_point(owner, channel, count - 1u);
     let p0_is_origin = abs(p0.x - 0.0) < 0.1 && abs(p0.y - 0.0) < 0.1;
     let p_last_is_end = abs(p_last.x - 255.0) < 0.1 && abs(p_last.y - 255.0) < 0.1;
 
     return is_identity && p0_is_origin && p_last_is_end;
 }
 
-fn apply_all_curves(color: vec3<f32>, luma_curve: array<Point, 16>, luma_curve_count: u32, red_curve: array<Point, 16>, red_curve_count: u32, green_curve: array<Point, 16>, green_curve_count: u32, blue_curve: array<Point, 16>, blue_curve_count: u32) -> vec3<f32> {
-    let red_is_default = is_default_curve(red_curve, red_curve_count);
-    let green_is_default = is_default_curve(green_curve, green_curve_count);
-    let blue_is_default = is_default_curve(blue_curve, blue_curve_count);
+/// The photo's curves (`owner` = `CURVE_OWNER_PHOTO`) or a mask's (its index).
+fn apply_all_curves(color: vec3<f32>, owner: u32) -> vec3<f32> {
+    let red_is_default = is_default_curve(owner, CURVE_RED);
+    let green_is_default = is_default_curve(owner, CURVE_GREEN);
+    let blue_is_default = is_default_curve(owner, CURVE_BLUE);
     let rgb_curves_are_active = !red_is_default || !green_is_default || !blue_is_default;
 
     if (rgb_curves_are_active) {
-        let color_graded = vec3<f32>(apply_curve(color.r, red_curve, red_curve_count), apply_curve(color.g, green_curve, green_curve_count), apply_curve(color.b, blue_curve, blue_curve_count));
+        let color_graded = vec3<f32>(apply_curve(color.r, owner, CURVE_RED), apply_curve(color.g, owner, CURVE_GREEN), apply_curve(color.b, owner, CURVE_BLUE));
         let luma_initial = get_luma(color);
-        let luma_target = apply_curve(luma_initial, luma_curve, luma_curve_count);
+        let luma_target = apply_curve(luma_initial, owner, CURVE_LUMA);
         let luma_graded = get_luma(color_graded);
         var final_color: vec3<f32>;
         if (luma_graded > 0.001) { final_color = color_graded * (luma_target / luma_graded); } else { final_color = vec3<f32>(luma_target); }
@@ -1684,7 +1735,7 @@ fn apply_all_curves(color: vec3<f32>, luma_curve: array<Point, 16>, luma_curve_c
         if (max_comp > 1.0) { final_color = final_color / max_comp; }
         return final_color;
     } else {
-        return vec3<f32>(apply_curve(color.r, luma_curve, luma_curve_count), apply_curve(color.g, luma_curve, luma_curve_count), apply_curve(color.b, luma_curve, luma_curve_count));
+        return vec3<f32>(apply_curve(color.r, owner, CURVE_LUMA), apply_curve(color.g, owner, CURVE_LUMA), apply_curve(color.b, owner, CURVE_LUMA));
     }
 }
 
@@ -1992,7 +2043,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let influence = get_mask_influence(i, absolute_coord);
         if (influence > 0.001) {
-            let m = adjustments.mask_adjustments[i];
+            let m = &adjustments.mask_adjustments[i];
 
             t_exposure += m.exposure * influence;
             t_brightness += m.brightness * influence;
@@ -2088,7 +2139,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let influence = get_mask_influence(i, absolute_coord);
         if (influence > 0.001) {
-            let m = adjustments.mask_adjustments[i];
+            let m = &adjustments.mask_adjustments[i];
             if (abs(m.sharpness) > 0.001) {
                 let local_sharp_result = apply_local_contrast(
                     initial_linear_rgb, sharpness_blurred,
@@ -2195,7 +2246,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let influence = get_mask_influence(i, absolute_coord);
         if (influence > 0.001) {
-            let m = adjustments.mask_adjustments[i];
+            let m = &adjustments.mask_adjustments[i];
             let mask_graded = apply_color_grading(
                 composite_rgb_linear,
                 m.color_grading_shadows, m.color_grading_midtones, m.color_grading_highlights, m.color_grading_global, m.color_grading_blending, m.color_grading_balance
@@ -2215,7 +2266,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let influence = get_mask_influence(i, absolute_coord);
         if (influence > 0.001) {
-            let m = adjustments.mask_adjustments[i];
+            let m = &adjustments.mask_adjustments[i];
             let vignetted = apply_vignette_effect(
                 composite_rgb_linear,
                 m.vignette_amount,
@@ -2255,12 +2306,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         textureStore(output_texture, id.xy, curve_probe(base_srgb));
         return;
     }
-    var final_rgb = apply_all_curves(base_srgb,
-        adjustments.global.luma_curve, adjustments.global.luma_curve_count,
-        adjustments.global.red_curve, adjustments.global.red_curve_count,
-        adjustments.global.green_curve, adjustments.global.green_curve_count,
-        adjustments.global.blue_curve, adjustments.global.blue_curve_count
-    );
+    var final_rgb = apply_all_curves(base_srgb, CURVE_OWNER_PHOTO);
     if (SAMPLE_PROBE == SAMPLE_PROBE_MASK_CURVE) {
         textureStore(output_texture, id.xy, curve_probe(final_rgb));
         return;
@@ -2269,13 +2315,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let influence = get_mask_influence(i, absolute_coord);
         if (influence > 0.001) {
-            let m = adjustments.mask_adjustments[i];
-            let mask_curved_srgb = apply_all_curves(final_rgb,
-                m.luma_curve, m.luma_curve_count,
-                m.red_curve, m.red_curve_count,
-                m.green_curve, m.green_curve_count,
-                m.blue_curve, m.blue_curve_count
-            );
+            let mask_curved_srgb = apply_all_curves(final_rgb, i);
             final_rgb = mix(final_rgb, mask_curved_srgb, influence);
         }
     }
@@ -2324,7 +2364,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let influence = get_mask_influence(i, absolute_coord);
         if (influence > 0.001) {
-            let m = adjustments.mask_adjustments[i];
+            let m = &adjustments.mask_adjustments[i];
             final_rgb += grain_delta(
                 final_rgb,
                 absolute_coord_i,

@@ -16,6 +16,7 @@ import {
 } from '../../../utils/adjustments';
 import { favoriteKey } from '../../../utils/adjustmentControls';
 import { sampleDepthMap } from '../../ui/depthScope/DepthScope';
+import ErrorBoundary from '../../ui/ErrorBoundary';
 import { Mask, SubMask, SubMaskMode, ToolType } from '../right/Masks';
 import { AppSettings, BrushSettings, Invokes, Panel, SelectedImage } from '../../ui/AppProperties';
 import { RenderSize } from '../../../hooks/useImageRenderSize';
@@ -54,6 +55,7 @@ interface DrawnLine {
 const RELIGHT_FAVORITES = [favoriteKey('tool', 'relight'), favoriteKey('section', 'lightAtmosphere')];
 const STROKE_SMOOTHING_SPACING = 4;
 const STROKE_SMOOTHING_MAX_STEPS = 16;
+const MASK_CANVAS_DRAG_ENDED = { isSliderDragging: false, isMaskShapeDragging: false, isMaskCanvasDragging: false };
 
 // Centripetal Catmull-Rom through the sampled pointer positions, so fast strokes
 // curve instead of forming polygon corners between sparse mouse samples.
@@ -714,6 +716,8 @@ const MaskOverlay = memo(
 
     const commonProps = {
       dash: [4, 4],
+      // A see-through outline needs no off-screen copy of the whole stage to draw correctly.
+      perfectDrawEnabled: false,
       onClick: handleSelect,
       onTap: handleSelect,
       opacity: isSelected ? 1 : 0.7,
@@ -1394,7 +1398,11 @@ const ImageCanvas = memo(
       return () => clearTimeout(timer);
     }, [transformState.scale]);
 
-    const maxDimension = Math.max(stageWidth, stageHeight, 1);
+    // Konva draws the stage at the screen's pixel ratio, so the limit counts device pixels: each
+    // canvas of the stage stays within 4092 of them a side, which keeps its scene, hit and buffer
+    // canvases inside WebKit's canvas memory (past it, drawing throws and blanks the window).
+    const devicePixelRatio = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    const maxDimension = Math.max(stageWidth, stageHeight, 1) * devicePixelRatio;
     const maxSafeScale = Math.max(1, Math.min(settledScale, 4092 / maxDimension));
 
     const getCanvasPointer = useCallback(
@@ -2932,21 +2940,39 @@ const ImageCanvas = memo(
       [activeContainer, onLiveMaskPreview],
     );
 
+    // Dragging, resizing or rotating a mask shape on the photo is a drag like the panel's shape
+    // sliders (`onMaskShapeDragStateChange`): the preview renders through the interactive
+    // pipeline without the crossfade, and the full render and the save follow the release. The
+    // overlay is hidden meanwhile (`maskOpacity`), so the editor skips it (`isMaskCanvasDragging`).
+    const isMaskShapeDragRef = useRef(false);
     const handleMaskInteractionStart = useCallback(
       (e?: any) => {
         setIsMaskInteractionActive(true);
+        isMaskShapeDragRef.current = true;
+        setEditor({ isSliderDragging: true, isMaskShapeDragging: true, isMaskCanvasDragging: true });
         const eventType = e?.evt?.type;
         if (eventType === 'touchstart') {
           setIsMaskTouchInteracting(true);
         }
       },
-      [setIsMaskTouchInteracting],
+      [setIsMaskTouchInteracting, setEditor],
     );
 
     const handleMaskInteractionEnd = useCallback(() => {
       setIsMaskInteractionActive(false);
+      if (isMaskShapeDragRef.current) {
+        isMaskShapeDragRef.current = false;
+        setEditor(MASK_CANVAS_DRAG_ENDED);
+      }
       setIsMaskTouchInteracting(false);
-    }, [setIsMaskTouchInteracting]);
+    }, [setIsMaskTouchInteracting, setEditor]);
+
+    useEffect(
+      () => () => {
+        if (isMaskShapeDragRef.current) setEditor(MASK_CANVAS_DRAG_ENDED);
+      },
+      [setEditor],
+    );
 
     const currentActiveSubMaskId = activeAiSubMaskId || activeMaskId;
     const maskOpacity =
@@ -3186,138 +3212,143 @@ const ImageCanvas = memo(
                 ...getEdgeFadeStyle(128),
               }}
             >
-              <Stage
-                width={stageWidth * maxSafeScale}
-                height={stageHeight * maxSafeScale}
-                onMouseDown={handleStart}
-                onTouchStart={handleStart}
-                onMouseEnter={handleMouseEnter}
-                onMouseLeave={handleMouseLeave}
-                onMouseMove={handleMove}
-                onTouchMove={handleMove}
-                onMouseUp={handleUp}
-                onTouchEnd={handleUp}
-                onDblClick={isTargetedAdjustmentActive ? resetTargetedAdjustment : undefined}
+              <ErrorBoundary
+                name="Mask canvas"
+                resetKey={`${selectedImage.path}|${activeMaskContainerId}|${activeAiPatchContainerId}`}
               >
-                <Layer listening={!showOriginal && !isTargetedAdjustmentActive}>
-                  <Group scaleX={maxSafeScale} scaleY={maxSafeScale}>
-                    <Group x={groupOffsetX} y={groupOffsetY}>
-                      {(isMasking || isAiEditing) &&
-                        activeContainer &&
-                        sortedSubMasks.map((subMask: SubMask) => {
-                          const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
-                          const renderSubMask =
-                            subMask.id === activeId && localInitialDrawParams
-                              ? { ...subMask, parameters: localInitialDrawParams }
-                              : subMask;
+                <Stage
+                  width={stageWidth * maxSafeScale}
+                  height={stageHeight * maxSafeScale}
+                  onMouseDown={handleStart}
+                  onTouchStart={handleStart}
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                  onMouseMove={handleMove}
+                  onTouchMove={handleMove}
+                  onMouseUp={handleUp}
+                  onTouchEnd={handleUp}
+                  onDblClick={isTargetedAdjustmentActive ? resetTargetedAdjustment : undefined}
+                >
+                  <Layer listening={!showOriginal && !isTargetedAdjustmentActive}>
+                    <Group scaleX={maxSafeScale} scaleY={maxSafeScale}>
+                      <Group x={groupOffsetX} y={groupOffsetY}>
+                        {(isMasking || isAiEditing) &&
+                          activeContainer &&
+                          sortedSubMasks.map((subMask: SubMask) => {
+                            const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
+                            const renderSubMask =
+                              subMask.id === activeId && localInitialDrawParams
+                                ? { ...subMask, parameters: localInitialDrawParams }
+                                : subMask;
 
-                          const isCloneOrHeal = renderSubMask.type === Mask.Clone || renderSubMask.type === Mask.Heal;
-                          const isThisSubMaskActive = renderSubMask.id === activeId;
-                          const isActivelyDrawingThis = isThisSubMaskActive && isDrawing.current;
-                          const isHoveringThisMarker = hoveredMarkerId === renderSubMask.id;
+                            const isCloneOrHeal = renderSubMask.type === Mask.Clone || renderSubMask.type === Mask.Heal;
+                            const isThisSubMaskActive = renderSubMask.id === activeId;
+                            const isActivelyDrawingThis = isThisSubMaskActive && isDrawing.current;
+                            const isHoveringThisMarker = hoveredMarkerId === renderSubMask.id;
 
-                          let showBrushStrokes = true;
-                          if (isCloneOrHeal) {
-                            showBrushStrokes =
-                              isActivelyDrawingThis ||
-                              isHoveringThisMarker ||
-                              (isThisSubMaskActive && isMaskControlHovered);
-                          }
+                            let showBrushStrokes = true;
+                            if (isCloneOrHeal) {
+                              showBrushStrokes =
+                                isActivelyDrawingThis ||
+                                isHoveringThisMarker ||
+                                (isThisSubMaskActive && isMaskControlHovered);
+                            }
 
-                          return (
-                            <MaskOverlay
-                              adjustments={adjustments}
-                              imageHeight={effectiveImageDimensions.height}
-                              imageWidth={effectiveImageDimensions.width}
-                              isSelected={renderSubMask.id === activeId}
-                              isToolActive={isToolActive}
-                              showBrushStrokes={showBrushStrokes}
-                              key={renderSubMask.id}
-                              onMaskInteractionEnd={handleMaskInteractionEnd}
-                              onMaskInteractionStart={handleMaskInteractionStart}
-                              onMaskMouseEnter={() => !isToolActive && setIsMaskHovered(true)}
-                              onMaskMouseLeave={() => !isToolActive && setIsMaskHovered(false)}
-                              onPreviewUpdate={handlePreviewUpdate}
-                              onSelect={() =>
-                                isMasking ? onSelectMask(renderSubMask.id) : onSelectAiSubMask(renderSubMask.id)
-                              }
-                              onUpdate={updateSubMask}
-                              scale={imageRenderSize.scale}
-                              subMask={renderSubMask}
-                              offsetX={groupOffsetX}
-                              offsetY={groupOffsetY}
-                              stageScale={maxSafeScale}
-                            />
-                          );
-                        })}
-
-                      {previewBox && (
-                        <Rect
-                          x={Math.min(previewBox.start.x, previewBox.end.x)}
-                          y={Math.min(previewBox.start.y, previewBox.end.y)}
-                          width={Math.max(0.1, Math.abs(previewBox.end.x - previewBox.start.x))}
-                          height={Math.max(0.1, Math.abs(previewBox.end.y - previewBox.start.y))}
-                          stroke="#0ea5e9"
-                          strokeWidth={2}
-                          dash={[4, 4]}
-                          listening={false}
-                        />
-                      )}
-                      {pickArea && (
-                        <Rect
-                          {...pickArea}
-                          stroke="#ffffff"
-                          strokeWidth={1.5}
-                          dash={[4, 4]}
-                          shadowColor="black"
-                          shadowBlur={2}
-                          shadowOpacity={0.8}
-                          listening={false}
-                        />
-                      )}
-                      {isBrushActive &&
-                        !isTargetedAdjustmentActive &&
-                        cursorPreview.visible &&
-                        (!isManualCleanupActive ||
-                          (activeSubMask?.parameters?.sourceX !== undefined && !isCtrlPressed)) && (
-                          <Circle
-                            {...(brushCursorPreview.colorStops
-                              ? {
-                                  fillRadialGradientColorStops: brushCursorPreview.colorStops,
-                                  fillRadialGradientEndPoint: { x: 0, y: 0 },
-                                  fillRadialGradientEndRadius: brushCursorPreview.radius,
-                                  fillRadialGradientStartPoint: { x: 0, y: 0 },
-                                  fillRadialGradientStartRadius: 0,
+                            return (
+                              <MaskOverlay
+                                adjustments={adjustments}
+                                imageHeight={effectiveImageDimensions.height}
+                                imageWidth={effectiveImageDimensions.width}
+                                isSelected={renderSubMask.id === activeId}
+                                isToolActive={isToolActive}
+                                showBrushStrokes={showBrushStrokes}
+                                key={renderSubMask.id}
+                                onMaskInteractionEnd={handleMaskInteractionEnd}
+                                onMaskInteractionStart={handleMaskInteractionStart}
+                                onMaskMouseEnter={() => !isToolActive && setIsMaskHovered(true)}
+                                onMaskMouseLeave={() => !isToolActive && setIsMaskHovered(false)}
+                                onPreviewUpdate={handlePreviewUpdate}
+                                onSelect={() =>
+                                  isMasking ? onSelectMask(renderSubMask.id) : onSelectAiSubMask(renderSubMask.id)
                                 }
-                              : { fill: brushCursorPreview.fill })}
+                                onUpdate={updateSubMask}
+                                scale={imageRenderSize.scale}
+                                subMask={renderSubMask}
+                                offsetX={groupOffsetX}
+                                offsetY={groupOffsetY}
+                                stageScale={maxSafeScale}
+                              />
+                            );
+                          })}
+
+                        {previewBox && (
+                          <Rect
+                            x={Math.min(previewBox.start.x, previewBox.end.x)}
+                            y={Math.min(previewBox.start.y, previewBox.end.y)}
+                            width={Math.max(0.1, Math.abs(previewBox.end.x - previewBox.start.x))}
+                            height={Math.max(0.1, Math.abs(previewBox.end.y - previewBox.start.y))}
+                            stroke="#0ea5e9"
+                            strokeWidth={2}
+                            dash={[4, 4]}
                             listening={false}
-                            perfectDrawEnabled={false}
-                            radius={brushCursorPreview.radius}
-                            x={cursorPreview.x}
-                            y={cursorPreview.y}
                           />
                         )}
-                      {showRelightLights &&
-                        (adjustments.relightLights || []).map((light: RelightLight) => (
-                          <RelightLightShape
-                            key={light.id}
-                            light={light}
-                            pos={mapRelightUvToCanvas(light)}
-                            basis={relightBasis}
-                            zoomScale={effectiveZoomScale}
-                            isActive={light.id === activeRelightLightId}
-                            onSelect={() => setEditor({ activeRelightLightId: light.id })}
-                            onMove={(pos) => moveRelightLight(light.id, pos)}
-                            onAim={(angle, elevation) => aimRelightLight(light.id, angle, elevation)}
-                            onDragStateChange={(isDragging) => setEditor({ isSliderDragging: isDragging })}
-                            onHoverChange={setIsMaskHovered}
-                            onTouchInteraction={() => setIsMaskTouchInteracting(true)}
+                        {pickArea && (
+                          <Rect
+                            {...pickArea}
+                            stroke="#ffffff"
+                            strokeWidth={1.5}
+                            dash={[4, 4]}
+                            shadowColor="black"
+                            shadowBlur={2}
+                            shadowOpacity={0.8}
+                            listening={false}
                           />
-                        ))}
+                        )}
+                        {isBrushActive &&
+                          !isTargetedAdjustmentActive &&
+                          cursorPreview.visible &&
+                          (!isManualCleanupActive ||
+                            (activeSubMask?.parameters?.sourceX !== undefined && !isCtrlPressed)) && (
+                            <Circle
+                              {...(brushCursorPreview.colorStops
+                                ? {
+                                    fillRadialGradientColorStops: brushCursorPreview.colorStops,
+                                    fillRadialGradientEndPoint: { x: 0, y: 0 },
+                                    fillRadialGradientEndRadius: brushCursorPreview.radius,
+                                    fillRadialGradientStartPoint: { x: 0, y: 0 },
+                                    fillRadialGradientStartRadius: 0,
+                                  }
+                                : { fill: brushCursorPreview.fill })}
+                              listening={false}
+                              perfectDrawEnabled={false}
+                              radius={brushCursorPreview.radius}
+                              x={cursorPreview.x}
+                              y={cursorPreview.y}
+                            />
+                          )}
+                        {showRelightLights &&
+                          (adjustments.relightLights || []).map((light: RelightLight) => (
+                            <RelightLightShape
+                              key={light.id}
+                              light={light}
+                              pos={mapRelightUvToCanvas(light)}
+                              basis={relightBasis}
+                              zoomScale={effectiveZoomScale}
+                              isActive={light.id === activeRelightLightId}
+                              onSelect={() => setEditor({ activeRelightLightId: light.id })}
+                              onMove={(pos) => moveRelightLight(light.id, pos)}
+                              onAim={(angle, elevation) => aimRelightLight(light.id, angle, elevation)}
+                              onDragStateChange={(isDragging) => setEditor({ isSliderDragging: isDragging })}
+                              onHoverChange={setIsMaskHovered}
+                              onTouchInteraction={() => setIsMaskTouchInteracting(true)}
+                            />
+                          ))}
+                      </Group>
                     </Group>
-                  </Group>
-                </Layer>
-              </Stage>
+                  </Layer>
+                </Stage>
+              </ErrorBoundary>
             </div>
           )}
         </div>

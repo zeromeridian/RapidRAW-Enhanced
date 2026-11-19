@@ -1105,6 +1105,23 @@ export const getInitialAdjustments = (isRaw: boolean): Adjustments => ({
 /** Whether Guided Perspective has enough guides to correct the image. */
 export const hasGuidedPerspective = (guided: GuidedPerspective) => guided.enabled && guided.lines.length >= 2;
 
+/**
+ * A mask's first component is its base and has no mode (as in Lightroom Classic; the
+ * renderer ignores it), so it is stored as Additive. Returns the same list when nothing
+ * changes.
+ */
+export const withAdditiveBase = (subMasks: Array<SubMask>): Array<SubMask> =>
+  subMasks.length === 0 || subMasks[0].mode === SubMaskMode.Additive
+    ? subMasks
+    : [{ ...subMasks[0], mode: SubMaskMode.Additive }, ...subMasks.slice(1)];
+
+/** `withAdditiveBase` for every mask or AI edit in a list, after its components change. */
+export const withAdditiveBases = <T extends { subMasks: Array<SubMask> }>(containers: Array<T>): Array<T> =>
+  containers.map((container) => {
+    const subMasks = withAdditiveBase(container.subMasks);
+    return subMasks === container.subMasks ? container : { ...container, subMasks };
+  });
+
 export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any => {
   if (!loadedAdjustments) {
     return INITIAL_ADJUSTMENTS;
@@ -1113,13 +1130,15 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
   const subMaskModes = Object.values(SubMaskMode) as unknown[];
   // Before 1.85.2, dropping a mask tool onto a component saved a number as its mode.
   const normalizeSubMasks = (subMasks: any[]) => {
-    return (subMasks || []).map((subMask: Partial<SubMask>) => ({
-      visible: true,
-      invert: false,
-      opacity: 100,
-      ...subMask,
-      mode: subMaskModes.includes(subMask.mode) ? subMask.mode : SubMaskMode.Additive,
-    }));
+    return withAdditiveBase(
+      (subMasks || []).map((subMask: Partial<SubMask>) => ({
+        visible: true,
+        invert: false,
+        opacity: 100,
+        ...subMask,
+        mode: subMaskModes.includes(subMask.mode) ? subMask.mode : SubMaskMode.Additive,
+      })) as Array<SubMask>,
+    );
   };
 
   const normalizedMasks = (loadedAdjustments.masks || []).map((maskContainer: MaskContainer) => {

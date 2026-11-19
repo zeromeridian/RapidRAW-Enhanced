@@ -135,6 +135,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   const maskOverlayVisible = useEditorStore((s) => s.maskOverlayVisible);
   const isSliderDragging = useEditorStore((s) => s.isSliderDragging);
   const isMaskShapeDragging = useEditorStore((s) => s.isSliderDragging && s.isMaskShapeDragging);
+  const isMaskCanvasDragging = useEditorStore((s) => s.isMaskCanvasDragging);
   const targetZoom = useEditorStore((s) => s.zoom);
   const originalSize = useEditorStore((s) => s.originalSize);
   // Zoom levels count Super Resolution's pixels (`getZoomPixelSize`); the canvas keeps photo pixels.
@@ -1254,6 +1255,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
 
   const handleLiveMaskPreview = useCallback(
     (maskDef: any) => {
+      if (useEditorStore.getState().isMaskCanvasDragging) return;
       let normalizedDef = maskDef;
       if (maskDef && !maskDef.adjustments) {
         normalizedDef = {
@@ -1534,6 +1536,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   ]);
 
   useEffect(() => {
+    // Hidden while a shape is dragged on the photo; the release renders it again.
+    if (isMaskCanvasDragging) return;
     let maskDefForOverlay = null;
 
     if (activeRightPanel === Panel.Masks && activeMaskContainerId) {
@@ -1575,6 +1579,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     activeAiPatchContainerId,
     imageRenderSize,
     isMaskShapeDragging,
+    isMaskCanvasDragging,
   ]);
 
   useEffect(() => {

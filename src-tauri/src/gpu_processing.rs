@@ -10,6 +10,7 @@ use std::num::NonZero;
 use tauri::Manager;
 use wgpu::util::{DeviceExt, TextureDataOrder};
 
+use crate::app_state::GpuLane;
 use crate::image_processing::{AllAdjustments, GpuContext, MAX_MASKS};
 use crate::lut_processing::Lut;
 use crate::render_source::RenderSource;
@@ -596,6 +597,88 @@ struct BlurCacheKey {
     input_generation: u64,
     bounds: (u32, u32, u32, u32),
 }
+
+/// Opt-in timing of a render's GPU stages, on when the app starts with
+/// `THISISRAW_GPU_PROFILE=1`. It waits for the GPU after every stage, so it slows rendering and
+/// is meant for finding where a frame's time goes. A render runs on one thread, so the profile
+/// of the render in progress is kept per thread.
+struct GpuProfile {
+    last: Instant,
+    stages: Vec<(&'static str, std::time::Duration)>,
+}
+
+thread_local! {
+    static GPU_PROFILE: std::cell::RefCell<Option<GpuProfile>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+fn gpu_profile_wait(device: &wgpu::Device) {
+    let _ = device.poll(wgpu::PollType::Wait {
+        submission_index: None,
+        timeout: Some(std::time::Duration::from_secs(10)),
+    });
+}
+
+/// Starts profiling this thread's render, when profiling is on.
+fn profile_start(device: &wgpu::Device) {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if !*ENABLED
+        .get_or_init(|| std::env::var_os("THISISRAW_GPU_PROFILE").is_some_and(|value| value == "1"))
+    {
+        return;
+    }
+    gpu_profile_wait(device);
+    GPU_PROFILE.with_borrow_mut(|profile| {
+        *profile = Some(GpuProfile {
+            last: Instant::now(),
+            stages: Vec::new(),
+        })
+    });
+}
+
+/// Waits for the GPU and adds the time since the last mark to `stage`.
+fn profile_mark(device: &wgpu::Device, stage: &'static str) {
+    GPU_PROFILE.with_borrow_mut(|profile| {
+        let Some(profile) = profile else {
+            return;
+        };
+        gpu_profile_wait(device);
+        let now = Instant::now();
+        let elapsed = now - profile.last;
+        profile.last = now;
+        match profile.stages.iter_mut().find(|(name, _)| *name == stage) {
+            Some((_, total)) => *total += elapsed,
+            None => profile.stages.push((stage, elapsed)),
+        }
+    });
+}
+
+/// Ends this thread's profile with a last `stage` and logs it.
+fn profile_finish(device: &wgpu::Device, stage: &'static str, caller_id: &str, size: (u32, u32)) {
+    profile_mark(device, stage);
+    let Some(profile) = GPU_PROFILE.with_borrow_mut(Option::take) else {
+        return;
+    };
+    let stages: Vec<String> = profile
+        .stages
+        .iter()
+        .map(|(stage, time)| format!("{stage} {:.1} ms", time.as_secs_f64() * 1e3))
+        .collect();
+    log::info!(
+        "[gpu-profile] {caller_id} {}x{}: {}",
+        size.0,
+        size.1,
+        stages.join(", ")
+    );
+}
+
+/// Uploaded sources a [`GpuLane`] keeps: the editor's interactive (drag) and full-size source,
+/// so starting and ending a drag does not rebuild the source stages.
+const GPU_SOURCE_SLOTS: usize = 2;
+
+/// Pixels a lane's sources may hold together (16 MP, about 128 MB as half floats): a
+/// 3072 × 2048 preview and its drag-size copy fit; a larger source is kept alone.
+const GPU_SOURCE_PIXEL_BUDGET: u64 = 16_000_000;
 
 /// Gives every uploaded input texture its own [`crate::app_state::GpuImageCache::generation`].
 static NEXT_INPUT_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
@@ -1713,6 +1796,7 @@ impl GpuProcessor {
 
             queue.submit(Some(encoder.finish()));
         }
+        profile_mark(device, "LUT and flare");
 
         const TILE_SIZE: u32 = 2048;
         const TILE_OVERLAP: u32 = 128;
@@ -1858,6 +1942,7 @@ impl GpuProcessor {
                     run_blur(8.0, &self.clarity_blur_view);
                     run_blur(40.0, &self.structure_blur_view);
                 }
+                profile_mark(device, "blurs");
 
                 let mut main_encoder = device.create_command_encoder(&Default::default());
 
@@ -1978,6 +2063,7 @@ impl GpuProcessor {
                 }
 
                 queue.submit(Some(main_encoder.finish()));
+                profile_mark(device, "main shader");
 
                 if !skip_cpu_readback {
                     let processed_tile_data = read_texture_data_roi(
@@ -2032,6 +2118,7 @@ impl GpuProcessor {
                             }
                         }
                     }
+                    profile_mark(device, "readback");
                 }
             }
         }
@@ -2053,10 +2140,29 @@ pub fn process_and_get_dynamic_image(
 ) -> Result<DynamicImage, String> {
     process_and_get_dynamic_image_inner(
         context,
-        state,
+        &state.editor_gpu,
         source,
         request,
         caller_id,
+        RenderOutputPrecision::EightBit,
+        false,
+        None,
+    )
+}
+
+/// `process_and_get_dynamic_image` for a library or filmstrip thumbnail, on its own GPU lane.
+pub fn process_thumbnail_image(
+    context: &GpuContext,
+    state: &tauri::State<AppState>,
+    source: &RenderSource,
+    request: RenderRequest,
+) -> Result<DynamicImage, String> {
+    process_and_get_dynamic_image_inner(
+        context,
+        &state.thumbnail_gpu,
+        source,
+        request,
+        "generate_thumbnail_data",
         RenderOutputPrecision::EightBit,
         false,
         None,
@@ -2073,7 +2179,7 @@ pub fn process_and_get_dynamic_image_with_precision(
 ) -> Result<DynamicImage, String> {
     process_and_get_dynamic_image_inner(
         context,
-        state,
+        &state.editor_gpu,
         source,
         request,
         caller_id,
@@ -2094,7 +2200,7 @@ pub fn process_and_get_dynamic_image_with_analytics(
 ) -> Result<DynamicImage, String> {
     process_and_get_dynamic_image_inner(
         context,
-        state,
+        &state.editor_gpu,
         source,
         request,
         caller_id,
@@ -2166,7 +2272,7 @@ pub fn fit_to_gpu<'a>(
 #[allow(clippy::too_many_arguments)]
 fn process_and_get_dynamic_image_inner(
     context: &GpuContext,
-    state: &tauri::State<AppState>,
+    lane: &GpuLane,
     source: &RenderSource,
     request: RenderRequest,
     caller_id: &str,
@@ -2175,6 +2281,7 @@ fn process_and_get_dynamic_image_inner(
     analytics_config: Option<crate::AnalyticsConfig>,
 ) -> Result<DynamicImage, String> {
     let start_time = Instant::now();
+    profile_start(&context.device);
     let (width, height) = source.size();
     let source_size = source.image.dimensions();
     let device = &context.device;
@@ -2188,7 +2295,7 @@ fn process_and_get_dynamic_image_inner(
         ));
     }
 
-    let mut processor_lock = state.gpu_processor.lock().unwrap();
+    let mut processor_lock = lane.processor.lock().unwrap();
     let mut needs_new_processor = false;
     let new_width = (width + 255) & !255;
     let new_height = (height + 255) & !255;
@@ -2228,44 +2335,66 @@ fn process_and_get_dynamic_image_inner(
     let processor_state = processor_lock.as_ref().unwrap();
     let processor = &processor_state.processor;
 
-    let mut cache_lock = state.gpu_image_cache.lock().unwrap();
+    let mut sources = lane.sources.lock().unwrap();
     let source_key = source.key();
-    let needs_new_cache = !cache_lock.as_ref().is_some_and(|cache| {
+    match sources.iter().position(|cache| {
         cache.source_key == source_key && cache.width == width && cache.height == height
-    });
+    }) {
+        Some(index) => {
+            let cache = sources.remove(index);
+            sources.insert(0, cache);
+        }
+        None => {
+            // Free older sources first, so a full-size export does not stay next to the editor's.
+            let pixels = |cache: &GpuImageCache| cache.width as u64 * cache.height as u64;
+            let mut held = sources.iter().map(pixels).sum::<u64>();
+            let mut evicted = false;
+            while let Some(oldest) = sources.last()
+                && (sources.len() >= GPU_SOURCE_SLOTS
+                    || held + width as u64 * height as u64 > GPU_SOURCE_PIXEL_BUDGET)
+            {
+                held -= pixels(oldest);
+                sources.pop();
+                evicted = true;
+            }
+            if evicted {
+                let _ = context.device.poll(wgpu::PollType::Wait {
+                    submission_index: None,
+                    timeout: Some(std::time::Duration::from_millis(500)),
+                });
+            }
 
-    if needs_new_cache {
-        let old_cache = cache_lock.take();
-        drop(old_cache);
+            let input = source.render(context).unwrap_or_else(|error| {
+                log::warn!(
+                    "GPU source stages failed for {} ({}); preparing the image on the CPU",
+                    caller_id,
+                    error
+                );
+                crate::gpu_compute::upload_image(context, &source.render_on_cpu())
+            });
 
-        let _ = context.device.poll(wgpu::PollType::Wait {
-            submission_index: None,
-            timeout: Some(std::time::Duration::from_millis(500)),
-        });
-
-        let input = source.render(context).unwrap_or_else(|error| {
-            log::warn!(
-                "GPU source stages failed for {} ({}); preparing the image on the CPU",
-                caller_id,
-                error
+            sources.insert(
+                0,
+                GpuImageCache {
+                    texture: input.texture,
+                    texture_view: input.view,
+                    width,
+                    height,
+                    source_key,
+                    generation: NEXT_INPUT_GENERATION
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+                },
             );
-            crate::gpu_compute::upload_image(context, &source.render_on_cpu())
-        });
-
-        *cache_lock = Some(GpuImageCache {
-            texture: input.texture,
-            texture_view: input.view,
-            width,
-            height,
-            source_key,
-            generation: NEXT_INPUT_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-        });
+        }
     }
 
-    let cache = cache_lock.as_ref().unwrap();
+    let cache = &sources[0];
+    profile_mark(device, "processor and source");
 
     let mask_view = processor.mask_texture_view(request.mask_bitmaps, width, height);
+    profile_mark(device, "mask upload");
     let motion = processor.motion_blurred(cache, &request, &mask_view)?;
+    profile_mark(device, "motion blur");
     let (input, mask_view) = match &motion {
         Some(blurred) => (
             RenderInput {
@@ -2378,6 +2507,7 @@ fn process_and_get_dynamic_image_inner(
     if submit_final_encoder {
         queue.submit(Some(final_encoder.finish()));
     }
+    profile_mark(device, "final copy");
 
     if let Some(analytics) = analytics_config {
         if let Some(buffer) = async_readback_buffer {
@@ -2495,6 +2625,7 @@ fn process_and_get_dynamic_image_inner(
         display.current_bind_group = Some(bind_group);
         display.render(device, queue);
     }
+    profile_finish(device, "display", caller_id, (width, height));
 
     if skip_readback {
         let duration = start_time.elapsed();
@@ -2572,6 +2703,167 @@ mod tests {
         assert!(!source.contains("texture_storage_2d<rgba8unorm, write>"));
         assert!(source.contains("override HIGH_PRECISION_OUTPUT: u32 = 0u"));
         assert!(source.contains("base_srgb = linear_to_srgb"));
+    }
+
+    /// A tone curve through `points` (0–255), as the editor sends it.
+    fn tone_curve(points: &[(f32, f32)]) -> ([crate::image_processing::Point; 16], u32) {
+        let mut curve = [crate::image_processing::Point::default(); 16];
+        for (slot, &(x, y)) in curve.iter_mut().zip(points) {
+            *slot = bytemuck::cast([x, y, 0.0f32, 0.0]);
+        }
+        (curve, points.len() as u32)
+    }
+
+    /// The shader's curve evaluation (`apply_curve`) as it was before `1.94.6`.
+    fn reference_curve(value: f32, points: &[(f32, f32)]) -> f32 {
+        let count = points.len();
+        if count < 2 {
+            return value;
+        }
+        let x = value * 255.0;
+        if x <= points[0].0 {
+            return points[0].1 / 255.0;
+        }
+        if x >= points[count - 1].0 {
+            return points[count - 1].1 / 255.0;
+        }
+        for i in 0..count - 1 {
+            let (p1, p2) = (points[i], points[i + 1]);
+            if x <= p2.0 {
+                let p0 = points[i.saturating_sub(1)];
+                let p3 = points[(i + 2).min(count - 1)];
+                let slope = |a: (f32, f32), b: (f32, f32)| (b.1 - a.1) / (b.0 - a.0).max(0.001);
+                let (before, current, after) = (slope(p0, p1), slope(p1, p2), slope(p2, p3));
+                let mut m1 = if i == 0 {
+                    current
+                } else if before * current <= 0.0 {
+                    0.0
+                } else {
+                    (before + current) / 2.0
+                };
+                let mut m2 = if i + 1 == count - 1 {
+                    current
+                } else if current * after <= 0.0 {
+                    0.0
+                } else {
+                    (current + after) / 2.0
+                };
+                if current != 0.0 {
+                    let (alpha, beta) = (m1 / current, m2 / current);
+                    if alpha * alpha + beta * beta > 9.0 {
+                        let tau = 3.0 / (alpha * alpha + beta * beta).sqrt();
+                        m1 *= tau;
+                        m2 *= tau;
+                    }
+                }
+                let dx = p2.0 - p1.0;
+                let t = (x - p1.0) / dx;
+                let (t2, t3) = (t * t, t * t * t);
+                let y = (2.0 * t3 - 3.0 * t2 + 1.0) * p1.1
+                    + (t3 - 2.0 * t2 + t) * m1 * dx
+                    + (-2.0 * t3 + 3.0 * t2) * p2.1
+                    + (t3 - t2) * m2 * dx;
+                return (y / 255.0).clamp(0.0, 1.0);
+            }
+        }
+        points[count - 1].1 / 255.0
+    }
+
+    #[test]
+    fn tone_curves_follow_their_points() {
+        let Some(context) = headless_gpu_context() else {
+            eprintln!("No GPU adapter; skipping the tone curve render test.");
+            return;
+        };
+        let (width, height) = (256, 2);
+        let image =
+            image::DynamicImage::ImageRgb32F(image::ImageBuffer::from_fn(width, height, |x, _| {
+                let value = x as f32 / 255.0;
+                image::Rgb([value, value * 0.8, value * 0.55])
+            }));
+        let input = upload_test_image(&context, &image);
+        let processor = super::GpuProcessor::new(context, width, 256).expect("processor");
+        let mask_view = processor.mask_texture_view(&[], width, height);
+        let probe = |adjustments: AllAdjustments, probe: super::SampleProbe| -> Vec<u8> {
+            let request = super::RenderRequest {
+                adjustments,
+                mask_bitmaps: &[],
+                lut: None,
+                roi: None,
+                probe: Some(probe),
+                motion_blur: Default::default(),
+            };
+            match processor
+                .run(
+                    super::RenderInput::from_cache(&input),
+                    &mask_view,
+                    request,
+                    false,
+                    false,
+                    super::RenderOutputPrecision::EightBit,
+                )
+                .expect("render")
+                .0
+            {
+                super::RenderedPixels::U8(pixels) => pixels,
+                super::RenderedPixels::U16(_) => unreachable!("8-bit render"),
+            }
+        };
+
+        let identity = [(0.0, 0.0), (255.0, 255.0)];
+        let luma = [
+            (0.0, 0.0),
+            (64.0, 30.0),
+            (128.0, 160.0),
+            (200.0, 220.0),
+            (255.0, 250.0),
+        ];
+        let red = [(0.0, 10.0), (100.0, 60.0), (255.0, 255.0)];
+        for red_points in [&identity[..], &red[..]] {
+            let mut adjustments = AllAdjustments::default();
+            let global = &mut adjustments.global;
+            (global.luma_curve, global.luma_curve_count) = tone_curve(&luma);
+            (global.red_curve, global.red_curve_count) = tone_curve(red_points);
+            (global.green_curve, global.green_curve_count) = tone_curve(&identity);
+            (global.blue_curve, global.blue_curve_count) = tone_curve(&identity);
+
+            // The photo's curve takes the `Curve` probe's colour to the `MaskCurve` probe's.
+            let before = probe(adjustments, super::SampleProbe::Curve);
+            let after = probe(adjustments, super::SampleProbe::MaskCurve);
+            for (pixel, (input, output)) in before.chunks(4).zip(after.chunks(4)).enumerate() {
+                let rgb = [0, 1, 2].map(|c| input[c] as f32 / 255.0);
+                let expected = if red_points.len() == 2 {
+                    rgb.map(|value| reference_curve(value, &luma))
+                } else {
+                    let luma_of = |c: [f32; 3]| 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+                    let graded = [
+                        reference_curve(rgb[0], red_points),
+                        reference_curve(rgb[1], &identity),
+                        reference_curve(rgb[2], &identity),
+                    ];
+                    let target = reference_curve(luma_of(rgb), &luma);
+                    let graded_luma = luma_of(graded);
+                    let mut result = if graded_luma > 0.001 {
+                        graded.map(|value| value * target / graded_luma)
+                    } else {
+                        [target; 3]
+                    };
+                    let max = result[0].max(result[1]).max(result[2]);
+                    if max > 1.0 {
+                        result = result.map(|value| value / max);
+                    }
+                    result
+                };
+                for c in 0..3 {
+                    let got = output[c] as f32;
+                    let want = expected[c].clamp(0.0, 1.0) * 255.0;
+                    assert!(
+                        (got - want).abs() <= 2.5,
+                        "pixel {pixel}, channel {c}: {got} vs {want} (red curve {red_points:?})"
+                    );
+                }
+            }
+        }
     }
 
     #[test]

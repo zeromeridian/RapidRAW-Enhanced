@@ -6,6 +6,7 @@ use image::{DynamicImage, GenericImageView, GrayImage, ImageFormat, Luma, Rgba, 
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::f32::consts::PI;
 use std::hash::{Hash, Hasher};
@@ -617,30 +618,29 @@ fn generate_radial_bitmap(
     let radius_x = params.radius_x as f32 * scale;
     let radius_y = params.radius_y as f32 * scale;
     let rotation_rad = params.rotation * PI / 180.0;
+    let cos_rot = rotation_rad.cos();
+    let sin_rot = rotation_rad.sin();
+    let inner_bound = 1.0 - params.feather.clamp(0.0, 1.0);
 
-    for y in 0..height {
-        for x in 0..width {
-            let dx = x as f32 - center_x as f32;
-            let dy = y as f32 - center_y as f32;
+    mask.par_chunks_mut(width.max(1) as usize)
+        .enumerate()
+        .for_each(|(y, row)| {
+            for (x, pixel) in row.iter_mut().enumerate() {
+                let dx = x as f32 - center_x as f32;
+                let dy = y as f32 - center_y as f32;
 
-            let cos_rot = rotation_rad.cos();
-            let sin_rot = rotation_rad.sin();
+                let rot_dx = dx * cos_rot + dy * sin_rot;
+                let rot_dy = -dx * sin_rot + dy * cos_rot;
 
-            let rot_dx = dx * cos_rot + dy * sin_rot;
-            let rot_dy = -dx * sin_rot + dy * cos_rot;
+                let norm_x = rot_dx / radius_x.max(0.01);
+                let norm_y = rot_dy / radius_y.max(0.01);
 
-            let norm_x = rot_dx / radius_x.max(0.01);
-            let norm_y = rot_dy / radius_y.max(0.01);
+                let dist = (norm_x.powi(2) + norm_y.powi(2)).sqrt();
 
-            let dist = (norm_x.powi(2) + norm_y.powi(2)).sqrt();
-
-            let inner_bound = 1.0 - params.feather.clamp(0.0, 1.0);
-            let intensity = 1.0 - (dist - inner_bound) / (1.0 - inner_bound).max(0.01);
-            let clamped_intensity = intensity.clamp(0.0, 1.0);
-
-            mask.put_pixel(x, y, Luma([(clamped_intensity * 255.0) as u8]));
-        }
-    }
+                let intensity = 1.0 - (dist - inner_bound) / (1.0 - inner_bound).max(0.01);
+                *pixel = (intensity.clamp(0.0, 1.0) * 255.0) as u8;
+            }
+        });
 
     mask
 }
@@ -676,25 +676,21 @@ fn generate_linear_bitmap(
 
     let half_width = range.max(0.01);
 
-    for y_u in 0..height {
-        for x_u in 0..width {
-            let x = x_u as f32;
-            let y = y_u as f32;
+    mask.par_chunks_mut(width.max(1) as usize)
+        .enumerate()
+        .for_each(|(y_u, row)| {
+            for (x_u, pixel) in row.iter_mut().enumerate() {
+                let pixel_vec_x = x_u as f32 - start_x;
+                let pixel_vec_y = y_u as f32 - start_y;
 
-            let pixel_vec_x = x - start_x;
-            let pixel_vec_y = y - start_y;
+                let dist_perp = pixel_vec_x * perp_vec_x + pixel_vec_y * perp_vec_y;
 
-            let dist_perp = pixel_vec_x * perp_vec_x + pixel_vec_y * perp_vec_y;
+                let t = dist_perp / half_width;
 
-            let t = dist_perp / half_width;
-
-            let intensity = 0.5 - t * 0.5;
-
-            let clamped_intensity = intensity.clamp(0.0, 1.0);
-
-            mask.put_pixel(x_u, y_u, Luma([(clamped_intensity * 255.0) as u8]));
-        }
-    }
+                let intensity = 0.5 - t * 0.5;
+                *pixel = (intensity.clamp(0.0, 1.0) * 255.0) as u8;
+            }
+        });
 
     mask
 }
@@ -1424,63 +1420,72 @@ pub fn generate_mask_bitmap(
     crop_offset: (f32, f32),
     warped_image: Option<&DynamicImage>,
 ) -> Option<GrayImage> {
+    combine_mask_bitmap(mask_def, width, height, |sub_mask| {
+        generate_sub_mask_bitmap(sub_mask, width, height, scale, crop_offset, warped_image)
+            .map(Arc::new)
+    })
+}
+
+/// A component's or mask's invert, then opacity, applied to one value.
+fn shade(value: u8, invert: bool, opacity: f32) -> u8 {
+    let value = if invert { 255 - value } else { value };
+    let multiplier = (opacity / 100.0).clamp(0.0, 1.0);
+    if multiplier < 1.0 {
+        (value as f32 * multiplier) as u8
+    } else {
+        value
+    }
+}
+
+/// Combines a mask's components, drawn by `component` (`None` for a component without a
+/// bitmap: hidden, or an AI mask not generated yet).
+fn combine_mask_bitmap(
+    mask_def: &MaskDefinition,
+    width: u32,
+    height: u32,
+    mut component: impl FnMut(&SubMask) -> Option<Arc<GrayImage>>,
+) -> Option<GrayImage> {
     if !mask_def.visible || mask_def.sub_masks.is_empty() {
         return None;
     }
 
-    let mut final_mask = GrayImage::new(width, height);
+    // The first component that produces a bitmap is the base, whatever its mode (as in
+    // Lightroom Classic); the later ones combine with it by their mode.
+    let mut base: Option<GrayImage> = None;
 
     for sub_mask in &mask_def.sub_masks {
-        if let Some(mut sub_bitmap) =
-            generate_sub_mask_bitmap(sub_mask, width, height, scale, crop_offset, warped_image)
-        {
-            if sub_mask.invert {
-                for p in sub_bitmap.pixels_mut() {
-                    p[0] = 255 - p[0];
-                }
-            }
+        let Some(sub_bitmap) = component(sub_mask) else {
+            continue;
+        };
+        let (invert, opacity) = (sub_mask.invert, sub_mask.opacity);
 
-            let opacity_multiplier = (sub_mask.opacity / 100.0).clamp(0.0, 1.0);
-            if opacity_multiplier < 1.0 {
-                for pixel in sub_bitmap.pixels_mut() {
-                    pixel[0] = (pixel[0] as f32 * opacity_multiplier) as u8;
-                }
-            }
+        let Some(final_mask) = base.as_mut() else {
+            let mut layer = GrayImage::new(width, height);
+            layer
+                .par_iter_mut()
+                .zip(sub_bitmap.par_iter())
+                .for_each(|(dst, &src)| *dst = shade(src, invert, opacity));
+            base = Some(layer);
+            continue;
+        };
 
-            match sub_mask.mode {
-                SubMaskMode::Additive => {
-                    for (x, y, pixel) in final_mask.enumerate_pixels_mut() {
-                        let sub_pixel = sub_bitmap.get_pixel(x, y);
-                        pixel[0] = pixel[0].max(sub_pixel[0]);
-                    }
-                }
-                SubMaskMode::Subtractive => {
-                    for (x, y, pixel) in final_mask.enumerate_pixels_mut() {
-                        let sub_pixel = sub_bitmap.get_pixel(x, y);
-                        pixel[0] = pixel[0].saturating_sub(sub_pixel[0]);
-                    }
-                }
-                SubMaskMode::Intersect => {
-                    for (x, y, pixel) in final_mask.enumerate_pixels_mut() {
-                        let sub_pixel = sub_bitmap.get_pixel(x, y);
-                        pixel[0] = pixel[0].min(sub_pixel[0]);
-                    }
-                }
-            }
-        }
+        let combine: fn(u8, u8) -> u8 = match sub_mask.mode {
+            SubMaskMode::Additive => u8::max,
+            SubMaskMode::Subtractive => u8::saturating_sub,
+            SubMaskMode::Intersect => u8::min,
+        };
+        final_mask
+            .par_iter_mut()
+            .zip(sub_bitmap.par_iter())
+            .for_each(|(dst, &src)| *dst = combine(*dst, shade(src, invert, opacity)));
     }
 
-    if mask_def.invert {
-        for pixel in final_mask.pixels_mut() {
-            pixel[0] = 255 - pixel[0];
-        }
-    }
-
-    let opacity_multiplier = (mask_def.opacity / 100.0).clamp(0.0, 1.0);
-    if opacity_multiplier < 1.0 {
-        for pixel in final_mask.pixels_mut() {
-            pixel[0] = (pixel[0] as f32 * opacity_multiplier) as u8;
-        }
+    let mut final_mask = base.unwrap_or_else(|| GrayImage::new(width, height));
+    let (invert, opacity) = (mask_def.invert, mask_def.opacity);
+    if invert || opacity < 100.0 {
+        final_mask
+            .par_iter_mut()
+            .for_each(|value| *value = shade(*value, invert, opacity));
     }
 
     Some(final_mask)
@@ -1551,18 +1556,27 @@ fn generate_mask_overlay_blocking(
 
     let scaled_crop_offset = (crop_offset.0 * scale, crop_offset.1 * scale);
 
-    let warped_image = js_adjustments.as_ref().and_then(|adj| {
-        resolve_warped_image_for_masks(&state, adj, std::slice::from_ref(&parsed_mask_def))
-    });
+    let gray_mask = match &js_adjustments {
+        Some(adjustments) => get_cached_or_generate_mask(
+            &state,
+            &parsed_mask_def,
+            width,
+            height,
+            scale,
+            scaled_crop_offset,
+            adjustments,
+        ),
+        None => generate_mask_bitmap(
+            &parsed_mask_def,
+            width,
+            height,
+            scale,
+            scaled_crop_offset,
+            None,
+        ),
+    };
 
-    if let Some(gray_mask) = generate_mask_bitmap(
-        &parsed_mask_def,
-        width,
-        height,
-        scale,
-        scaled_crop_offset,
-        warped_image.as_deref(),
-    ) {
+    if let Some(gray_mask) = gray_mask {
         mask_overlay_data_url(&gray_mask)
     } else {
         Ok("".to_string())
@@ -1601,13 +1615,106 @@ pub fn resolve_warped_image_for_masks(
     }
 }
 
-/// Identifies a mask bitmap rendered at a given size and placement.
+/// Mask bitmaps kept up to a byte budget; past it, the least recently used go first.
+pub struct BitmapCache {
+    entries: HashMap<u64, (Arc<GrayImage>, u64)>,
+    bytes: usize,
+    budget: usize,
+    clock: u64,
+}
+
+impl BitmapCache {
+    fn new(budget: usize) -> Self {
+        Self {
+            entries: HashMap::new(),
+            bytes: 0,
+            budget,
+            clock: 0,
+        }
+    }
+
+    fn get(&mut self, key: u64) -> Option<Arc<GrayImage>> {
+        self.clock += 1;
+        let (bitmap, used) = self.entries.get_mut(&key)?;
+        *used = self.clock;
+        Some(Arc::clone(bitmap))
+    }
+
+    fn insert(&mut self, key: u64, bitmap: Arc<GrayImage>) {
+        let size = bitmap.len();
+        if size > self.budget {
+            return;
+        }
+        self.clock += 1;
+        if let Some((old, _)) = self.entries.insert(key, (bitmap, self.clock)) {
+            self.bytes -= old.len();
+        }
+        self.bytes += size;
+        while self.bytes > self.budget {
+            let Some(oldest) = self
+                .entries
+                .iter()
+                .min_by_key(|(_, (_, used))| *used)
+                .map(|(key, _)| *key)
+            else {
+                break;
+            };
+            if let Some((old, _)) = self.entries.remove(&oldest) {
+                self.bytes -= old.len();
+            }
+        }
+    }
+}
+
+/// Byte budget of each mask cache: about 58 masks or components at a 2560 × 1707 preview,
+/// or five at 45 MP for an export. The old cache held 50 masks of any size.
+const MASK_CACHE_BUDGET: usize = 256 << 20;
+
+/// The editor's mask bitmaps: whole masks, and each component on its own, so that editing
+/// one component leaves the others as drawn.
+pub struct MaskCaches {
+    masks: BitmapCache,
+    components: BitmapCache,
+}
+
+impl Default for MaskCaches {
+    fn default() -> Self {
+        Self {
+            masks: BitmapCache::new(MASK_CACHE_BUDGET),
+            components: BitmapCache::new(MASK_CACHE_BUDGET),
+        }
+    }
+}
+
+impl MaskCaches {
+    pub fn clear(&mut self) {
+        *self = Self::default();
+    }
+}
+
+fn hash_placement(
+    hasher: &mut DefaultHasher,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+) {
+    width.hash(hasher);
+    height.hash(hasher);
+    scale.to_bits().hash(hasher);
+    crop_offset.0.to_bits().hash(hasher);
+    crop_offset.1.to_bits().hash(hasher);
+}
+
+/// Identifies a mask bitmap rendered at a given size and placement. `geometry` is the
+/// photo's geometry hash when a component reads the warped photo (Color, Luminance).
 fn mask_cache_key(
     def: &MaskDefinition,
     width: u32,
     height: u32,
     scale: f32,
     crop_offset: (f32, f32),
+    geometry: Option<u64>,
 ) -> u64 {
     let mut hasher = DefaultHasher::new();
 
@@ -1627,16 +1734,47 @@ fn mask_cache_key(
         &(id, name, visible, invert, opacity, blend_mode, sub_masks),
         &mut hasher,
     );
-
-    width.hash(&mut hasher);
-    height.hash(&mut hasher);
-    scale.to_bits().hash(&mut hasher);
-    crop_offset.0.to_bits().hash(&mut hasher);
-    crop_offset.1.to_bits().hash(&mut hasher);
+    hash_placement(&mut hasher, width, height, scale, crop_offset);
+    geometry.hash(&mut hasher);
 
     hasher.finish()
 }
 
+/// Identifies a component's bitmap as drawn, before its invert, opacity and mode are
+/// applied, so toggling or changing those reuses it.
+fn sub_mask_cache_key(
+    sub_mask: &SubMask,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+    geometry: Option<u64>,
+) -> u64 {
+    let mut hasher = DefaultHasher::new();
+
+    // Destructured, so a new field cannot be left out of the key unnoticed.
+    let SubMask {
+        id: _,
+        mask_type,
+        visible: _,
+        invert: _,
+        opacity: _,
+        mode: _,
+        parameters,
+    } = sub_mask;
+    crate::cache_utils::hash_json(&(mask_type, parameters), &mut hasher);
+    hash_placement(&mut hasher, width, height, scale, crop_offset);
+    geometry.hash(&mut hasher);
+
+    hasher.finish()
+}
+
+fn reads_warped_image(sub_mask: &SubMask) -> bool {
+    sub_mask.mask_type == "color" || sub_mask.mask_type == "luminance"
+}
+
+/// `generate_mask_bitmap` through the editor's caches: a cached mask is returned as is, and a
+/// changed mask redraws only its changed components.
 pub fn get_cached_or_generate_mask(
     state: &tauri::State<AppState>,
     def: &MaskDefinition,
@@ -1646,33 +1784,67 @@ pub fn get_cached_or_generate_mask(
     crop_offset: (f32, f32),
     adjustments: &serde_json::Value,
 ) -> Option<GrayImage> {
-    let key = mask_cache_key(def, width, height, scale, crop_offset);
-
-    {
-        let cache = state.mask_cache.lock().unwrap();
-        if let Some(img) = cache.get(&key) {
-            return Some(img.clone());
-        }
+    let geometry = def
+        .requires_warped_image()
+        .then(|| crate::cache_utils::calculate_geometry_hash(adjustments));
+    let key = mask_cache_key(def, width, height, scale, crop_offset, geometry);
+    if let Some(bitmap) = state.mask_cache.lock().unwrap().masks.get(key) {
+        return Some(Arc::unwrap_or_clone(bitmap));
     }
 
-    let warped_image =
-        resolve_warped_image_for_masks(state, adjustments, std::slice::from_ref(def));
-
-    let generated = generate_mask_bitmap(
-        def,
-        width,
-        height,
-        scale,
-        crop_offset,
-        warped_image.as_deref(),
-    );
-
-    if let Some(img) = &generated {
-        let mut cache = state.mask_cache.lock().unwrap();
-        if cache.len() > 50 {
-            cache.clear();
+    let mut warped_image: Option<Option<Arc<DynamicImage>>> = None;
+    let generated = combine_mask_bitmap(def, width, height, |sub_mask| {
+        if !sub_mask.visible {
+            return None;
         }
-        cache.insert(key, img.clone());
+        let component_geometry = geometry.filter(|_| reads_warped_image(sub_mask));
+        let component_key = sub_mask_cache_key(
+            sub_mask,
+            width,
+            height,
+            scale,
+            crop_offset,
+            component_geometry,
+        );
+        if let Some(bitmap) = state
+            .mask_cache
+            .lock()
+            .unwrap()
+            .components
+            .get(component_key)
+        {
+            return Some(bitmap);
+        }
+
+        let warped = warped_image
+            .get_or_insert_with(|| {
+                resolve_warped_image_for_masks(state, adjustments, std::slice::from_ref(def))
+            })
+            .as_deref();
+        let bitmap = Arc::new(generate_sub_mask_bitmap(
+            sub_mask,
+            width,
+            height,
+            scale,
+            crop_offset,
+            warped,
+        )?);
+        state
+            .mask_cache
+            .lock()
+            .unwrap()
+            .components
+            .insert(component_key, Arc::clone(&bitmap));
+        Some(bitmap)
+    });
+
+    if let Some(bitmap) = &generated {
+        state
+            .mask_cache
+            .lock()
+            .unwrap()
+            .masks
+            .insert(key, Arc::new(bitmap.clone()));
     }
 
     generated
@@ -1681,12 +1853,16 @@ pub fn get_cached_or_generate_mask(
 #[cfg(test)]
 mod tests {
     use super::{
-        MaskDefinition, SubMaskMode, ai_depth_mask_weight, gaussian_blur_mask,
-        generate_luminance_bitmap, grayscale_square_filter, mask_cache_key,
+        BitmapCache, LinearMaskParameters, MaskDefinition, RadialMaskParameters, SubMask,
+        SubMaskMode, ai_depth_mask_weight, gaussian_blur_mask, generate_linear_bitmap,
+        generate_luminance_bitmap, generate_mask_bitmap, generate_radial_bitmap,
+        grayscale_square_filter, mask_cache_key, sub_mask_cache_key,
     };
     use crate::ai_processing::AiDepthMaskParameters;
-    use image::{DynamicImage, GrayImage, RgbImage};
-    use serde_json::json;
+    use image::{DynamicImage, GrayImage, Luma, RgbImage};
+    use serde_json::{Value, json};
+    use std::f32::consts::PI;
+    use std::sync::Arc;
 
     /// Masks that stress a feather or grow: hard edges, a thin line, a lone dot, content at
     /// the borders, noise, and images narrower than the kernel.
@@ -1860,29 +2036,286 @@ mod tests {
         );
     }
 
+    /// The tone of a 4 × 2 mask built from "all" components, given as
+    /// `(mode, visible, invert, opacity)`; every pixel has the same tone.
+    fn all_components_tone(components: &[(&str, bool, bool, f32)]) -> u8 {
+        let sub_masks: Vec<_> = components
+            .iter()
+            .enumerate()
+            .map(|(n, &(mode, visible, invert, opacity))| {
+                json!({
+                    "id": format!("s{n}"), "type": "all", "visible": visible,
+                    "invert": invert, "opacity": opacity, "mode": mode, "parameters": {},
+                })
+            })
+            .collect();
+        let mask: MaskDefinition = serde_json::from_value(json!({
+            "id": "m1", "name": "Mask", "visible": true, "invert": false,
+            "adjustments": {}, "subMasks": sub_masks,
+        }))
+        .unwrap();
+        let bitmap = generate_mask_bitmap(&mask, 4, 2, 1.0, (0.0, 0.0), None).unwrap();
+        let tone = bitmap.get_pixel(0, 0)[0];
+        assert!(bitmap.pixels().all(|p| p[0] == tone));
+        tone
+    }
+
+    #[test]
+    fn the_first_component_is_the_base_whatever_its_mode() {
+        assert_eq!(
+            all_components_tone(&[("subtractive", true, false, 100.0)]),
+            255
+        );
+        assert_eq!(
+            all_components_tone(&[("intersect", true, false, 40.0)]),
+            102
+        );
+        assert_eq!(
+            all_components_tone(&[
+                ("subtractive", true, false, 60.0),
+                ("subtractive", true, false, 20.0),
+            ]),
+            102
+        );
+    }
+
+    #[test]
+    fn hiding_the_first_component_makes_the_next_visible_one_the_base() {
+        assert_eq!(
+            all_components_tone(&[
+                ("additive", false, false, 100.0),
+                ("subtractive", true, false, 40.0),
+            ]),
+            102
+        );
+        assert_eq!(all_components_tone(&[("additive", false, false, 100.0)]), 0);
+    }
+
+    #[test]
+    fn later_components_combine_by_their_mode() {
+        let tone = |second: &str| {
+            all_components_tone(&[("additive", true, false, 60.0), (second, true, false, 20.0)])
+        };
+        assert_eq!(tone("additive"), 153);
+        assert_eq!(tone("subtractive"), 102);
+        assert_eq!(tone("intersect"), 51);
+        // Subtracting a component from itself leaves nothing; opacity 0 changes nothing.
+        let itself = ("subtractive", true, false, 60.0);
+        assert_eq!(
+            all_components_tone(&[("additive", true, false, 60.0), itself]),
+            0
+        );
+        for mode in ["additive", "subtractive"] {
+            assert_eq!(
+                all_components_tone(&[("additive", true, false, 60.0), (mode, true, false, 0.0)]),
+                153
+            );
+        }
+        // A component's invert applies before it becomes the base.
+        assert_eq!(all_components_tone(&[("additive", true, true, 100.0)]), 0);
+    }
+
     #[test]
     fn mask_cache_key_ignores_adjustments_but_follows_the_bitmap_and_size() {
-        let base = mask_cache_key(
-            &mask(json!({ "exposure": 0 }), "AAAA"),
-            100,
-            50,
-            1.0,
-            (0.0, 0.0),
-        );
+        let key = |def: &MaskDefinition, width, offset, geometry| {
+            mask_cache_key(def, width, 50, 1.0, (offset, 0.0), geometry)
+        };
+        let base = key(&mask(json!({ "exposure": 0 }), "AAAA"), 100, 0.0, None);
 
         let other_adjustments = mask(json!({ "exposure": 2 }), "AAAA");
-        assert_eq!(
-            base,
-            mask_cache_key(&other_adjustments, 100, 50, 1.0, (0.0, 0.0))
-        );
+        assert_eq!(base, key(&other_adjustments, 100, 0.0, None));
 
         let other_bitmap = mask(json!({ "exposure": 0 }), "BBBB");
-        assert_ne!(
-            base,
-            mask_cache_key(&other_bitmap, 100, 50, 1.0, (0.0, 0.0))
-        );
+        assert_ne!(base, key(&other_bitmap, 100, 0.0, None));
         let same = mask(json!({ "exposure": 0 }), "AAAA");
-        assert_ne!(base, mask_cache_key(&same, 200, 50, 1.0, (0.0, 0.0)));
-        assert_ne!(base, mask_cache_key(&same, 100, 50, 1.0, (1.0, 0.0)));
+        assert_ne!(base, key(&same, 200, 0.0, None));
+        assert_ne!(base, key(&same, 100, 1.0, None));
+        assert_ne!(base, key(&same, 100, 0.0, Some(7)));
+    }
+
+    fn radial_sub_mask(mode: &str, center_x: f64, feather: f32) -> SubMask {
+        serde_json::from_value(json!({
+            "id": format!("radial-{center_x}"), "type": "radial", "visible": true,
+            "mode": mode, "parameters": {
+                "centerX": center_x, "centerY": 41.0, "radiusX": 37.0, "radiusY": 23.0,
+                "rotation": 17.0, "feather": feather,
+            },
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn a_component_key_ignores_what_is_applied_after_drawing() {
+        let key = |sub_mask: &SubMask| sub_mask_cache_key(sub_mask, 90, 60, 1.0, (0.0, 0.0), None);
+        let radial = radial_sub_mask("additive", 40.0, 0.5);
+        let shaded = SubMask {
+            id: "another".into(),
+            visible: false,
+            invert: true,
+            opacity: 30.0,
+            mode: SubMaskMode::Subtractive,
+            ..radial.clone()
+        };
+        assert_eq!(key(&radial), key(&shaded));
+        assert_ne!(key(&radial), key(&radial_sub_mask("additive", 41.0, 0.5)));
+        assert_ne!(key(&radial), key(&radial_sub_mask("additive", 40.0, 0.6)));
+        assert_ne!(
+            key(&radial),
+            sub_mask_cache_key(&radial, 90, 60, 1.0, (0.0, 0.0), Some(1))
+        );
+    }
+
+    #[test]
+    fn the_bitmap_cache_drops_the_least_recently_used_past_its_budget() {
+        let bitmap = || Arc::new(GrayImage::new(10, 10));
+        let mut cache = BitmapCache::new(300);
+        cache.insert(1, bitmap());
+        cache.insert(2, bitmap());
+        cache.insert(3, bitmap());
+        assert!(cache.get(1).is_some());
+        cache.insert(4, bitmap());
+        assert!(cache.get(2).is_none(), "2 was used least recently");
+        assert!(cache.get(1).is_some() && cache.get(3).is_some() && cache.get(4).is_some());
+        cache.insert(4, bitmap());
+        assert_eq!(cache.bytes, 300);
+        cache.insert(5, Arc::new(GrayImage::new(20, 20)));
+        assert!(cache.get(5).is_none(), "larger than the whole budget");
+        assert_eq!(cache.bytes, 300);
+    }
+
+    /// The radial loop before `1.94.0`.
+    fn reference_radial(params: &Value, width: u32, height: u32, scale: f32) -> GrayImage {
+        let params: RadialMaskParameters = serde::Deserialize::deserialize(params).unwrap();
+        let center_x = (params.center_x as f32 * scale) as i32;
+        let center_y = (params.center_y as f32 * scale) as i32;
+        let radius_x = params.radius_x as f32 * scale;
+        let radius_y = params.radius_y as f32 * scale;
+        let rotation_rad = params.rotation * PI / 180.0;
+        GrayImage::from_fn(width, height, |x, y| {
+            let dx = x as f32 - center_x as f32;
+            let dy = y as f32 - center_y as f32;
+            let rot_dx = dx * rotation_rad.cos() + dy * rotation_rad.sin();
+            let rot_dy = -dx * rotation_rad.sin() + dy * rotation_rad.cos();
+            let norm_x = rot_dx / radius_x.max(0.01);
+            let norm_y = rot_dy / radius_y.max(0.01);
+            let dist = (norm_x.powi(2) + norm_y.powi(2)).sqrt();
+            let inner_bound = 1.0 - params.feather.clamp(0.0, 1.0);
+            let intensity = 1.0 - (dist - inner_bound) / (1.0 - inner_bound).max(0.01);
+            Luma([(intensity.clamp(0.0, 1.0) * 255.0) as u8])
+        })
+    }
+
+    /// The linear loop before `1.94.0`.
+    fn reference_linear(params: &Value, width: u32, height: u32) -> GrayImage {
+        let params: LinearMaskParameters = serde::Deserialize::deserialize(params).unwrap();
+        let (sx, sy) = (params.start_x as f32, params.start_y as f32);
+        let (lx, ly) = (params.end_x as f32 - sx, params.end_y as f32 - sy);
+        let len = (lx.powi(2) + ly.powi(2)).sqrt();
+        let (px, py) = (-ly / len, lx / len);
+        GrayImage::from_fn(width, height, |x, y| {
+            let dist_perp = (x as f32 - sx) * px + (y as f32 - sy) * py;
+            let intensity = 0.5 - dist_perp / params.range.max(0.01) * 0.5;
+            Luma([(intensity.clamp(0.0, 1.0) * 255.0) as u8])
+        })
+    }
+
+    #[test]
+    fn parallel_gradients_draw_the_same_pixels_as_the_old_loops() {
+        for (width, height) in [(97, 61), (1, 1), (3, 200)] {
+            for sub_mask in [
+                radial_sub_mask("additive", 40.0, 0.5),
+                radial_sub_mask("additive", -5.0, 0.0),
+            ] {
+                let drawn =
+                    generate_radial_bitmap(&sub_mask.parameters, width, height, 1.3, (0.0, 0.0));
+                let reference = reference_radial(&sub_mask.parameters, width, height, 1.3);
+                assert_eq!(
+                    drawn.into_raw(),
+                    reference.into_raw(),
+                    "radial {width} × {height}"
+                );
+            }
+            let linear =
+                json!({ "startX": 10.0, "startY": 5.0, "endX": 70.0, "endY": 50.0, "range": 23.0 });
+            let drawn = generate_linear_bitmap(&linear, width, height, 1.0, (0.0, 0.0));
+            assert_eq!(
+                drawn.into_raw(),
+                reference_linear(&linear, width, height).into_raw(),
+                "linear {width} × {height}"
+            );
+        }
+    }
+
+    #[test]
+    fn parallel_combining_matches_the_pixel_loop() {
+        let (width, height) = (97, 61);
+        let layers: Vec<SubMask> = [
+            ("subtractive", 30.0, 0.7, true, 100.0),
+            ("additive", 60.0, 0.4, false, 55.0),
+            ("intersect", 45.0, 1.0, true, 80.0),
+            ("subtractive", 70.0, 0.2, false, 100.0),
+        ]
+        .iter()
+        .map(|&(mode, center_x, feather, invert, opacity)| SubMask {
+            invert,
+            opacity,
+            ..radial_sub_mask(mode, center_x, feather)
+        })
+        .collect();
+
+        for (invert, opacity) in [(false, 100.0), (true, 100.0), (false, 35.0), (true, 70.0)] {
+            let def = MaskDefinition {
+                id: "m".into(),
+                name: "Mask".into(),
+                visible: true,
+                invert,
+                opacity,
+                blend_mode: String::new(),
+                adjustments: json!({}),
+                sub_masks: layers.clone(),
+            };
+            // The `1.93.0` loop: invert, opacity, then the first as base, the rest by mode.
+            let mut expected: Option<GrayImage> = None;
+            for sub_mask in &def.sub_masks {
+                let mut layer = reference_radial(&sub_mask.parameters, width, height, 1.0);
+                for p in layer.pixels_mut() {
+                    if sub_mask.invert {
+                        p[0] = 255 - p[0];
+                    }
+                    if sub_mask.opacity < 100.0 {
+                        p[0] = (p[0] as f32 * (sub_mask.opacity / 100.0)) as u8;
+                    }
+                }
+                let Some(base) = expected.as_mut() else {
+                    expected = Some(layer);
+                    continue;
+                };
+                for (x, y, p) in base.enumerate_pixels_mut() {
+                    let s = layer.get_pixel(x, y)[0];
+                    p[0] = match sub_mask.mode {
+                        SubMaskMode::Additive => p[0].max(s),
+                        SubMaskMode::Subtractive => p[0].saturating_sub(s),
+                        SubMaskMode::Intersect => p[0].min(s),
+                    };
+                }
+            }
+            let mut expected = expected.unwrap();
+            for p in expected.pixels_mut() {
+                if invert {
+                    p[0] = 255 - p[0];
+                }
+                if opacity < 100.0 {
+                    p[0] = (p[0] as f32 * (opacity / 100.0)) as u8;
+                }
+            }
+
+            let combined =
+                generate_mask_bitmap(&def, width, height, 1.0, (0.0, 0.0), None).unwrap();
+            assert_eq!(
+                combined.into_raw(),
+                expected.into_raw(),
+                "invert {invert}, opacity {opacity}"
+            );
+        }
     }
 }

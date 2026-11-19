@@ -810,6 +810,18 @@ fn process_preview_job(
                 submission_index: None,
                 timeout: Some(std::time::Duration::from_millis(500)),
             });
+            // The display line above times only the submission; this includes the GPU's work.
+            log::info!(
+                "[process_preview_job] {} {}x{} shown, total {:.2?}",
+                if is_interactive {
+                    "interactive"
+                } else {
+                    "full"
+                },
+                preview_width,
+                preview_height,
+                fn_start.elapsed()
+            );
             let _ = app_handle.emit(
                 "wgpu-frame-ready",
                 serde_json::json!({ "path": loaded_image.path }),
@@ -2668,8 +2680,8 @@ pub fn run() {
             original_image: Mutex::new(None),
             cached_preview: Mutex::new(None),
             gpu_context: Mutex::new(None),
-            gpu_image_cache: Mutex::new(None),
-            gpu_processor: Mutex::new(None),
+            editor_gpu: Default::default(),
+            thumbnail_gpu: Default::default(),
             ai_state: Mutex::new(None),
             ai_init_lock: TokioMutex::new(()),
             export_task_token: Arc::new(Mutex::new(None)),
@@ -2688,7 +2700,7 @@ pub fn run() {
             preview_worker_tx: Mutex::new(None),
             analytics_worker_tx: Mutex::new(None),
             uncropped_preview_worker_tx: Mutex::new(None),
-            mask_cache: Mutex::new(HashMap::new()),
+            mask_cache: Mutex::new(Default::default()),
             patch_cache: Mutex::new(HashMap::new()),
             geometry_cache: Mutex::new(HashMap::new()),
             thumbnail_base_cache: Mutex::new(HashMap::new()),

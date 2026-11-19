@@ -72,6 +72,8 @@ export interface EditorState {
   isSliderDragging: boolean;
   /** The drag in progress shapes the active mask (range bars, Tolerance, Grow, Feather), so its overlay stays visible. */
   isMaskShapeDragging: boolean;
+  /** A mask shape is dragged on the photo, which hides the overlay, so none is generated. */
+  isMaskCanvasDragging: boolean;
   speedEditTarget: RefObject<SpeedEditTarget | null> | null;
   isSpeedEditActive: boolean;
   zoom: number;
@@ -162,6 +164,7 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   isSliderDragging: false,
   isMaskShapeDragging: false,
+  isMaskCanvasDragging: false,
   speedEditTarget: null,
   isSpeedEditActive: false,
   interactivePatch: null,

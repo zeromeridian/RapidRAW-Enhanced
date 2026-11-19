@@ -389,9 +389,8 @@ pub fn clear_image_caches(state: tauri::State<AppState>) {
     if let Ok(mut decoded_cache) = state.decoded_image_cache.lock() {
         decoded_cache.clear();
     }
-    if let Ok(mut gpu_cache) = state.gpu_image_cache.lock() {
-        *gpu_cache = None;
-    }
+    state.editor_gpu.clear_sources();
+    state.thumbnail_gpu.clear_sources();
     if let Ok(mut preview_cache) = state.cached_preview.lock() {
         *preview_cache = None;
     }

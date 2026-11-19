@@ -54,7 +54,7 @@ import {
   formatMaskTypeName,
   getSubMaskName,
 } from './Masks';
-import { Adjustments, AiPatch } from '../../../utils/adjustments';
+import { Adjustments, AiPatch, withAdditiveBases } from '../../../utils/adjustments';
 import { OPTION_SEPARATOR } from '../../ui/AppProperties';
 import { createSubMask } from '../../../utils/maskUtils';
 import Text from '../../ui/Text';
@@ -534,15 +534,17 @@ export default function AIPanel() {
     const subMask = createMaskLogic(type, mode);
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      aiPatches: prev.aiPatches?.map((c: AiPatch) => {
-        if (c.id === containerId) {
-          const newSubMasks = [...c.subMasks];
-          if (insertIndex >= 0) newSubMasks.splice(insertIndex, 0, subMask);
-          else newSubMasks.push(subMask);
-          return { ...c, subMasks: newSubMasks };
-        }
-        return c;
-      }),
+      aiPatches: withAdditiveBases(
+        (prev.aiPatches || []).map((c: AiPatch) => {
+          if (c.id === containerId) {
+            const newSubMasks = [...c.subMasks];
+            if (insertIndex >= 0) newSubMasks.splice(insertIndex, 0, subMask);
+            else newSubMasks.push(subMask);
+            return { ...c, subMasks: newSubMasks };
+          }
+          return c;
+        }),
+      ),
     }));
     onSelectPatchContainer(containerId);
     onSelectSubMask(subMask.id);
@@ -639,8 +641,10 @@ export default function AIPanel() {
     if (activeSubMaskId === subMaskId) onSelectSubMask(null);
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      aiPatches: prev.aiPatches.map((p) =>
-        p.id === containerId ? { ...p, subMasks: p.subMasks.filter((sm) => sm.id !== subMaskId) } : p,
+      aiPatches: withAdditiveBases(
+        prev.aiPatches.map((p) =>
+          p.id === containerId ? { ...p, subMasks: p.subMasks.filter((sm) => sm.id !== subMaskId) } : p,
+        ),
       ),
     }));
   };
@@ -703,17 +707,19 @@ export default function AIPanel() {
   const insertSubMaskIntoContainer = (containerId: string, subMask: SubMask, insertIndex?: number) => {
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      aiPatches: (prev.aiPatches || []).map((container) => {
-        if (container.id !== containerId) {
-          return container;
-        }
+      aiPatches: withAdditiveBases(
+        (prev.aiPatches || []).map((container) => {
+          if (container.id !== containerId) {
+            return container;
+          }
 
-        const newSubMasks = [...container.subMasks];
-        const targetIndex = Math.max(0, Math.min(insertIndex ?? newSubMasks.length, newSubMasks.length));
+          const newSubMasks = [...container.subMasks];
+          const targetIndex = Math.max(0, Math.min(insertIndex ?? newSubMasks.length, newSubMasks.length));
 
-        newSubMasks.splice(targetIndex, 0, subMask);
-        return { ...container, subMasks: newSubMasks };
-      }),
+          newSubMasks.splice(targetIndex, 0, subMask);
+          return { ...container, subMasks: newSubMasks };
+        }),
+      ),
     }));
 
     onSelectPatchContainer(containerId);
@@ -933,7 +939,7 @@ export default function AIPanel() {
             onSelectSubMask(movedSubMask.id);
             setExpandedContainers((p) => new Set(p).add(newContainer.id));
           }, 0);
-          return { ...prev, aiPatches: newPatches };
+          return { ...prev, aiPatches: withAdditiveBases(newPatches) };
         });
         return;
       }
@@ -967,7 +973,7 @@ export default function AIPanel() {
             }
             setExpandedContainers((p) => new Set(p).add(targetContainerId!));
           }
-          return { ...prev, aiPatches: newPatches };
+          return { ...prev, aiPatches: withAdditiveBases(newPatches) };
         });
       }
     }

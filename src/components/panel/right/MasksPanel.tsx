@@ -75,6 +75,7 @@ import {
   getSectionEye,
   withSectionEyeToggled,
   withSectionVisible,
+  withAdditiveBases,
   AI_DEPTH_MASK_RANGE_DEFAULTS,
   LUMINANCE_MASK_RANGE_DEFAULTS,
 } from '../../../utils/adjustments';
@@ -505,18 +506,20 @@ export default function MasksPanel() {
     const subMask = createMaskLogic(type, mode);
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      masks: prev.masks?.map((c: MaskContainer) => {
-        if (c.id === containerId) {
-          const newSubMasks = [...c.subMasks];
-          if (insertIndex >= 0) {
-            newSubMasks.splice(insertIndex, 0, subMask);
-          } else {
-            newSubMasks.push(subMask);
+      masks: withAdditiveBases(
+        (prev.masks || []).map((c: MaskContainer) => {
+          if (c.id === containerId) {
+            const newSubMasks = [...c.subMasks];
+            if (insertIndex >= 0) {
+              newSubMasks.splice(insertIndex, 0, subMask);
+            } else {
+              newSubMasks.push(subMask);
+            }
+            return { ...c, subMasks: newSubMasks };
           }
-          return { ...c, subMasks: newSubMasks };
-        }
-        return c;
-      }),
+          return c;
+        }),
+      ),
     }));
     onSelectContainer(containerId);
     onSelectMask(subMask.id);
@@ -609,8 +612,10 @@ export default function MasksPanel() {
     if (activeMaskId === subMaskId) onSelectMask(null);
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      masks: prev.masks.map((m) =>
-        m.id === containerId ? { ...m, subMasks: m.subMasks.filter((sm) => sm.id !== subMaskId) } : m,
+      masks: withAdditiveBases(
+        prev.masks.map((m) =>
+          m.id === containerId ? { ...m, subMasks: m.subMasks.filter((sm) => sm.id !== subMaskId) } : m,
+        ),
       ),
     }));
   };
@@ -676,18 +681,20 @@ export default function MasksPanel() {
   const insertSubMaskIntoContainer = (containerId: string, subMask: SubMask, insertIndex?: number) => {
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      masks: prev.masks.map((container) => {
-        if (container.id !== containerId) {
-          return container;
-        }
+      masks: withAdditiveBases(
+        prev.masks.map((container) => {
+          if (container.id !== containerId) {
+            return container;
+          }
 
-        const newSubMasks = [...container.subMasks];
-        const targetIndex = Math.max(0, Math.min(insertIndex ?? newSubMasks.length, newSubMasks.length));
+          const newSubMasks = [...container.subMasks];
+          const targetIndex = Math.max(0, Math.min(insertIndex ?? newSubMasks.length, newSubMasks.length));
 
-        newSubMasks.splice(targetIndex, 0, subMask);
+          newSubMasks.splice(targetIndex, 0, subMask);
 
-        return { ...container, subMasks: newSubMasks };
-      }),
+          return { ...container, subMasks: newSubMasks };
+        }),
+      ),
     }));
 
     onSelectContainer(containerId);
@@ -851,7 +858,7 @@ export default function MasksPanel() {
             onSelectMask(movedSubMask.id);
             setExpandedContainers((p) => new Set(p).add(newContainer.id));
           }, 0);
-          return { ...prev, masks: newMasks };
+          return { ...prev, masks: withAdditiveBases(newMasks) };
         });
         return;
       }
@@ -892,7 +899,7 @@ export default function MasksPanel() {
             }
             setExpandedContainers((p) => new Set(p).add(targetContainerId!));
           }
-          return { ...prev, masks: newMasks };
+          return { ...prev, masks: withAdditiveBases(newMasks) };
         });
       }
     }

@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Condvar, Mutex};
 
-use image::{DynamicImage, GrayImage};
+use image::DynamicImage;
 use serde::{Deserialize, Serialize};
 use sysinfo::Disks;
 use tokio::sync::Mutex as TokioMutex;
@@ -96,6 +96,24 @@ pub struct GpuProcessorState {
     pub processor: GpuProcessor,
     pub width: u32,
     pub height: u32,
+}
+
+/// The GPU state of one kind of render: a processor (with its cached blurs) and the sources
+/// uploaded for it, most recently used first. Thumbnails have their own, so updating one does
+/// not evict the editor's source and blurs.
+#[derive(Default)]
+pub struct GpuLane {
+    pub processor: Mutex<Option<GpuProcessorState>>,
+    pub sources: Mutex<Vec<GpuImageCache>>,
+}
+
+impl GpuLane {
+    pub fn clear_sources(&self) {
+        self.sources
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clear();
+    }
 }
 
 pub struct PreviewJob {
@@ -258,8 +276,10 @@ pub struct AppState {
     pub original_image: Mutex<Option<LoadedImage>>,
     pub cached_preview: Mutex<Option<CachedPreview>>,
     pub gpu_context: Mutex<Option<GpuContext>>,
-    pub gpu_image_cache: Mutex<Option<GpuImageCache>>,
-    pub gpu_processor: Mutex<Option<GpuProcessorState>>,
+    /// The editor's renders and everything else but thumbnails (exports, previews).
+    pub editor_gpu: GpuLane,
+    /// Library and filmstrip thumbnails (`generate_thumbnail_data`).
+    pub thumbnail_gpu: GpuLane,
     pub ai_state: Mutex<Option<AiState>>,
     pub ai_init_lock: TokioMutex<()>,
     pub export_task_token: Arc<Mutex<Option<Arc<AtomicBool>>>>,
@@ -279,7 +299,7 @@ pub struct AppState {
     pub preview_worker_tx: Mutex<Option<Sender<PreviewJob>>>,
     pub analytics_worker_tx: Mutex<Option<Sender<AnalyticsJob>>>,
     pub uncropped_preview_worker_tx: Mutex<Option<Sender<UncroppedPreviewJob>>>,
-    pub mask_cache: Mutex<HashMap<u64, GrayImage>>,
+    pub mask_cache: Mutex<crate::mask_generation::MaskCaches>,
     pub patch_cache: Mutex<HashMap<String, serde_json::Value>>,
     pub geometry_cache: Mutex<HashMap<u64, DynamicImage>>,
     pub thumbnail_base_cache: Mutex<HashMap<String, ThumbnailBase>>,

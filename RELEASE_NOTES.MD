@@ -5,6 +5,87 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.94.7-dev-mask-revamp — 2026-11-19
+
+### Develop
+
+- Fixed the window going blank when opening the masks of a photo after
+  working on masks in another one. The mask outlines now use far less
+  memory on high-resolution screens, and if drawing them ever fails,
+  only the outlines are left out instead of the whole window.
+
+## 1.94.6-dev-mask-revamp — 2026-11-19
+
+### Develop
+
+- The photo renders faster on the GPU: tone curves and mask settings are
+  read in place instead of being copied for every pixel. Previews,
+  slider and mask drags, thumbnails and exports should all benefit.
+  Edits look the same.
+
+## 1.94.5-dev-mask-revamp — 2026-11-18
+
+### Develop
+
+- For troubleshooting slow previews, starting the app with
+  `THISISRAW_GPU_PROFILE=1` logs how long each processing stage of a
+  preview takes. Without it nothing changes.
+
+## 1.94.4-dev-mask-revamp — 2026-11-18
+
+### Develop
+
+- The log now records how long each preview takes until it is on
+  screen, to track down remaining delays.
+
+## 1.94.3-dev-mask-revamp — 2026-11-18
+
+### Develop
+
+- Edits show sooner after a change such as turning a mask on or off:
+  updating the photo's thumbnail no longer makes the next preview
+  prepare the photo again from scratch. Starting and ending a drag on a
+  slider or mask is quicker for the same reason.
+
+## 1.94.2-dev-mask-revamp — 2026-11-18
+
+### Develop
+
+- Dragging a mask shape on the photo is smoother still: the red mask
+  overlay, which is hidden during the drag, is no longer drawn in the
+  background on every step; it returns when you let go.
+
+## 1.94.1-dev-mask-revamp — 2026-11-18
+
+### Develop
+
+- Dragging, resizing or rotating a radial or linear mask on the photo now
+  previews as smoothly as moving a slider: the photo follows the drag
+  without fading in each step, and the full-quality render and the save
+  happen when you let go.
+
+## 1.94.0-dev-mask-revamp — 2026-11-18
+
+### Develop
+
+- Masks with several components update much faster: moving, resizing or
+  editing one component, or turning one on or off, no longer redraws the
+  others. For example, dragging a radial that is subtracted from a large
+  brush mask no longer redraws every brush stroke on each step. Radial
+  and linear gradients also draw faster. Masks look exactly as before.
+
+## 1.93.0-dev-mask-revamp — 2026-11-18
+
+### Develop
+
+- A mask's first component is now its base, as in Lightroom Classic:
+  whatever its mode, it shows its area, and the components below it add,
+  subtract or intersect with it. Before, a mask whose first component was
+  a Subtract or Intersect stayed empty, for example after dragging one to
+  the top, or deleting or hiding the component above it. Older edits with
+  such a mask now show that component.
+- The same applies to the components of an AI edit.
+
 ## 1.92.0-dev-small-library-editor-tweaks — 2026-11-18
 
 ### Library

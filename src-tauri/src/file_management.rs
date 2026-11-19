@@ -3250,7 +3250,7 @@ pub fn generate_thumbnail_data(
             None
         });
 
-        if let Ok(processed_image) = gpu_processing::process_and_get_dynamic_image(
+        if let Ok(processed_image) = gpu_processing::process_thumbnail_image(
             context,
             &state,
             &source,
@@ -3270,7 +3270,6 @@ pub fn generate_thumbnail_data(
                     motion_extent,
                 ),
             },
-            "generate_thumbnail_data",
         ) {
             return Ok(processed_image);
         } else {

@@ -3,11 +3,50 @@
 Status: proposed (owner, 2026-11-17). WP0's code fix done as item 43
 (`1.85.2`, owner commit `9563da6f` on `fix/mask-drop-insert`), but the
 drop it fixes cannot be reached yet (see P1); making it reachable is
-part of WP3 (owner 2026-11-17). WP1–WP6 not started. Plan item 51 in
+part of WP3 (owner 2026-11-17). WP1 done (`1.93.0`, branch
+`dev/mask-revamp`, not committed; owner decision 2026-11-18: first
+component is the base). WP5 done next (`1.94.0`, same branch, not
+committed), brought forward after the owner found mask updates slow
+(2026-11-18). WP2, WP3, WP4 and WP6 not started. Plan item 51 in
 `UPSTREAM_FEATURE_GAP.md`. Code check
-2026-11-17: section 1 and the problems P1, P2 and P7 match the code. Open
-decision before WP1: base rule or start from white (WP1). Item 41
+2026-11-17: section 1 and the problems P1, P2 and P7 match the code. Item 41
 (stronger feather) follows this plan.
+
+Progress:
+
+- WP1 (`1.93.0`): `generate_mask_bitmap` takes the first component that
+  returns a bitmap as the base (after its invert and opacity); this covers
+  masks and AI edits, since both use it. Frontend `withAdditiveBase` /
+  `withAdditiveBases` (`utils/adjustments.ts`) store the first component
+  as Additive on load (`normalizeLoadedAdjustments`) and after every add,
+  delete, paste, duplicate and drag in `MasksPanel.tsx` and `AIPanel.tsx`.
+  Hiding the first component does not rewrite modes: the next visible one
+  renders as the base but keeps its stored mode for when the first is
+  shown again. Row 1 already had no mode button; its "Base" tooltip comes
+  with WP2's badge. Three new Rust tests cover section 5's cases except
+  the order of Additive components and the WP5 cache key.
+- WP5 (`1.94.0`): `MaskCaches` in `AppState.mask_cache` holds whole masks
+  and components, each a `BitmapCache` bounded at 256 MB that drops the
+  least recently used (a small map in `mask_generation.rs`; `hashlink`
+  is only a transitive dependency, so none was added).
+  `sub_mask_cache_key` hashes type and parameters (destructured; id,
+  visible, invert, opacity and mode left out, since they apply after
+  drawing). Colour and luminance masks were never invalidated by a
+  geometry change (the key held no geometry); both keys now add
+  `calculate_geometry_hash` for masks/components that read the warped
+  photo. `combine_mask_bitmap` takes the component bitmaps from a
+  closure (fresh in `generate_mask_bitmap`, cached in
+  `get_cached_or_generate_mask`) and combines raw buffers with rayon;
+  the live overlay (`generate_mask_overlay`) now goes through the cache
+  too. Radial and linear gradients draw rows in parallel with the
+  rotation's sin/cos hoisted. Bit-identical (tests against the old
+  loops). Measured at 2560 × 1707 with a 40-stroke brush and a
+  subtracted radial: a full redraw took 440 ms, a drag step now 3 ms of
+  mask work plus 25 ms for the overlay PNG (faster PNG compression
+  tried: no gain, reverted). WP5's acceptance check with an AI
+  component is covered by the key test (a component's key does not
+  change when another component does); a counter would need `AppState`
+  in tests and was not added.
 
 Goal: make building masks from components (add, subtract, intersect, invert)
 feel like Lightroom Classic. The data model already matches LrC's
@@ -147,9 +186,8 @@ Behaviour change: existing edits whose first component is Subtractive or
 Intersect currently render nothing and will now render that component as the
 base. Record this in `RELEASE_NOTES.MD`.
 
-Owner decision needed before starting: the alternative is to start from
-white when the first component is Subtractive ("everything except X"). The
-recommendation is the base rule above, because it matches LrC and is
+Owner decision 2026-11-18: the base rule above (not starting from white
+for a Subtractive first component), because it matches LrC and is
 predictable.
 
 ### WP2: Visible mode and direct selection (P3, P4)

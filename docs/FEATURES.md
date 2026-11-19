@@ -506,6 +506,11 @@ details are in `RELEASE_NOTES.MD`.
 - Mask containers can be drag-reordered and composited with Normal, darkening,
   lightening, contrast, and component blend modes. Mask order and blend mode
   persist with the complete editable state in XMP.
+- A mask's (or AI edit's) first visible component is its base, as in
+  Lightroom Classic: it shows whatever its mode, and later components add,
+  subtract or intersect with it; it is stored as Add. Each component's
+  bitmap is cached on its own, so editing, moving or toggling one
+  component does not redraw the others.
 - Clear green enabled styling and dimmed neutral styling for shared toggle
   switches throughout the application.
 - **Relight** in Light & Atmosphere adds point, spot, and directional lights to a photo
