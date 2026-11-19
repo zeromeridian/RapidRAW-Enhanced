@@ -67,7 +67,22 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useAiMasking } from '../../../hooks/useAiMasking';
-import { BrushTools, NewMaskDropZone, SubMaskRow, SubMaskRowLabels } from './MaskEditorShared';
+import {
+  BrushTools,
+  CreationDragPreview,
+  MaskToolStrip,
+  NewMaskDropZone,
+  SubMaskRow,
+  SubMaskRowLabels,
+  creationDragData,
+  addMode,
+} from './MaskEditorShared';
+import { useIsAltHeld } from '../../../hooks/useIsAltHeld';
+
+/** Clone and Heal make an edit of their own and are never added to another edit. */
+const isStandaloneType = (type: Mask) => type === Mask.Clone || type === Mask.Heal;
+const isStandalonePatch = (patch: AiPatch | undefined) =>
+  patch?.subMasks.length === 1 && isStandaloneType(patch.subMasks[0].type);
 
 interface DragData {
   type: 'Container' | 'SubMask' | 'Creation';
@@ -318,7 +333,7 @@ export default function AIPanel() {
   const [activeDragItem, setActiveDragItem] = useState<DragData | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [tempName, setTempName] = useState('');
-  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const isAltHeld = useIsAltHeld();
   const [isSettingsPanelEverOpened, setIsSettingsPanelEverOpened] = useState(false);
   const hasPerformedInitialSelection = useRef(false);
   const [analyzingSubMaskId, setAnalyzingSubMaskId] = useState<string | null>(null);
@@ -553,33 +568,48 @@ export default function AIPanel() {
     if (type === Mask.AiForeground) handleGenerateAiForegroundMask(subMask.id);
   };
 
+  /**
+   * The tool list: adds a component in `mode` to the edit, or without one makes a new edit;
+   * Clone and Heal only make new edits, so they are left out for an edit.
+   */
+  const buildToolMenu = (
+    targetContainerId: string | null,
+    types: MaskType[],
+    mode: SubMaskMode = SubMaskMode.Additive,
+  ) =>
+    types
+      .filter((mt) => !mt.disabled && (!targetContainerId || !isStandaloneType(mt.type)))
+      .map((maskType: MaskType) => ({
+        label: formatMaskTypeName(maskType.type),
+        icon: maskType.icon,
+        onClick: () => {
+          if (targetContainerId) {
+            handleAddSubMask(targetContainerId, maskType.type, mode);
+          } else {
+            handleAddAiPatchContainer(maskType.type);
+          }
+        },
+      }));
+
+  /** A strip or tile click adds to the selected edit (right-click: a new edit), else makes a new one. */
+  const handleToolClick = (type: Mask, forceNewEdit: boolean = false) => {
+    if (!forceNewEdit && activeContainer && !isStandalonePatch(activeContainer) && !isStandaloneType(type)) {
+      handleAddSubMask(activeContainer.id, type);
+    } else {
+      handleAddAiPatchContainer(type);
+    }
+  };
+
   const handleAddAiContextMenu = (event: React.MouseEvent, targetContainerId?: string | null) => {
     event.preventDefault();
     event.stopPropagation();
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
 
-    const container = targetContainerId ? adjustments.aiPatches.find((m) => m.id === targetContainerId) : null;
-    const isStandalone =
-      container && container.subMasks.length === 1 && [Mask.Clone, Mask.Heal].includes(container.subMasks[0].type);
+    const container = targetContainerId ? adjustments.aiPatches.find((m) => m.id === targetContainerId) : undefined;
 
-    if (isStandalone && targetContainerId) {
+    if (targetContainerId && isStandalonePatch(container)) {
       return;
     }
-
-    const buildMenu = (types: MaskType[], mode: SubMaskMode = SubMaskMode.Additive) =>
-      types
-        .filter((mt) => !mt.disabled && (!targetContainerId || ![Mask.Clone, Mask.Heal].includes(mt.type)))
-        .map((maskType: MaskType) => ({
-          label: formatMaskTypeName(maskType.type),
-          icon: maskType.icon,
-          onClick: () => {
-            if (targetContainerId) {
-              handleAddSubMask(targetContainerId, maskType.type, mode);
-            } else {
-              handleAddAiPatchContainer(maskType.type);
-            }
-          },
-        }));
 
     const hasComponents = container && container.subMasks.length > 0;
 
@@ -587,12 +617,12 @@ export default function AIPanel() {
 
     if (!targetContainerId) {
       options = [
-        ...buildMenu(AI_MANUAL_CLEANUP_TYPES, SubMaskMode.Additive),
+        ...buildToolMenu(null, AI_MANUAL_CLEANUP_TYPES),
         { type: OPTION_SEPARATOR },
-        ...buildMenu(AI_GENERATIVE_CREATION_TYPES, SubMaskMode.Additive),
+        ...buildToolMenu(null, AI_GENERATIVE_CREATION_TYPES),
       ];
     } else {
-      options = buildMenu(AI_SUB_MASK_COMPONENT_TYPES, SubMaskMode.Additive);
+      options = buildToolMenu(targetContainerId, AI_SUB_MASK_COMPONENT_TYPES);
 
       if (hasComponents) {
         options.push(
@@ -600,12 +630,12 @@ export default function AIPanel() {
           {
             label: t('editor.ai.actions.subtractFromEdit'),
             icon: Minus,
-            submenu: buildMenu(AI_SUB_MASK_COMPONENT_TYPES, SubMaskMode.Subtractive),
+            submenu: buildToolMenu(targetContainerId, AI_SUB_MASK_COMPONENT_TYPES, SubMaskMode.Subtractive),
           },
           {
             label: t('editor.ai.actions.intersectEditWith'),
             icon: SquaresIntersect,
-            submenu: buildMenu(AI_SUB_MASK_COMPONENT_TYPES, SubMaskMode.Intersect),
+            submenu: buildToolMenu(targetContainerId, AI_SUB_MASK_COMPONENT_TYPES, SubMaskMode.Intersect),
           },
         );
       }
@@ -830,39 +860,25 @@ export default function AIPanel() {
     if (onDragStateChange) onDragStateChange(false);
 
     if (dragData.type === 'Creation' && dragData.maskType) {
-      const creationFn = () => {
-        const isCreationStandalone = [Mask.Clone, Mask.Heal].includes(dragData.maskType!);
-
-        if (isCreationStandalone) {
-          handleAddAiPatchContainer(dragData.maskType!);
-        } else if (overData?.type === 'Container') {
-          const overContainer = adjustments.aiPatches.find((p) => p.id === overData.item!.id);
-          const isOverStandalone =
-            overContainer?.subMasks.length === 1 && [Mask.Clone, Mask.Heal].includes(overContainer.subMasks[0].type);
-
-          if (isOverStandalone) {
-            handleAddAiPatchContainer(dragData.maskType!);
-          } else {
-            handleAddSubMask(overData.item!.id, dragData.maskType!);
-          }
-        } else if (overData?.type === 'SubMask') {
-          const container = adjustments.aiPatches.find((p) => p.id === overData.parentId);
-          const isTargetStandalone =
-            container?.subMasks.length === 1 && [Mask.Clone, Mask.Heal].includes(container.subMasks[0].type);
-
-          if (container && !isTargetStandalone) {
-            const targetIndex = container.subMasks.findIndex((sm) => sm.id === over!.id);
-            handleAddSubMask(overData.parentId!, dragData.maskType!, SubMaskMode.Additive, targetIndex);
-          } else {
-            handleAddAiPatchContainer(dragData.maskType!);
-          }
+      const type = dragData.maskType;
+      const mode = addMode(isAltHeld);
+      if (isStandaloneType(type)) {
+        handleAddAiPatchContainer(type);
+      } else if (overData?.type === 'Container') {
+        const overContainer = adjustments.aiPatches.find((p) => p.id === overData.item!.id);
+        if (isStandalonePatch(overContainer)) handleAddAiPatchContainer(type);
+        else handleAddSubMask(overData.item!.id, type, mode);
+      } else if (overData?.type === 'SubMask') {
+        const container = adjustments.aiPatches.find((p) => p.id === overData.parentId);
+        if (container && !isStandalonePatch(container)) {
+          const targetIndex = container.subMasks.findIndex((sm) => sm.id === over!.id);
+          handleAddSubMask(overData.parentId!, type, mode, targetIndex);
         } else {
-          handleAddAiPatchContainer(dragData.maskType!);
+          handleAddAiPatchContainer(type);
         }
-      };
-
-      if ((adjustments.aiPatches || []).length > 0) setPendingAction(() => creationFn);
-      else creationFn();
+      } else {
+        handleAddAiPatchContainer(type);
+      }
       return;
     }
 
@@ -1072,20 +1088,25 @@ export default function AIPanel() {
                 className={`flex flex-col transition-colors ${isRootOver ? 'bg-surface' : ''}`}
                 onClick={handleDeselect}
               >
+                <MaskToolStrip
+                  groups={[AI_MANUAL_CLEANUP_TYPES, AI_GENERATIVE_CREATION_TYPES]}
+                  idPrefix="strip-ai"
+                  getTooltip={(maskType) =>
+                    maskType.disabled
+                      ? t('editor.ai.comingSoon')
+                      : activeContainer && !isStandalonePatch(activeContainer) && !isStandaloneType(maskType.type)
+                        ? t('editor.ai.addToCurrentTooltip', { name: formatMaskTypeName(maskType.type) })
+                        : t('editor.ai.createNewTooltip', { name: formatMaskTypeName(maskType.type) })
+                  }
+                  isDisabled={() => isGeneratingAi}
+                  onClick={(type) => handleToolClick(type)}
+                  onRightClick={(type) => handleToolClick(type, true)}
+                />
                 <Text variant={TextVariants.heading} className="mb-2 compact:text-sm">
                   {t('editor.ai.editsTitle')}
                 </Text>
 
-                <AnimatePresence
-                  initial={false}
-                  mode="popLayout"
-                  onExitComplete={() => {
-                    if (pendingAction) {
-                      pendingAction();
-                      setPendingAction(null);
-                    }
-                  }}
-                >
+                <AnimatePresence initial={false} mode="popLayout">
                   {(adjustments.aiPatches || []).map((container) => (
                     <ContainerRow
                       key={container.id}
@@ -1124,6 +1145,7 @@ export default function AIPanel() {
                       copiedSubMask={copiedSubMask}
                       analyzingSubMaskId={analyzingSubMaskId}
                       onAddComponent={(e: React.MouseEvent) => handleAddAiContextMenu(e, container.id)}
+                      toolMenu={(mode: SubMaskMode) => buildToolMenu(container.id, AI_SUB_MASK_COMPONENT_TYPES, mode)}
                     />
                   ))}
                 </AnimatePresence>
@@ -1220,25 +1242,10 @@ export default function AIPanel() {
               </Text>
             )}
             {activeDragItem.type === 'Creation' && (
-              <Text
-                as="div"
-                variant={TextVariants.small}
-                color={TextColors.primary}
-                className="bg-surface rounded-lg gap-2 p-2 flex flex-col items-center justify-center aspect-square w-20 shadow-xl opacity-90"
-              >
-                {(() => {
-                  const maskType = AI_SUB_MASK_COMPONENT_TYPES.find((m) => m.type === activeDragItem.maskType);
-                  const Icon = maskType?.icon || Circle;
-                  return (
-                    <>
-                      <Icon size={24} />
-                      <span className="text-center">
-                        {activeDragItem.maskType ? formatMaskTypeName(activeDragItem.maskType) : 'Mask'}
-                      </span>
-                    </>
-                  );
-                })()}
-              </Text>
+              <CreationDragPreview
+                maskType={AI_SUB_MASK_COMPONENT_TYPES.find((m) => m.type === activeDragItem.maskType)}
+                isSubtract={isAltHeld && !!activeDragItem.maskType && !isStandaloneType(activeDragItem.maskType)}
+              />
             )}
           </div>
         ) : null}
@@ -1251,7 +1258,7 @@ function DraggableGridItem({ maskType, isGenerating, onClick }: any) {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `create-ai-${maskType.type}`,
-    data: { type: 'Creation', maskType: maskType.type },
+    data: creationDragData(maskType.type),
     disabled: isGenerating,
   });
   return (
@@ -1315,6 +1322,7 @@ function ContainerRow({
   copiedSubMask,
   analyzingSubMaskId,
   onAddComponent,
+  toolMenu,
 }: any) {
   const { t } = useTranslation();
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
@@ -1329,7 +1337,14 @@ function ContainerRow({
   } = useDraggable({ id: container.id, data: { type: 'Container', item: container } });
   const { showContextMenu } = useContextMenu();
 
-  const isStandalone = container.subMasks.length === 1 && [Mask.Clone, Mask.Heal].includes(container.subMasks[0].type);
+  const isStandalone = isStandalonePatch(container);
+  const hasComponents = container.subMasks.length > 0;
+  /** The row's Add (Alt/Option: Subtract) and Subtract buttons open the tool list below them. */
+  const openToolMenu = (e: React.MouseEvent, mode: SubMaskMode) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    showContextMenu(rect.left, rect.bottom + 5, toolMenu(mode));
+  };
   const firstSubMask = container.subMasks[0];
   const isRowSelected = isStandalone ? container.id === activePatchContainerId : isSelected;
 
@@ -1375,11 +1390,20 @@ function ContainerRow({
     ];
 
     if (!isStandalone) {
-      menuOptions.push({
-        label: t('editor.ai.actions.resetSelection'),
-        icon: RotateCcw,
-        onClick: () => updateContainer(container.id, { subMasks: [] }),
-      });
+      menuOptions.push(
+        {
+          label: t('editor.ai.actions.intersectEditWith'),
+          icon: SquaresIntersect,
+          disabled: !hasComponents,
+          submenu: toolMenu(SubMaskMode.Intersect),
+        },
+        { type: OPTION_SEPARATOR },
+        {
+          label: t('editor.ai.actions.resetSelection'),
+          icon: RotateCcw,
+          onClick: () => updateContainer(container.id, { subMasks: [] }),
+        },
+      );
     }
 
     menuOptions.push({
@@ -1485,6 +1509,25 @@ function ContainerRow({
           )}
         </div>
         <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+          {!isStandalone && (
+            <>
+              <button
+                className="p-1 hover:text-text-primary text-text-secondary"
+                data-tooltip={t('editor.ai.actions.addToEdit')}
+                onClick={(e) => openToolMenu(e, addMode(e.altKey))}
+              >
+                <Plus size={16} />
+              </button>
+              <button
+                className="p-1 hover:text-text-primary text-text-secondary disabled:opacity-40 disabled:hover:text-text-secondary disabled:cursor-not-allowed"
+                data-tooltip={t('editor.ai.actions.subtractFromEdit')}
+                disabled={!hasComponents}
+                onClick={(e) => openToolMenu(e, SubMaskMode.Subtractive)}
+              >
+                <Minus size={16} />
+              </button>
+            </>
+          )}
           <button
             className="p-1 hover:text-text-primary text-text-secondary"
             data-tooltip={container.visible ? t('editor.ai.actions.hideEdit') : t('editor.ai.actions.showEdit')}
@@ -1550,33 +1593,22 @@ function ContainerRow({
               ))}
             </AnimatePresence>
 
-            <AnimatePresence initial={false}>
-              {(isSelected || hasActiveChild || container.subMasks.length === 0) && (
-                <motion.div
-                  key="add-component-btn"
-                  layout="position"
-                  initial={{ opacity: 0, height: 0, overflow: 'hidden' }}
-                  animate={{ opacity: 1, height: 'auto', overflow: 'hidden' }}
-                  exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <Text
-                    as="div"
-                    weight={TextWeights.medium}
-                    className="flex items-center gap-2 p-2 compact:py-1 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onAddComponent(e);
-                    }}
-                  >
-                    <div className="relative w-4 h-4 ml-1 shrink-0 flex items-center justify-center">
-                      <Plus size={16} />
-                    </div>
-                    <span className="select-none">{t('editor.ai.actions.addNewComponent')}</span>
-                  </Text>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <motion.div layout="position">
+              <Text
+                as="div"
+                weight={TextWeights.medium}
+                className="flex items-center gap-2 p-2 compact:py-1 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddComponent(e);
+                }}
+              >
+                <div className="relative w-4 h-4 ml-1 shrink-0 flex items-center justify-center">
+                  <Plus size={16} />
+                </div>
+                <span className="select-none">{t('editor.ai.actions.addNewComponent')}</span>
+              </Text>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

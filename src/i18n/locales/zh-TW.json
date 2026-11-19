@@ -478,6 +478,7 @@
     "ai": {
       "actions": {
         "addNewComponent": "新增新元件",
+        "addToEdit": "新增到編輯",
         "copyComponent": "複製元件",
         "copyEdit": "複製編輯",
         "deleteComponent": "刪除元件",
@@ -496,6 +497,7 @@
         "subtractFromEdit": "從編輯中減去"
       },
       "addNewEdit": "新增新編輯",
+      "addToCurrentTooltip": "將 {{name}} 新增到當前編輯或建立新編輯（右鍵單擊）",
       "brush": {
         "add": "新增",
         "erase": "擦除",
@@ -783,6 +785,7 @@
     "masks": {
       "actions": {
         "addNewComponent": "新增新元件",
+        "addToMask": "新增到遮色片",
         "applyPreset": "應用預設",
         "copyComponent": "複製元件",
         "copyMask": "複製遮色片",

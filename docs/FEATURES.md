@@ -511,7 +511,13 @@ details are in `RELEASE_NOTES.MD`.
   subtract or intersect with it; it is stored as Add. Every other
   component shows its mode (+, −, ∩) in front of its name; a click on it or the
   component's right-click menu sets Add, Subtract or Intersect directly,
-  and Subtract rows are faintly tinted. Each component's
+  and Subtract rows are faintly tinted. Once masks (or AI edits) exist,
+  the tools stay in an icon strip above the list: click to add to the
+  selected mask (right-click: new mask), or drag onto empty space, a
+  mask or a component (insert there); Alt/Option while dropping adds a
+  Subtract. Mask rows have Add (Alt/Option-click: Subtract) and Subtract
+  buttons opening the tool list, "Intersect Mask with" in their menu,
+  and an always visible "Add New Component" row. Each component's
   bitmap is cached on its own, so editing, moving or toggling one
   component does not redraw the others.
 - Clear green enabled styling and dimmed neutral styling for shared toggle

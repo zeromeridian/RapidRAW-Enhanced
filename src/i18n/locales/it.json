@@ -497,6 +497,7 @@
     "ai": {
       "actions": {
         "addNewComponent": "Aggiungi Nuovo Componente",
+        "addToEdit": "Aggiungi a Modifica",
         "copyComponent": "Copia Componente",
         "copyEdit": "Copia Modifica",
         "deleteComponent": "Elimina Componente",
@@ -515,6 +516,7 @@
         "subtractFromEdit": "Sottrai da Modifica"
       },
       "addNewEdit": "Aggiungi Nuova Modifica",
+      "addToCurrentTooltip": "Aggiungi {{name}} alla Modifica Attuale o Crea Nuova (Tasto Destro)",
       "brush": {
         "add": "Aggiungi",
         "erase": "Cancella",
@@ -809,6 +811,7 @@
     "masks": {
       "actions": {
         "addNewComponent": "Aggiungi Nuovo Componente",
+        "addToMask": "Aggiungi a Maschera",
         "applyPreset": "Applica Predefinito",
         "copyComponent": "Copia Componente",
         "copyMask": "Copia Maschera",

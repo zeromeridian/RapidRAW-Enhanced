@@ -26,6 +26,7 @@ import { canvasToolState, useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { Invokes } from '../../ui/AppProperties';
 import { useEditorActions } from '../../../hooks/useEditorActions';
+import { useIsAltHeld } from '../../../hooks/useIsAltHeld';
 import {
   BlendPadCurve,
   HueSatLum,
@@ -321,21 +322,7 @@ export default function ZoneTintPanel() {
   // Alt/Option mask preview (owner 2026-11-15): while Alt/Option is held over a zone on the
   // scale or a row of the Grades list, the photo shows where those zones colour it.
   const [previewTarget, setPreviewTarget] = useState<number[] | null>(null);
-  const [isAltHeld, setIsAltHeld] = useState(false);
-  useEffect(() => {
-    const track = (e: KeyboardEvent | PointerEvent) => setIsAltHeld(e.altKey);
-    const release = () => setIsAltHeld(false);
-    window.addEventListener('keydown', track);
-    window.addEventListener('keyup', track);
-    window.addEventListener('pointermove', track);
-    window.addEventListener('blur', release);
-    return () => {
-      window.removeEventListener('keydown', track);
-      window.removeEventListener('keyup', track);
-      window.removeEventListener('pointermove', track);
-      window.removeEventListener('blur', release);
-    };
-  }, []);
+  const isAltHeld = useIsAltHeld();
   const previewZones = isAltHeld ? previewTarget : null;
   useEffect(() => {
     setEditor({ zoneTintPreviewZones: previewZones });

@@ -504,6 +504,7 @@
     "ai": {
       "actions": {
         "addNewComponent": "Add New Component",
+        "addToEdit": "Add to Edit",
         "copyComponent": "Copy Component",
         "copyEdit": "Copy Edit",
         "deleteComponent": "Delete Component",
@@ -522,6 +523,7 @@
         "subtractFromEdit": "Subtract from Edit"
       },
       "addNewEdit": "Add New Edit",
+      "addToCurrentTooltip": "Add {{name}} to Current Edit or Create New (Right-click)",
       "brush": {
         "add": "Add",
         "erase": "Erase",
@@ -834,6 +836,7 @@
     "masks": {
       "actions": {
         "addNewComponent": "Add New Component",
+        "addToMask": "Add to Mask",
         "applyPreset": "Apply Preset",
         "blendMode": "Blend Mode",
         "copyComponent": "Copy Component",

@@ -24,7 +24,16 @@ import {
 
 import Slider from '../../ui/Slider';
 import Text from '../../ui/Text';
-import { Mask, MASK_ICON_MAP, SubMask, SubMaskMode, ToolType, getSubMaskName } from './Masks';
+import {
+  Mask,
+  MASK_ICON_MAP,
+  MaskType,
+  SubMask,
+  SubMaskMode,
+  ToolType,
+  formatMaskTypeName,
+  getSubMaskName,
+} from './Masks';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { BRUSH_SIZE_MAX, BRUSH_SIZE_MIN, BrushSettings, OPTION_SEPARATOR } from '../../ui/AppProperties';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
@@ -99,6 +108,120 @@ export function NewMaskDropZone({ isOver, text }: { isOver: boolean; text: strin
     >
       <Text weight={TextWeights.medium}>{text}</Text>
     </motion.div>
+  );
+}
+
+/** Drag data of a mask tool, from the empty panel's tiles or the tool strip. */
+export const creationDragData = (type: Mask) => ({ type: 'Creation' as const, maskType: type });
+
+/**
+ * The mode of a component added with the Add button or by dropping a tool on a mask or component:
+ * Alt/Option gives Subtract, as in Lightroom Classic.
+ */
+export const addMode = (isAltHeld: boolean) => (isAltHeld ? SubMaskMode.Subtractive : SubMaskMode.Additive);
+
+/** What a dragged mask tool looks like under the pointer; − while Alt/Option makes it a Subtract. */
+export function CreationDragPreview({ maskType, isSubtract }: { maskType: MaskType | undefined; isSubtract: boolean }) {
+  const Icon = maskType?.icon || Circle;
+  return (
+    <Text
+      as="div"
+      variant={TextVariants.small}
+      color={TextColors.primary}
+      className="relative bg-surface rounded-lg gap-2 p-2 flex flex-col items-center justify-center aspect-square w-20 shadow-xl opacity-90"
+    >
+      {isSubtract && <Minus size={14} strokeWidth={3} className="absolute top-1.5 left-1.5" />}
+      <Icon size={24} />
+      <span className="text-center">{maskType ? formatMaskTypeName(maskType.type) : 'Mask'}</span>
+    </Text>
+  );
+}
+
+function MaskToolStripButton({
+  maskType,
+  idPrefix,
+  tooltip,
+  isDisabled,
+  onClick,
+  onRightClick,
+}: {
+  maskType: MaskType;
+  idPrefix: string;
+  tooltip: string;
+  isDisabled: boolean;
+  onClick(): void;
+  onRightClick?(): void;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `${idPrefix}-${maskType.type}`,
+    data: creationDragData(maskType.type),
+    disabled: isDisabled,
+  });
+  return (
+    <button
+      type="button"
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      aria-label={tooltip}
+      data-tooltip={tooltip}
+      disabled={isDisabled}
+      onClick={onClick}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onMouseDown={(e) => {
+        if (e.button === 2 && !isDisabled) onRightClick?.();
+      }}
+      className={`w-full h-10 compact:h-8 rounded-md bg-surface text-text-primary flex items-center justify-center transition-colors
+        ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active active:bg-accent/20'}
+        ${isDragging ? 'opacity-50' : ''}`}
+    >
+      <maskType.icon size={22} className="compact:size-5" />
+    </button>
+  );
+}
+
+/**
+ * The mask tools as icon buttons above the list once it has entries (the empty panel shows the
+ * named tiles instead). Each can be clicked, or dragged onto empty space, a container or a
+ * component, like a tile. Six to a row across the panel's width, each group starting a new row,
+ * so the layout does not change with the panel's width.
+ */
+export function MaskToolStrip({
+  groups,
+  idPrefix,
+  getTooltip,
+  isDisabled = () => false,
+  onClick,
+  onRightClick,
+}: {
+  groups: MaskType[][];
+  idPrefix: string;
+  getTooltip(maskType: MaskType): string;
+  isDisabled?(maskType: MaskType): boolean;
+  onClick(type: Mask): void;
+  onRightClick?(type: Mask): void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5 compact:gap-1 mb-3 compact:mb-2" onClick={(e) => e.stopPropagation()}>
+      {groups.map((types, groupIndex) => (
+        <div key={groupIndex} className="grid grid-cols-6 gap-1.5 compact:gap-1">
+          {types.map((maskType) => (
+            <MaskToolStripButton
+              key={maskType.type}
+              maskType={maskType}
+              idPrefix={idPrefix}
+              tooltip={getTooltip(maskType)}
+              isDisabled={!!maskType.disabled || isDisabled(maskType)}
+              onClick={() => onClick(maskType.type)}
+              onRightClick={onRightClick && (() => onRightClick(maskType.type))}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
   );
 }
 

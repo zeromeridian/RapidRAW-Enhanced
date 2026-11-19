@@ -478,6 +478,7 @@
     "ai": {
       "actions": {
         "addNewComponent": "添加新组件",
+        "addToEdit": "添加到编辑",
         "copyComponent": "复制组件",
         "copyEdit": "复制编辑",
         "deleteComponent": "删除组件",
@@ -496,6 +497,7 @@
         "subtractFromEdit": "从编辑中减去"
       },
       "addNewEdit": "添加新编辑",
+      "addToCurrentTooltip": "将 {{name}} 添加到当前编辑或创建新编辑（右键单击）",
       "brush": {
         "add": "添加",
         "erase": "擦除",
@@ -783,6 +785,7 @@
     "masks": {
       "actions": {
         "addNewComponent": "添加新组件",
+        "addToMask": "添加到蒙版",
         "applyPreset": "应用预设",
         "copyComponent": "复制组件",
         "copyMask": "复制蒙版",

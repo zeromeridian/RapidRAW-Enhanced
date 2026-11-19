@@ -5,6 +5,32 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.96.1-dev-mask-revamp — 2026-11-19
+
+### Develop
+
+- The mask tool icons above the mask list are larger and always sit in
+  two rows of six across the panel, whatever its width. In AI edits,
+  Clone and Heal have the first row and the other tools the second.
+
+## 1.96.0-dev-mask-revamp — 2026-11-19
+
+### Develop
+
+- Building masks is quicker, as in Lightroom Classic:
+  - Once a photo has masks, the mask tools stay available as a row of
+    small icons above the list. Click one to add it to the selected
+    mask (right-click for a new mask), or drag it onto a mask, onto a
+    component to insert it there, or onto empty space for a new mask.
+  - Hold Alt/Option while dropping a tool on a mask to add it as a
+    Subtract.
+  - Hovering a mask shows Add and Subtract buttons; each opens the tool
+    list. Alt/Option-click Add to add a Subtract.
+  - A mask's right-click menu has "Intersect Mask with".
+  - "Add New Component" now shows whenever a mask is open, not only
+    when it is selected.
+- AI edits get the same tool row, buttons and menu item.
+
 ## 1.95.1-dev-mask-revamp — 2026-11-19
 
 ### Develop

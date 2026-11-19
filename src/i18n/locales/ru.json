@@ -516,6 +516,7 @@
     "ai": {
       "actions": {
         "addNewComponent": "Добавить новый компонент",
+        "addToEdit": "Добавить к изменениям",
         "copyComponent": "Копировать компонент",
         "copyEdit": "Копировать изменения",
         "deleteComponent": "Удалить компонент",
@@ -534,6 +535,7 @@
         "subtractFromEdit": "Вычесть из изменений"
       },
       "addNewEdit": "Добавить изменения",
+      "addToCurrentTooltip": "Добавить {{name}} к текущим изменениям или создать новые (правый клик)",
       "brush": {
         "add": "Добавить",
         "erase": "Стереть",
@@ -833,6 +835,7 @@
     "masks": {
       "actions": {
         "addNewComponent": "Добавить новый компонент",
+        "addToMask": "Добавить к маске",
         "applyPreset": "Применить пресет",
         "copyComponent": "Копировать компонент",
         "copyMask": "Копировать маску",

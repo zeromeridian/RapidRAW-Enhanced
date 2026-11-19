@@ -7,8 +7,9 @@ part of WP3 (owner 2026-11-17). WP1 done (`1.93.0`, branch
 `dev/mask-revamp`, not committed; owner decision 2026-11-18: first
 component is the base). WP5 done next (`1.94.0`, same branch, not
 committed), brought forward after the owner found mask updates slow
-(2026-11-18). WP2 done (`1.95.0`, same branch, not committed). WP3,
-WP4 and WP6 not started. Plan item 51 in
+(2026-11-18). WP2 done (`1.95.0`–`1.95.1`, owner-checked 2026-11-19).
+WP3 done (`1.96.0`, not committed; WP0's acceptance check now
+reachable). WP4 and WP6 not started. Plan item 51 in
 `UPSTREAM_FEATURE_GAP.md`. Code check
 2026-11-17: section 1 and the problems P1, P2 and P7 match the code. Item 41
 (stronger feather) follows this plan.
@@ -62,6 +63,31 @@ Progress:
   selected, Intersect rows stay plain. Mode names are shared keys
   `editor.masks.modes.{add,subtract,intersect,base}` (12 locales) read
   by `SubMaskRow` itself; the six `switchTo*` keys are removed.
+- WP3 (`1.96.0`, owner decisions 2026-11-19 under WP3 below): shared
+  `MaskToolStrip` (`MaskEditorShared.tsx`; icon buttons, draggable with
+  `creationDragData`, right-click = new mask/edit) above the list in
+  both panels; the AI strip has two groups (Clone/Heal | the rest).
+  `1.96.1` (owner 2026-11-19: 1 or 2 rows depending on panel width,
+  icons a bit small; asked for larger icons and at least 2 rows): a
+  6-column grid across the panel width, each group starting a row
+  (Masks 6 + 6, AI 2 + 6), buttons 40 px high (was 32), icons 22 px
+  (was 18); compact mode 32 px / 20 px. Drops on a container or component take `addMode(isAltHeld)`
+  (shared `useIsAltHeld` hook in `src/hooks/`, also used by
+  `ZoneTintPanel`); `CreationDragPreview` shows − while Alt is held.
+  The old `pendingAction` (a drop with masks present waited for a list
+  exit animation that never came, so it would have done nothing) is
+  removed: drops apply at once. Container rows: Add (Alt-click:
+  Subtract) and Subtract (disabled without components) open
+  `buildToolMenu(id, mode)`, which `handleAddMaskContextMenu` now also
+  uses (no second copy of the tool list); "Intersect Mask with" /
+  "Intersect Edit with" in the row menu; the "Add New Component" row
+  shows whenever the container is open. AI: `isStandaloneType` /
+  `isStandalonePatch` replace the inline Clone/Heal checks in the code
+  touched; standalone edits get no Add/Subtract. Strip clicks in the AI
+  panel add to the selected edit like the Masks panel (new tooltip key
+  `editor.ai.addToCurrentTooltip`). New keys
+  `editor.masks.actions.addToMask`, `editor.ai.actions.addToEdit`
+  (12 locales). WP0's guard kept (owner).
 
 Goal: make building masks from components (add, subtract, intersect, invert)
 feel like Lightroom Classic. The data model already matches LrC's
@@ -241,11 +267,13 @@ predictable.
   say so) and draggable onto empty space (new mask), a mask row (append)
   or a component row (insert there). Fork deviation from upstream
   `ad276373`'s space-saving layout; record it in `UPSTREAM_FEATURE_GAP.md`.
-  **Open points:** where the tiles sit and how much space they take (e.g.
-  a compact one-row strip above the mask list, or a collapsible grid);
-  whether the dragged tile's mode follows Alt/Option (Subtract) like the
-  Add button; whether the AI panel gets the same (it hides its tiles the
-  same way).
+  **Owner decisions 2026-11-19:** (1) once masks exist, the tools sit in
+  an icon-only strip (names in tooltips) above the "Masks" heading, one
+  or two rows, always shown; the named grid stays for a photo without
+  masks; (2) Alt/Option held when a tile is dropped on a mask or
+  component makes it Subtract (dropping on empty space still makes a new
+  mask); (3) the AI panel gets the same, through one shared strip
+  component; (4) WP0's invalid-mode guard stays.
 - i18n: add every new string to all 12 files in `src/i18n/locales/` (see
   `src/i18n/update_translations.py`). Remove `switchToSubtract`,
   `switchToIntersect` and `switchToAdd` once nothing uses them. Check with

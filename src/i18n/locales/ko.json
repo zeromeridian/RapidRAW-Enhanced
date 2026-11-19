@@ -478,6 +478,7 @@
     "ai": {
       "actions": {
         "addNewComponent": "새 구성 요소 추가",
+        "addToEdit": "편집에 추가",
         "copyComponent": "구성 요소 복사",
         "copyEdit": "편집 복사",
         "deleteComponent": "구성 요소 삭제",
@@ -496,6 +497,7 @@
         "subtractFromEdit": "편집에서 빼기"
       },
       "addNewEdit": "새 편집 추가",
+      "addToCurrentTooltip": "{{name}}을(를) 현재 편집에 추가하거나 새로 만들기 (우클릭)",
       "brush": {
         "add": "추가",
         "erase": "지우기",
@@ -783,6 +785,7 @@
     "masks": {
       "actions": {
         "addNewComponent": "새 구성 요소 추가",
+        "addToMask": "마스크에 추가",
         "applyPreset": "프리셋 적용",
         "copyComponent": "구성 요소 복사",
         "copyMask": "마스크 복사",

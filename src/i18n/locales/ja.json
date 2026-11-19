@@ -478,6 +478,7 @@
     "ai": {
       "actions": {
         "addNewComponent": "新しいコンポーネントを追加",
+        "addToEdit": "編集に追加",
         "copyComponent": "コンポーネントをコピー",
         "copyEdit": "編集をコピー",
         "deleteComponent": "コンポーネントを削除",
@@ -496,6 +497,7 @@
         "subtractFromEdit": "編集から減算"
       },
       "addNewEdit": "新しい編集を追加",
+      "addToCurrentTooltip": "{{name}}を現在の編集に追加、または新規作成 (右クリック)",
       "brush": {
         "add": "追加",
         "erase": "消去",
@@ -783,6 +785,7 @@
     "masks": {
       "actions": {
         "addNewComponent": "新しいコンポーネントを追加",
+        "addToMask": "マスクに追加",
         "applyPreset": "プリセットを適用",
         "copyComponent": "コンポーネントをコピー",
         "copyMask": "マスクをコピー",
