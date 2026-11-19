@@ -9,7 +9,9 @@ component is the base). WP5 done next (`1.94.0`, same branch, not
 committed), brought forward after the owner found mask updates slow
 (2026-11-18). WP2 done (`1.95.0`–`1.95.1`, owner-checked 2026-11-19).
 WP3 done (`1.96.0`–`1.96.1`, owner-checked 2026-11-19: "works
-great"; not committed). WP4 done (`1.97.0`, not committed). WP6 deferred by the owner
+great"; not committed). WP4 done (`1.97.0`–`1.97.1`, owner-checked
+2026-11-19: "this is now good"; not committed). **WP0–WP5 done;** only
+WP6 (deferred) and the hands-on regression list remain. WP6 deferred by the owner
 2026-11-19 (restart: owner asks for it). Plan item 51 in
 `UPSTREAM_FEATURE_GAP.md`. Code check
 2026-11-17: section 1 and the problems P1, P2 and P7 match the code. Item 41
