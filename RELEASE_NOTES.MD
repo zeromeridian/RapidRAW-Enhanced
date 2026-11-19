@@ -5,6 +5,24 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.97.1-dev-mask-revamp — 2026-11-19
+
+### Develop
+
+- Hovering a mask (or an AI edit) in the list now shows its whole
+  combined area on the photo, even with the mask overlay switched off,
+  just as hovering one of its components shows that component.
+
+## 1.97.0-dev-mask-revamp — 2026-11-19
+
+### Develop
+
+- Hovering a mask component in the list shows just that component's
+  area on the photo, as in Lightroom Classic; for a Subtract component
+  that is the area it removes. Moving the pointer away shows the whole
+  mask again. This works even with the mask overlay switched off, and
+  for the components of AI edits too.
+
 ## 1.96.1-dev-mask-revamp — 2026-11-19
 
 ### Develop

@@ -22,7 +22,7 @@ import GuidedPerspectiveOverlay from './editor/GuidedPerspectiveOverlay';
 import ImageCanvas from './editor/ImageCanvas';
 import SpeedEditOverlay from './editor/overlays/SpeedEditOverlay';
 import ZoneHoverReadout from './editor/overlays/ZoneHoverReadout';
-import { Mask, SubMask } from './right/Masks';
+import { Mask, SubMask, SubMaskMode } from './right/Masks';
 import { Panel, TransformState, Invokes } from '../ui/AppProperties';
 import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
@@ -61,6 +61,31 @@ const NEUTRAL_GREY_RGB: [number, number, number, number] = [128 / 255, 128 / 255
 const NEUTRAL_GREY_CSS = '#808080';
 /** Linear size of the mask overlay while a drag shapes the mask (a quarter of the pixels). */
 const MASK_OVERLAY_DRAG_SCALE = 0.5;
+
+/**
+ * What the overlay shows for an item hovered in the panel list, even when it is hidden: a mask or
+ * AI edit combined as usual, or the one holding a component reduced to that component drawn on
+ * its own as an Add (a Subtract then shows the area it removes).
+ */
+const hoveredMaskItemDef = (containers: Array<MaskContainer | AiPatch> | undefined, itemId: string) => {
+  for (const container of containers || []) {
+    if (container.id === itemId) {
+      return { opacity: 100, ...container, visible: true, adjustments: {} };
+    }
+    const subMask = container.subMasks?.find((sm: SubMask) => sm.id === itemId);
+    if (subMask) {
+      return {
+        ...container,
+        visible: true,
+        invert: false,
+        opacity: 100,
+        adjustments: {},
+        subMasks: [{ ...subMask, visible: true, mode: SubMaskMode.Additive }],
+      };
+    }
+  }
+  return null;
+};
 
 const checkCropValid = (pixelCrop: Partial<Crop>, imageW: number, imageH: number, rotation: number) => {
   if (pixelCrop.x === undefined || pixelCrop.y === undefined || !pixelCrop.width || !pixelCrop.height) {
@@ -155,6 +180,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   const activeAiPatchContainerId = useEditorStore((s) => s.activeAiPatchContainerId);
   const activeAiSubMaskId = useEditorStore((s) => s.activeAiSubMaskId);
   const isMaskControlHovered = useEditorStore((s) => s.isMaskControlHovered);
+  const hoveredMaskItemId = useEditorStore((s) => s.hoveredMaskItemId);
   const hasRenderedFirstFrame = useEditorStore((s) => s.hasRenderedFirstFrame);
 
   const setEditor = useEditorStore((s) => s.setEditor);
@@ -179,7 +205,12 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   const [isMaskHovered, setIsMaskHovered] = useState(false);
   const [isMaskTouchInteracting, setIsMaskTouchInteracting] = useState(false);
   const [isLoaderVisible, setIsLoaderVisible] = useState(false);
-  const [maskOverlayUrl, setMaskOverlayUrl] = useState<string | null>(null);
+  // The overlay image and the hovered mask or component it shows (null: the selected mask), so a
+  // hover never shows another request's image while the overlay is switched off.
+  const [maskOverlay, setMaskOverlay] = useState<{ url: string | null; hoveredMaskItemId: string | null }>({
+    url: null,
+    hoveredMaskItemId: null,
+  });
   const [transformState, setTransformState] = useState<TransformState>({ scale: 1, positionX: 0, positionY: 0 });
 
   const imageContainerRef = useRef<HTMLDivElement>(null);
@@ -1201,11 +1232,12 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   const processOverlayQueue = useCallback(async () => {
     if (isGeneratingOverlayRef.current || !pendingOverlayRequestRef.current) return;
 
-    const { maskDef, renderSize, jsAdjustments } = pendingOverlayRequestRef.current;
+    const { maskDef, renderSize, jsAdjustments, hoveredMaskItemId } = pendingOverlayRequestRef.current;
     pendingOverlayRequestRef.current = null;
+    const showOverlay = (url: string | null) => setMaskOverlay({ url, hoveredMaskItemId });
 
     if (!maskDef || !maskDef.visible || renderSize.width === 0) {
-      setMaskOverlayUrl(null);
+      showOverlay(null);
       return;
     }
 
@@ -1229,14 +1261,10 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
         jsAdjustments: strippedAdjustments,
       });
 
-      if (dataUrl) {
-        setMaskOverlayUrl(dataUrl);
-      } else {
-        setMaskOverlayUrl(null);
-      }
+      showOverlay(dataUrl || null);
     } catch (e) {
       console.error('Failed to generate live mask overlay:', e);
-      setMaskOverlayUrl(null);
+      showOverlay(null);
     } finally {
       isGeneratingOverlayRef.current = false;
       if (pendingOverlayRequestRef.current) {
@@ -1246,8 +1274,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   }, []);
 
   const requestMaskOverlay = useCallback(
-    (maskDef: any, renderSize: any, currentAdjustments: any) => {
-      pendingOverlayRequestRef.current = { maskDef, renderSize, jsAdjustments: currentAdjustments };
+    (maskDef: any, renderSize: any, currentAdjustments: any, hoveredMaskItemId: string | null = null) => {
+      pendingOverlayRequestRef.current = { maskDef, renderSize, jsAdjustments: currentAdjustments, hoveredMaskItemId };
       processOverlayQueue();
     },
     [processOverlayQueue],
@@ -1569,7 +1597,23 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
           scale: imageRenderSize.scale * MASK_OVERLAY_DRAG_SCALE,
         }
       : imageRenderSize;
-    requestMaskOverlay(maskDefForOverlay, overlaySize, adjustments);
+    // A mask or component hovered in the panel list shows its own area instead.
+    const hoveredMaskDef = hoveredMaskItemId
+      ? hoveredMaskItemDef(
+          activeRightPanel === Panel.Masks
+            ? adjustments.masks
+            : activeRightPanel === Panel.Ai
+              ? adjustments.aiPatches
+              : undefined,
+          hoveredMaskItemId,
+        )
+      : null;
+    requestMaskOverlay(
+      hoveredMaskDef ?? maskDefForOverlay,
+      overlaySize,
+      adjustments,
+      hoveredMaskDef ? hoveredMaskItemId : null,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     overlayTriggerHash,
@@ -1580,6 +1624,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     imageRenderSize,
     isMaskShapeDragging,
     isMaskCanvasDragging,
+    hoveredMaskItemId,
   ]);
 
   useEffect(() => {
@@ -2305,7 +2350,11 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
             isStraightenActive={isStraightenActive}
             isRotationActive={isRotationActive}
             isSliderDragging={isSliderDragging}
-            maskOverlayUrl={maskOverlayVisible ? maskOverlayUrl : null}
+            maskOverlayUrl={
+              maskOverlayVisible || (hoveredMaskItemId !== null && maskOverlay.hoveredMaskItemId === hoveredMaskItemId)
+                ? maskOverlay.url
+                : null
+            }
             onGenerateAiMask={handleGenerateAiMask}
             onSelectAiPatchContainer={(id) => setEditor({ activeAiPatchContainerId: id })}
             onSelectMaskContainer={(id) => setEditor({ activeMaskContainerId: id })}

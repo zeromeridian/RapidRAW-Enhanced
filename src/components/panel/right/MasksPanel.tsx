@@ -96,6 +96,7 @@ import {
   SubMaskRowLabels,
   creationDragData,
   addMode,
+  useMaskHoverHighlight,
 } from './MaskEditorShared';
 import { useIsAltHeld } from '../../../hooks/useIsAltHeld';
 import { useSettingsStore } from '../../../store/useSettingsStore';
@@ -1291,6 +1292,7 @@ function ContainerRow({
     data: { type: 'Container', item: container },
   });
   const hasComponents = container.subMasks.length > 0;
+  const { startHighlight, clearHighlight } = useMaskHoverHighlight(container.id);
   /** The row's Add (Alt/Option: Subtract) and Subtract buttons open the tool list below them. */
   const openToolMenu = (e: React.MouseEvent, mode: SubMaskMode) => {
     e.stopPropagation();
@@ -1437,6 +1439,8 @@ function ContainerRow({
           e.stopPropagation();
           onSelect();
         }}
+        onMouseEnter={() => !activeDragItem && startHighlight()}
+        onMouseLeave={clearHighlight}
         onContextMenu={onContextMenu}
       >
         <Text

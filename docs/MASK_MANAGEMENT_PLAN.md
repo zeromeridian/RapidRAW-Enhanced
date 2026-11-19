@@ -8,8 +8,9 @@ part of WP3 (owner 2026-11-17). WP1 done (`1.93.0`, branch
 component is the base). WP5 done next (`1.94.0`, same branch, not
 committed), brought forward after the owner found mask updates slow
 (2026-11-18). WP2 done (`1.95.0`–`1.95.1`, owner-checked 2026-11-19).
-WP3 done (`1.96.0`, not committed; WP0's acceptance check now
-reachable). WP4 and WP6 not started. Plan item 51 in
+WP3 done (`1.96.0`–`1.96.1`, owner-checked 2026-11-19: "works
+great"; not committed). WP4 done (`1.97.0`, not committed). WP6 deferred by the owner
+2026-11-19 (restart: owner asks for it). Plan item 51 in
 `UPSTREAM_FEATURE_GAP.md`. Code check
 2026-11-17: section 1 and the problems P1, P2 and P7 match the code. Item 41
 (stronger feather) follows this plan.
@@ -88,6 +89,25 @@ Progress:
   `editor.ai.addToCurrentTooltip`). New keys
   `editor.masks.actions.addToMask`, `editor.ai.actions.addToEdit`
   (12 locales). WP0's guard kept (owner).
+- WP4 (`1.97.0`, owner decision 2026-11-19 under WP4 below): store
+  `hoveredSubMaskId`; `SubMaskRow` sets it 150 ms after the pointer
+  rests on the row (`SUB_MASK_HIGHLIGHT_DELAY_MS`; not during a drag)
+  and clears it on leave and unmount. `Editor.tsx`
+  `soloComponentMaskDef` turns the container holding it (any in the
+  open panel) into a visible, uninverted, 100 % mask with only that
+  component, visible and Additive, and requests it instead of the
+  normal overlay; component bitmaps come from the WP5 cache (its key
+  ignores mode and visibility). The overlay state remembers which hover
+  it was made for, so with the overlay off only the hovered component's
+  own image is shown, never the whole mask. No stripping helper change
+  needed: the request goes through the same `processOverlayQueue`.
+  `1.97.1` (owner 2026-11-19: with the overlay off, hovering showed a
+  component but never the whole mask): the store field is now
+  `hoveredMaskItemId` (a mask, AI edit or component); the timer moved
+  into the shared hook `useMaskHoverHighlight` used by `SubMaskRow` and
+  both panels' container rows (not Clone/Heal edits, which use their
+  markers); `hoveredMaskItemDef` returns a hovered container as its
+  normal combined overlay, made visible.
 
 Goal: make building masks from components (add, subtract, intersect, invert)
 feel like Lightroom Classic. The data model already matches LrC's
@@ -292,6 +312,12 @@ predictable.
   Show it in place of the normal overlay; restore it on leave.
 - Reuse the existing stripping helpers (`stripSentMaskData`,
   `stripSentSubMasks`) the same way the current overlay call does.
+- **Owner decision 2026-11-19:** hovering shows the component's area
+  even while the mask overlay is switched off (as in LrC); leaving hides
+  it again. The hovered component shows alone even when it is the
+  selected one (the normal overlay shows the whole mask, not the
+  selected component, so "differs from `activeMaskId`" above does not
+  apply), and it may belong to any open mask, not only the selected one.
 - Acceptance: hovering a Subtract component shows the area it removes, and
   moving the pointer away restores the normal overlay within one frame of the
   existing overlay pipeline.
@@ -315,7 +341,7 @@ predictable.
   subject component doesn't re-run that AI component's decode/transform
   (verify with a debug log or a counter in a test).
 
-### WP6 (optional, after owner review)
+### WP6 (optional; deferred by the owner 2026-11-19, restarts when the owner asks)
 
 - Subtract formula: `a · (1 − b)` instead of `saturating_sub(a, b)`. It
   blends overlapping feathered edges more softly. It changes how existing

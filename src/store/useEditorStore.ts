@@ -111,6 +111,8 @@ export interface EditorState {
   activeAiPatchContainerId: string | null;
   activeAiSubMaskId: string | null;
   isMaskControlHovered: boolean;
+  /** The mask, AI edit or component under the pointer in the panel list; the photo shows its area alone. */
+  hoveredMaskItemId: string | null;
   isGeneratingAiMask: boolean;
   isGeneratingAi: boolean;
   aiDenoiseProgress: Record<string, number>;
@@ -206,6 +208,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   aiDenoiseProgress: {},
   aiUpscaleProgress: {},
   isMaskControlHovered: false,
+  hoveredMaskItemId: null,
   hasRenderedFirstFrame: false,
   photoSwapPhase: 'idle',
   patchesSentToBackend: new Set<string>(),

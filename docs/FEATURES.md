@@ -517,7 +517,8 @@ details are in `RELEASE_NOTES.MD`.
   mask or a component (insert there); Alt/Option while dropping adds a
   Subtract. Mask rows have Add (Alt/Option-click: Subtract) and Subtract
   buttons opening the tool list, "Intersect Mask with" in their menu,
-  and an always visible "Add New Component" row. Each component's
+  and an always visible "Add New Component" row. Hovering a mask or a
+  component shows its own area on the photo (even with the overlay off). Each component's
   bitmap is cached on its own, so editing, moving or toggling one
   component does not redraw the others.
 - Clear green enabled styling and dimmed neutral styling for shared toggle

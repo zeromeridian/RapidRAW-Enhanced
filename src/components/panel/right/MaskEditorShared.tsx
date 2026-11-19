@@ -1,7 +1,7 @@
 // Parts shared by the Masks and AI panels. Each panel passes its own labels, translated with
 // literal `t()` keys so the i18n extractor still finds them; text both panels share (the component
 // modes) is translated here.
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -35,6 +35,7 @@ import {
   getSubMaskName,
 } from './Masks';
 import { useContextMenu } from '../../../context/ContextMenuContext';
+import { useEditorStore } from '../../../store/useEditorStore';
 import { BRUSH_SIZE_MAX, BRUSH_SIZE_MIN, BrushSettings, OPTION_SEPARATOR } from '../../ui/AppProperties';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 
@@ -235,6 +236,34 @@ export interface SubMaskRowLabels {
   deleteTooltip: string;
 }
 
+const MASK_HIGHLIGHT_DELAY_MS = 150;
+
+/**
+ * While the pointer rests on a mask, AI edit or component row, the photo shows that item's area
+ * alone (`hoveredMaskItemId`), even with the overlay off; the short delay keeps a quick pass over
+ * the list from rendering every row's area. Cleared on leave and unmount.
+ */
+export function useMaskHoverHighlight(itemId: string) {
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearHighlight = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    const { hoveredMaskItemId, setEditor } = useEditorStore.getState();
+    if (hoveredMaskItemId === itemId) setEditor({ hoveredMaskItemId: null });
+  }, [itemId]);
+  const startHighlight = useCallback(() => {
+    if (timeoutRef.current) return;
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
+      useEditorStore.getState().setEditor({ hoveredMaskItemId: itemId });
+    }, MASK_HIGHLIGHT_DELAY_MS);
+  }, [itemId]);
+  useEffect(() => clearHighlight, [clearHighlight]);
+  return { startHighlight, clearHighlight };
+}
+
 const SUB_MASK_MODE_ICONS = {
   [SubMaskMode.Additive]: Plus,
   [SubMaskMode.Subtractive]: Minus,
@@ -365,16 +394,20 @@ export function SubMaskRow({
   // An AI patch shows its Quick Eraser as busy while the patch itself is generated.
   const isAnalyzing = subMask.id === analyzingSubMaskId || (isParentLoading && subMask.type === Mask.QuickEraser);
 
+  const { startHighlight, clearHighlight } = useMaskHoverHighlight(subMask.id);
+
   const handleMouseEnter = () => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
     }
     setIsHovered(true);
+    if (!activeDragItem) startHighlight();
   };
 
   const handleMouseLeave = () => {
     hoverTimeoutRef.current = setTimeout(() => setIsHovered(false), 1000);
+    clearHighlight();
   };
 
   useEffect(() => {
