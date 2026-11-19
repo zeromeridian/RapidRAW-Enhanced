@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.94.8-dev-mask-revamp — 2026-11-19
+
+### Develop
+
+- Moving, resizing or rotating a mask shape is smoother: while you drag,
+  the photo is drawn at a lower resolution so it keeps up with the
+  pointer, as in Lightroom Classic, and it is sharp again as soon as you
+  let go.
+
 ## 1.94.7-dev-mask-revamp — 2026-11-19
 
 ### Develop

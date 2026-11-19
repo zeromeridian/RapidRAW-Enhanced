@@ -655,6 +655,7 @@ fn process_preview_job(
     state: tauri::State<AppState>,
     mut adjustments_json: serde_json::Value,
     is_interactive: bool,
+    interactive_scale: Option<f32>,
     target_resolution: Option<u32>,
     roi: Option<(f32, f32, f32, f32)>,
     compute_analytics: bool,
@@ -721,8 +722,11 @@ fn process_preview_job(
     let full_source = preview.render_source();
     let full_size = full_source.size();
     let (processing_source, jpeg_quality) = if is_interactive {
-        let source = if interactive_divisor > 1.0 {
-            let target_size = (preview_dim as f32 / interactive_divisor) as u32;
+        // A mask shape drag asks for a smaller frame still (`interactive_scale`), as Lightroom
+        // Classic does: it keeps up with the pointer, and the release renders it sharp again.
+        let divisor = interactive_divisor / interactive_scale.unwrap_or(1.0).clamp(0.1, 1.0);
+        let source = if divisor > 1.0 {
+            let target_size = (preview_dim as f32 / divisor) as u32;
             let (w, h) = full_size;
             full_source.fitted(if w > h {
                 let ratio = h as f32 / w as f32;
@@ -947,6 +951,7 @@ fn start_preview_worker(app_handle: tauri::AppHandle) {
                     state,
                     job.adjustments,
                     job.is_interactive,
+                    job.interactive_scale,
                     job.target_resolution,
                     job.roi,
                     job.compute_analytics,
@@ -993,6 +998,7 @@ struct PreviewAnalyticsOptions {
 async fn apply_adjustments(
     js_adjustments: serde_json::Value,
     is_interactive: bool,
+    interactive_scale: Option<f32>,
     target_resolution: Option<u32>,
     roi: Option<(f32, f32, f32, f32)>,
     analytics_options: PreviewAnalyticsOptions,
@@ -1006,6 +1012,7 @@ async fn apply_adjustments(
             let job = PreviewJob {
                 adjustments: js_adjustments,
                 is_interactive,
+                interactive_scale,
                 target_resolution,
                 roi,
                 compute_analytics: analytics_options.compute_analytics,

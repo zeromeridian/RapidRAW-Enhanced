@@ -119,6 +119,8 @@ impl GpuLane {
 pub struct PreviewJob {
     pub adjustments: serde_json::Value,
     pub is_interactive: bool,
+    /// Shrinks an interactive frame further (0–1), e.g. while a mask shape is dragged.
+    pub interactive_scale: Option<f32>,
     pub target_resolution: Option<u32>,
     pub roi: Option<(f32, f32, f32, f32)>,
     pub compute_analytics: bool,

@@ -14,6 +14,12 @@ import { stripSentMaskData } from '../utils/maskUtils';
 const INTERACTIVE_ANALYTICS_MIN_INTERVAL_MS = 250;
 const INTERACTIVE_ANALYTICS_MAX_INTERVAL_MS = 1000;
 const INTERACTIVE_ANALYTICS_RENDER_COST_MULTIPLIER = 4;
+/**
+ * While a mask shape is dragged (on the photo or by its sliders), frames are drawn at half the
+ * width of other drags, as Lightroom Classic does: the photo keeps up with the pointer, and the
+ * release renders it sharp again.
+ */
+const MASK_SHAPE_DRAG_SCALE = 0.5;
 
 /**
  * The adjustments last rendered for a photo; seeded with the loaded edit, so only later changes
@@ -176,7 +182,7 @@ export function useImageProcessing(
       if (!currentPath) return;
       const renderStartedAt = performance.now();
 
-      const { patchesSentToBackend } = useEditorStore.getState();
+      const { patchesSentToBackend, isMaskShapeDragging } = useEditorStore.getState();
       const newlySentPatches = new Set<string>();
       const payload = stripSentMaskData(currentAdjustments, patchesSentToBackend, newlySentPatches);
 
@@ -187,6 +193,7 @@ export function useImageProcessing(
         const buffer: ArrayBuffer = await invoke(Invokes.ApplyAdjustments, {
           jsAdjustments: payload,
           isInteractive: dragging,
+          interactiveScale: dragging && isMaskShapeDragging ? MASK_SHAPE_DRAG_SCALE : null,
           targetResolution: targetRes || null,
           roi: roi || null,
           analyticsOptions: {
