@@ -31,6 +31,7 @@ use crate::PendingMetadata;
 #[cfg(target_os = "android")]
 use crate::android_integration::*;
 use crate::app_settings::*;
+use crate::app_state::{cancel_task, start_cancellable_task};
 use crate::exif_processing;
 use crate::formats::{is_raw_file, is_supported_image_file};
 use crate::gpu_processing;
@@ -502,18 +503,6 @@ fn assign_group_ids(files: &mut [ImageFile], settings: &crate::app_settings::App
             files[candidate.index].group_id = Some(key.clone());
         }
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct ImportSettings {
-    pub filename_template: String,
-    /// The Custom Texts for `{text}`, `{text2}`, `{text3}`.
-    #[serde(default)]
-    pub filename_texts: Vec<String>,
-    pub organize_by_date: bool,
-    pub date_folder_format: String,
-    pub delete_after_import: bool,
 }
 
 pub(crate) fn sanitize_filename_suffix(suffix: &str) -> String {
@@ -4967,15 +4956,10 @@ pub async fn apply_preset_batch(
     }
 
     let state = app_handle.state::<AppState>();
-    let cancellation_token = {
-        let mut active_token = state.preset_batch_task_token.lock().unwrap();
-        if active_token.is_some() {
-            return Err("A preset batch is already running".to_string());
-        }
-        let token = Arc::new(AtomicBool::new(false));
-        *active_token = Some(token.clone());
-        token
-    };
+    let cancellation_token = start_cancellable_task(
+        &state.preset_batch_task_token,
+        "A preset batch is already running",
+    )?;
     let task_token = state.preset_batch_task_token.clone();
     let job_id = Uuid::new_v4().to_string();
     let task_job_id = job_id.clone();
@@ -5103,13 +5087,7 @@ pub async fn apply_preset_batch(
 
 #[tauri::command]
 pub fn cancel_preset_batch(app_handle: AppHandle) -> bool {
-    let state = app_handle.state::<AppState>();
-    let active_token = state.preset_batch_task_token.lock().unwrap();
-    if let Some(token) = active_token.as_ref() {
-        !token.swap(true, Ordering::Relaxed)
-    } else {
-        false
-    }
+    cancel_task(&app_handle.state::<AppState>().preset_batch_task_token)
 }
 
 #[tauri::command]
@@ -6274,205 +6252,6 @@ pub fn get_thumb_cache_dir(app_handle: &AppHandle) -> Result<PathBuf, String> {
         fs::create_dir_all(&thumb_cache_dir).map_err(|e| e.to_string())?;
     }
     Ok(thumb_cache_dir)
-}
-
-#[tauri::command]
-pub async fn import_files(
-    source_paths: Vec<String>,
-    destination_folder: String,
-    settings: ImportSettings,
-    app_handle: AppHandle,
-) -> Result<(), String> {
-    let total_files = source_paths.len();
-    let _ = app_handle.emit("import-start", serde_json::json!({ "total": total_files }));
-    let enable_xmp_sync = load_settings(app_handle.clone())
-        .map(|settings| settings.enable_xmp_sync.unwrap_or(false))
-        .unwrap_or(false);
-
-    tauri::async_runtime::spawn_blocking(move || {
-        for (i, source_path_str) in source_paths.iter().enumerate() {
-            let _ = app_handle.emit(
-                "import-progress",
-                serde_json::json!({ "current": i, "total": total_files, "path": source_path_str }),
-            );
-
-            let import_result: Result<(), String> = (|| {
-                #[cfg(target_os = "android")]
-                if is_android_content_uri(source_path_str) {
-                    let resolved_name = resolve_android_content_uri_name(source_path_str)?;
-                    let source_bytes = read_android_content_uri(source_path_str)?;
-                    let source_name_path = Path::new(&resolved_name);
-                    let file_date = exif_processing::get_creation_date_from_bytes(
-                        &resolved_name,
-                        &source_bytes,
-                    );
-
-                    let mut final_dest_folder = PathBuf::from(&destination_folder);
-                    if settings.organize_by_date {
-                        let date_format_str = settings
-                            .date_folder_format
-                            .replace("YYYY", "%Y")
-                            .replace("MM", "%m")
-                            .replace("DD", "%d");
-                        let subfolder = file_date.format(&date_format_str).to_string();
-                        final_dest_folder.push(subfolder);
-                    }
-
-                    fs::create_dir_all(&final_dest_folder)
-                        .map_err(|e| format!("Failed to create destination folder: {}", e))?;
-
-                    let new_stem = generate_filename_from_template(
-                        &settings.filename_template,
-                        &resolved_name,
-                        i + 1,
-                        total_files,
-                        Some(file_date),
-                        &settings.filename_texts,
-                    );
-                    let extension = source_name_path
-                        .extension()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("");
-                    let new_filename = format!("{}.{}", new_stem, extension);
-                    let dest_file_path = final_dest_folder.join(new_filename);
-
-                    if dest_file_path.exists() {
-                        return Err(format!(
-                            "File already exists at destination: {}",
-                            dest_file_path.display()
-                        ));
-                    }
-
-                    fs::write(&dest_file_path, source_bytes).map_err(|e| e.to_string())?;
-
-                    if settings.delete_after_import {
-                        log::info!(
-                            "Skipping delete_after_import for Android content URI source: {}",
-                            source_path_str
-                        );
-                    }
-
-                    return Ok(());
-                }
-
-                let (source_path, source_sidecar) = parse_virtual_path(source_path_str);
-                if !source_path.exists() {
-                    return Err(format!("Source file not found: {}", source_path_str));
-                }
-
-                let file_date = exif_processing::get_creation_date_from_path(&source_path);
-
-                let mut final_dest_folder = PathBuf::from(&destination_folder);
-                if settings.organize_by_date {
-                    let date_format_str = settings
-                        .date_folder_format
-                        .replace("YYYY", "%Y")
-                        .replace("MM", "%m")
-                        .replace("DD", "%d");
-                    let subfolder = file_date.format(&date_format_str).to_string();
-                    final_dest_folder.push(subfolder);
-                }
-
-                fs::create_dir_all(&final_dest_folder)
-                    .map_err(|e| format!("Failed to create destination folder: {}", e))?;
-
-                let new_stem = generate_filename_from_template(
-                    &settings.filename_template,
-                    source_path_str,
-                    i + 1,
-                    total_files,
-                    Some(file_date),
-                    &settings.filename_texts,
-                );
-                let extension = source_path
-                    .extension()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("");
-                let new_filename = format!("{}.{}", new_stem, extension);
-                let dest_file_path = final_dest_folder.join(new_filename);
-
-                if dest_file_path.exists() {
-                    return Err(format!(
-                        "File already exists at destination: {}",
-                        dest_file_path.display()
-                    ));
-                }
-
-                fs::copy(&source_path, &dest_file_path).map_err(|e| e.to_string())?;
-                if source_sidecar.exists()
-                    && let Some(dest_str) = dest_file_path.to_str()
-                {
-                    let (_, dest_sidecar) = parse_virtual_path(dest_str);
-                    fs::copy(&source_sidecar, &dest_sidecar).map_err(|e| e.to_string())?;
-                }
-                // A copy imported under a new name remembers the camera's (owner 2026-11-16).
-                if dest_file_path.file_stem() != source_path.file_stem()
-                    && let Err(error) = remember_original_file_name(
-                        &dest_file_path,
-                        &original_file_name(&source_path),
-                        enable_xmp_sync,
-                    )
-                {
-                    log::warn!(
-                        "Could not record the original name of {}: {error}",
-                        dest_file_path.display()
-                    );
-                }
-
-                if settings.delete_after_import {
-                    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
-                    {
-                        if let Err(trash_error) = trash::delete(&source_path) {
-                            log::warn!(
-                                "Failed to trash source file {}: {}. Deleting permanently.",
-                                source_path.display(),
-                                trash_error
-                            );
-                            fs::remove_file(&source_path).map_err(|e| e.to_string())?;
-                        }
-                        if source_sidecar.exists()
-                            && let Err(trash_error) = trash::delete(&source_sidecar)
-                        {
-                            log::warn!(
-                                "Failed to trash source sidecar {}: {}. Deleting permanently.",
-                                source_sidecar.display(),
-                                trash_error
-                            );
-                            fs::remove_file(&source_sidecar).map_err(|e| e.to_string())?;
-                        }
-                    }
-
-                    #[cfg(not(any(
-                        target_os = "windows",
-                        target_os = "macos",
-                        target_os = "linux"
-                    )))]
-                    {
-                        fs::remove_file(&source_path).map_err(|e| e.to_string())?;
-                        if source_sidecar.exists() {
-                            fs::remove_file(&source_sidecar).map_err(|e| e.to_string())?;
-                        }
-                    }
-                }
-
-                Ok(())
-            })();
-
-            if let Err(e) = import_result {
-                eprintln!("Failed to import {}: {}", source_path_str, e);
-                let _ = app_handle.emit("import-error", e);
-                return;
-            }
-        }
-
-        let _ = app_handle.emit(
-            "import-progress",
-            serde_json::json!({ "current": total_files, "total": total_files, "path": "" }),
-        );
-        let _ = app_handle.emit("import-complete", ());
-    });
-
-    Ok(())
 }
 
 /// The file stem `template` gives the image at `image_path` (a virtual copy's

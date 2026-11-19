@@ -8,10 +8,11 @@ import { useUIStore } from '../store/useUIStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { Invokes, LibraryViewMode } from '../components/ui/AppProperties';
-import { Status } from '../components/ui/ExportImportProperties';
+import { ImportSettings, Status } from '../components/ui/ExportImportProperties';
 import { isCollectionView, isPathWithin } from '../utils/libraryViews';
 import { debouncedSave } from './useEditorActions';
 import { DEFAULT_IMPORT_TEMPLATE } from '../utils/filenameTemplates';
+import { DEFAULT_DATE_FOLDER_FORMAT } from '../utils/importSettings';
 
 export function useFileOperations(
   refreshImageList: () => Promise<void>,
@@ -282,30 +283,32 @@ export function useFileOperations(
     [sortedImageList],
   );
 
-  const startImportFiles = useCallback(async (sourcePaths: string[], destinationFolder: string, settings: any) => {
-    if (sourcePaths.length === 0 || !destinationFolder) return;
+  const startImportFiles = useCallback(
+    async (sourcePaths: string[], destinationFolder: string, settings: ImportSettings) => {
+      if (sourcePaths.length === 0 || !destinationFolder) return;
 
-    try {
-      await invoke(Invokes.ImportFiles, { destinationFolder, settings, sourcePaths });
-    } catch (err) {
-      console.error('Failed to start import:', err);
-      useProcessStore
-        .getState()
-        .setImportState({ status: Status.Error, errorMessage: `Failed to start import: ${err}` });
-    }
-  }, []);
+      try {
+        await invoke(Invokes.ImportFiles, { destinationFolder, settings, sourcePaths });
+      } catch (err) {
+        console.error('Failed to start import:', err);
+        useProcessStore
+          .getState()
+          .setImportState({ status: Status.Error, errorMessage: `Failed to start import: ${err}` });
+      }
+    },
+    [],
+  );
 
   const handleStartImport = useCallback(
-    async (settings: any) => {
-      const { importTargetFolder, importSourcePaths } = useUIStore.getState();
-      if (!importTargetFolder) return;
-      await startImportFiles(importSourcePaths, importTargetFolder, settings);
+    async (settings: ImportSettings, destination: string) => {
+      await startImportFiles(useUIStore.getState().importSourcePaths, destination, settings);
     },
     [startImportFiles],
   );
 
+  /** Picks the photos to import, then opens the Import dialog; `targetPath` is the folder it was started on. */
   const handleImportClick = useCallback(
-    async (targetPath: string) => {
+    async (targetPath: string | null = null) => {
       const { supportedTypes, osPlatform } = useSettingsStore.getState();
       const { setUI } = useUIStore.getState();
       const isAndroid = osPlatform === 'android';
@@ -373,13 +376,14 @@ export function useFileOperations(
           }
 
           if (isAndroid) {
-            const DEFAULT_IMPORT_SETTINGS = {
+            const androidTarget = targetPath ?? useLibraryStore.getState().currentFolderPath;
+            if (!androidTarget) return;
+            await startImportFiles(validFiles, androidTarget, {
               filenameTemplate: DEFAULT_IMPORT_TEMPLATE,
               organizeByDate: false,
-              dateFolderFormat: 'YYYY/MM-DD',
+              dateFolderFormat: DEFAULT_DATE_FOLDER_FORMAT,
               deleteAfterImport: false,
-            };
-            await startImportFiles(validFiles, targetPath, DEFAULT_IMPORT_SETTINGS);
+            });
             return;
           }
 

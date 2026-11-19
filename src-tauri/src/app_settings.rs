@@ -985,6 +985,10 @@ pub struct AppSettings {
         deserialize_with = "text_or_texts"
     )]
     pub filename_custom_texts: Vec<String>,
+    /// The Import dialog's last choices (`LastImportSettings` in
+    /// `components/modals/ImportSettingsModal.tsx`), cleaned there.
+    #[serde(default)]
+    pub last_import_settings: Option<Value>,
     /// Whether the Adjustments panel shows the Favorites instead of every section.
     #[serde(default)]
     pub show_favorite_adjustments: bool,
@@ -1140,6 +1144,7 @@ impl Default for AppSettings {
             zone_tint_advanced: false,
             filename_templates: None,
             filename_custom_texts: Vec::new(),
+            last_import_settings: None,
             show_favorite_adjustments: false,
             left_panel_width: None,
             right_panel_width: None,

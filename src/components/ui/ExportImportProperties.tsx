@@ -120,14 +120,45 @@ export interface FileFormat {
   name: string;
 }
 
+/** Rust `ImportNameClash`: what happens to a photo whose new name is taken. */
+export enum ImportNameClash {
+  AddSuffix = 'addSuffix',
+  Skip = 'skip',
+}
+
 /** Rust `ImportSettings`. */
 export interface ImportSettings {
   filenameTemplate: string;
   /** The Custom Texts for `{text}`, `{text2}`, `{text3}`. */
   filenameTexts?: Array<string>;
   organizeByDate: boolean;
+  /** The date subfolders (`YYYY`, `MM`, `MMMM`, `DD`, `/`); Rust `date_subfolder`. */
   dateFolderFormat: string;
+  /** Move: the sources go to the Trash once copied. */
   deleteAfterImport: boolean;
+  nameClash?: ImportNameClash;
+  /** January to December in the app's language, for `MMMM`. */
+  monthNames?: Array<string>;
+}
+
+/** Rust `ImportIssueKind`. */
+export enum ImportIssueKind {
+  NameTaken = 'nameTaken',
+  Failed = 'failed',
+  SourceKept = 'sourceKept',
+}
+
+/** Rust `ImportReport`, sent with `import-complete`. */
+export interface ImportReport {
+  destination: string;
+  total: number;
+  imported: Array<{ source: string; destination: string; suffixed: boolean }>;
+  issues: Array<{ source: string; kind: ImportIssueKind; message: string | null }>;
+  notStarted: number;
+  cancelled: boolean;
+  moved: boolean;
+  folders: Array<string>;
+  elapsedMs: number;
 }
 
 export interface ImportState {
@@ -135,6 +166,8 @@ export interface ImportState {
   path?: string;
   progress?: Progress;
   status: Status;
+  /** The last finished import, shown in the summary until it is closed. */
+  report?: ImportReport | null;
 }
 
 export enum Status {

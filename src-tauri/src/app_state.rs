@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Condvar, Mutex};
 
@@ -286,6 +286,8 @@ pub struct AppState {
     pub ai_init_lock: TokioMutex<()>,
     pub export_task_token: Arc<Mutex<Option<Arc<AtomicBool>>>>,
     pub preset_batch_task_token: Arc<Mutex<Option<Arc<AtomicBool>>>>,
+    /// The running import's cancel flag (`photo_import::import_files`).
+    pub import_task_token: Arc<Mutex<Option<Arc<AtomicBool>>>>,
     pub hdr_result: Arc<Mutex<Option<DynamicImage>>>,
     pub panorama_result: Arc<Mutex<Option<DynamicImage>>>,
     pub denoise_result: Arc<Mutex<Option<DynamicImage>>>,
@@ -318,6 +320,48 @@ pub struct AppState {
     pub metadata_manager: Arc<MetadataManager>,
     pub disks_cache: Mutex<Option<Disks>>,
     pub disks_cache_refreshing: AtomicBool,
+}
+
+/// Marks a cancellable task (`AppState`'s preset batch or import) as running
+/// and returns the flag that cancels it, or fails with `busy` while one runs.
+/// The task empties `slot` when it ends.
+pub fn start_cancellable_task(
+    slot: &Mutex<Option<Arc<AtomicBool>>>,
+    busy: &str,
+) -> Result<Arc<AtomicBool>, String> {
+    let mut active = slot.lock().unwrap();
+    if active.is_some() {
+        return Err(busy.to_string());
+    }
+    let token = Arc::new(AtomicBool::new(false));
+    *active = Some(token.clone());
+    Ok(token)
+}
+
+/// Asks the task running in `slot` to stop; false when none runs or it was asked already.
+pub fn cancel_task(slot: &Mutex<Option<Arc<AtomicBool>>>) -> bool {
+    slot.lock()
+        .unwrap()
+        .as_ref()
+        .is_some_and(|token| !token.swap(true, Ordering::SeqCst))
+}
+
+#[cfg(test)]
+mod cancellable_task_tests {
+    use super::*;
+
+    #[test]
+    fn a_task_slot_takes_one_task_and_one_cancel() {
+        let slot = Mutex::new(None);
+        let token = start_cancellable_task(&slot, "busy").unwrap();
+        assert_eq!(start_cancellable_task(&slot, "busy").unwrap_err(), "busy");
+        assert!(cancel_task(&slot));
+        assert!(!cancel_task(&slot));
+        assert!(token.load(Ordering::SeqCst));
+        *slot.lock().unwrap() = None;
+        assert!(!cancel_task(&slot));
+        assert!(start_cancellable_task(&slot, "busy").is_ok());
+    }
 }
 
 #[cfg(test)]

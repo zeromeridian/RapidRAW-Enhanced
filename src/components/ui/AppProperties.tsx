@@ -43,6 +43,7 @@ export enum Invokes {
   ApplyApprovedLightroomXmpEdits = 'apply_approved_lightroom_xmp_edits',
   CalculateAutoAdjustments = 'calculate_auto_adjustments',
   CancelExport = 'cancel_export',
+  CancelImport = 'cancel_import',
   CancelPresetBatch = 'cancel_preset_batch',
   CheckAIConnectorStatus = 'check_ai_connector_status',
   ClearAllSidecars = 'clear_all_sidecars',
@@ -126,6 +127,7 @@ export enum Invokes {
   RefreshFolderThumbnails = 'refresh_folder_thumbnails',
   RemoveTagForPaths = 'remove_tag_for_paths',
   PreviewFilenameTemplate = 'preview_filename_template',
+  PreviewImportFolder = 'preview_import_folder',
   PreviewRename = 'preview_rename',
   RenameFiles = 'rename_files',
   RenameFolder = 'rename_folder',
@@ -413,6 +415,8 @@ export interface AppSettings {
   filenameTemplates?: Array<unknown> | null;
   /** The Custom Texts last used in rename, export or import, offered when no saved template brings its own. */
   filenameCustomTexts?: Array<string> | null;
+  /** The Import dialog's last choices as saved; read them through `readLastImportSettings`. */
+  lastImportSettings?: unknown;
   /** Whether the Adjustments panel shows the Favorites instead of every section (its All / Favorites switch). */
   showFavoriteAdjustments?: boolean;
   leftPanelWidth?: number;

@@ -3,7 +3,6 @@ import { getVersion } from '@tauri-apps/api/app';
 import { open } from '@tauri-apps/plugin-shell';
 import {
   AlertTriangle,
-  Check,
   Folder,
   FolderInput,
   Home,
@@ -45,6 +44,7 @@ import SettingsPanel from './SettingsPanel';
 
 import LibraryGrid from './library/LibraryGrid';
 import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
+import ImportProgress from './library/ImportProgress';
 
 export interface ColumnWidths {
   thumbnail: number;
@@ -173,6 +173,7 @@ function DisplayModeSwitch({ displayMode, setDisplayMode, t }: DisplayModeSwitch
 
 export default function MainLibrary(props: MainLibraryProps) {
   const { t } = useTranslation();
+  const isImportRunning = [Status.Importing, Status.Cancelling].includes(props.importState.status);
   const setUI = useUIStore((state) => state.setUI);
   const [appVersion, setAppVersion] = useState('');
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
@@ -649,25 +650,27 @@ export default function MainLibrary(props: MainLibraryProps) {
           )}
         </div>
         <div className="flex items-center gap-4 compact:gap-2 shrink-0">
-          {props.importState.status === Status.Importing && (
-            <Text as="div" color={TextColors.accent} className="flex items-center gap-2 animate-pulse">
-              <FolderInput size={16} />
-              <span>
-                {t('library.import.progress', {
-                  current: props.importState.progress?.current,
-                  total: props.importState.progress?.total,
-                })}
-              </span>
-            </Text>
-          )}
-          {props.importState.status === Status.Success && (
-            <Text as="div" color={TextColors.success} className="flex items-center gap-2">
-              <Check size={16} />
-              <span>{t('library.import.complete')}</span>
-            </Text>
+          {isImportRunning ? (
+            <ImportProgress importState={props.importState} />
+          ) : (
+            !props.isAndroid && (
+              <Button
+                className="h-10 compact:h-8 px-3 compact:px-2 shadow-shiny"
+                onClick={() => props.onImportClick()}
+                data-tooltip={t('library.tooltips.importImages')}
+              >
+                <FolderInput className="w-4 h-4" />
+                <span className="compact:hidden">{t('library.import.button')}</span>
+              </Button>
+            )
           )}
           {props.importState.status === Status.Error && (
-            <Text as="div" color={TextColors.error} className="flex items-center gap-2">
+            <Text
+              as="div"
+              color={TextColors.error}
+              className="flex items-center gap-2"
+              data-tooltip={props.importState.errorMessage || undefined}
+            >
               <AlertTriangle size={16} />
               <span>{t('library.import.failed')}</span>
             </Text>

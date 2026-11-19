@@ -47,6 +47,12 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     section: 'library',
   },
   {
+    action: 'import_photos',
+    description: 'settings.keybinds.actions.import_photos',
+    defaultCombo: ['ctrl', 'shift', 'KeyI'],
+    section: 'library',
+  },
+  {
     action: 'copy_image_path',
     description: 'settings.keybinds.actions.copy_image_path',
     defaultCombo: ['ctrl', 'KeyL'],

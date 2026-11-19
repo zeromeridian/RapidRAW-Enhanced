@@ -10,7 +10,8 @@ committed), brought forward after the owner found mask updates slow
 (2026-11-18). WP2 done (`1.95.0`–`1.95.1`, owner-checked 2026-11-19).
 WP3 done (`1.96.0`–`1.96.1`, owner-checked 2026-11-19: "works
 great"; not committed). WP4 done (`1.97.0`–`1.97.1`, owner-checked
-2026-11-19: "this is now good"; not committed). **WP0–WP5 done;** only
+2026-11-19: "this is now good"). `1.95.0`–`1.97.1` committed by the
+owner, in `develop` = `4f67d9b6` (checked 2026-11-19). **WP0–WP5 done;** only
 WP6 (deferred) and the hands-on regression list remain. WP6 deferred by the owner
 2026-11-19 (restart: owner asks for it). Plan item 51 in
 `UPSTREAM_FEATURE_GAP.md`. Code check

@@ -56,6 +56,7 @@ mod naming;
 mod negative_conversion;
 mod panorama_stitching;
 mod panorama_utils;
+mod photo_import;
 mod preset_converter;
 mod preset_file;
 mod preview_jpeg;
@@ -2693,6 +2694,7 @@ pub fn run() {
             ai_init_lock: TokioMutex::new(()),
             export_task_token: Arc::new(Mutex::new(None)),
             preset_batch_task_token: Arc::new(Mutex::new(None)),
+            import_task_token: Arc::new(Mutex::new(None)),
             hdr_result: Arc::new(Mutex::new(None)),
             panorama_result: Arc::new(Mutex::new(None)),
             denoise_result: Arc::new(Mutex::new(None)),
@@ -2854,7 +2856,9 @@ pub fn run() {
             file_management::set_color_label_for_paths,
             file_management::set_rating_for_paths,
             file_management::sync_image_stacks_to_xmp,
-            file_management::import_files,
+            photo_import::import_files,
+            photo_import::cancel_import,
+            photo_import::preview_import_folder,
             file_management::create_virtual_copy,
             file_management::get_albums,
             file_management::save_albums,

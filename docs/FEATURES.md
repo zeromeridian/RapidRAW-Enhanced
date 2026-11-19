@@ -160,6 +160,15 @@ details are in `RELEASE_NOTES.MD`.
   chips, inline errors, Custom Text, example name); the default export
   name is `{filename}_edited`; a photo imported under a new name
   remembers its camera name.
+- Lightroom Classic-style import (Plan item 64, phase 1): an Import
+  button in the Library header and Cmd/Ctrl+Shift+I; a remembered
+  destination (one outside the Library is added to it); date subfolders
+  from a list or a custom `YYYY`/`MM`/`MMMM`/`DD` pattern with an
+  example path; Copy or Move; a taken name gets a number (shared by
+  RAW+JPEG partners) or is skipped; failures no longer stop the import;
+  a header progress bar with Cancel; a summary of what was imported,
+  numbered, skipped or failed. The dialog reopens with its last choices
+  (always on Copy).
 - Caps Lock auto-advance after applying ratings, color labels, or flags.
 - Main Settings access from both Library and Develop. The Settings window
   has ten pages listed down the left (Interface, Library, Editor, Tagging,

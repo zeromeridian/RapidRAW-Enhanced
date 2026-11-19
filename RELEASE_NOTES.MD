@@ -5,6 +5,35 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.98.0-dev-streamlined-import — 2026-11-19
+
+### Library
+
+- A new **Import** button in the Library header (also Cmd/Ctrl+Shift+I)
+  starts an import; right-clicking a folder still offers Import too.
+- The Import dialog now has a **destination** you can choose. It
+  remembers the last one, and a folder outside the Library is added to
+  it after the import.
+- **Subfolders** by capture date can be picked from a list, as in
+  Lightroom Classic (for example `YYYY/YYYY-MM-DD` or
+  `YYYY/YYYY-MM/YYYY-MM-DD`), or typed as a custom pattern, now also
+  with `MMMM` for the month's name. The dialog shows an example path.
+- **Copy** or **Move** is chosen at the top of the dialog; Move puts
+  the originals in the Trash after copying. The dialog always opens on
+  Copy.
+- When a file name is already taken, the photo gets a number
+  (`name-1`) or is skipped, as you choose. A RAW+JPEG pair gets the
+  same number.
+- One failing file no longer stops the whole import: the other photos
+  still import.
+- While importing, the Library header shows a progress bar with the
+  current file and a button to cancel.
+- When the import ends, a summary shows how many photos were imported,
+  numbered, skipped or failed (with the reasons), the folders they went
+  to and the time taken, with a button to show them in the Library.
+- The dialog reopens with your last destination, subfolders, file name
+  template and name choice.
+
 ## 1.97.1-dev-mask-revamp — 2026-11-19
 
 ### Develop

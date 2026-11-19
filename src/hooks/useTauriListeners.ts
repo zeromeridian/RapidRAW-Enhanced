@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { invoke } from '@tauri-apps/api/core';
-import { Status } from '../components/ui/ExportImportProperties';
+import { ImportReport, Status } from '../components/ui/ExportImportProperties';
 import { Invokes, LibraryViewMode } from '../components/ui/AppProperties';
 import type { ImageEditState, ImageFile, XmpStackMetadata } from '../components/ui/AppProperties';
 import { useProcessStore } from '../store/useProcessStore';
@@ -14,7 +14,7 @@ import { toast } from 'react-toastify';
 import { autoStackCreatedImages } from '../utils/autoStacking';
 import { mergeXmpImageStacks } from '../utils/imageStacks';
 import { globalImageCache } from '../utils/ImageLRUCache';
-import { isCollectionView } from '../utils/libraryViews';
+import { isCollectionView, isPathWithin } from '../utils/libraryViews';
 import { applyKeywordOperationToSets, applyKeywordOperationToTag, getKeywordSets } from '../utils/keywords';
 import i18n from 'i18next';
 
@@ -387,9 +387,20 @@ export function useTauriListeners({
             progress: { current: event.payload.current, total: event.payload.total },
           });
       }),
-      listen('import-complete', () => {
+      listen<ImportReport>('import-complete', (event) => {
         if (isEffectActive) {
-          useProcessStore.getState().setImportState({ status: Status.Success });
+          const report = event.payload;
+          useProcessStore
+            .getState()
+            .setImportState({ status: report.cancelled ? Status.Cancelled : Status.Success, report });
+          // A destination outside the Library joins it (owner 2026-11-19).
+          const { rootPaths, setLibrary } = useLibraryStore.getState();
+          if (report.imported.length > 0 && !rootPaths.some((root) => isPathWithin(report.destination, root))) {
+            const newRootPaths = [...rootPaths, report.destination];
+            setLibrary({ rootPaths: newRootPaths });
+            const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+            if (appSettings) handleSettingsChange({ ...appSettings, rootFolders: newRootPaths });
+          }
           refs.current.refreshAllFolderTrees();
           const currentPath = useLibraryStore.getState().currentFolderPath;
           if (currentPath && !isCollectionView(currentPath)) {

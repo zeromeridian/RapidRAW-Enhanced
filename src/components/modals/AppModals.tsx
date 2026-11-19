@@ -17,12 +17,14 @@ import RenameFolderModal from './RenameFolderModal';
 import RenameFileModal from './RenameFileModal';
 import ConfirmModal from './ConfirmModal';
 import ImportSettingsModal from './ImportSettingsModal';
+import ImportSummaryModal from './ImportSummaryModal';
 import CullingModal from './CullingModal';
 import CollageModal from './CollageModal';
 import PresetBatchModal from './PresetBatchModal';
 import LightroomImportModal from './LightroomImportModal';
 import CaptureTimeStackModal from './CaptureTimeStackModal';
 import { AppSettings, Invokes, AlbumItem, Album, AlbumGroup } from '../ui/AppProperties';
+import { ImportSettings } from '../ui/ExportImportProperties';
 import { CopyPasteSettings } from '../../utils/adjustments';
 
 export interface AppModalsProps {
@@ -38,7 +40,9 @@ export interface AppModalsProps {
   handleCreateFolder: (folderName: string) => Promise<void>;
   handleRenameFolder: (newName: string) => Promise<void>;
   handleSaveRename: (nameTemplate: string, texts: Array<string> | null) => Promise<void>;
-  handleStartImport: (settings: any) => Promise<void>;
+  handleStartImport: (settings: ImportSettings, destination: string) => Promise<void>;
+  /** Opens a folder in the Library (the import summary's Show in Library). */
+  handleSelectFolder: (path: string) => void;
   handleSetColorLabel: (color: string | null, paths?: string[]) => Promise<void>;
   handleRate: (rating: number, paths?: string[]) => void;
   executeDelete: (paths: string[], options: any) => Promise<void>;
@@ -65,6 +69,7 @@ export default function AppModals(props: AppModalsProps) {
     folderActionTarget,
     renameTargetPaths,
     importSourcePaths,
+    importTargetFolder,
     isCreateAlbumModalOpen,
     isCreateAlbumGroupModalOpen,
     isRenameAlbumModalOpen,
@@ -90,6 +95,7 @@ export default function AppModals(props: AppModalsProps) {
       folderActionTarget: state.folderActionTarget,
       renameTargetPaths: state.renameTargetPaths,
       importSourcePaths: state.importSourcePaths,
+      importTargetFolder: state.importTargetFolder,
       isCreateAlbumModalOpen: state.isCreateAlbumModalOpen,
       isCreateAlbumGroupModalOpen: state.isCreateAlbumGroupModalOpen,
       isRenameAlbumModalOpen: state.isRenameAlbumModalOpen,
@@ -108,10 +114,11 @@ export default function AppModals(props: AppModalsProps) {
     })),
   );
 
-  const { thumbnails, aiModelDownloadStatus } = useProcessStore(
+  const { thumbnails, aiModelDownloadStatus, importReport } = useProcessStore(
     useShallow((state) => ({
       thumbnails: state.thumbnails,
       aiModelDownloadStatus: state.aiModelDownloadStatus,
+      importReport: state.importState.report ?? null,
     })),
   );
 
@@ -316,9 +323,15 @@ export default function AppModals(props: AppModalsProps) {
       <ConfirmModal {...confirmModalState} onClose={closeConfirmModal} />
       <ImportSettingsModal
         sourcePaths={importSourcePaths}
+        targetFolder={importTargetFolder}
         isOpen={isImportModalOpen}
         onClose={() => setUI({ isImportModalOpen: false })}
         onSave={props.handleStartImport}
+      />
+      <ImportSummaryModal
+        report={importReport}
+        onClose={() => useProcessStore.getState().setImportState({ report: null })}
+        onShowFolder={props.handleSelectFolder}
       />
       <CullingModal
         isOpen={cullingModalState.isOpen}

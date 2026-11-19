@@ -501,6 +501,7 @@ function App() {
     handleClearSelection,
     handleDeleteSelected,
     handleImageSelect,
+    handleImportClick,
     handlePasteFiles,
     handleToggleFullScreen,
     handleZoomChange,
@@ -945,6 +946,7 @@ function App() {
           handleRenameFolder={handleRenameFolder}
           handleSaveRename={handleSaveRename}
           handleStartImport={handleStartImport}
+          handleSelectFolder={(path) => handleSelectSubfolder(path)}
           handleSetColorLabel={handleSetColorLabel}
           handleRate={handleRate}
           executeDelete={executeDelete}
