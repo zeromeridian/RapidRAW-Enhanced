@@ -1,6 +1,5 @@
 import { useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { open } from '@tauri-apps/plugin-dialog';
 import { toast } from 'react-toastify';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useEditorStore } from '../store/useEditorStore';
@@ -12,7 +11,7 @@ import { ImportSettings, Status } from '../components/ui/ExportImportProperties'
 import { isCollectionView, isPathWithin } from '../utils/libraryViews';
 import { debouncedSave } from './useEditorActions';
 import { DEFAULT_IMPORT_TEMPLATE } from '../utils/filenameTemplates';
-import { DEFAULT_DATE_FOLDER_FORMAT } from '../utils/importSettings';
+import { DEFAULT_DATE_FOLDER_FORMAT, pickImportFiles } from '../utils/importSettings';
 
 export function useFileOperations(
   refreshImageList: () => Promise<void>,
@@ -300,98 +299,31 @@ export function useFileOperations(
   );
 
   const handleStartImport = useCallback(
-    async (settings: ImportSettings, destination: string) => {
-      await startImportFiles(useUIStore.getState().importSourcePaths, destination, settings);
+    async (settings: ImportSettings, destination: string, sourcePaths: Array<string>) => {
+      await startImportFiles(sourcePaths, destination, settings);
     },
     [startImportFiles],
   );
 
-  /** Picks the photos to import, then opens the Import dialog; `targetPath` is the folder it was started on. */
+  /**
+   * Opens the Import dialog, which picks its own source; `targetPath` is the folder it was
+   * started on. Android has no dialog: the photos picked import into that folder at once.
+   */
   const handleImportClick = useCallback(
     async (targetPath: string | null = null) => {
-      const { supportedTypes, osPlatform } = useSettingsStore.getState();
-      const { setUI } = useUIStore.getState();
-      const isAndroid = osPlatform === 'android';
-
-      try {
-        const nonRaw = supportedTypes?.nonRaw || [];
-        const raw = supportedTypes?.raw || [];
-
-        const expandExtensions = (exts: string[]) => {
-          return Array.from(new Set(exts.flatMap((ext) => [ext.toLowerCase(), ext.toUpperCase()])));
-        };
-
-        const processedNonRaw = expandExtensions(nonRaw);
-        const processedRaw = expandExtensions(raw);
-        const allImageExtensions = [...processedNonRaw, ...processedRaw];
-
-        const typeFilters = isAndroid
-          ? []
-          : [
-              { name: 'All Supported Images', extensions: allImageExtensions },
-              { name: 'RAW Images', extensions: processedRaw },
-              { name: 'Standard Images (JPEG, PNG, etc.)', extensions: processedNonRaw },
-              { name: 'All Files', extensions: ['*'] },
-            ];
-
-        const selected = await open({
-          filters: typeFilters,
-          multiple: true,
-          title: 'Select files to import',
-        });
-
-        if (Array.isArray(selected) && selected.length > 0) {
-          const invalidExtensions = new Set<string>();
-          const allowedExtensions = new Set(allImageExtensions.map((e) => e.toLowerCase()));
-
-          const resolvedFiles = await Promise.all(
-            selected.map(async (path) => {
-              if (isAndroid) {
-                try {
-                  return await invoke<string>('resolve_android_content_uri_name', { uriStr: path });
-                } catch (e) {
-                  console.error('Failed to resolve URI:', e);
-                  return path;
-                }
-              }
-              return path;
-            }),
-          );
-
-          const validFiles = selected.filter((originalPath, index) => {
-            const resolvedName = resolvedFiles[index];
-            const ext = resolvedName.split('.').pop()?.toLowerCase() || 'unknown';
-
-            if (!allowedExtensions.has(ext)) {
-              invalidExtensions.add(`.${ext}`);
-              return false;
-            }
-            return true;
-          });
-
-          if (invalidExtensions.size > 0) {
-            const extList = Array.from(invalidExtensions).join(', ');
-            toast.error(`Unsupported file format(s) detected: ${extList}`);
-            return;
-          }
-
-          if (isAndroid) {
-            const androidTarget = targetPath ?? useLibraryStore.getState().currentFolderPath;
-            if (!androidTarget) return;
-            await startImportFiles(validFiles, androidTarget, {
-              filenameTemplate: DEFAULT_IMPORT_TEMPLATE,
-              organizeByDate: false,
-              dateFolderFormat: DEFAULT_DATE_FOLDER_FORMAT,
-              deleteAfterImport: false,
-            });
-            return;
-          }
-
-          setUI({ importSourcePaths: validFiles, importTargetFolder: targetPath, isImportModalOpen: true });
-        }
-      } catch (err) {
-        console.error('Failed to open file dialog for import:', err);
+      if (useSettingsStore.getState().osPlatform !== 'android') {
+        useUIStore.getState().setUI({ importSourcePaths: [], importTargetFolder: targetPath, isImportModalOpen: true });
+        return;
       }
+      const files = await pickImportFiles();
+      const androidTarget = targetPath ?? useLibraryStore.getState().currentFolderPath;
+      if (!files || !androidTarget) return;
+      await startImportFiles(files, androidTarget, {
+        filenameTemplate: DEFAULT_IMPORT_TEMPLATE,
+        organizeByDate: false,
+        dateFolderFormat: DEFAULT_DATE_FOLDER_FORMAT,
+        deleteAfterImport: false,
+      });
     },
     [startImportFiles],
   );

@@ -3330,7 +3330,7 @@ pub fn generate_thumbnail_data(
     Ok(apply_coarse_rotation(Cow::Owned(final_image), fallback_orientation_steps).into_owned())
 }
 
-fn encode_thumbnail(image: &DynamicImage, target_width: u32) -> Result<Vec<u8>> {
+pub(crate) fn encode_thumbnail(image: &DynamicImage, target_width: u32) -> Result<Vec<u8>> {
     let thumbnail = crate::image_processing::downscale_f32_image(image, target_width, target_width);
     let mut buf = Cursor::new(Vec::new());
     let mut encoder = JpegEncoder::new_with_quality(&mut buf, 75);

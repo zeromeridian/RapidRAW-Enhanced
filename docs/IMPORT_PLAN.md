@@ -8,7 +8,7 @@ owner before the next.
 
 Progress:
 
-- Phase 1 (`1.98.0`, 2026-11-19, not committed): import moved out of
+- Phase 1 (`1.98.0`, 2026-11-19): import moved out of
   `file_management.rs` into `src-tauri/src/photo_import.rs`:
   `ImportSettings` gains `name_clash` (`ImportNameClash`: AddSuffix,
   Skip) and `month_names`; `date_subfolder` replaces the chrono-format
@@ -33,6 +33,33 @@ Progress:
   the Library roots (`useTauriListeners.ts`). Placeholders of es, fr,
   pt and pl showed translated tokens (`AAAA`, `JJ`, `RRRR`) the code
   never understood; all now show `YYYY/MM-DD`.
+  Committed by the owner as `13ca4b2e` on `dev/streamlined-import`.
+- Phase 2 (`1.99.0`, 2026-11-19, not committed; the owner tests all of
+  import on this branch before merging): Rust `scan_import_source`
+  (`find_import_files`: folders, optionally recursive, and files, each
+  once, hidden files and folders left out; capture times in parallel,
+  sorted), `list_import_volumes` (sysinfo `Disks` with a `DCIM` folder;
+  the volume name on macOS and Windows, the mount folder's name on
+  Linux), `generate_import_thumbnail` (`generate_thumbnail_data` plus
+  `encode_thumbnail` at 320 px, not cached); setting
+  `import_on_card_connect` (absent = on). Frontend: the Import button
+  opens the dialog directly (Android keeps its file picker and direct
+  import); `pickImportFiles` moved to `utils/importSettings.ts` for the
+  dialog's Files…; the dialog is two columns (source, toolbar and new
+  `ImportSourceGrid.tsx` left, the phase 1 settings right); previews
+  load when a tile scrolls into view, four at a time; the ticked photos
+  go to `import_files` in capture order; `includeSubfolders` is
+  remembered; new `hooks/useImportCardWatcher.ts` polls the drives every
+  3 s and opens the dialog for a drive that was not there before (not
+  while a dialog or Settings is open, or an import runs); Settings →
+  Library switch. Locale `photoCount` replaced by `fileCount` and
+  `selectedCount`.
+- Phase 2 fixes `1.99.1`–`1.99.2` (owner's checks 2026-11-19): TIFF
+  capture dates read in place (`exif_processing::tiff_capture_date`;
+  850 MB scans were read whole), superseded scans stop, dates on the
+  scan's own pool, large files previewed one at a time, Library
+  thumbnails reused, dialog 96vw × 92vh, tiles from 186 px. **Owner:
+  "This is good now"** (phase 2 accepted, 2026-11-19).
 - Found, not changed (ask later): import copies a photo's `.tirdata`
   but not its `.xmp` sidecars (`IMG_1.CR3.xmp`, `IMG_1.xmp`), unlike
   rename (`rename.rs`), so Lightroom edits on a card or in a source

@@ -5,6 +5,44 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.99.2-dev-streamlined-import — 2026-11-19
+
+### Library
+
+- Photos that are already in the Library show their Library thumbnail
+  in the Import dialog at once, instead of being read again.
+- The Import previews are a third larger, and the leftmost ones are no
+  longer cut off.
+
+## 1.99.1-dev-streamlined-import — 2026-11-19
+
+### Library
+
+- The Import dialog lists a folder of large TIFFs at once: capture dates
+  of TIFF files (and TIFF-based RAWs) are read without reading the
+  whole file, which also speeds up naming and sorting by capture date.
+- Choosing another source, or switching subfolders on or off, stops the
+  listing that was still running.
+- Previews of very large files load one at a time, so a folder of scans
+  does not use several gigabytes of memory at once.
+- The Import dialog uses nearly the whole window, with larger previews.
+
+## 1.99.0-dev-streamlined-import — 2026-11-19
+
+### Library
+
+- The Import dialog now picks its own **source**: a whole folder (with
+  or without its subfolders), single files, or a memory card or camera
+  that shows up as a drive, listed by name.
+- The photos of the source appear as a grid of previews, grouped by
+  capture day. All are ticked; untick the ones you do not want, tick or
+  untick a whole day at once, or use Check All and Uncheck All. The
+  ticked photos import in capture order.
+- Connecting a memory card, or a camera that shows up as a drive, opens
+  the Import dialog with it as the source. This can be turned off in
+  Settings → Library.
+- The dialog also remembers whether subfolders are included.
+
 ## 1.98.0-dev-streamlined-import — 2026-11-19
 
 ### Library

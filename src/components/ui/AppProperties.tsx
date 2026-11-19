@@ -128,6 +128,9 @@ export enum Invokes {
   RemoveTagForPaths = 'remove_tag_for_paths',
   PreviewFilenameTemplate = 'preview_filename_template',
   PreviewImportFolder = 'preview_import_folder',
+  ScanImportSource = 'scan_import_source',
+  ListImportVolumes = 'list_import_volumes',
+  GenerateImportThumbnail = 'generate_import_thumbnail',
   PreviewRename = 'preview_rename',
   RenameFiles = 'rename_files',
   RenameFolder = 'rename_folder',
@@ -417,6 +420,8 @@ export interface AppSettings {
   filenameCustomTexts?: Array<string> | null;
   /** The Import dialog's last choices as saved; read them through `readLastImportSettings`. */
   lastImportSettings?: unknown;
+  /** Whether connecting a memory card or camera drive opens the Import dialog; absent means on. */
+  importOnCardConnect?: boolean;
   /** Whether the Adjustments panel shows the Favorites instead of every section (its All / Favorites switch). */
   showFavoriteAdjustments?: boolean;
   leftPanelWidth?: number;

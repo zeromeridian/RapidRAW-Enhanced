@@ -40,7 +40,7 @@ export interface AppModalsProps {
   handleCreateFolder: (folderName: string) => Promise<void>;
   handleRenameFolder: (newName: string) => Promise<void>;
   handleSaveRename: (nameTemplate: string, texts: Array<string> | null) => Promise<void>;
-  handleStartImport: (settings: ImportSettings, destination: string) => Promise<void>;
+  handleStartImport: (settings: ImportSettings, destination: string, sourcePaths: Array<string>) => Promise<void>;
   /** Opens a folder in the Library (the import summary's Show in Library). */
   handleSelectFolder: (path: string) => void;
   handleSetColorLabel: (color: string | null, paths?: string[]) => Promise<void>;

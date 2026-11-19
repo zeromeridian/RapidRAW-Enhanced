@@ -989,6 +989,9 @@ pub struct AppSettings {
     /// `components/modals/ImportSettingsModal.tsx`), cleaned there.
     #[serde(default)]
     pub last_import_settings: Option<Value>,
+    /// Whether connecting a memory card or camera drive opens the Import dialog; absent means on.
+    #[serde(default)]
+    pub import_on_card_connect: Option<bool>,
     /// Whether the Adjustments panel shows the Favorites instead of every section.
     #[serde(default)]
     pub show_favorite_adjustments: bool,
@@ -1145,6 +1148,7 @@ impl Default for AppSettings {
             filename_templates: None,
             filename_custom_texts: Vec::new(),
             last_import_settings: None,
+            import_on_card_connect: None,
             show_favorite_adjustments: false,
             left_panel_width: None,
             right_panel_width: None,

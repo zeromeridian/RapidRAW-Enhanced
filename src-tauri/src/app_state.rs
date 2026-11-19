@@ -288,6 +288,8 @@ pub struct AppState {
     pub preset_batch_task_token: Arc<Mutex<Option<Arc<AtomicBool>>>>,
     /// The running import's cancel flag (`photo_import::import_files`).
     pub import_task_token: Arc<Mutex<Option<Arc<AtomicBool>>>>,
+    /// Bumped by every Import source listing; older listings stop (`photo_import::scan_import_source`).
+    pub import_scan_generation: AtomicUsize,
     pub hdr_result: Arc<Mutex<Option<DynamicImage>>>,
     pub panorama_result: Arc<Mutex<Option<DynamicImage>>>,
     pub denoise_result: Arc<Mutex<Option<DynamicImage>>>,

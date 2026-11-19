@@ -38,6 +38,7 @@ import { useThumbnails } from './hooks/useThumbnails';
 import { ImageDimensions } from './hooks/useImageRenderSize';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTauriListeners } from './hooks/useTauriListeners';
+import { useImportCardWatcher } from './hooks/useImportCardWatcher';
 import { useFileOperations } from './hooks/useFileOperations';
 import { useAppContextMenus } from './hooks/useAppContextMenus';
 import { useSortedLibrary } from './hooks/useSortedLibrary';
@@ -468,6 +469,8 @@ function App() {
     executeDelete,
     handleTogglePinFolder,
   });
+
+  useImportCardWatcher();
 
   useTauriListeners({
     refreshAllFolderTrees,

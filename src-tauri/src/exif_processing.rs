@@ -214,6 +214,63 @@ pub fn is_tiff(file_bytes: &[u8]) -> bool {
     file_bytes.starts_with(b"II*\0") || file_bytes.starts_with(b"MM\0*")
 }
 
+/// The capture time a TIFF-based file records (the Exif IFD's DateTimeOriginal,
+/// else IFD0's DateTime), read by following its IFD offsets in place. A large
+/// TIFF often keeps its IFDs after the image data, past every prefix
+/// `read_exif` tries, so that copies the whole file (≈ 850 MB per scan TIFF,
+/// owner 2026-11-19); this touches only the few pages the IFDs sit on.
+/// Classic TIFF only (not BigTIFF).
+fn tiff_capture_date(bytes: &[u8]) -> Option<NaiveDateTime> {
+    let is_little_endian = bytes.starts_with(b"II");
+    let u16_at = |at: usize| {
+        let raw: [u8; 2] = bytes.get(at..at.checked_add(2)?)?.try_into().ok()?;
+        Some(if is_little_endian {
+            u16::from_le_bytes(raw)
+        } else {
+            u16::from_be_bytes(raw)
+        })
+    };
+    let u32_at = |at: usize| {
+        let raw: [u8; 4] = bytes.get(at..at.checked_add(4)?)?.try_into().ok()?;
+        Some(if is_little_endian {
+            u32::from_le_bytes(raw)
+        } else {
+            u32::from_be_bytes(raw)
+        })
+    };
+    // The type, count and value field of `tag` in the IFD at `ifd`.
+    let entry = |ifd: usize, tag: u16| -> Option<(u16, usize, usize)> {
+        let count = u16_at(ifd)? as usize;
+        (0..count).find_map(|index| {
+            let at = ifd + 2 + index * 12;
+            (u16_at(at)? == tag).then_some(())?;
+            Some((u16_at(at + 2)?, u32_at(at + 4)? as usize, at + 8))
+        })
+    };
+    let ascii = |ifd: usize, tag: u16| -> Option<NaiveDateTime> {
+        let (kind, count, field) = entry(ifd, tag)?;
+        if kind != 2 {
+            return None;
+        }
+        let start = if count <= 4 {
+            field
+        } else {
+            u32_at(field)? as usize
+        };
+        let value = bytes.get(start..start.checked_add(count)?)?;
+        parse_creation_datetime(String::from_utf8_lossy(value).trim_end_matches('\0').trim())
+    };
+
+    if !is_tiff(bytes) {
+        return None;
+    }
+    let ifd0 = u32_at(4)? as usize;
+    let exif_ifd = entry(ifd0, 0x8769).and_then(|(_, _, field)| u32_at(field));
+    exif_ifd
+        .and_then(|ifd| ascii(ifd as usize, 0x9003))
+        .or_else(|| ascii(ifd0, 0x0132))
+}
+
 /// Smallest and largest TIFF prefix `read_exif` parses before the whole file.
 const EXIF_PREFIX_MIN: usize = 64 * 1024;
 const EXIF_PREFIX_MAX: usize = 16 * 1024 * 1024;
@@ -861,6 +918,12 @@ pub fn try_get_exif_creation_date(path: &Path) -> Option<NaiveDateTime> {
     if let Some(map) = read_sidecar_exif(path)
         && let Some(dt_str) = map.get("DateTimeOriginal").or(map.get("CreateDate"))
         && let Some(dt) = parse_creation_datetime(dt_str)
+    {
+        return Some(dt);
+    }
+
+    if let Ok(mmap) = crate::file_management::read_file_mapped(path)
+        && let Some(dt) = tiff_capture_date(&mmap)
     {
         return Some(dt);
     }
@@ -1676,6 +1739,48 @@ mod tests {
         let exif = read_exif(&whole).unwrap();
         assert_eq!(exif_make(&exif).as_deref(), Some("Whole Cam"));
         assert_eq!(exif.buf().len(), whole.len());
+    }
+
+    #[test]
+    fn a_tiff_capture_date_is_read_in_place_even_after_the_image_data() {
+        // IFD0 near the end of a 2 MB file (past the first prefixes) points to an Exif IFD.
+        let (ifd0, exif_ifd) = (2_000_000, 2_000_100);
+        let mut bytes = test_tiff::little_endian(
+            2_100_000,
+            ifd0,
+            &[(0x0132, 2, 20, 2_000_200), (0x8769, 4, 1, exif_ifd as u32)],
+        );
+        let place = |bytes: &mut Vec<u8>, at: usize, text: &str| {
+            bytes[at..at + text.len()].copy_from_slice(text.as_bytes());
+        };
+        place(&mut bytes, 2_000_200, "2026:03:07 10:00:00\0");
+        bytes[exif_ifd..exif_ifd + 2].copy_from_slice(&1u16.to_le_bytes());
+        let original = [
+            0x9003u16.to_le_bytes().as_slice(),
+            &2u16.to_le_bytes(),
+            &20u32.to_le_bytes(),
+            &2_000_300u32.to_le_bytes(),
+        ]
+        .concat();
+        bytes[exif_ifd + 2..exif_ifd + 14].copy_from_slice(&original);
+        place(&mut bytes, 2_000_300, "2026:03:07 09:30:15\0");
+        assert_eq!(
+            tiff_capture_date(&bytes),
+            parse_creation_datetime("2026:03:07 09:30:15")
+        );
+
+        // Without an Exif IFD, IFD0's DateTime; without either, none.
+        let mut plain = test_tiff::little_endian(4096, 8, &[(0x0132, 2, 20, 100)]);
+        place(&mut plain, 100, "2025:12:31 23:59:59\0");
+        assert_eq!(
+            tiff_capture_date(&plain),
+            parse_creation_datetime("2025:12:31 23:59:59")
+        );
+        assert_eq!(
+            tiff_capture_date(&test_tiff::with_make(4096, 8, "Cam")),
+            None
+        );
+        assert_eq!(tiff_capture_date(b"\xff\xd8\xff\xe0 not a tiff"), None);
     }
 
     fn encoded_test_tiff() -> Vec<u8> {

@@ -160,8 +160,13 @@ details are in `RELEASE_NOTES.MD`.
   chips, inline errors, Custom Text, example name); the default export
   name is `{filename}_edited`; a photo imported under a new name
   remembers its camera name.
-- Lightroom Classic-style import (Plan item 64, phase 1): an Import
-  button in the Library header and Cmd/Ctrl+Shift+I; a remembered
+- Lightroom Classic-style import (Plan item 64, phases 1–2): an Import
+  button in the Library header and Cmd/Ctrl+Shift+I; a source of a
+  folder (subfolders optional), single files, or a card or camera drive
+  (`DCIM`, found by itself; connecting one opens Import unless turned
+  off in Settings → Library); the source's photos in a preview grid by
+  capture day with per-photo and per-day ticks, Check All / Uncheck
+  All, imported in capture order; a remembered
   destination (one outside the Library is added to it); date subfolders
   from a list or a custom `YYYY`/`MM`/`MMMM`/`DD` pattern with an
   example path; Copy or Move; a taken name gets a number (shared by

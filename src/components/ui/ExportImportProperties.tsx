@@ -141,6 +141,20 @@ export interface ImportSettings {
   monthNames?: Array<string>;
 }
 
+/** Rust `ImportCandidate`: a photo an import source holds. */
+export interface ImportCandidate {
+  path: string;
+  /** `YYYY-MM-DDTHH:MM:SS` as the camera recorded it (else the file's time). */
+  captureTime: string;
+}
+
+/** Rust `ImportVolume`: a memory card or camera mounted as a drive. */
+export interface ImportVolume {
+  name: string;
+  /** Its `DCIM` folder. */
+  path: string;
+}
+
 /** Rust `ImportIssueKind`. */
 export enum ImportIssueKind {
   NameTaken = 'nameTaken',

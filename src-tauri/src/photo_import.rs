@@ -5,16 +5,24 @@
 //! that is already taken gets a number or is skipped (the import's choice);
 //! a file that fails is reported and the others still import. The import can
 //! be cancelled between files and ends with a report of what happened.
+//!
+//! Sources are folders, single files, or memory cards and cameras mounted as
+//! drives (a `DCIM` folder); the dialog lists their photos by capture time
+//! (`scan_import_source`) with small previews (`generate_import_thumbnail`).
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 use chrono::{Datelike, NaiveDateTime};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use sysinfo::Disks;
+use tauri::{AppHandle, Emitter, Manager, ipc::Response};
+use walkdir::WalkDir;
 
 use crate::AppState;
 #[cfg(target_os = "android")]
@@ -25,12 +33,212 @@ use crate::app_settings::load_settings;
 use crate::app_state::{cancel_task, start_cancellable_task};
 use crate::exif_processing;
 use crate::file_management::{
-    generate_filename_from_template, original_file_name, parse_virtual_path,
+    encode_thumbnail, generate_filename_from_template, generate_thumbnail_data,
+    get_cached_thumbnail_image, original_file_name, parse_virtual_path,
     remember_original_file_name, sanitize_filename_suffix,
 };
+use crate::formats::is_supported_image_file;
+use crate::gpu_processing::get_or_init_gpu_context;
 
 /// The highest number tried after a taken name (`IMG_1-9999`).
 const MAX_NAME_SUFFIX: usize = 9999;
+
+/// Threads that read capture times while a source is listed (a card or disk gains little from more).
+const IMPORT_SCAN_THREADS: usize = 4;
+
+/// Files larger than this (e.g. 850 MB scan TIFFs) are decoded for a preview one at a time,
+/// so a grid of them never holds several full-size decodes in memory at once.
+const LARGE_IMPORT_FILE_BYTES: u64 = 256 * 1024 * 1024;
+static LARGE_IMPORT_DECODE: Mutex<()> = Mutex::new(());
+
+/// The long side of a preview in the Import dialog's grid (twice its tile, for sharp screens).
+const IMPORT_THUMBNAIL_SIZE: u32 = 400;
+
+/// A photo an import source holds.
+#[derive(Serialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportCandidate {
+    pub path: String,
+    /// The capture time as the camera recorded it (`YYYY-MM-DDTHH:MM:SS`; else the file's time).
+    pub capture_time: String,
+}
+
+/// A memory card or camera mounted as a drive.
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportVolume {
+    /// The drive's name, e.g. `EOS_DIGITAL`.
+    pub name: String,
+    /// Its `DCIM` folder.
+    pub path: String,
+}
+
+fn is_hidden(name: &std::ffi::OsStr) -> bool {
+    name.to_string_lossy().starts_with('.')
+}
+
+/// The supported photos in `sources`: folders (and, when `recursive`, their
+/// subfolders) and single files, each once, leaving out hidden files and
+/// folders. Stops early, with what it has, once `is_current` turns false.
+fn find_import_files(
+    sources: &[PathBuf],
+    recursive: bool,
+    is_current: impl Fn() -> bool,
+) -> Vec<PathBuf> {
+    let mut seen = HashSet::new();
+    let mut files = Vec::new();
+    for source in sources {
+        if source.is_dir() {
+            let walker = WalkDir::new(source)
+                .max_depth(if recursive { usize::MAX } else { 1 })
+                .into_iter()
+                .filter_entry(|entry| entry.depth() == 0 || !is_hidden(entry.file_name()));
+            for entry in walker.filter_map(Result::ok) {
+                if !is_current() {
+                    return files;
+                }
+                if entry.file_type().is_file() && is_supported_image_file(entry.path()) {
+                    let path = entry.into_path();
+                    if seen.insert(path.clone()) {
+                        files.push(path);
+                    }
+                }
+            }
+        } else if source.is_file() && is_supported_image_file(source) && seen.insert(source.clone())
+        {
+            files.push(source.clone());
+        }
+    }
+    files
+}
+
+/// Lists the photos in `paths` (folders, with subfolders when `recursive`,
+/// or files) in capture order, then by path. A newer scan stops this one,
+/// which then returns what it found so far (the dialog ignores it). Capture
+/// times are read on a pool of the scan's own, so thumbnail or metadata
+/// work on the shared rayon pool cannot hold it up.
+#[tauri::command]
+pub async fn scan_import_source(
+    paths: Vec<String>,
+    recursive: bool,
+    app_handle: AppHandle,
+) -> Result<Vec<ImportCandidate>, String> {
+    let scan = app_handle
+        .state::<AppState>()
+        .import_scan_generation
+        .fetch_add(1, Ordering::SeqCst)
+        + 1;
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app_handle.state::<AppState>();
+        let is_current = || state.import_scan_generation.load(Ordering::SeqCst) == scan;
+        let started = Instant::now();
+        let sources: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
+        let files = find_import_files(&sources, recursive, is_current);
+        let listed_ms = started.elapsed().as_millis();
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(IMPORT_SCAN_THREADS)
+            .build()
+            .map_err(|error| error.to_string())?;
+        let mut candidates: Vec<ImportCandidate> = pool.install(|| {
+            files
+                .par_iter()
+                .filter(|_| is_current())
+                .map(|path| ImportCandidate {
+                    path: path.to_string_lossy().into_owned(),
+                    capture_time: exif_processing::get_creation_date_from_path(path)
+                        .format("%Y-%m-%dT%H:%M:%S")
+                        .to_string(),
+                })
+                .collect()
+        });
+        candidates.sort_by(|a, b| {
+            a.capture_time
+                .cmp(&b.capture_time)
+                .then_with(|| a.path.cmp(&b.path))
+        });
+        log::info!(
+            "[import] {} photos in {paths:?} (subfolders: {recursive}): listed in {listed_ms} ms, \
+             dated in {} ms{}",
+            candidates.len(),
+            started.elapsed().as_millis() - listed_ms,
+            if is_current() { "" } else { " (superseded)" }
+        );
+        Ok(candidates)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+/// The mounted drives with a `DCIM` folder: memory cards, and cameras that
+/// connect as a drive (USB mass storage). Cameras that connect only over
+/// PTP/MTP are not drives and are not listed (`IMPORT_PLAN.md` decision 14).
+#[tauri::command]
+pub async fn list_import_volumes() -> Result<Vec<ImportVolume>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let disks = Disks::new_with_refreshed_list();
+        let mut seen = HashSet::new();
+        disks
+            .list()
+            .iter()
+            .filter_map(|disk| {
+                let mount = disk.mount_point();
+                let dcim = mount.join("DCIM");
+                if !dcim.is_dir() || !seen.insert(mount.to_path_buf()) {
+                    return None;
+                }
+                // macOS and Windows name the volume; Linux names the device (`/dev/sdb1`).
+                let label = disk.name().to_string_lossy().into_owned();
+                let name = if !label.is_empty() && !label.starts_with("/dev/") {
+                    label
+                } else {
+                    mount.file_name().map_or_else(
+                        || mount.to_string_lossy().into_owned(),
+                        |name| name.to_string_lossy().into_owned(),
+                    )
+                };
+                Some(ImportVolume {
+                    name,
+                    path: dcim.to_string_lossy().into_owned(),
+                })
+            })
+            .collect()
+    })
+    .await
+    .map_err(|error| error.to_string())
+}
+
+/// A small JPEG of the photo at `path` for the Import dialog's grid: its
+/// Library thumbnail when one is cached (a photo already in the Library),
+/// else made like one (the embedded preview of an unedited RAW), not cached.
+#[tauri::command]
+pub async fn generate_import_thumbnail(
+    path: String,
+    app_handle: AppHandle,
+) -> Result<Response, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if let Some(cached) = get_cached_thumbnail_image(&path, &app_handle) {
+            return encode_thumbnail(&cached, IMPORT_THUMBNAIL_SIZE)
+                .map(Response::new)
+                .map_err(|error| error.to_string());
+        }
+        let is_large =
+            fs::metadata(&path).is_ok_and(|metadata| metadata.len() > LARGE_IMPORT_FILE_BYTES);
+        let _turn = is_large.then(|| {
+            LARGE_IMPORT_DECODE
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+        });
+        let state = app_handle.state::<AppState>();
+        let gpu_context = get_or_init_gpu_context(&state, &app_handle).ok();
+        let image = generate_thumbnail_data(&path, gpu_context.as_ref(), None, &app_handle)
+            .map_err(|error| error.to_string())?;
+        encode_thumbnail(&image, IMPORT_THUMBNAIL_SIZE)
+            .map(Response::new)
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
 
 /// What happens to a photo whose new name is already taken in the destination.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -636,6 +844,52 @@ mod tests {
         );
         assert_eq!(date_subfolder("", date(), &none), PathBuf::new());
         assert_eq!(date_subfolder("100%", date(), &none), PathBuf::from("100"));
+    }
+
+    #[test]
+    fn a_scan_finds_supported_photos_once_and_skips_hidden_ones() {
+        let folder = tempfile::tempdir().unwrap();
+        let root = folder.path();
+        for name in [
+            "IMG_1.CR3",
+            "IMG_1.JPG",
+            "notes.txt",
+            "._IMG_1.JPG",
+            ".hidden.jpg",
+            "100CANON/IMG_2.CR3",
+            ".Trashes/IMG_3.JPG",
+        ] {
+            let path = root.join(name);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, b"").unwrap();
+        }
+        let names = |files: Vec<PathBuf>| -> Vec<String> {
+            let mut names: Vec<String> = files
+                .iter()
+                .map(|file| {
+                    file.strip_prefix(root)
+                        .unwrap()
+                        .to_string_lossy()
+                        .replace('\\', "/")
+                })
+                .collect();
+            names.sort();
+            names
+        };
+        assert_eq!(
+            names(find_import_files(&[root.to_path_buf()], false, || true)),
+            ["IMG_1.CR3", "IMG_1.JPG"]
+        );
+        let single = root.join("IMG_1.JPG");
+        assert_eq!(
+            names(find_import_files(
+                &[root.to_path_buf(), single],
+                true,
+                || true
+            )),
+            ["100CANON/IMG_2.CR3", "IMG_1.CR3", "IMG_1.JPG"]
+        );
+        assert!(find_import_files(&[root.to_path_buf()], true, || false).is_empty());
     }
 
     fn planner(clash: ImportNameClash, sources: &[&str]) -> ImportNamePlanner {

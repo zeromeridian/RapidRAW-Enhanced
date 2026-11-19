@@ -161,6 +161,19 @@ export default function LibrarySettings({ query }: SettingsPageProps) {
               ),
             },
             {
+              id: 'import-on-card-connect',
+              label: t('settings.general.importOnCardConnect'),
+              description: t('settings.general.importOnCardConnectDesc'),
+              control: (
+                <SettingSwitch
+                  checked={appSettings?.importOnCardConnect ?? true}
+                  id="import-on-card-connect-toggle"
+                  label={t('settings.general.importOnCardConnect')}
+                  onChange={(checked) => updateSetting('importOnCardConnect', checked)}
+                />
+              ),
+            },
+            {
               id: 'display-edit-icon',
               label: t('settings.general.displayEditIcon'),
               description: t('settings.general.displayEditIconDesc'),
