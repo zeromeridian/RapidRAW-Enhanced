@@ -493,10 +493,7 @@
         "rename": "이름 변경",
         "resetSelection": "선택 초기화",
         "showEdit": "편집 표시",
-        "subtractFromEdit": "편집에서 빼기",
-        "switchToAdd": "추가 모드로 전환",
-        "switchToIntersect": "교차 모드로 전환",
-        "switchToSubtract": "빼기 모드로 전환"
+        "subtractFromEdit": "편집에서 빼기"
       },
       "addNewEdit": "새 편집 추가",
       "brush": {
@@ -806,10 +803,7 @@
         "resetMaskAdjustments": "마스크 조정값 초기화",
         "showComponent": "구성 요소 표시",
         "showMask": "마스크 표시",
-        "subtractFromMask": "마스크에서 빼기",
-        "switchToAdd": "추가 모드로 전환",
-        "switchToIntersect": "교차 모드로 전환",
-        "switchToSubtract": "빼기 모드로 전환"
+        "subtractFromMask": "마스크에서 빼기"
       },
       "addNewMask": "새 마스크 추가",
       "brush": {
@@ -835,6 +829,12 @@
       "maskAdjustmentsTitle": "마스크 조정",
       "maskingTitle": "마스킹",
       "masksTitle": "마스크",
+      "modes": {
+        "add": "추가",
+        "base": "기본",
+        "intersect": "교차",
+        "subtract": "빼기"
+      },
       "params": {
         "feather": "페더",
         "globalFeather": "전체 페더",

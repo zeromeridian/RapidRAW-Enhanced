@@ -531,10 +531,7 @@
         "rename": "Zmień nazwę",
         "resetSelection": "Resetuj zaznaczenie",
         "showEdit": "Pokaż edycję",
-        "subtractFromEdit": "Odejmij od edycji",
-        "switchToAdd": "Przełącz na Dodawanie",
-        "switchToIntersect": "Przełącz na Przecinanie",
-        "switchToSubtract": "Przełącz na Odejmowanie"
+        "subtractFromEdit": "Odejmij od edycji"
       },
       "addNewEdit": "Dodaj nową edycję",
       "brush": {
@@ -856,10 +853,7 @@
         "resetMaskAdjustments": "Resetuj ustawienia maski",
         "showComponent": "Pokaż komponent",
         "showMask": "Pokaż maskę",
-        "subtractFromMask": "Odejmij od maski",
-        "switchToAdd": "Przełącz na Dodawanie",
-        "switchToIntersect": "Przełącz na Przecinanie",
-        "switchToSubtract": "Przełącz na Odejmowanie"
+        "subtractFromMask": "Odejmij od maski"
       },
       "addNewMask": "Dodaj nową maskę",
       "brush": {
@@ -885,6 +879,12 @@
       "maskAdjustmentsTitle": "Ustawienia maski",
       "maskingTitle": "Maskowanie",
       "masksTitle": "Maski",
+      "modes": {
+        "add": "Dodawanie",
+        "base": "Baza",
+        "intersect": "Przecinanie",
+        "subtract": "Odejmowanie"
+      },
       "params": {
         "feather": "Wtapianie",
         "globalFeather": "Globalne wtapianie",

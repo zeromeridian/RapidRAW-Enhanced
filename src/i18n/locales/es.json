@@ -512,10 +512,7 @@
         "rename": "Renombrar",
         "resetSelection": "Restablecer selección",
         "showEdit": "Mostrar edición",
-        "subtractFromEdit": "Restar de la edición",
-        "switchToAdd": "Cambiar a Añadir",
-        "switchToIntersect": "Cambiar a Intersecar",
-        "switchToSubtract": "Cambiar a Restar"
+        "subtractFromEdit": "Restar de la edición"
       },
       "addNewEdit": "Añadir nueva edición",
       "brush": {
@@ -832,10 +829,7 @@
         "resetMaskAdjustments": "Restablecer ajustes de máscara",
         "showComponent": "Mostrar componente",
         "showMask": "Mostrar máscara",
-        "subtractFromMask": "Restar de la máscara",
-        "switchToAdd": "Cambiar a Añadir",
-        "switchToIntersect": "Cambiar a Intersecar",
-        "switchToSubtract": "Cambiar a Restar"
+        "subtractFromMask": "Restar de la máscara"
       },
       "addNewMask": "Añadir nueva máscara",
       "brush": {
@@ -861,6 +855,12 @@
       "maskAdjustmentsTitle": "Ajustes de máscara",
       "maskingTitle": "Enmascaramiento",
       "masksTitle": "Máscaras",
+      "modes": {
+        "add": "Añadir",
+        "base": "Base",
+        "intersect": "Intersecar",
+        "subtract": "Restar"
+      },
       "params": {
         "feather": "Desvanecimiento",
         "globalFeather": "Desvanecimiento global",

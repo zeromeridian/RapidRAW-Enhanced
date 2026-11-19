@@ -512,10 +512,7 @@
         "rename": "Rinomina",
         "resetSelection": "Reimposta Selezione",
         "showEdit": "Mostra Modifica",
-        "subtractFromEdit": "Sottrai da Modifica",
-        "switchToAdd": "Passa ad Aggiungi",
-        "switchToIntersect": "Passa a Interseca",
-        "switchToSubtract": "Passa a Sottrai"
+        "subtractFromEdit": "Sottrai da Modifica"
       },
       "addNewEdit": "Aggiungi Nuova Modifica",
       "brush": {
@@ -832,10 +829,7 @@
         "resetMaskAdjustments": "Ripristina Regolazioni Maschera",
         "showComponent": "Mostra Componente",
         "showMask": "Mostra Maschera",
-        "subtractFromMask": "Sottrai da Maschera",
-        "switchToAdd": "Passa ad Aggiungi",
-        "switchToIntersect": "Passa a Interseca",
-        "switchToSubtract": "Passa a Sottrai"
+        "subtractFromMask": "Sottrai da Maschera"
       },
       "addNewMask": "Aggiungi Nuova Maschera",
       "brush": {
@@ -861,6 +855,12 @@
       "maskAdjustmentsTitle": "Regolazioni Maschera",
       "maskingTitle": "Mascheratura",
       "masksTitle": "Maschere",
+      "modes": {
+        "add": "Aggiungi",
+        "base": "Base",
+        "intersect": "Interseca",
+        "subtract": "Sottrai"
+      },
       "params": {
         "feather": "Sfumatura",
         "globalFeather": "Sfumatura Globale",

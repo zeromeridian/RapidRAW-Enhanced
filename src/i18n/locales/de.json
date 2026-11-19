@@ -493,10 +493,7 @@
         "rename": "Umbenennen",
         "resetSelection": "Auswahl zurücksetzen",
         "showEdit": "Bearbeitung anzeigen",
-        "subtractFromEdit": "Von Bearbeitung subtrahieren",
-        "switchToAdd": "Zu Hinzufügen wechseln",
-        "switchToIntersect": "Zu Schnittmenge wechseln",
-        "switchToSubtract": "Zu Subtrahieren wechseln"
+        "subtractFromEdit": "Von Bearbeitung subtrahieren"
       },
       "addNewEdit": "Neue Bearbeitung hinzufügen",
       "brush": {
@@ -808,10 +805,7 @@
         "resetMaskAdjustments": "Maskenanpassungen zurücksetzen",
         "showComponent": "Komponente anzeigen",
         "showMask": "Maske anzeigen",
-        "subtractFromMask": "Von Maske subtrahieren",
-        "switchToAdd": "Zu Hinzufügen wechseln",
-        "switchToIntersect": "Zu Schnittmenge wechseln",
-        "switchToSubtract": "Zu Subtrahieren wechseln"
+        "subtractFromMask": "Von Maske subtrahieren"
       },
       "addNewMask": "Neue Maske hinzufügen",
       "brush": {
@@ -837,6 +831,12 @@
       "maskAdjustmentsTitle": "Maskenanpassungen",
       "maskingTitle": "Maskieren",
       "masksTitle": "Masken",
+      "modes": {
+        "add": "Hinzufügen",
+        "base": "Basis",
+        "intersect": "Schnittmenge",
+        "subtract": "Subtrahieren"
+      },
       "params": {
         "feather": "Weiche Kante",
         "globalFeather": "Globale weiche Kante",

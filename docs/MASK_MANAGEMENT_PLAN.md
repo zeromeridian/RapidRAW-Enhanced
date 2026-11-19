@@ -7,7 +7,8 @@ part of WP3 (owner 2026-11-17). WP1 done (`1.93.0`, branch
 `dev/mask-revamp`, not committed; owner decision 2026-11-18: first
 component is the base). WP5 done next (`1.94.0`, same branch, not
 committed), brought forward after the owner found mask updates slow
-(2026-11-18). WP2, WP3, WP4 and WP6 not started. Plan item 51 in
+(2026-11-18). WP2 done (`1.95.0`, same branch, not committed). WP3,
+WP4 and WP6 not started. Plan item 51 in
 `UPSTREAM_FEATURE_GAP.md`. Code check
 2026-11-17: section 1 and the problems P1, P2 and P7 match the code. Item 41
 (stronger feather) follows this plan.
@@ -47,6 +48,20 @@ Progress:
   component is covered by the key test (a component's key does not
   change when another component does); a counter would need `AppState`
   in tests and was not added.
+- WP2 (`1.95.0`): `SubMaskModeBadge` (`MaskEditorShared.tsx`, so the
+  Masks and AI panels both get it) sits between the type icon and the
+  name of every row but the first (first on the icon's corner; moved
+  and enlarged in `1.95.1`, owner 2026-11-19: too small to click; 24 px
+  target, 14 px icon); row 1 keeps an empty slot of the same width so
+  names line up, and its icon has the tooltip "Base". A click opens a menu with Add / Subtract / Intersect, ✓ on the
+  current one (same pattern as `focusModeMenuOption`); the row's
+  right-click menu lists the same three items above Delete (not on row
+  1). The cycling hover button is gone. Owner decisions 2026-11-19: keep
+  the row number on hover (it replaces only the type icon; the badge
+  stays); Subtract rows get a faint `bg-text-primary/5` wash when not
+  selected, Intersect rows stay plain. Mode names are shared keys
+  `editor.masks.modes.{add,subtract,intersect,base}` (12 locales) read
+  by `SubMaskRow` itself; the six `switchTo*` keys are removed.
 
 Goal: make building masks from components (add, subtract, intersect, invert)
 feel like Lightroom Classic. The data model already matches LrC's

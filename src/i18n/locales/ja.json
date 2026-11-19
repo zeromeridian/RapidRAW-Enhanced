@@ -493,10 +493,7 @@
         "rename": "名前を変更",
         "resetSelection": "選択をリセット",
         "showEdit": "編集を表示",
-        "subtractFromEdit": "編集から減算",
-        "switchToAdd": "追加に切り替え",
-        "switchToIntersect": "交差に切り替え",
-        "switchToSubtract": "減算に切り替え"
+        "subtractFromEdit": "編集から減算"
       },
       "addNewEdit": "新しい編集を追加",
       "brush": {
@@ -806,10 +803,7 @@
         "resetMaskAdjustments": "マスク補正設定をリセット",
         "showComponent": "コンポーネントを表示",
         "showMask": "マスクを表示",
-        "subtractFromMask": "マスクから減算",
-        "switchToAdd": "追加に切り替え",
-        "switchToIntersect": "交差に切り替え",
-        "switchToSubtract": "減算に切り替え"
+        "subtractFromMask": "マスクから減算"
       },
       "addNewMask": "新しいマスクを追加",
       "brush": {
@@ -835,6 +829,12 @@
       "maskAdjustmentsTitle": "マスク補正",
       "maskingTitle": "マスク処理",
       "masksTitle": "マスク一覧",
+      "modes": {
+        "add": "追加",
+        "base": "ベース",
+        "intersect": "交差",
+        "subtract": "減算"
+      },
       "params": {
         "feather": "ぼかし",
         "globalFeather": "全体のぼかし",

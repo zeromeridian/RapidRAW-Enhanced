@@ -531,10 +531,7 @@
         "rename": "Переименовать",
         "resetSelection": "Сбросить выделение",
         "showEdit": "Показать изменения",
-        "subtractFromEdit": "Вычесть из изменений",
-        "switchToAdd": "Переключить на добавление",
-        "switchToIntersect": "Переключить на пересечение",
-        "switchToSubtract": "Переключить на вычитание"
+        "subtractFromEdit": "Вычесть из изменений"
       },
       "addNewEdit": "Добавить изменения",
       "brush": {
@@ -856,10 +853,7 @@
         "resetMaskAdjustments": "Сбросить настройки маски",
         "showComponent": "Показать компонент",
         "showMask": "Показать маску",
-        "subtractFromMask": "Вычесть из маски",
-        "switchToAdd": "Переключить на добавление",
-        "switchToIntersect": "Переключить на пересечение",
-        "switchToSubtract": "Переключить на вычитание"
+        "subtractFromMask": "Вычесть из маски"
       },
       "addNewMask": "Добавить новую маску",
       "brush": {
@@ -885,6 +879,12 @@
       "maskAdjustmentsTitle": "Коррекция маски",
       "maskingTitle": "Маскирование",
       "masksTitle": "Маски",
+      "modes": {
+        "add": "Добавление",
+        "base": "Основа",
+        "intersect": "Пересечение",
+        "subtract": "Вычитание"
+      },
       "params": {
         "feather": "Растушевка",
         "globalFeather": "Общая растушевка",

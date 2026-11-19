@@ -512,10 +512,7 @@
         "rename": "Renommer",
         "resetSelection": "Réinitialiser la sélection",
         "showEdit": "Afficher la retouche",
-        "subtractFromEdit": "Soustraire de la retouche",
-        "switchToAdd": "Basculer sur Ajouter",
-        "switchToIntersect": "Basculer sur Intersecter",
-        "switchToSubtract": "Basculer sur Soustraire"
+        "subtractFromEdit": "Soustraire de la retouche"
       },
       "addNewEdit": "Ajouter une nouvelle retouche",
       "brush": {
@@ -832,10 +829,7 @@
         "resetMaskAdjustments": "Réinitialiser les ajustements du masque",
         "showComponent": "Afficher le composant",
         "showMask": "Afficher le masque",
-        "subtractFromMask": "Soustraire du masque",
-        "switchToAdd": "Basculer sur Ajouter",
-        "switchToIntersect": "Basculer sur Intersecter",
-        "switchToSubtract": "Basculer sur Soustraire"
+        "subtractFromMask": "Soustraire du masque"
       },
       "addNewMask": "Ajouter un nouveau masque",
       "brush": {
@@ -861,6 +855,12 @@
       "maskAdjustmentsTitle": "Ajustements de masque",
       "maskingTitle": "Masquage",
       "masksTitle": "Masques",
+      "modes": {
+        "add": "Ajouter",
+        "base": "Base",
+        "intersect": "Intersecter",
+        "subtract": "Soustraire"
+      },
       "params": {
         "feather": "Contour progressif",
         "globalFeather": "Contour progressif global",

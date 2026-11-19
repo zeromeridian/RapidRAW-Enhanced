@@ -508,7 +508,10 @@ details are in `RELEASE_NOTES.MD`.
   persist with the complete editable state in XMP.
 - A mask's (or AI edit's) first visible component is its base, as in
   Lightroom Classic: it shows whatever its mode, and later components add,
-  subtract or intersect with it; it is stored as Add. Each component's
+  subtract or intersect with it; it is stored as Add. Every other
+  component shows its mode (+, −, ∩) in front of its name; a click on it or the
+  component's right-click menu sets Add, Subtract or Intersect directly,
+  and Subtract rows are faintly tinted. Each component's
   bitmap is cached on its own, so editing, moving or toggling one
   component does not redraw the others.
 - Clear green enabled styling and dimmed neutral styling for shared toggle

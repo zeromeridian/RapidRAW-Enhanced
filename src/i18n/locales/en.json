@@ -519,10 +519,7 @@
         "rename": "Rename",
         "resetSelection": "Reset Selection",
         "showEdit": "Show Edit",
-        "subtractFromEdit": "Subtract from Edit",
-        "switchToAdd": "Switch to Add",
-        "switchToIntersect": "Switch to Intersect",
-        "switchToSubtract": "Switch to Subtract"
+        "subtractFromEdit": "Subtract from Edit"
       },
       "addNewEdit": "Add New Edit",
       "brush": {
@@ -858,10 +855,7 @@
         "resetMaskAdjustments": "Reset Mask Adjustments",
         "showComponent": "Show Component",
         "showMask": "Show Mask",
-        "subtractFromMask": "Subtract from Mask",
-        "switchToAdd": "Switch to Add",
-        "switchToIntersect": "Switch to Intersect",
-        "switchToSubtract": "Switch to Subtract"
+        "subtractFromMask": "Subtract from Mask"
       },
       "addNewMask": "Add New Mask",
       "brush": {
@@ -887,6 +881,12 @@
       "maskAdjustmentsTitle": "Mask Adjustments",
       "maskingTitle": "Masking",
       "masksTitle": "Masks",
+      "modes": {
+        "add": "Add",
+        "base": "Base",
+        "intersect": "Intersect",
+        "subtract": "Subtract"
+      },
       "params": {
         "feather": "Feather",
         "globalFeather": "Global Feather",

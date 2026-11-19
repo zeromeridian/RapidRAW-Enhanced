@@ -129,9 +129,6 @@ const subMaskRowLabels = (t: TFunction): SubMaskRowLabels => ({
   paste: t('editor.ai.actions.pasteComponent'),
   delete: t('editor.ai.actions.deleteComponent'),
   deleteTooltip: t('editor.ai.actions.deleteComponent'),
-  switchToSubtract: t('editor.ai.actions.switchToSubtract'),
-  switchToIntersect: t('editor.ai.actions.switchToIntersect'),
-  switchToAdd: t('editor.ai.actions.switchToAdd'),
 });
 
 interface ConnectionStatusProps {

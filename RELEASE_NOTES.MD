@@ -5,6 +5,24 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.95.1-dev-mask-revamp — 2026-11-19
+
+### Develop
+
+- A mask component's +, − or ∩ mark now sits in front of its name and is
+  larger, so it is easier to see and click.
+
+## 1.95.0-dev-mask-revamp — 2026-11-19
+
+### Develop
+
+- Each mask component now shows its mode at all times: a small +, − or ∩
+  on the corner of its icon (the first component is the base and shows
+  none). Click the mark, or right-click the component, to pick Add,
+  Subtract or Intersect directly instead of clicking through them.
+  Subtract components have a faint background so they stand out. The
+  same applies to the components of AI edits.
+
 ## 1.94.8-dev-mask-revamp — 2026-11-19
 
 ### Develop

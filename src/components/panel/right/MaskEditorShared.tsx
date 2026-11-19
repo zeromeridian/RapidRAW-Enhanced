@@ -1,9 +1,12 @@
 // Parts shared by the Masks and AI panels. Each panel passes its own labels, translated with
-// literal `t()` keys so the i18n extractor still finds them.
+// literal `t()` keys so the i18n extractor still finds them; text both panels share (the component
+// modes) is translated here.
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import {
+  Check,
   Circle,
   ClipboardPaste,
   Copy,
@@ -107,9 +110,40 @@ export interface SubMaskRowLabels {
   paste: string;
   delete: string;
   deleteTooltip: string;
-  switchToSubtract: string;
-  switchToIntersect: string;
-  switchToAdd: string;
+}
+
+const SUB_MASK_MODE_ICONS = {
+  [SubMaskMode.Additive]: Plus,
+  [SubMaskMode.Subtractive]: Minus,
+  [SubMaskMode.Intersect]: SquaresIntersect,
+};
+
+/** A component's mode in front of its name; a click opens the mode menu. */
+function SubMaskModeBadge({
+  mode,
+  label,
+  onOpenMenu,
+}: {
+  mode: SubMaskMode;
+  label: string;
+  onOpenMenu(x: number, y: number): void;
+}) {
+  const ModeIcon = SUB_MASK_MODE_ICONS[mode] ?? Plus;
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      data-tooltip={label}
+      className="w-6 h-6 -mx-1 shrink-0 rounded-md text-text-primary hover:bg-bg-primary hover:text-accent flex items-center justify-center"
+      onClick={(e) => {
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        onOpenMenu(rect.left, rect.bottom + 4);
+      }}
+    >
+      <ModeIcon size={14} strokeWidth={2.5} />
+    </button>
+  );
 }
 
 /** The Masks panel's show/hide button; the AI panel has none. */
@@ -184,7 +218,23 @@ export function SubMaskRow({
     setDroppableRef(node);
   };
   const MaskIcon = MASK_ICON_MAP[subMask.type] || Circle;
+  const { t } = useTranslation();
   const { showContextMenu } = useContextMenu();
+  // The first component is the base: the renderer ignores its mode, so it shows none.
+  const isBase = index === 1;
+  const modeLabels = {
+    [SubMaskMode.Additive]: t('editor.masks.modes.add'),
+    [SubMaskMode.Subtractive]: t('editor.masks.modes.subtract'),
+    [SubMaskMode.Intersect]: t('editor.masks.modes.intersect'),
+  };
+  const modeOptions = () =>
+    Object.values(SubMaskMode).map((mode) => ({
+      label: modeLabels[mode],
+      icon: subMask.mode === mode ? Check : undefined,
+      onClick: () => {
+        if (subMask.mode !== mode) updateSubMask(subMask.id, { mode });
+      },
+    }));
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -240,11 +290,13 @@ export function SubMaskRow({
         onClick: handlePaste,
       },
       { type: OPTION_SEPARATOR },
+      ...(isBase ? [] : [...modeOptions(), { type: OPTION_SEPARATOR }]),
       { label: labels.delete, icon: Trash2, isDestructive: true, onClick: handleDelete },
     ]);
   };
 
   const showNumber = isHovered && totalCount > 1;
+  const isSubtractTinted = !isBase && !isActive && subMask.mode === SubMaskMode.Subtractive;
 
   return (
     <motion.div
@@ -259,6 +311,7 @@ export function SubMaskRow({
       onMouseLeave={handleMouseLeave}
       className={`flex items-center gap-2 p-2 compact:py-1 rounded-md transition-colors group cursor-pointer
             ${isActive ? 'bg-surface' : 'hover:bg-card-active'}
+            ${isSubtractTinted ? 'bg-text-primary/5' : ''}
             ${isOver && !isDraggingContainer ? 'border-t-2 border-accent' : ''}
             ${isDragging ? 'opacity-40 z-50' : ''}
             ${parentVisible === false ? 'opacity-50' : ''}
@@ -275,6 +328,7 @@ export function SubMaskRow({
         variant={TextVariants.small}
         weight={TextWeights.bold}
         className="relative w-4 h-4 ml-1 shrink-0 flex items-center justify-center"
+        data-tooltip={isBase ? t('editor.masks.modes.base') : undefined}
       >
         <AnimatePresence mode="wait" initial={false}>
           {isAnalyzing ? (
@@ -313,6 +367,16 @@ export function SubMaskRow({
           )}
         </AnimatePresence>
       </Text>
+      {isBase ? (
+        // Keeps the base's name in line with the names after a badge.
+        <span className="w-4 shrink-0" aria-hidden />
+      ) : (
+        <SubMaskModeBadge
+          mode={subMask.mode}
+          label={modeLabels[subMask.mode]}
+          onOpenMenu={(x, y) => showContextMenu(x, y, modeOptions())}
+        />
+      )}
       {renamingId === subMask.id ? (
         <input
           autoFocus
@@ -329,37 +393,6 @@ export function SubMaskRow({
         </Text>
       )}
       <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-        {index > 1 && (
-          <button
-            className="p-1 hover:text-text-primary text-text-secondary"
-            data-tooltip={
-              subMask.mode === SubMaskMode.Additive
-                ? labels.switchToSubtract
-                : subMask.mode === SubMaskMode.Subtractive
-                  ? labels.switchToIntersect
-                  : labels.switchToAdd
-            }
-            onClick={(e) => {
-              e.stopPropagation();
-              updateSubMask(subMask.id, {
-                mode:
-                  subMask.mode === SubMaskMode.Additive
-                    ? SubMaskMode.Subtractive
-                    : subMask.mode === SubMaskMode.Subtractive
-                      ? SubMaskMode.Intersect
-                      : SubMaskMode.Additive,
-              });
-            }}
-          >
-            {subMask.mode === SubMaskMode.Additive ? (
-              <Plus size={16} />
-            ) : subMask.mode === SubMaskMode.Subtractive ? (
-              <Minus size={16} />
-            ) : (
-              <SquaresIntersect size={16} />
-            )}
-          </button>
-        )}
         {visibilityToggle && (
           <button
             className="p-1 hover:text-text-primary text-text-secondary"

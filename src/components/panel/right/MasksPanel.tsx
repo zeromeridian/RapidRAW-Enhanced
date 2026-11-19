@@ -187,9 +187,6 @@ const subMaskRowLabels = (t: TFunction): SubMaskRowLabels => ({
   delete: t('editor.masks.actions.deleteComponent'),
   // The Masks panel has always used the AI panel's (identical) text here.
   deleteTooltip: t('editor.ai.actions.deleteComponent'),
-  switchToSubtract: t('editor.masks.actions.switchToSubtract'),
-  switchToIntersect: t('editor.masks.actions.switchToIntersect'),
-  switchToAdd: t('editor.masks.actions.switchToAdd'),
 });
 
 const FlowBrushTool = ({
