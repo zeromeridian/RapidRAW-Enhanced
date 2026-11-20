@@ -20,8 +20,17 @@
 
   --shadow-shiny: 0 0 24px rgba(255, 255, 255, 0.12);
 
-  --radius-md: 8px;
-  --radius-lg: 15px;
+  /* Square corners everywhere inside the window (owner trial 2026-11-20); `rounded-full` circles
+     and the macOS window shell keep their shape. */
+  --radius: 0;
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
 }
 
 @layer base {
@@ -153,7 +162,7 @@
   }
   ::-webkit-scrollbar-thumb {
     background-color: var(--color-text-secondary);
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     border: 2px solid transparent;
     background-clip: padding-box;
   }
@@ -220,7 +229,7 @@
 
     .compact-sidebar .rounded-lg,
     .compact-sidebar .rounded-xl {
-      border-radius: 0.5rem;
+      border-radius: var(--radius-md);
     }
   }
 

@@ -102,7 +102,7 @@ const SegmentedSwitch = ({ options, value, onChange }: SegmentedSwitchProps) => 
       <div className="relative flex w-full">
         <motion.div
           className="absolute top-0 bottom-0 left-0 z-0 bg-card-active shadow-xs"
-          style={{ borderRadius: 6 }}
+          style={{ borderRadius: 'var(--radius-md)' }}
           animate={bubbleStyle}
           initial={false}
           transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}

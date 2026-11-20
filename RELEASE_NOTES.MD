@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.106.2-dev-square-corners — 2026-11-20
+
+### Interface
+
+- **Square corners.** Panels, buttons, fields, menus, switches and
+  thumbnails inside the window now have square corners instead of
+  rounded ones. Round controls such as slider knobs and colour-label
+  dots stay round.
+
 ## 1.106.1-dev-menu-bar — 2026-11-20
 
 ### Library

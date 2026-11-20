@@ -361,7 +361,7 @@ function DraggablePresetItem({
   );
 
   const style = {
-    borderRadius: '10px',
+    borderRadius: 'var(--radius-lg)',
     opacity: isDragging ? 0.4 : 1,
     outline: isOver ? '2px solid var(--color-primary)' : '2px solid transparent',
     outlineOffset: '-2px',

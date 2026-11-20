@@ -363,7 +363,7 @@ export default function LensCorrection({
           <div className="relative flex w-full">
             <motion.div
               className="absolute top-0 bottom-0 z-0 bg-accent"
-              style={{ borderRadius: 6 }}
+              style={{ borderRadius: 'var(--radius-md)' }}
               animate={modeBubbleStyle}
               transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
             />

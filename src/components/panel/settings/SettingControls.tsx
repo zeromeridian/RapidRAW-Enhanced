@@ -56,7 +56,7 @@ export const SegmentedSwitch = <T extends string>({ layoutId, onChange, options,
           <motion.span
             layoutId={layoutId}
             className="absolute inset-0 z-0 bg-accent"
-            style={{ borderRadius: 6 }}
+            style={{ borderRadius: 'var(--radius-md)' }}
             transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
           />
         )}

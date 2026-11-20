@@ -264,7 +264,7 @@ const EditorToolbar = memo(
         <div className="flex-1 flex justify-center min-w-0 relative h-full">
           <div
             className={clsx(
-              'bg-surface absolute top-2.5 compact:top-1.5 flex items-center h-9 compact:h-8 px-4 compact:px-3 rounded-[18px] max-w-full transition-colors duration-200',
+              'bg-surface absolute top-2.5 compact:top-1.5 flex items-center h-9 compact:h-8 px-4 compact:px-3 rounded-lg max-w-full transition-colors duration-200',
               hasExif && 'cursor-pointer hover:bg-card-active',
             )}
             onClick={() => hasExif && toggleExifVisible()}
