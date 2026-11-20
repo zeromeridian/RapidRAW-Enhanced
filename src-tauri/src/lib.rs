@@ -2894,6 +2894,7 @@ pub fn run() {
             lens_correction::autodetect_lens,
             lens_correction::get_lens_distortion_params,
             lens_correction::get_lens_correction_info,
+            file_management::upgrade_lens_correction_for_paths,
             negative_conversion::preview_negative_conversion,
             negative_conversion::convert_negatives,
             lights_out_cover::set_lights_out_cover,

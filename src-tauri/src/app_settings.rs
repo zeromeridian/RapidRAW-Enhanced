@@ -185,6 +185,7 @@ pub fn all_available_adjustments() -> HashSet<String> {
         "transformConstrainCrop",
         "masks",
         "lensCorrectionMode",
+        "lensCorrectionVersion",
         "lensMaker",
         "lensModel",
         "lensDistortionAmount",
@@ -223,6 +224,7 @@ pub fn default_included_adjustments() -> HashSet<String> {
         "transformConstrainCrop",
         "masks",
         "lensCorrectionMode",
+        "lensCorrectionVersion",
         "lensMaker",
         "lensModel",
         "lensDistortionAmount",
@@ -1224,6 +1226,11 @@ fn read_settings_from_disk(app_handle: &AppHandle) -> Result<AppSettings, String
     Ok(settings)
 }
 
+/// Copy-and-paste keys added to an existing group: `(new key, its group's key)`. A new key is
+/// pasted when its group's key already is, so the group keeps pasting as a whole.
+const COPY_PASTE_COMPANION_KEYS: &[(&str, &str)] =
+    &[("lensCorrectionVersion", "lensCorrectionMode")];
+
 /// Brings settings written by an older version up to date; true when anything changed.
 /// Idempotent, so it also normalizes every saved document.
 fn migrate_settings(settings: &mut AppSettings) -> bool {
@@ -1261,7 +1268,14 @@ fn migrate_settings(settings: &mut AppSettings) -> bool {
 
         if !new_features.is_empty() {
             for feature in new_features {
-                if default_included.contains(&feature) {
+                let follows_included_key = COPY_PASTE_COMPANION_KEYS.iter().any(|(key, of)| {
+                    *key == feature
+                        && settings
+                            .copy_paste_settings
+                            .included_adjustments
+                            .contains(*of)
+                });
+                if default_included.contains(&feature) || follows_included_key {
                     settings
                         .copy_paste_settings
                         .included_adjustments
@@ -1326,6 +1340,38 @@ mod tests {
         assert!(!migrate_settings(&mut settings));
         assert_eq!(serde_json::to_value(&settings).unwrap(), migrated);
         assert_eq!(settings.root_folders, vec!["/photos".to_string()]);
+    }
+
+    /// Settings saved before `lensCorrectionVersion` existed paste it exactly when they paste
+    /// the lens mode, so lens corrections keep pasting as a whole.
+    #[test]
+    fn the_lens_version_pastes_with_the_lens_mode() {
+        for pastes_lens in [true, false] {
+            let mut settings = AppSettings::default();
+            let copy_paste = &mut settings.copy_paste_settings;
+            copy_paste.known_adjustments.remove("lensCorrectionVersion");
+            copy_paste
+                .included_adjustments
+                .remove("lensCorrectionVersion");
+            if pastes_lens {
+                copy_paste
+                    .included_adjustments
+                    .insert("lensCorrectionMode".to_string());
+            }
+            migrate_settings(&mut settings);
+            let copy_paste = &settings.copy_paste_settings;
+            assert!(
+                copy_paste
+                    .known_adjustments
+                    .contains("lensCorrectionVersion")
+            );
+            assert_eq!(
+                copy_paste
+                    .included_adjustments
+                    .contains("lensCorrectionVersion"),
+                pastes_lens
+            );
+        }
     }
 
     #[test]

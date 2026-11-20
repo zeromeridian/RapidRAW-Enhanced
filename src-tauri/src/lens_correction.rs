@@ -567,15 +567,54 @@ pub enum LensCorrectionVersion {
 }
 
 impl LensCorrectionVersion {
+    pub const KEY: &'static str = "lensCorrectionVersion";
+
     pub fn of(adjustments: &Value) -> Self {
-        match adjustments
-            .get("lensCorrectionVersion")
-            .and_then(Value::as_u64)
-        {
+        match adjustments.get(Self::KEY).and_then(Value::as_u64) {
             Some(version) if version >= 2 => Self::V2,
             _ => Self::V1,
         }
     }
+
+    /// Moves an edit to version 2 (decisions D1 and D2): its stored version 1 profile goes, and
+    /// each render looks up the photo's own.
+    pub fn upgrade(adjustments: &mut Value) {
+        if let Some(map) = adjustments.as_object_mut() {
+            map.insert(Self::KEY.to_string(), Value::from(2));
+            map.remove("lensDistortionParams");
+        }
+    }
+}
+
+/// Whether a version 2 edit's lens correction is an edit: a lens chosen by hand, or a changed
+/// amount or switch while a lens is chosen or automatic. The automatic profile at its defaults
+/// is not (`1.15.0`), nor is anything without a lens choice, which corrects nothing.
+pub fn is_v2_lens_edit(adjustments: &Value) -> bool {
+    let Some(selection) = lens_selection(adjustments) else {
+        return false;
+    };
+    let changed_amount = [
+        "lensDistortionAmount",
+        "lensVignetteAmount",
+        "lensTcaAmount",
+    ]
+    .iter()
+    .any(|key| adjustments[*key].as_f64().is_some_and(|v| v != 100.0));
+    let switched_off = [
+        "lensDistortionEnabled",
+        "lensTcaEnabled",
+        "lensVignetteEnabled",
+    ]
+    .iter()
+    .any(|key| adjustments[*key].as_bool() == Some(false));
+    selection.is_some() || changed_amount || switched_off
+}
+
+/// Whether the version 2 lookup finds a lens for a shot with this EXIF whose profile corrects
+/// something (the automatic default, `file_management::apply_default_lens_profile`).
+pub fn detects_lens(db: &LensDatabase, exif: &HashMap<String, String>) -> bool {
+    db.resolve(&Shot::from_exif(exif), &None)
+        .is_some_and(|(info, _)| info.distortion || info.tca || info.vignetting)
 }
 
 /// A lens's correction at one shot's focal length, aperture and distance.

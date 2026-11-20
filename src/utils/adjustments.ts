@@ -210,8 +210,12 @@ export enum TransformAdjustment {
   TransformConstrainCrop = 'transformConstrainCrop',
 }
 
+/** The lens correction new edits use (`Adjustments.lensCorrectionVersion`). */
+export const LENS_CORRECTION_VERSION = 2;
+
 export enum LensAdjustment {
   LensCorrectionMode = 'lensCorrectionMode',
+  LensCorrectionVersion = 'lensCorrectionVersion',
   LensMaker = 'lensMaker',
   LensModel = 'lensModel',
   LensDistortionAmount = 'lensDistortionAmount',
@@ -318,6 +322,12 @@ export interface Adjustments {
   lensBlurMinDepth: number;
   lensBlurMinFade: number;
   lensCorrectionMode: 'auto' | 'manual';
+  /**
+   * 1: the stored `lensDistortionParams` and the lens maths before the rework, also for every
+   * edit saved without this key; 2: the photo's Lensfun profile, looked up at each render
+   * (`lens_correction::LensCorrectionVersion`). New edits start at 2.
+   */
+  lensCorrectionVersion: number;
   lensDistortionAmount: number;
   lensVignetteAmount: number;
   lensTcaAmount: number;
@@ -983,6 +993,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   lensBlurMinDepth: 20,
   lensBlurMinFade: 20,
   lensCorrectionMode: 'manual',
+  lensCorrectionVersion: LENS_CORRECTION_VERSION,
   lensDistortionAmount: 100,
   lensVignetteAmount: 100,
   lensTcaAmount: 100,
@@ -1223,6 +1234,8 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     lensBlurMinDepth: loadedAdjustments.lensBlurMinDepth ?? INITIAL_ADJUSTMENTS.lensBlurMinDepth,
     lensBlurMinFade: loadedAdjustments.lensBlurMinFade ?? INITIAL_ADJUSTMENTS.lensBlurMinFade,
     lensCorrectionMode: loadedAdjustments.lensCorrectionMode || 'manual',
+    // Edits saved before the lens rework keep their lens correction (owner, 2026-11-10).
+    lensCorrectionVersion: loadedAdjustments.lensCorrectionVersion ?? 1,
     relightAmbient: loadedAdjustments.relightAmbient ?? INITIAL_ADJUSTMENTS.relightAmbient,
     relightEnabled: loadedAdjustments.relightEnabled ?? INITIAL_ADJUSTMENTS.relightEnabled,
     relightLights: (loadedAdjustments.relightLights ?? INITIAL_ADJUSTMENTS.relightLights).map(
@@ -1430,6 +1443,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
       label: 'modals.copyPaste.groups.lensCorrection',
       keys: [
         LensAdjustment.LensCorrectionMode,
+        LensAdjustment.LensCorrectionVersion,
         LensAdjustment.LensMaker,
         LensAdjustment.LensModel,
         LensAdjustment.LensDistortionAmount,
@@ -1525,6 +1539,8 @@ export const EFFECT_MAP_GEOMETRY_KEYS = [
   'lensDistortionAmount',
   'lensVignetteAmount',
   'lensTcaAmount',
+  'lensCorrectionVersion',
+  'lensCorrectionMode',
   'lensDistortionParams',
   'lensMaker',
   'lensModel',

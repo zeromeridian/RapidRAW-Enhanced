@@ -41,6 +41,7 @@ use crate::image_processing::{
     Crop, ImageMetadata, XmpStackMetadata, apply_coarse_rotation, apply_cpu_default_raw_processing,
     auto_results_to_json, get_all_adjustments_from_json, perform_auto_analysis,
 };
+use crate::lens_correction::LensCorrectionVersion;
 use crate::mask_generation::MaskDefinition;
 use crate::naming::{self, NamingSource};
 use crate::preset_converter;
@@ -612,6 +613,8 @@ fn is_sidecar_of(sidecar_filename: &str, image_filename: &str) -> bool {
 #[cfg(test)]
 mod output_naming_tests {
     use std::collections::HashMap;
+
+    use crate::lens_correction::LensCorrectionVersion;
 
     use super::{
         DC_CREATOR, DC_RIGHTS, DC_SUBJECT, LOCAL_ONLY_ADJUSTMENT_KEYS, LR_HIERARCHICAL_SUBJECT,
@@ -1615,9 +1618,11 @@ mod output_naming_tests {
             olympus_12_40_exif,
         );
 
+        // A new edit: version 2, its profile looked up at each render, none stored (D1, D3).
         assert_eq!(adjustments["lensCorrectionMode"], "auto");
-        assert_eq!(adjustments["lensMaker"], "Olympus");
-        assert!(adjustments["lensDistortionParams"].is_object());
+        assert_eq!(adjustments[LensCorrectionVersion::KEY], 2);
+        assert!(adjustments.get("lensDistortionParams").is_none());
+        assert!(adjustments.get("lensMaker").is_none());
         assert_eq!(adjustments["rating"], 3);
 
         let mut unadjusted = Value::Null;
@@ -1744,13 +1749,46 @@ mod output_naming_tests {
             None
         ));
 
+        // Manual without a lens corrects nothing, as after a reset.
         adjustments["lensDistortionAmount"] = serde_json::json!(100);
         adjustments["lensCorrectionMode"] = serde_json::json!("manual");
+        assert!(!crate::image_processing::is_image_edited(
+            &adjustments,
+            true,
+            None
+        ));
+
+        adjustments["lensMaker"] = serde_json::json!("Olympus");
+        adjustments["lensModel"] = serde_json::json!("M.Zuiko Digital ED 12-40mm f/2.8 Pro");
         assert!(crate::image_processing::is_image_edited(
             &adjustments,
             true,
             None
         ));
+    }
+
+    /// An edit saved before the rework stays on version 1 when loaded, its stored profile and
+    /// lens choice untouched; a version 2 edit is left without a stored profile.
+    #[test]
+    fn version_one_edits_keep_their_stored_profile_and_version_two_edits_store_none() {
+        let db = olympus_lens_db();
+        let mut v1 = serde_json::json!({ "lensCorrectionMode": "auto" });
+        super::resolve_lens_params_in_adjustments(&mut v1, &olympus_12_40_exif(), Some(&db));
+        assert_eq!(v1["lensMaker"], "Olympus");
+        assert!(v1["lensDistortionParams"].is_object());
+        assert_eq!(LensCorrectionVersion::of(&v1), LensCorrectionVersion::V1);
+
+        let mut v2 = serde_json::json!({ "lensCorrectionMode": "auto" });
+        LensCorrectionVersion::upgrade(&mut v2);
+        let stored = v2.clone();
+        super::resolve_lens_params_in_adjustments(&mut v2, &olympus_12_40_exif(), Some(&db));
+        assert_eq!(v2, stored);
+
+        // Upgrading drops the version 1 profile and keeps the choice.
+        LensCorrectionVersion::upgrade(&mut v1);
+        assert_eq!(v1[LensCorrectionVersion::KEY], 2);
+        assert!(v1.get("lensDistortionParams").is_none());
+        assert_eq!(v1["lensMaker"], "Olympus");
     }
 
     #[test]
@@ -3922,11 +3960,17 @@ pub async fn regenerate_thumbnails(
     .map_err(|error| format!("Thumbnail regeneration task failed: {error}"))?
 }
 
+/// Version 1 edits only: stores the detected lens (automatic mode) and its profile
+/// (`lensDistortionParams`) in the edit. Version 2 edits look the profile up at each render
+/// (`lens_correction::insert_lens_profile`) and are left as they are.
 pub fn resolve_lens_params_in_adjustments(
     adjustments: &mut Value,
     exif_data: &Option<HashMap<String, String>>,
     lens_db: Option<&crate::lens_correction::LensDatabase>,
 ) {
+    if LensCorrectionVersion::of(adjustments) == LensCorrectionVersion::V2 {
+        return;
+    }
     if let Some(map) = adjustments.as_object_mut() {
         let mode = map
             .get("lensCorrectionMode")
@@ -4063,17 +4107,18 @@ fn link_default_lens_profile(
         return;
     }
 
-    let mut candidate = if adjustments.is_object() {
-        adjustments.clone()
-    } else {
-        serde_json::json!({})
-    };
-    candidate["lensCorrectionMode"] = serde_json::json!("auto");
-    resolve_lens_params_in_adjustments(&mut candidate, &load_exif(), lens_db);
-
-    if candidate.get("lensDistortionParams").is_some() {
-        *adjustments = candidate;
+    let detected = lens_db
+        .zip(load_exif())
+        .is_some_and(|(db, exif)| crate::lens_correction::detects_lens(db, &exif));
+    if !detected {
+        return;
     }
+    // A photo set up now is a new edit, so it takes version 2 (decision D1).
+    if !adjustments.is_object() {
+        *adjustments = serde_json::json!({});
+    }
+    adjustments["lensCorrectionMode"] = serde_json::json!("auto");
+    LensCorrectionVersion::upgrade(adjustments);
 }
 
 #[tauri::command]
@@ -5203,9 +5248,11 @@ pub async fn reset_adjustments_for_paths(
 
             // Reset unlinks the lens profile; the explicit manual mode keeps
             // `apply_default_lens_profile` from linking it again. The tone
-            // mapper goes back to the default for unedited images.
+            // mapper goes back to the default for unedited images, and a
+            // lens chosen later uses version 2 like any new edit (D1).
             existing_metadata.adjustments = serde_json::json!({
                 "lensCorrectionMode": "manual",
+                (LensCorrectionVersion::KEY): 2,
                 "toneMapper": crate::tone_mapping::default_tone_mapper(is_raw_file(&source_path)),
             });
 
@@ -5259,11 +5306,52 @@ pub async fn reset_adjustments_for_paths(
 }
 
 /// Turns on automatic lens correction (profile from EXIF, distortion, TCA and
-/// vignetting) for every path, keeping their other adjustments.
+/// vignetting) for every path, keeping their other adjustments. A changed lens
+/// choice uses version 2 (decision D1).
 #[tauri::command]
 pub async fn apply_auto_lens_correction_to_paths(
     paths: Vec<String>,
     app_handle: AppHandle,
+) -> Result<(), String> {
+    edit_sidecars_for_paths(paths, app_handle, |metadata| {
+        if !metadata.adjustments.is_object() {
+            metadata.adjustments = serde_json::json!({});
+        }
+        if let Some(map) = metadata.adjustments.as_object_mut() {
+            map.insert("lensCorrectionMode".to_string(), serde_json::json!("auto"));
+            map.insert("lensDistortionEnabled".to_string(), serde_json::json!(true));
+            map.insert("lensTcaEnabled".to_string(), serde_json::json!(true));
+            map.insert("lensVignetteEnabled".to_string(), serde_json::json!(true));
+        }
+        LensCorrectionVersion::upgrade(&mut metadata.adjustments);
+        true
+    })
+}
+
+/// Moves every path's version 1 lens correction to version 2 (decision D2), keeping the lens
+/// choice and every other adjustment. Photos without an edit or already on version 2 are left
+/// as they are.
+#[tauri::command]
+pub async fn upgrade_lens_correction_for_paths(
+    paths: Vec<String>,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    edit_sidecars_for_paths(paths, app_handle, |metadata| {
+        let upgradable = metadata.adjustments.is_object()
+            && LensCorrectionVersion::of(&metadata.adjustments) == LensCorrectionVersion::V1;
+        if upgradable {
+            LensCorrectionVersion::upgrade(&mut metadata.adjustments);
+        }
+        upgradable
+    })
+}
+
+/// Changes every path's sidecar with `edit` (`false`: nothing to change, nothing written),
+/// syncs its XMP, then renders its thumbnail again, in the background.
+fn edit_sidecars_for_paths(
+    paths: Vec<String>,
+    app_handle: AppHandle,
+    edit: impl Fn(&mut ImageMetadata) -> bool + Send + Sync + 'static,
 ) -> Result<(), String> {
     let state = app_handle.state::<AppState>();
     add_to_thumbnail_queue(&state, paths.len(), &app_handle);
@@ -5289,31 +5377,20 @@ pub async fn apply_auto_lens_correction_to_paths(
         };
 
         let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
-        let lens_db = crate::lens_correction::database();
 
         paths.par_iter().for_each(|path| {
             let (source_path, sidecar_path) = parse_virtual_path(path);
             let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
-            if !existing_metadata.adjustments.is_object() {
-                existing_metadata.adjustments = serde_json::json!({});
+            if !edit(&mut existing_metadata) {
+                increment_thumbnail_progress(&state, &app_handle);
+                return;
             }
-            if let Some(map) = existing_metadata.adjustments.as_object_mut() {
-                map.insert("lensCorrectionMode".to_string(), serde_json::json!("auto"));
-                map.insert("lensDistortionEnabled".to_string(), serde_json::json!(true));
-                map.insert("lensTcaEnabled".to_string(), serde_json::json!(true));
-                map.insert("lensVignetteEnabled".to_string(), serde_json::json!(true));
-            }
-            resolve_lens_params_in_adjustments(
-                &mut existing_metadata.adjustments,
-                &exif_processing::exif_for_lens_lookup(&existing_metadata.exif, &source_path),
-                lens_db,
-            );
 
             match serde_json::to_string_pretty(&existing_metadata) {
                 Ok(json_string) => {
                     if let Err(e) = write_metadata_file(&sidecar_path, &json_string) {
-                        log::error!("Failed to apply auto lens correction to {}: {}", path, e);
+                        log::error!("Failed to update the sidecar of {}: {}", path, e);
                     }
                 }
                 Err(e) => log::error!("Failed to serialize metadata for {}: {}", path, e),

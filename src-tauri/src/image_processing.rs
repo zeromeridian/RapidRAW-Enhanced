@@ -2763,6 +2763,13 @@ pub fn is_image_edited(
         return true;
     }
 
+    // A saved version 2 edit holds no profile (it is looked up at each render), so its lens
+    // correction is judged by the choice itself.
+    if LensCorrectionVersion::of(adj) == LensCorrectionVersion::V2
+        && crate::lens_correction::is_v2_lens_edit(adj)
+    {
+        return true;
+    }
     let mut geo = get_geometry_params_from_json(adj);
     if adj.get("lensCorrectionMode").and_then(|v| v.as_str()) == Some("auto") {
         // An automatically linked lens profile at its default strength is not an edit.

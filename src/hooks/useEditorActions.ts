@@ -305,6 +305,16 @@ export function useEditorActions() {
           adjustmentsToApply.lensDistortionParams = null;
         }
       }
+      // A pasted lens choice keeps the lens correction it was made with; Merge would skip
+      // version 2, the default.
+      const lensChoiceKeys: (keyof Adjustments)[] = [
+        LensAdjustment.LensCorrectionMode,
+        LensAdjustment.LensMaker,
+        LensAdjustment.LensModel,
+      ];
+      if (lensChoiceKeys.some((key) => key in adjustmentsToApply)) {
+        adjustmentsToApply.lensCorrectionVersion = copiedAdjustments.lensCorrectionVersion ?? 1;
+      }
 
       if (Object.keys(adjustmentsToApply).length === 0) {
         setProcess({ isPasted: true });
