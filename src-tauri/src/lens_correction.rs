@@ -553,8 +553,31 @@ const DEFAULT_DISTANCE: f32 = 1000.0;
 /// the scale factors `vr` / `vb`.
 const TCA_FOCAL_SCALED: [bool; 6] = [false, false, true, true, true, true];
 
+/// Which lens correction an edit uses (`lensCorrectionVersion`): `V1`, the
+/// stored `lensDistortionParams` and the maths of builds before the rework,
+/// also for every edit saved without the key; `V2`, this model with the
+/// profile resolved per image. Decisions D1–D5 in `LENS_CORRECTION_PLAN.md`.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LensCorrectionVersion {
+    #[default]
+    V1,
+    V2,
+}
+
+impl LensCorrectionVersion {
+    pub fn of(adjustments: &Value) -> Self {
+        match adjustments
+            .get("lensCorrectionVersion")
+            .and_then(Value::as_u64)
+        {
+            Some(version) if version >= 2 => Self::V2,
+            _ => Self::V1,
+        }
+    }
+}
+
 /// A lens's correction at one shot's focal length, aperture and distance.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 pub struct LensProfile {
     /// Source radius as a polynomial in the corrected radius: `[c0, c1, c2,
     /// c3, c4]` for `c0·r + c1·r² + c2·r³ + c3·r⁴ + c4·r⁵`.
@@ -569,6 +592,20 @@ pub struct LensProfile {
     pub distortion_scale: f64,
     /// The same for the vignetting terms (Lensfun: half diagonal).
     pub vignetting_scale: f64,
+}
+
+/// For warp tests: the Olympus M.Zuiko 12-40mm f/2.8 Pro at 12 mm and f/4 (PTLens distortion,
+/// poly3 TCA, `pa` vignetting, 4:3 calibration), as `resolve` gives it.
+#[cfg(test)]
+pub(crate) fn olympus_12_40_profile() -> LensProfile {
+    let (a, b, c) = (0.03659f32 as f64, -0.11322f32 as f64, 0.0294f32 as f64);
+    LensProfile {
+        distortion: Some([1.0 - a - b - c, c, b, a, 0.0]),
+        tca: Some([1.0004733f32, 0.9998876, 0.0, 0.0, -0.0001355, 0.0001043].map(f64::from)),
+        vignetting: Some([-0.2230f32, -0.1020, -0.1210].map(f64::from)),
+        distortion_scale: (4.0f64 / 3.0).hypot(1.0),
+        vignetting_scale: 1.0,
+    }
 }
 
 /// The lens a selection resolves to, and which corrections its profile has.
@@ -1459,6 +1496,11 @@ mod tests {
         let (info, profile) = db
             .resolve(&olympus_12_40_shot("12", "f/4"), &None)
             .expect("the 12-40mm Pro is in the database");
+        assert_eq!(
+            profile,
+            super::olympus_12_40_profile(),
+            "the warp tests' fixture"
+        );
         assert_eq!(info.maker, "Olympus");
         assert!(info.distortion && info.tca && info.vignetting);
 

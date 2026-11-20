@@ -29,6 +29,7 @@ const WARP_PTLENS: u32 = 2;
 const WARP_TCA: u32 = 4;
 const WARP_VIGNETTE: u32 = 8;
 const WARP_DISTORTION: u32 = 16;
+const WARP_V2: u32 = 32;
 
 /// The parameters of every stage in `shaders/transform.wgsl` (its `Params`).
 #[repr(C)]
@@ -56,6 +57,12 @@ pub(crate) struct TransformParams {
     oriented_size: [u32; 2],
     flip: [u32; 2],
     grain: [u32; 4],
+    /// Version 2 lens correction (`WARP_V2`): the radius scales of the distortion, TCA and
+    /// vignetting terms, then red's and blue's TCA `[v, c, b]` (`image_processing::LensWarp`);
+    /// it reuses `lens_k`, `vignette_k` and `vignette_amount` for its own terms.
+    lens_scales: [f32; 4],
+    tca_red: [f32; 4],
+    tca_blue: [f32; 4],
 }
 
 impl TransformParams {
@@ -200,12 +207,16 @@ fn warp(
         (model.has_tca, WARP_TCA),
         (model.has_vignetting, WARP_VIGNETTE),
         (model.k_distortion.abs() > 1e-5, WARP_DISTORTION),
+        (model.v2.is_some(), WARP_V2),
     ]
     .iter()
     .filter(|(on, _)| *on)
     .fold(0, |flags, (_, flag)| flags | flag);
-    let [k1, k2, k3] = model.lens_k.map(|k| k as f32);
-    let [v1, v2, v3] = model.vignette_k.map(|k| k as f32);
+    let to_f32 = |terms: &[f64]| {
+        let mut out = [0.0f32; 4];
+        out.iter_mut().zip(terms).for_each(|(o, t)| *o = *t as f32);
+        out
+    };
     let params = TransformParams {
         grid: Grid::new(dst.size),
         inverse_x: column(0),
@@ -217,12 +228,26 @@ fn warp(
         distortion: model.k_distortion as f32,
         lens_amount: model.lens_amount as f32,
         auto_crop_scale: model.auto_crop_scale,
-        vignette_amount: model.vignette_amount as f32,
-        lens_k: [k1, k2, k3, 0.0],
-        vignette_k: [v1, v2, v3, 0.0],
         tca: [model.vr, model.vb],
         warp_flags,
         ..Default::default()
+    };
+    let params = match &model.v2 {
+        None => TransformParams {
+            vignette_amount: model.vignette_amount as f32,
+            lens_k: to_f32(&model.lens_k),
+            vignette_k: to_f32(&model.vignette_k),
+            ..params
+        },
+        Some(lens) => TransformParams {
+            vignette_amount: lens.vignette_amount as f32,
+            lens_k: to_f32(&lens.lens_k),
+            vignette_k: to_f32(&lens.vignette_k),
+            lens_scales: to_f32(&[lens.lens_scale, lens.tca_scale, lens.vignette_scale]),
+            tca_red: to_f32(&lens.tca_red),
+            tca_blue: to_f32(&lens.tca_blue),
+            ..params
+        },
     };
     enc.run(
         Group::Transform,
@@ -1130,7 +1155,83 @@ mod tests {
                 .with_effects(Effects::prepare(&adjustments, working_size));
             let name = format!("warp {width}x{height} supersampled with effects");
             compare(&context, &name, &source, &mut failures);
+            for (label, geometry) in v2_warps() {
+                let source = RenderSource::plain(&image, 0).with_warp(Some(geometry));
+                let name = format!("warp {width}x{height} version 2 {label}");
+                compare(&context, &name, &source, &mut failures);
+            }
         }
         assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    /// Version 2 lens corrections (Plan item 19): the Olympus 12-40mm profile with every
+    /// correction, each one alone, a pincushion profile with its exact auto crop, manual
+    /// distortion before the profile, and manual distortion without one.
+    fn v2_warps() -> Vec<(&'static str, GeometryParams)> {
+        use crate::lens_correction::{LensCorrectionVersion, LensProfile, olympus_12_40_profile};
+        let profile = olympus_12_40_profile();
+        let only = |distortion, tca, vignetting| LensProfile {
+            distortion,
+            tca,
+            vignetting,
+            ..profile
+        };
+        let v2 = |lens: Option<LensProfile>| GeometryParams {
+            lens_version: LensCorrectionVersion::V2,
+            lens,
+            ..GeometryParams::default()
+        };
+        vec![
+            ("full profile", v2(Some(profile))),
+            (
+                "distortion after manual distortion",
+                GeometryParams {
+                    distortion: 30.0,
+                    lens_distortion_amount: 0.6,
+                    ..v2(Some(only(profile.distortion, None, None)))
+                },
+            ),
+            (
+                "pincushion auto crop",
+                v2(Some(only(Some([0.95, 0.0, 0.05, 0.0, 0.0]), None, None))),
+            ),
+            (
+                "TCA per radius",
+                GeometryParams {
+                    scale: 92.0,
+                    ..v2(Some(only(
+                        None,
+                        Some([1.003, 0.997, 0.0005, -0.0004, -0.0002, 0.0001]),
+                        None,
+                    )))
+                },
+            ),
+            (
+                "vignetting",
+                GeometryParams {
+                    lens_vignette_amount: 0.8,
+                    ..v2(Some(only(None, None, profile.vignetting)))
+                },
+            ),
+            (
+                "manual distortion only",
+                GeometryParams {
+                    distortion: -30.0,
+                    vertical: 10.0,
+                    ..v2(None)
+                },
+            ),
+        ]
+    }
+
+    /// The version 2 warps are warps (the GPU comparison would pass trivially otherwise), and
+    /// each sets the shader's version 2 flag.
+    #[test]
+    fn v2_warps_reach_the_shader_with_their_flag() {
+        for (label, geometry) in v2_warps() {
+            assert!(!is_geometry_identity(&geometry), "{label}");
+            let model = WarpModel::new(&geometry, 640, 420);
+            assert!(model.v2.is_some(), "{label}");
+        }
     }
 }

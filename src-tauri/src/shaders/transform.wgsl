@@ -28,6 +28,12 @@ struct Params {
     oriented_size: vec2<u32>,
     flip: vec2<u32>,
     grain: vec4<u32>,
+    // Version 2 lens correction (`WARP_V2`): x distortion, y TCA, z vignetting radius scales;
+    // red's and blue's TCA `v, c, b`. It reads its own terms from `lens_k`, `vignette_k` and
+    // `vignette_amount`.
+    lens_scales: vec4<f32>,
+    tca_red: vec4<f32>,
+    tca_blue: vec4<f32>,
 }
 
 @group(0) @binding(7) var<uniform> params: Params;
@@ -38,6 +44,7 @@ const WARP_PTLENS: u32 = 2u;
 const WARP_TCA: u32 = 4u;
 const WARP_VIGNETTE: u32 = 8u;
 const WARP_DISTORTION: u32 = 16u;
+const WARP_V2: u32 = 32u;
 
 // The warp's sources lie inside the image when bilinear sampling has all four taps there, as
 // `is_outside_source`; outside it is black.
@@ -82,16 +89,62 @@ fn radial(r2: f32, k: vec4<f32>) -> f32 {
     return 1.0 + k.x * r2 + k.y * (r2 * r2) + k.z * (r2 * r2 * r2);
 }
 
+// Version 2: red or blue's source, scaled about the centre by `v + c·r + b·r²`
+// (`LensWarp::tca_scales`).
+fn tca_point(c: vec2<f32>, p: vec2<f32>, k: vec4<f32>) -> vec2<f32> {
+    let d = p - c;
+    let r = length(d) * params.lens_scales.y;
+    return c + d * (k.x + r * (k.y + r * k.z));
+}
+
 // Each output pixel's source through the inverse perspective matrix, Constrain Crop and the
 // lens auto-crop scale, lens profile distortion (poly3 or PTLens), manual distortion; then
-// sampled with or without TCA and corrected for lens vignetting.
+// sampled with or without TCA and corrected for lens vignetting. Version 2 (`WARP_V2`,
+// `WarpModel::v2_source_point`) applies manual distortion first, then the profile's
+// polynomial, TCA and vignetting per radius.
 @compute @workgroup_size(8, 8, 1)
 fn tf_warp(@builtin(global_invocation_id) id: vec3<u32>) {
     if (outside(id)) { return; }
     let size = params.grid.dst;
     let h = params.inverse_x * f32(id.x) + params.inverse_y * f32(id.y) + params.inverse_z;
     var rgb = vec3<f32>(0.0);
-    if (abs(h.z) > 1e-6) {
+    if (abs(h.z) > 1e-6 && (params.warp_flags & WARP_V2) != 0u) {
+        let flags = params.warp_flags;
+        let c = params.center;
+        var p = h.xy * (1.0 / h.z);
+        if (params.auto_crop_scale > 1.0) {
+            p = c + (p - c) / params.auto_crop_scale;
+        }
+        if ((flags & WARP_DISTORTION) != 0u) {
+            let d = p - c;
+            p = c + d * (1.0 + params.distortion * (dot(d, d) * params.max_radius_sq_inv));
+        }
+        if ((flags & WARP_LENS) != 0u) {
+            let d = p - c;
+            let r = length(d) * params.lens_scales.x;
+            let k = params.lens_k;
+            p = c + d * (1.0 + r * (k.x + r * (k.y + r * (k.z + r * k.w))));
+        }
+        if ((flags & WARP_TCA) != 0u) {
+            // As version 1: black where the green source lies outside the image (`1.28.2`).
+            if (inside_source(p, size)) {
+                rgb = vec3<f32>(
+                    sample_channel(tca_point(c, p, params.tca_red), size, 0u),
+                    sample_channel(p, size, 1u),
+                    sample_channel(tca_point(c, p, params.tca_blue), size, 2u),
+                );
+            }
+        } else {
+            rgb = sample_inside(p, size);
+        }
+        if ((flags & WARP_VIGNETTE) != 0u) {
+            let r = length(p - c) * params.lens_scales.z;
+            let factor = radial(r * r, params.vignette_k);
+            if (factor > 1e-6) {
+                rgb *= 1.0 + (1.0 / factor - 1.0) * params.vignette_amount;
+            }
+        }
+    } else if (abs(h.z) > 1e-6) {
         let flags = params.warp_flags;
         let c = params.center;
         var p = h.xy * (1.0 / h.z);

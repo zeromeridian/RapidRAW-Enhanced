@@ -26,6 +26,7 @@ pub const GEOMETRY_KEYS: &[&str] = &[
     "lensDistortionAmount",
     "lensVignetteAmount",
     "lensTcaAmount",
+    "lensCorrectionVersion",
     "lensDistortionParams",
     "lensMaker",
     "lensModel",

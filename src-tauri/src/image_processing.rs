@@ -1,5 +1,6 @@
 use crate::gpu_processing::WgpuDisplay;
 use crate::guided_perspective::GuidedPerspective;
+use crate::lens_correction::{LensCorrectionVersion, LensProfile};
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat3, Vec2, Vec3};
 use image::{DynamicImage, GenericImageView, Rgb32FImage, Rgba};
@@ -151,6 +152,13 @@ pub struct GeometryParams {
     pub lens_distortion_enabled: bool,
     pub lens_tca_enabled: bool,
     pub lens_vignette_enabled: bool,
+    /// Which lens correction applies: `V1` reads the stored profile below
+    /// (`lens_dist_*`, `tca_*`, `vig_*`), `V2` the per-image `lens`.
+    #[serde(default)]
+    pub lens_version: LensCorrectionVersion,
+    /// The version 2 profile for this image (`lens_correction::LensProfile`).
+    #[serde(default)]
+    pub lens: Option<LensProfile>,
     pub lens_dist_k1: f32,
     pub lens_dist_k2: f32,
     pub lens_dist_k3: f32,
@@ -181,6 +189,8 @@ impl Default for GeometryParams {
             lens_distortion_enabled: true,
             lens_tca_enabled: true,
             lens_vignette_enabled: true,
+            lens_version: LensCorrectionVersion::V1,
+            lens: None,
             lens_dist_k1: 0.0,
             lens_dist_k2: 0.0,
             lens_dist_k3: 0.0,
@@ -195,9 +205,34 @@ impl Default for GeometryParams {
 }
 
 impl GeometryParams {
+    /// The version 2 distortion polynomial, when it applies.
+    fn lens_distortion(&self) -> Option<&[f64; 5]> {
+        self.lens
+            .as_ref()
+            .and_then(|l| l.distortion.as_ref())
+            .filter(|_| self.lens_distortion_enabled && self.lens_distortion_amount != 0.0)
+    }
+
+    /// The version 2 TCA terms, when they apply.
+    fn lens_tca(&self) -> Option<&[f64; 6]> {
+        self.lens
+            .as_ref()
+            .and_then(|l| l.tca.as_ref())
+            .filter(|_| self.lens_tca_enabled && self.lens_tca_amount != 0.0)
+    }
+
+    /// The version 2 vignetting terms, when they apply.
+    fn lens_vignetting(&self) -> Option<&[f64; 3]> {
+        self.lens
+            .as_ref()
+            .and_then(|l| l.vignetting.as_ref())
+            .filter(|_| self.lens_vignette_enabled && self.lens_vignette_amount != 0.0)
+    }
+
     fn without_lens_profile(self) -> Self {
         let identity = Self::default();
         Self {
+            lens: identity.lens,
             lens_dist_k1: identity.lens_dist_k1,
             lens_dist_k2: identity.lens_dist_k2,
             lens_dist_k3: identity.lens_dist_k3,
@@ -243,6 +278,8 @@ pub fn get_geometry_params_from_json(adjustments: &serde_json::Value) -> Geometr
             .unwrap_or(true),
         lens_tca_enabled: adjustments["lensTcaEnabled"].as_bool().unwrap_or(true),
         lens_vignette_enabled: adjustments["lensVignetteEnabled"].as_bool().unwrap_or(true),
+        lens_version: LensCorrectionVersion::of(adjustments),
+        lens: None,
 
         lens_dist_k1: lens_params
             .and_then(|p| p.get("k1").and_then(|k| k.as_f64()))
@@ -862,6 +899,9 @@ fn compute_lens_auto_crop_scale(params: &GeometryParams, width: f32, height: f32
 /// What the geometry warp of an image of one size computes before its pixels (upstream
 /// `15a9ff2e`): the inverse matrix, the lens terms and which corrections apply. The CPU warp
 /// (`warp_image_geometry`) and the GPU one (`render_source`'s `tf_warp`) both start from it.
+/// A version 1 edit uses the fields below `v2`'s, unchanged since before the lens rework; a
+/// version 2 edit `v2` (its `lens_k`, `vr`, `vb`, `vignette_k` and amounts are unused).
+#[derive(Clone, Copy)]
 pub(crate) struct WarpModel {
     pub inverse: NaMatrix3<f32>,
     pub cx: f32,
@@ -880,10 +920,202 @@ pub(crate) struct WarpModel {
     pub vignette_k: [f64; 3],
     pub vignette_amount: f64,
     pub has_vignetting: bool,
+    pub v2: Option<LensWarp>,
+}
+
+/// The version 2 lens terms (upstream `f9d95eaa`): the manual distortion, then the profile,
+/// as one radial factor; TCA scaling red and blue per radius; vignetting at the profile's
+/// radius scale. Radii are in pixels times the scales.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct LensWarp {
+    /// The distortion polynomial divided by its linear term (and the amount applied), in the
+    /// radius times `lens_scale`.
+    pub lens_k: [f64; 4],
+    pub lens_scale: f64,
+    /// `[v, c, b]` per channel for `v + c·r + b·r²`, amount applied.
+    pub tca_red: [f64; 3],
+    pub tca_blue: [f64; 3],
+    pub tca_scale: f64,
+    pub vignette_k: [f64; 3],
+    pub vignette_scale: f64,
+    pub vignette_amount: f64,
+}
+
+impl LensWarp {
+    /// Red and blue's source scales about the centre at offset `(dx, dy)` from it.
+    fn tca_scales(&self, dx: f64, dy: f64) -> (f32, f32) {
+        let r = dx.hypot(dy) * self.tca_scale;
+        let scale = |[v, c, b]: [f64; 3]| (v + r * (c + r * b)) as f32;
+        (scale(self.tca_red), scale(self.tca_blue))
+    }
+
+    /// The vignetting correction's gain at offset `(dx, dy)` from the centre.
+    fn vignette_gain(&self, dx: f64, dy: f64) -> f32 {
+        let r = dx.hypot(dy) * self.vignette_scale;
+        let r2 = r * r;
+        let [k1, k2, k3] = self.vignette_k;
+        let falloff = 1.0 + r2 * (k1 + r2 * (k2 + r2 * k3));
+        if falloff > 1e-6 {
+            (1.0 + (1.0 / falloff - 1.0) * self.vignette_amount) as f32
+        } else {
+            1.0
+        }
+    }
 }
 
 impl WarpModel {
     pub fn new(params: &GeometryParams, width: u32, height: u32) -> Self {
+        match params.lens_version {
+            LensCorrectionVersion::V1 => Self::v1(params, width, height),
+            LensCorrectionVersion::V2 => Self::v2(params, width, height),
+        }
+    }
+
+    fn v2(params: &GeometryParams, width: u32, height: u32) -> Self {
+        let (forward, cx, cy, half_diagonal) =
+            build_transform_matrices(params, width as f32, height as f32);
+        let inverse = forward.try_inverse().unwrap_or(NaMatrix3::identity());
+        let radial_scale = params.lens.map_or(0.0, |l| l.distortion_scale) / half_diagonal;
+
+        // Divided by the linear term, the polynomial maps the centre's neighbourhood 1:1; the
+        // uniform scale it leaves out only resizes the corrected image (upstream).
+        let amount = params.lens_distortion_amount as f64;
+        let (lens_k, lens_scale) = params.lens_distortion().map_or(([0.0; 4], 0.0), |c| {
+            (
+                [c[1], c[2], c[3], c[4]].map(|k| k / c[0] * amount),
+                radial_scale / c[0],
+            )
+        });
+
+        let tca_amount = params.lens_tca_amount as f64;
+        let tca_channel =
+            |v: f64, c: f64, b: f64| [1.0 + (v - 1.0) * tca_amount, c * tca_amount, b * tca_amount];
+        let (tca_red, tca_blue) = params
+            .lens_tca()
+            .map_or(([1.0, 0.0, 0.0], [1.0, 0.0, 0.0]), |t| {
+                (tca_channel(t[0], t[2], t[4]), tca_channel(t[1], t[3], t[5]))
+            });
+
+        let lens = LensWarp {
+            lens_k,
+            lens_scale,
+            tca_red,
+            tca_blue,
+            tca_scale: radial_scale,
+            vignette_k: params.lens_vignetting().copied().unwrap_or_default(),
+            vignette_scale: params.lens.map_or(0.0, |l| l.vignetting_scale) / half_diagonal,
+            vignette_amount: params.lens_vignette_amount as f64,
+        };
+        let mut model = Self {
+            inverse,
+            cx,
+            cy,
+            half_diagonal,
+            max_radius_sq_inv: 1.0 / (half_diagonal * half_diagonal),
+            k_distortion: (params.distortion as f64 / 100.0) * 2.5,
+            lens_k: [0.0; 3],
+            lens_amount: 0.0,
+            has_lens_correction: params.lens_distortion().is_some(),
+            is_ptlens: false,
+            auto_crop_scale: 1.0,
+            vr: 1.0,
+            vb: 1.0,
+            has_tca: params.lens_tca().is_some(),
+            vignette_k: [0.0; 3],
+            vignette_amount: 0.0,
+            has_vignetting: params.lens_vignetting().is_some(),
+            v2: Some(lens),
+        };
+        model.auto_crop_scale = model.v2_auto_crop_scale(&lens);
+        model
+    }
+
+    /// Version 2: the source radius over the output radius at `radius` pixels from the centre
+    /// (after the auto crop), manual distortion first, then the profile.
+    fn v2_radial_factor(&self, lens: &LensWarp, radius: f64) -> f64 {
+        let user = 1.0 + self.k_distortion * radius * radius * self.max_radius_sq_inv;
+        let r = radius * user * lens.lens_scale;
+        let [k1, k2, k3, k4] = lens.lens_k;
+        user * (1.0 + r * (k1 + r * (k2 + r * (k3 + r * k4))))
+    }
+
+    /// Version 2's exact auto crop: the smallest zoom that keeps every border point's source
+    /// inside the image, found from the mapped radius along the half diagonal.
+    fn v2_auto_crop_scale(&self, lens: &LensWarp) -> f32 {
+        if !self.has_lens_correction && self.k_distortion.abs() <= 1e-5 {
+            return 1.0;
+        }
+        const RADIUS_STEPS: usize = 512;
+        const BORDER_SAMPLES: usize = 64;
+
+        let (cx, cy) = (self.cx as f64, self.cy as f64);
+        let half_diagonal = cx.hypot(cy);
+        let mut furthest = 0.0f64;
+        let reach: Vec<(f64, f64)> = (0..=RADIUS_STEPS)
+            .map(|i| {
+                let radius = half_diagonal * i as f64 / RADIUS_STEPS as f64;
+                furthest = furthest.max(radius * self.v2_radial_factor(lens, radius));
+                (radius, furthest)
+            })
+            .collect();
+
+        let shortest = cx.min(cy);
+        let scale = (0..=BORDER_SAMPLES)
+            .filter_map(|j| {
+                let border =
+                    shortest + (half_diagonal - shortest) * j as f64 / BORDER_SAMPLES as f64;
+                let i = reach.partition_point(|&(_, source)| source < border);
+                let ((r0, s0), (r1, s1)) = (*reach.get(i.checked_sub(1)?)?, *reach.get(i)?);
+                Some(border / (r0 + (border - s0) / (s1 - s0) * (r1 - r0)))
+            })
+            .fold(1.0f64, f64::max);
+
+        if scale > 1.0 {
+            (scale * 1.002) as f32
+        } else {
+            1.0
+        }
+    }
+
+    /// Version 2: the source of the warped point `(x, y)` (before the perspective matrix's
+    /// inverse is applied, i.e. in the matrix's output space).
+    fn v2_source_point(&self, lens: &LensWarp, x: f64, y: f64) -> (f64, f64) {
+        let (cx, cy) = (self.cx as f64, self.cy as f64);
+        let crop = self.auto_crop_scale as f64;
+        let (dx, dy) = ((x - cx) / crop, (y - cy) / crop);
+        let factor = self.v2_radial_factor(lens, dx.hypot(dy));
+        (cx + dx * factor, cy + dy * factor)
+    }
+
+    /// Version 2: where the source point `(x, y)` lands, the inverse of `v2_source_point`
+    /// (Newton's method on the radius).
+    fn v2_output_point(&self, lens: &LensWarp, x: f64, y: f64) -> (f64, f64) {
+        let (cx, cy) = (self.cx as f64, self.cy as f64);
+        let (dx, dy) = (x - cx, y - cy);
+        let source_radius = dx.hypot(dy);
+        let mapped = |r: f64| r * self.v2_radial_factor(lens, r);
+        let mut radius = source_radius;
+        for _ in 0..20 {
+            let h = (radius.abs() * 1e-4).max(1e-3);
+            let slope = (mapped(radius + h) - mapped(radius - h)) / (2.0 * h);
+            if slope.abs() < 1e-9 {
+                break;
+            }
+            let step = (mapped(radius) - source_radius) / slope;
+            radius -= step;
+            if step.abs() < 1e-4 {
+                break;
+            }
+        }
+        let scale = if source_radius > 1e-6 {
+            radius / source_radius
+        } else {
+            1.0
+        } * self.auto_crop_scale as f64;
+        (cx + dx * scale, cy + dy * scale)
+    }
+
+    fn v1(params: &GeometryParams, width: u32, height: u32) -> Self {
         let (forward_transform, cx, cy, half_diagonal) =
             build_transform_matrices(params, width as f32, height as f32);
         let inverse = forward_transform
@@ -943,6 +1175,7 @@ impl WarpModel {
             has_vignetting: params.lens_vignette_enabled
                 && vignette_k.iter().any(|k| k.abs() > 1e-6)
                 && vignette_amount > 0.01,
+            v2: None,
         }
     }
 }
@@ -952,6 +1185,7 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
     let (width, height) = src_img.dimensions();
     let mut out_buffer = vec![0.0f32; (width * height * 3) as usize];
 
+    let model = WarpModel::new(&params, width, height);
     let WarpModel {
         inverse: inv,
         cx,
@@ -970,7 +1204,8 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
         vignette_k: [vk1, vk2, vk3],
         vignette_amount: lens_vig_amt,
         has_vignetting,
-    } = WarpModel::new(&params, width, height);
+        v2,
+    } = model;
 
     let step_vec_x = NaVector3::new(inv[(0, 0)], inv[(1, 0)], inv[(2, 0)]);
     let step_vec_y = NaVector3::new(inv[(0, 1)], inv[(1, 1)], inv[(2, 1)]);
@@ -1001,6 +1236,30 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
                     let inv_z = 1.0 / current_vec.z;
                     let mut src_x = current_vec.x * inv_z;
                     let mut src_y = current_vec.y * inv_z;
+
+                    if let Some(lens) = &v2 {
+                        let (x, y) = model.v2_source_point(lens, src_x as f64, src_y as f64);
+                        let (dx, dy) = (x - cx as f64, y - cy as f64);
+                        let (src_x, src_y) = (x as f32, y as f32);
+                        if has_tca {
+                            let (red, blue) = lens.tca_scales(dx, dy);
+                            interpolate_pixel_with_tca(&tca_ctx, src_x, src_y, red, blue, pixel);
+                        } else {
+                            interpolate_pixel(
+                                src_raw,
+                                width_usize,
+                                height_usize,
+                                src_x,
+                                src_y,
+                                pixel,
+                            );
+                        }
+                        if has_vignetting {
+                            let gain = lens.vignette_gain(dx, dy);
+                            pixel.iter_mut().for_each(|c| *c *= gain);
+                        }
+                        continue;
+                    }
 
                     if auto_crop_scale > 1.0 {
                         src_x = cx + (src_x - cx) / auto_crop_scale;
@@ -1090,6 +1349,7 @@ pub fn unwarp_image_geometry(warped_image: &DynamicImage, params: GeometryParams
 
     let (forward_transform, cx, cy, half_diagonal) =
         build_transform_matrices(&params, width as f32, height as f32);
+    let model = WarpModel::new(&params, width, height);
     let max_radius_sq_inv = 1.0 / ((cx * cx + cy * cy) as f64);
     let hd = half_diagonal;
 
@@ -1124,81 +1384,87 @@ pub fn unwarp_image_geometry(warped_image: &DynamicImage, params: GeometryParams
                 let mut current_x = x_f;
                 let mut current_y = y_f;
 
-                if k_distortion.abs() > 1e-5 {
-                    let dx = (current_x - cx) as f64;
-                    let dy = (current_y - cy) as f64;
-                    let r_distorted = (dx * dx + dy * dy).sqrt();
+                if let Some(lens) = &model.v2 {
+                    let (x, y) = model.v2_output_point(lens, x_f as f64, y_f as f64);
+                    (current_x, current_y) = (x as f32, y as f32);
+                } else {
+                    if k_distortion.abs() > 1e-5 {
+                        let dx = (current_x - cx) as f64;
+                        let dy = (current_y - cy) as f64;
+                        let r_distorted = (dx * dx + dy * dy).sqrt();
 
-                    if r_distorted > 1e-6 {
-                        let k_effective = k_distortion * max_radius_sq_inv;
-                        let r_straight = solve_generic_distortion_inv(r_distorted, k_effective);
+                        if r_distorted > 1e-6 {
+                            let k_effective = k_distortion * max_radius_sq_inv;
+                            let r_straight = solve_generic_distortion_inv(r_distorted, k_effective);
 
-                        let scale = r_straight / r_distorted;
-                        current_x = cx + (dx * scale) as f32;
-                        current_y = cy + (dy * scale) as f32;
-                    }
-                }
-
-                if has_lens_correction {
-                    let dx = (current_x - cx) as f64;
-                    let dy = (current_y - cy) as f64;
-                    let rd = (dx * dx + dy * dy).sqrt();
-
-                    if rd > 1e-6 {
-                        let mut ru = rd;
-
-                        for _ in 0..8 {
-                            let ru_norm = ru / hd;
-                            let ru_norm2 = ru_norm * ru_norm;
-
-                            let (f_val, f_prime) = if is_ptlens {
-                                let a = lk1;
-                                let b = lk2;
-                                let c = lk3;
-                                let d = 1.0 - a - b - c;
-                                let poly = a * ru_norm2 * ru_norm + b * ru_norm2 + c * ru_norm + d;
-
-                                let val = ru * poly;
-                                let prime = 4.0 * a * ru_norm2 * ru_norm
-                                    + 3.0 * b * ru_norm2
-                                    + 2.0 * c * ru_norm
-                                    + d;
-                                (val, prime)
-                            } else {
-                                let poly = 1.0
-                                    + lk1 * ru_norm2
-                                    + lk2 * (ru_norm2 * ru_norm2)
-                                    + lk3 * (ru_norm2 * ru_norm2 * ru_norm2);
-                                let val = ru * poly;
-                                let poly_prime = 2.0 * lk1 * ru_norm
-                                    + 4.0 * lk2 * ru_norm2 * ru_norm
-                                    + 6.0 * lk3 * (ru_norm2 * ru_norm2) * ru_norm;
-                                let prime = poly + ru_norm * poly_prime;
-                                (val, prime)
-                            };
-
-                            let g_val = ru + (f_val - ru) * lens_dist_amt - rd;
-                            let g_prime = 1.0 + (f_prime - 1.0) * lens_dist_amt;
-
-                            if g_prime.abs() < 1e-7 {
-                                break;
-                            }
-                            let delta = g_val / g_prime;
-                            ru -= delta;
-                            if delta.abs() < 1e-4 {
-                                break;
-                            }
+                            let scale = r_straight / r_distorted;
+                            current_x = cx + (dx * scale) as f32;
+                            current_y = cy + (dy * scale) as f32;
                         }
-
-                        let scale = ru / rd;
-                        current_x = cx + (dx * scale) as f32;
-                        current_y = cy + (dy * scale) as f32;
                     }
-                }
 
-                if auto_crop_scale > 1.0 {
-                    current_x = cx + (current_x - cx) * auto_crop_scale;
-                    current_y = cy + (current_y - cy) * auto_crop_scale;
+                    if has_lens_correction {
+                        let dx = (current_x - cx) as f64;
+                        let dy = (current_y - cy) as f64;
+                        let rd = (dx * dx + dy * dy).sqrt();
+
+                        if rd > 1e-6 {
+                            let mut ru = rd;
+
+                            for _ in 0..8 {
+                                let ru_norm = ru / hd;
+                                let ru_norm2 = ru_norm * ru_norm;
+
+                                let (f_val, f_prime) = if is_ptlens {
+                                    let a = lk1;
+                                    let b = lk2;
+                                    let c = lk3;
+                                    let d = 1.0 - a - b - c;
+                                    let poly =
+                                        a * ru_norm2 * ru_norm + b * ru_norm2 + c * ru_norm + d;
+
+                                    let val = ru * poly;
+                                    let prime = 4.0 * a * ru_norm2 * ru_norm
+                                        + 3.0 * b * ru_norm2
+                                        + 2.0 * c * ru_norm
+                                        + d;
+                                    (val, prime)
+                                } else {
+                                    let poly = 1.0
+                                        + lk1 * ru_norm2
+                                        + lk2 * (ru_norm2 * ru_norm2)
+                                        + lk3 * (ru_norm2 * ru_norm2 * ru_norm2);
+                                    let val = ru * poly;
+                                    let poly_prime = 2.0 * lk1 * ru_norm
+                                        + 4.0 * lk2 * ru_norm2 * ru_norm
+                                        + 6.0 * lk3 * (ru_norm2 * ru_norm2) * ru_norm;
+                                    let prime = poly + ru_norm * poly_prime;
+                                    (val, prime)
+                                };
+
+                                let g_val = ru + (f_val - ru) * lens_dist_amt - rd;
+                                let g_prime = 1.0 + (f_prime - 1.0) * lens_dist_amt;
+
+                                if g_prime.abs() < 1e-7 {
+                                    break;
+                                }
+                                let delta = g_val / g_prime;
+                                ru -= delta;
+                                if delta.abs() < 1e-4 {
+                                    break;
+                                }
+                            }
+
+                            let scale = ru / rd;
+                            current_x = cx + (dx * scale) as f32;
+                            current_y = cy + (dy * scale) as f32;
+                        }
+                    }
+
+                    if auto_crop_scale > 1.0 {
+                        current_x = cx + (current_x - cx) * auto_crop_scale;
+                        current_y = cy + (current_y - cy) * auto_crop_scale;
+                    }
                 }
 
                 let target_vec = forward_transform * NaVector3::new(current_x, current_y, 1.0);
@@ -1324,6 +1590,13 @@ pub fn inverse_transform_point(
         let inv_z = 1.0 / (vec.z as f64);
         let mut src_x = (vec.x as f64) * inv_z;
         let mut src_y = (vec.y as f64) * inv_z;
+
+        if params.lens_version == LensCorrectionVersion::V2 {
+            let model = WarpModel::new(&params, curr_w as u32, curr_h as u32);
+            if let Some(lens) = &model.v2 {
+                return model.v2_source_point(lens, src_x, src_y);
+            }
+        }
 
         let k_distortion = (params.distortion as f64 / 100.0) * 2.5;
         let lk1 = params.lens_dist_k1 as f64;
@@ -1589,6 +1862,28 @@ pub fn apply_flip<'a>(
 }
 
 pub fn is_geometry_identity(params: &GeometryParams) -> bool {
+    let lens_identity = match params.lens_version {
+        LensCorrectionVersion::V1 => is_v1_lens_identity(params),
+        LensCorrectionVersion::V2 => {
+            params.lens_distortion().is_none()
+                && params.lens_tca().is_none()
+                && params.lens_vignetting().is_none()
+        }
+    };
+
+    params.distortion == 0.0
+        && params.vertical == 0.0
+        && params.horizontal == 0.0
+        && params.rotate == 0.0
+        && params.aspect == 0.0
+        && params.scale == 100.0
+        && params.x_offset == 0.0
+        && params.y_offset == 0.0
+        && !params.guided_perspective.is_active()
+        && lens_identity
+}
+
+fn is_v1_lens_identity(params: &GeometryParams) -> bool {
     let dist_identity = !params.lens_distortion_enabled
         || ((params.lens_distortion_amount - 1.0).abs() < 1e-4
             && params.lens_dist_k1.abs() < 1e-6
@@ -1606,18 +1901,7 @@ pub fn is_geometry_identity(params: &GeometryParams) -> bool {
             && params.vig_k2.abs() < 1e-6
             && params.vig_k3.abs() < 1e-6);
 
-    params.distortion == 0.0
-        && params.vertical == 0.0
-        && params.horizontal == 0.0
-        && params.rotate == 0.0
-        && params.aspect == 0.0
-        && params.scale == 100.0
-        && params.x_offset == 0.0
-        && params.y_offset == 0.0
-        && !params.guided_perspective.is_active()
-        && dist_identity
-        && tca_identity
-        && vig_identity
+    dist_identity && tca_identity && vig_identity
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -4089,10 +4373,12 @@ mod tests {
     use super::{
         AllAdjustments, DEFAULT_GLOW_HUE, GeometryParams, GlobalAdjustments, MAX_POINT_COLORS,
         MaskAdjustments, build_transform_matrix, calculate_histogram_from_image,
-        compute_transform_constrain_scale, get_global_adjustments_from_json,
-        get_mask_adjustments_from_json, is_image_edited, transform_covers_output, transform_point,
-        warp_image_geometry, with_crop_scaled,
+        compute_transform_constrain_scale, get_geometry_params_from_json,
+        get_global_adjustments_from_json, get_mask_adjustments_from_json, inverse_transform_point,
+        is_geometry_identity, is_image_edited, transform_covers_output, transform_point,
+        unwarp_image_geometry, warp_image_geometry, with_crop_scaled,
     };
+    use crate::lens_correction::{LensCorrectionVersion, LensProfile, olympus_12_40_profile};
     use image::{DynamicImage, Rgb, Rgb32FImage};
     use serde_json::json;
     use std::borrow::Cow;
@@ -4217,6 +4503,259 @@ mod tests {
                 .max((pixel.0[1] as f64 - sy).abs());
         }
         assert!(worst < 2e-3, "worst source error {worst} px");
+    }
+
+    /// A version 2 edit with `lens` and nothing else.
+    fn v2_params(lens: Option<LensProfile>) -> GeometryParams {
+        GeometryParams {
+            lens_version: LensCorrectionVersion::V2,
+            lens,
+            ..GeometryParams::default()
+        }
+    }
+
+    /// The Olympus profile's distortion alone.
+    fn v2_distortion(distortion: [f64; 5]) -> GeometryParams {
+        v2_params(Some(LensProfile {
+            distortion: Some(distortion),
+            tca: None,
+            vignetting: None,
+            ..olympus_12_40_profile()
+        }))
+    }
+
+    /// Each pixel's value is its own position (blue 1), which bilinear sampling reproduces
+    /// exactly, so a warped value is the source position the warp used, and blue 0 means
+    /// black (no source).
+    fn coordinates(width: u32, height: u32) -> DynamicImage {
+        DynamicImage::ImageRgb32F(Rgb32FImage::from_fn(width, height, |x, y| {
+            Rgb([x as f32, y as f32, 1.0])
+        }))
+    }
+
+    /// Version 2 samples each output pixel at `v2_source_point` of its perspective source,
+    /// and the exact auto crop leaves no pixel without a source while, when it zooms, a
+    /// border pixel's source lies at the image edge.
+    #[test]
+    fn v2_warp_samples_the_profile_source_and_the_auto_crop_is_exact() {
+        let (width, height) = (300u32, 200u32);
+        let source = coordinates(width, height);
+        let barrel = v2_distortion(olympus_12_40_profile().distortion.unwrap());
+        let pincushion = v2_distortion([0.95, 0.0, 0.05, 0.0, 0.0]);
+        let cases = [
+            (barrel, false),
+            (pincushion, true),
+            (
+                GeometryParams {
+                    distortion: 30.0,
+                    vertical: 12.0,
+                    lens_distortion_amount: 0.6,
+                    ..barrel
+                },
+                true,
+            ),
+            (
+                GeometryParams {
+                    distortion: -40.0,
+                    ..v2_params(None)
+                },
+                false,
+            ),
+        ];
+        for (params, zooms) in cases {
+            let model = super::WarpModel::new(&params, width, height);
+            let lens = model.v2.expect("a version 2 model");
+            assert_eq!(model.auto_crop_scale > 1.0, zooms, "{params:?}");
+            let inverse = model.inverse.cast::<f64>();
+            let warped = warp_image_geometry(&source, params).into_rgb32f();
+            let (mut worst, mut nearest_edge) = (0.0f64, f64::MAX);
+            for (x, y, pixel) in warped.enumerate_pixels() {
+                let h = inverse * nalgebra::Vector3::new(x as f64, y as f64, 1.0);
+                let (sx, sy) = model.v2_source_point(&lens, h.x / h.z, h.y / h.z);
+                if params.vertical == 0.0 {
+                    assert_eq!(pixel.0[2], 1.0, "({x}, {y}) has no source: {params:?}");
+                }
+                if pixel.0[2] == 0.0 {
+                    continue;
+                }
+                worst = worst
+                    .max((pixel.0[0] as f64 - sx).abs())
+                    .max((pixel.0[1] as f64 - sy).abs());
+                if x == 0 || y == 0 || x == width - 1 || y == height - 1 {
+                    let edge = sx.min(sy).min(width as f64 - 1.0 - sx);
+                    nearest_edge = nearest_edge.min(edge.min(height as f64 - 1.0 - sy));
+                }
+            }
+            assert!(worst < 2e-3, "worst source error {worst} px: {params:?}");
+            if zooms && params.vertical == 0.0 {
+                assert!(
+                    nearest_edge < 1.5,
+                    "zoomed too far: {nearest_edge} px to spare"
+                );
+            }
+        }
+    }
+
+    /// `v2_output_point` undoes `v2_source_point`; unwarping a version 2 warp gives the
+    /// image back; and the point mapping lands where the warp sampled.
+    #[test]
+    fn v2_point_mapping_and_unwarp_invert_the_warp() {
+        let (width, height) = (300u32, 200u32);
+        // Manual distortion −10: stronger barrel settings fold the corners back inside
+        // (the source radius stops growing), where no inverse is unique.
+        let lens = GeometryParams {
+            distortion: -10.0,
+            ..v2_distortion(olympus_12_40_profile().distortion.unwrap())
+        };
+        let pincushion = v2_distortion([0.95, 0.0, 0.05, 0.0, 0.0]);
+        for params in [lens, pincushion] {
+            let model = super::WarpModel::new(&params, width, height);
+            let warp = model.v2.unwrap();
+            for (x, y) in [(0.0, 0.0), (150.0, 100.0), (299.0, 10.0), (40.0, 190.0)] {
+                let (sx, sy) = model.v2_source_point(&warp, x, y);
+                let (bx, by) = model.v2_output_point(&warp, sx, sy);
+                assert!((bx - x).abs() < 1e-2 && (by - y).abs() < 1e-2, "({x}, {y})");
+            }
+            let source = coordinates(width, height);
+            let warped = warp_image_geometry(&source, params);
+            let unwarped = unwarp_image_geometry(&warped, params).into_rgb32f();
+            // Only sources the warped image shows: the barrel profile's output corners reach
+            // ≈ 127 px from the centre, and outside that (as in version 1 and upstream) the
+            // inverse finds no radius and returns an unrelated point, not black.
+            for (x, y, pixel) in unwarped.enumerate_pixels() {
+                let visible = (x as f32 - 150.0).hypot(y as f32 - 100.0) < 110.0;
+                if visible && pixel.0[2] > 0.999 {
+                    assert!(
+                        (pixel.0[0] - x as f32).abs() < 2e-2
+                            && (pixel.0[1] - y as f32).abs() < 2e-2,
+                        "({x}, {y}) came back as {:?}",
+                        pixel.0
+                    );
+                }
+            }
+        }
+
+        // Through the edit: manual distortion only, so the per-image profile is not needed.
+        let adjustments = json!({
+            "lensCorrectionVersion": 2,
+            "transformDistortion": 30,
+            "transformVertical": 10,
+        });
+        let params = get_geometry_params_from_json(&adjustments);
+        assert_eq!(params.lens_version, LensCorrectionVersion::V2);
+        let warped = warp_image_geometry(&coordinates(width, height), params).into_rgb32f();
+        for (x, y) in [(150u32, 100u32), (30, 20), (270, 170)] {
+            let (sx, sy) = inverse_transform_point(x as f64, y as f64, 300.0, 200.0, &adjustments);
+            let pixel = warped.get_pixel(x, y).0;
+            assert!(
+                (pixel[0] as f64 - sx).abs() < 2e-3 && (pixel[1] as f64 - sy).abs() < 2e-3,
+                "({x}, {y}): warp {pixel:?}, point ({sx}, {sy})"
+            );
+        }
+    }
+
+    /// Without distortion, version 2's TCA with only the `v` terms is version 1's.
+    #[test]
+    fn v2_linear_tca_matches_version_one() {
+        let (width, height) = (120u32, 80u32);
+        let source = DynamicImage::ImageRgb32F(Rgb32FImage::from_fn(width, height, |x, y| {
+            Rgb([
+                (x as f32 * 0.37).sin().abs(),
+                y as f32 / height as f32,
+                (x as f32 * 0.11 + y as f32 * 0.23).cos().abs(),
+            ])
+        }));
+        let v1 = GeometryParams {
+            tca_vr: 1.004,
+            tca_vb: 0.997,
+            lens_tca_amount: 0.6,
+            ..GeometryParams::default()
+        };
+        let v2 = GeometryParams {
+            lens_tca_amount: 0.6,
+            ..v2_params(Some(LensProfile {
+                distortion: None,
+                tca: Some([1.004, 0.997, 0.0, 0.0, 0.0, 0.0]),
+                vignetting: None,
+                ..olympus_12_40_profile()
+            }))
+        };
+        let a = warp_image_geometry(&source, v1).into_rgb32f();
+        let b = warp_image_geometry(&source, v2).into_rgb32f();
+        let worst = a
+            .iter()
+            .zip(b.iter())
+            .map(|(x, y)| (x - y).abs())
+            .fold(0.0f32, f32::max);
+        assert!(worst < 1e-5, "worst difference {worst}");
+    }
+
+    /// Version 2 vignetting brightens by the inverse falloff at its radius scale, scaled by
+    /// the amount; the centre is unchanged.
+    #[test]
+    fn v2_vignetting_lifts_the_corners_by_the_inverse_falloff() {
+        let (width, height) = (120u32, 90u32);
+        let flat = DynamicImage::ImageRgb32F(Rgb32FImage::from_pixel(width, height, Rgb([0.5; 3])));
+        let profile = LensProfile {
+            distortion: None,
+            tca: None,
+            ..olympus_12_40_profile()
+        };
+        let [k1, k2, k3] = profile.vignetting.unwrap();
+        for amount in [1.0f32, 0.5] {
+            let params = GeometryParams {
+                lens_vignette_amount: amount,
+                ..v2_params(Some(profile))
+            };
+            let warped = warp_image_geometry(&flat, params).into_rgb32f();
+            assert!((warped.get_pixel(60, 45).0[0] - 0.5).abs() < 1e-6);
+            // The corner pixel (0, 0) is half a diagonal minus a hair from the centre.
+            let r = (60.0f64).hypot(45.0) / (60.0f64).hypot(45.0);
+            let r2 = r * r;
+            let falloff = 1.0 + k1 * r2 + k2 * r2 * r2 + k3 * r2 * r2 * r2;
+            let gain = 1.0 + (1.0 / falloff - 1.0) * amount as f64;
+            let corner = warped.get_pixel(0, 0).0[1] as f64;
+            assert!(
+                (corner - 0.5 * gain).abs() < 1e-5,
+                "{corner} vs {}",
+                0.5 * gain
+            );
+        }
+    }
+
+    /// A version 2 edit changes the geometry only through its own profile and the sliders;
+    /// a stale version 1 profile left in the edit is ignored.
+    #[test]
+    fn v2_geometry_identity_follows_its_profile_and_switches() {
+        let profile = olympus_12_40_profile();
+        assert!(is_geometry_identity(&v2_params(None)));
+        assert!(!is_geometry_identity(&v2_params(Some(profile))));
+        let off = GeometryParams {
+            lens_distortion_amount: 0.0,
+            lens_tca_enabled: false,
+            lens_vignette_amount: 0.0,
+            ..v2_params(Some(profile))
+        };
+        assert!(is_geometry_identity(&off));
+        let stale = GeometryParams {
+            lens_dist_k1: 0.1,
+            tca_vr: 1.01,
+            vig_k1: -0.3,
+            ..v2_params(None)
+        };
+        assert!(is_geometry_identity(&stale));
+        assert!(!is_geometry_identity(&GeometryParams {
+            lens_version: LensCorrectionVersion::V1,
+            ..stale
+        }));
+
+        assert_eq!(
+            LensCorrectionVersion::of(&json!({ "lensCorrectionVersion": 2 })),
+            LensCorrectionVersion::V2
+        );
+        for v1 in [json!({}), json!({ "lensCorrectionVersion": 1 })] {
+            assert_eq!(LensCorrectionVersion::of(&v1), LensCorrectionVersion::V1);
+        }
     }
 
     #[test]
@@ -4594,5 +5133,86 @@ mod tests {
         );
         assert_eq!(shader_size("MaskAdjustments"), size_of::<MaskAdjustments>());
         assert_eq!(shader_size("AllAdjustments"), size_of::<AllAdjustments>());
+    }
+}
+
+/// Version 1 lens correction renders exactly as before the rework (Plan item 19,
+/// `LENS_CORRECTION_PLAN.md`): a checksum of the CPU warp, unwarp and point mapping of
+/// version 1 edits, taken on `b77d5ac9`, the last commit before the version 2 warp.
+#[cfg(test)]
+mod lens_v1_golden {
+    use super::{
+        get_geometry_params_from_json, inverse_transform_point, unwarp_image_geometry,
+        warp_image_geometry,
+    };
+    use image::{DynamicImage, Rgb, Rgb32FImage};
+    use serde_json::json;
+
+    /// FNV-1a over the values' bits, stable across Rust releases.
+    struct Checksum(u64);
+
+    impl Checksum {
+        fn add(&mut self, value: f64) {
+            for byte in value.to_bits().to_le_bytes() {
+                self.0 = (self.0 ^ byte as u64).wrapping_mul(0x0100_0000_01b3);
+            }
+        }
+    }
+
+    #[test]
+    fn v1_lens_correction_renders_as_before_the_rework() {
+        let (width, height) = (96u32, 64u32);
+        let image = DynamicImage::ImageRgb32F(Rgb32FImage::from_fn(width, height, |x, y| {
+            Rgb([
+                x as f32 / width as f32,
+                y as f32 / height as f32,
+                ((x * 7 + y * 13) % 17) as f32 / 17.0,
+            ])
+        }));
+        let cases = [
+            json!({ "lensDistortionParams": { "k1": -0.08, "k2": 0.02, "k3": 0.004 } }),
+            json!({ "lensCorrectionVersion": 1,
+                    "lensDistortionParams": { "k1": -0.08, "k2": 0.02, "k3": 0.004 } }),
+            json!({ "lensDistortionAmount": 70,
+                    "lensDistortionParams": { "model": 1, "k1": 0.01, "k2": -0.04, "k3": 0.02 } }),
+            json!({ "transformScale": 92, "lensTcaAmount": 60,
+                    "lensDistortionParams": { "tca_vr": 1.002, "tca_vb": 0.998 } }),
+            json!({ "lensVignetteAmount": 80,
+                    "lensDistortionParams": { "vig_k1": -0.3, "vig_k2": 0.05, "vig_k3": 0.01 } }),
+            json!({ "transformDistortion": 35, "lensDistortionParams": { "k1": 0.05 } }),
+            json!({ "transformDistortion": -30 }),
+            json!({
+                "transformVertical": 15,
+                "transformRotate": -2.0,
+                "transformDistortion": -20,
+                "lensDistortionParams": {
+                    "k1": -0.06, "tca_vr": 1.0015, "tca_vb": 0.999, "vig_k1": -0.25,
+                },
+            }),
+        ];
+        let mut checksum = Checksum(0xcbf2_9ce4_8422_2325);
+        for adjustments in &cases {
+            let params = get_geometry_params_from_json(adjustments);
+            let warped = warp_image_geometry(&image, params);
+            let unwarped = unwarp_image_geometry(&warped, params);
+            for value in warped.to_rgb32f().iter().chain(unwarped.to_rgb32f().iter()) {
+                checksum.add(*value as f64);
+            }
+            for (x, y) in [
+                (0.0, 0.0),
+                (10.0, 5.0),
+                (48.0, 32.0),
+                (95.0, 63.0),
+                (70.0, 12.0),
+            ] {
+                let (sx, sy) = inverse_transform_point(x, y, 96.0, 64.0, adjustments);
+                checksum.add(sx);
+                checksum.add(sy);
+            }
+        }
+        assert_eq!(
+            checksum.0, 863_762_071_807_900_332,
+            "checksum of the version 1 renders"
+        );
     }
 }
