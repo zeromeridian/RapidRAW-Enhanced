@@ -69,6 +69,12 @@ details are in `RELEASE_NOTES.MD`.
   selections created through Select by, not ordinary thumbnail selections.
   **Deselect All** is configurable in Keyboard Shortcuts and defaults to
   Command+D on macOS or Ctrl+D on Windows and Linux.
+- **Menu bar** (Lightroom Classic style; macOS native menus, Windows/Linux
+  in-app bar planned): File, Edit, Photo, View, Window and Help, plus
+  Library and Metadata in Library and Develop and Tools in Develop. Entries
+  run the same actions as the keys, show the bound shortcut (following
+  Settings → Keybinds) and grey out when they don't apply; text fields keep
+  Cut, Copy, Paste and Select All.
 - Manual image stacks with collapse/expand, visible stack cues, drag ordering,
   move-to-top covers, and matching Develop-filmstrip presentation. Stacking a
   selection adds it to, or merges, the stacks it touches (Lightroom's Group
