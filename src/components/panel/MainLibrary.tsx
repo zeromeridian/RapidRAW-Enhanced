@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import clsx from 'clsx';
 import { getVersion } from '@tauri-apps/api/app';
 import { open } from '@tauri-apps/plugin-shell';
 import {
@@ -106,6 +107,10 @@ export interface ColumnWidths {
   focal: number;
 }
 
+// Frame shared by the header's control groups; their contents are h-12 (compact h-9),
+// so every group and the Import button line up at the same height.
+const HEADER_GROUP_CLASS = 'flex items-center bg-surface p-1 rounded-lg border border-border-color/20';
+
 interface DisplayModeSwitchProps {
   displayMode: LibraryDisplayMode;
   setDisplayMode: (mode: LibraryDisplayMode) => void;
@@ -138,8 +143,8 @@ function DisplayModeSwitch({ displayMode, setDisplayMode, t }: DisplayModeSwitch
   const safeIndex = selectedIndex >= 0 ? selectedIndex : 0;
 
   return (
-    <div className="flex items-center bg-surface p-1 rounded-lg border border-border-color/20 h-14 compact:h-9 w-40 compact:w-32 select-none">
-      <div className="relative flex w-full h-full">
+    <div className={clsx(HEADER_GROUP_CLASS, 'w-40 compact:w-32 select-none')}>
+      <div className="relative flex w-full h-12 compact:h-9">
         <motion.div
           className="absolute top-0 bottom-0 z-0 bg-bg-primary rounded-md shadow-sm"
           initial={false}
@@ -654,14 +659,16 @@ export default function MainLibrary(props: MainLibraryProps) {
             <ImportProgress importState={props.importState} />
           ) : (
             !props.isAndroid && (
-              <Button
-                className="h-14 compact:h-9 px-4 compact:px-2 shadow-shiny"
-                onClick={() => props.onImportClick()}
-                data-tooltip={t('library.tooltips.importImages')}
-              >
-                <FolderInput className="w-4 h-4" />
-                <span className="compact:hidden">{t('library.import.button')}</span>
-              </Button>
+              <div className={HEADER_GROUP_CLASS}>
+                <Button
+                  className="h-12 compact:h-9 px-4 compact:px-2"
+                  onClick={() => props.onImportClick()}
+                  data-tooltip={t('library.tooltips.importImages')}
+                >
+                  <FolderInput className="w-4 h-4" />
+                  <span className="compact:hidden">{t('library.import.button')}</span>
+                </Button>
+              </div>
             )
           )}
           {props.importState.status === Status.Error && (
@@ -677,7 +684,7 @@ export default function MainLibrary(props: MainLibraryProps) {
           )}
           <DisplayModeSwitch displayMode={libraryDisplayMode} setDisplayMode={setLibraryDisplayMode} t={t} />
 
-          <div className="flex items-center bg-surface p-1 rounded-lg gap-1 border border-border-color/20">
+          <div className={clsx(HEADER_GROUP_CLASS, 'gap-1')}>
             <SearchInput indexingProgress={props.indexingProgress} isIndexing={props.isIndexing} />
             <ViewOptionsDropdown
               libraryViewMode={props.libraryViewMode}

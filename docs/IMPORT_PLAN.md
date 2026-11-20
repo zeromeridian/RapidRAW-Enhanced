@@ -1,11 +1,10 @@
 # Streamlined Import Plan (Lightroom Classic style)
 
-Status: all four phases built (phase 4 waits on the owner's check,
-2026-11-20). Plan item 64
-in `UPSTREAM_FEATURE_GAP.md`, top priority (owner 2026-11-19: before
-every other Plan task). Branch `dev/streamlined-import` from `develop`
-`4f67d9b6`. Four phases, one MINOR build each, each checked by the
-owner before the next.
+Status: **done** (2026-11-20). All four phases and the fixes
+`1.101.1`–`1.101.3` committed by the owner up to `3fa190cf` and merged:
+`develop` = `origin/develop` = `dev/streamlined-import`. Plan item 64
+in `UPSTREAM_FEATURE_GAP.md`. Open, not asked: a "None" entry in the
+preset bar (see phase 4 below); the duplicate check stays deferred.
 
 Progress:
 

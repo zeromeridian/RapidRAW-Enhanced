@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, RefObject } from 'react';
+import React, { useState, useEffect, useRef, useCallback, RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GLOBAL_KEYS } from './AppProperties';
 import { useEditorStore } from '../../store/useEditorStore';
@@ -120,15 +120,11 @@ const Slider = ({
     };
   }, []);
 
+  // Clamped, so a value outside min..max never draws the fill past the track (Plan item 67).
   const toPercentage = (amount: number) =>
     max !== min ? ((Math.min(max, Math.max(min, amount)) - min) / (max - min)) * 100 : 0;
-  const fillPercentage = max !== min ? ((displayValue - min) / (max - min)) * 100 : 0;
-  const originPercentage = useMemo(() => {
-    if (fillOrigin === 'min') {
-      return 0;
-    }
-    return max !== min ? ((defaultValue - min) / (max - min)) * 100 : 0;
-  }, [fillOrigin, defaultValue, min, max]);
+  const fillPercentage = toPercentage(displayValue);
+  const originPercentage = fillOrigin === 'min' ? 0 : toPercentage(defaultValue);
 
   const stepStr = String(step);
   const decimalPlaces = stepStr.includes('.') ? stepStr.split('.')[1].length : 0;

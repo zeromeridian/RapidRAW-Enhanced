@@ -5,6 +5,19 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.101.4-fix-header-height-slider-overflow — 2026-11-20
+
+### Library
+
+- The Import button now sits in the same frame as the view switch and
+  the search bar, so the Library header's controls line up at one
+  height, in normal and compact density.
+
+### Develop
+
+- A slider's coloured fill always stays inside its track; it can no
+  longer reach past the slider's label.
+
 ## 1.101.3-dev-streamlined-import — 2026-11-20
 
 ### Library
