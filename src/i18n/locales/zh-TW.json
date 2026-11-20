@@ -951,7 +951,6 @@
         "exportPreset": "匯出預設",
         "newFolder": "新建資料夾",
         "newPreset": "新建預設",
-        "overwrite": "覆蓋",
         "renameFolder": "重新命名資料夾",
         "sortAll": "全部按字母排序"
       },
@@ -974,9 +973,7 @@
       },
       "types": {
         "folder": "資料夾",
-        "preset": "預設",
-        "style": "風格",
-        "tool": "工具"
+        "preset": "預設"
       }
     },
     "switcher": {
@@ -1474,16 +1471,10 @@
     },
     "configurePreset": {
       "cancel": "取消",
-      "includeCropTransform": "包含裁剪與變換",
-      "includeMasks": "包含遮色片",
       "placeholder": "輸入預設名稱...",
       "save": "儲存",
       "titleConfigure": "配置預設",
-      "titleSave": "儲存新預設",
-      "typeStyleDesc": "應用完整外觀。這將覆蓋您當前的所有設定以完全匹配預設。",
-      "typeStyleLabel": "風格",
-      "typeToolDesc": "僅應用特定更改而不影響您的其他設定。",
-      "typeToolLabel": "工具"
+      "titleSave": "儲存新預設"
     },
     "confirm": {
       "cancel": "取消",

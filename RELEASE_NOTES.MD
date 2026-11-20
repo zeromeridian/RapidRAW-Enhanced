@@ -5,6 +5,26 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.103.0-dev-preset-sections — 2026-11-20
+
+### Develop
+
+- **Choose what a preset saves.** The preset dialog now lists every
+  setting, as in Lightroom Classic: sections, their groups and the single
+  sliders inside them (for example Tone → Contrast, Highlights, Shadows),
+  each with its own checkbox, plus Check All and Check None. A new preset
+  starts with the settings you changed on the photo ticked.
+- Applying a preset changes only the settings it holds; everything else
+  on the photo stays as it is. Masks and Crop & Transform are entries in
+  the same list.
+- **Update with Current Settings…** (was Overwrite) opens the list too,
+  so you can choose again which settings the preset takes from the
+  photo. **Configure Preset** renames a preset and removes or adds
+  settings while keeping its saved values.
+- The Tool / Style choice is gone; each preset shows how many settings it
+  holds, and hovering the number lists their groups. Presets saved before apply
+  exactly as they did.
+
 ## 1.102.0-dev-lens-correction-rework — 2026-11-20
 
 ### Develop

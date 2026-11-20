@@ -951,7 +951,6 @@
         "exportPreset": "导出预设",
         "newFolder": "新建文件夹",
         "newPreset": "新建预设",
-        "overwrite": "覆盖",
         "renameFolder": "重命名文件夹",
         "sortAll": "全部按字母排序"
       },
@@ -974,9 +973,7 @@
       },
       "types": {
         "folder": "文件夹",
-        "preset": "预设",
-        "style": "风格",
-        "tool": "工具"
+        "preset": "预设"
       }
     },
     "switcher": {
@@ -1474,16 +1471,10 @@
     },
     "configurePreset": {
       "cancel": "取消",
-      "includeCropTransform": "包含裁剪与变换",
-      "includeMasks": "包含蒙版",
       "placeholder": "输入预设名称...",
       "save": "保存",
       "titleConfigure": "配置预设",
-      "titleSave": "保存新预设",
-      "typeStyleDesc": "应用完整外观。这将覆盖您当前的所有设置以完全匹配预设。",
-      "typeStyleLabel": "风格",
-      "typeToolDesc": "仅应用特定更改而不影响您的其他设置。",
-      "typeToolLabel": "工具"
+      "titleSave": "保存新预设"
     },
     "confirm": {
       "cancel": "取消",

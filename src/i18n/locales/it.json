@@ -978,7 +978,6 @@
         "exportPreset": "Esporta Predefinito",
         "newFolder": "Nuova Cartella",
         "newPreset": "Nuovo Predefinito",
-        "overwrite": "Sovrascrivi",
         "renameFolder": "Rinomina Cartella",
         "sortAll": "Ordina Tutti in Ordine Alfabetico"
       },
@@ -1001,9 +1000,7 @@
       },
       "types": {
         "folder": "Cartella",
-        "preset": "Predefinito",
-        "style": "Stile",
-        "tool": "Strumento"
+        "preset": "Predefinito"
       }
     },
     "switcher": {
@@ -1508,16 +1505,10 @@
     },
     "configurePreset": {
       "cancel": "Annulla",
-      "includeCropTransform": "Includi Ritaglio e Trasformazione",
-      "includeMasks": "Includi Maschere",
       "placeholder": "Inserisci nome predefinito...",
       "save": "Salva",
       "titleConfigure": "Configura Predefinito",
-      "titleSave": "Salva Nuovo Predefinito",
-      "typeStyleDesc": "Applica l'aspetto completo. Questo sovrascriverà tutte le tue impostazioni attuali per corrispondere esattamente al predefinito.",
-      "typeStyleLabel": "Stile",
-      "typeToolDesc": "Applica solo modifiche specifiche senza toccare le altre tue impostazioni.",
-      "typeToolLabel": "Strumento"
+      "titleSave": "Salva Nuovo Predefinito"
     },
     "confirm": {
       "cancel": "Annulla",

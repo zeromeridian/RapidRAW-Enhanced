@@ -11,6 +11,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { useTranslation } from 'react-i18next';
+import type { ParseKeys } from 'i18next';
 import { PresetImportFailure, PresetListType, usePresets, UserPreset } from '../../../hooks/usePresets';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import {
@@ -29,12 +30,10 @@ import {
   Layers,
   Crop,
   Save,
-  Wrench,
-  Palette,
   Settings2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import ConfigurePresetModal from '../../modals/ConfigurePresetModal';
+import ConfigurePresetModal, { PresetDialogMode } from '../../modals/ConfigurePresetModal';
 import CreateFolderModal from '../../modals/CreateFolderModal';
 import RenameFolderModal from '../../modals/RenameFolderModal';
 import Button from '../../ui/Button';
@@ -42,7 +41,13 @@ import Text from '../../ui/Text';
 import PanelHeader from '../../ui/PanelHeader';
 import Slider from '../../ui/Slider';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { Adjustments, INITIAL_ADJUSTMENTS, ADJUSTMENT_GROUPS } from '../../../utils/adjustments';
+import { Adjustments, INITIAL_ADJUSTMENTS, getInitialAdjustments } from '../../../utils/adjustments';
+import {
+  describePresetSettings,
+  getEditedPresetKeys,
+  getPresetKeys,
+  presetHoldsSection,
+} from '../../../utils/presetSettings';
 import { Invokes, OPTION_SEPARATOR, Panel, Preset, SelectedImage } from '../../ui/AppProperties';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
@@ -79,8 +84,14 @@ interface FolderState {
 
 interface ModalState {
   isOpen: boolean;
+  mode: PresetDialogMode;
+  /** The preset updated or configured; none for a new one. */
   preset: Preset | null;
+  /** The settings ticked when the dialog opens. */
+  initialKeys: ReadonlySet<string>;
 }
+
+const CLOSED_MODAL: ModalState = { isOpen: false, mode: 'new', preset: null, initialKeys: new Set() };
 
 interface PresetItemDisplayProps {
   isGeneratingPreviews: boolean;
@@ -209,12 +220,9 @@ function PresetItemDisplay({
   onDragStateChange,
 }: PresetItemDisplayProps) {
   const { t } = useTranslation();
-  const geometryKeys = ADJUSTMENT_GROUPS.geometry.flatMap((g) => g.keys);
-
-  const supportsMasks = preset.includeMasks ?? (preset.adjustments?.masks && preset.adjustments.masks.length > 0);
-  const supportsGeometry =
-    preset.includeCropTransform ?? geometryKeys.some((key) => preset.adjustments?.[key] !== undefined);
-  const isTool = preset.presetType === 'tool';
+  const supportsMasks = presetHoldsSection(preset, 'masks');
+  const supportsGeometry = presetHoldsSection(preset, 'geometry');
+  const settings = useMemo(() => describePresetSettings(preset), [preset]);
   const tooltipContent = useMemo(() => {
     const features = [];
     if (supportsMasks) features.push(t('editor.presets.supports.masks'));
@@ -260,17 +268,13 @@ function PresetItemDisplay({
             {preset.name}
           </Text>
           <div className="flex items-center gap-1.5 mt-0.5">
-            {isTool ? (
-              <Wrench size={12} className="text-text-secondary" />
-            ) : (
-              <Palette size={12} className="text-text-secondary" />
-            )}
             <Text
               variant={TextVariants.small}
               color={TextColors.secondary}
               className="text-[10px] uppercase tracking-wider"
+              data-tooltip={settings.groupLabels.map((label) => t(label as ParseKeys)).join(', ')}
             >
-              {isTool ? t('editor.presets.types.tool') : t('editor.presets.types.style')}
+              {t('editor.presets.settingsCount', { count: settings.count })}
             </Text>
           </div>
         </div>
@@ -485,23 +489,22 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
   const {
     addFolder,
     addPreset,
-    configurePreset,
     deleteItem,
     duplicatePreset,
     exportPresetsToFile,
     importPresetsFromFiles,
     isLoading,
     movePreset,
-    overwritePreset,
     presets,
     renameItem,
     reorderItems,
     sortAllPresetsAlphabetically,
+    updatePreset,
   } = usePresets(adjustments);
   const { showContextMenu } = useContextMenu();
   const [previews, setPreviews] = useState<Record<string, string | null>>({});
   const [isGeneratingPreviews, setIsGeneratingPreviews] = useState(false);
-  const [configureModalState, setConfigureModalState] = useState<ModalState>({ isOpen: false, preset: null });
+  const [configureModalState, setConfigureModalState] = useState<ModalState>(CLOSED_MODAL);
   const [isAddFolderModalOpen, setIsAddFolderModalOpen] = useState(false);
   const [renameFolderState, setRenameFolderState] = useState<FolderState>({ isOpen: false, folder: null });
   const [expandedFolders, setExpandedFolders] = useState(new Set<string>());
@@ -846,30 +849,24 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
     [setAdjustments],
   );
 
-  const handleSaveConfiguredPreset = async (
-    name: string,
-    includeMasks: boolean,
-    includeCropTransform: boolean,
-    presetType: 'tool' | 'style',
-  ) => {
-    if (configureModalState.preset) {
-      const updated = configurePreset(
-        configureModalState.preset.id,
-        name,
-        includeMasks,
-        includeCropTransform,
-        presetType,
-      );
-      if (updated) {
-        await generateSinglePreview(updated);
-      }
-    } else {
-      const newPreset = addPreset(name, null, includeMasks, includeCropTransform, presetType);
-      if (newPreset) {
-        await generateSinglePreview(newPreset);
-      }
+  /** Opens the preset dialog: a new preset starts with the photo's edited settings ticked, others with their own. */
+  const openPresetDialog = (mode: PresetDialogMode, preset: Preset | null = null) => {
+    const initialKeys = preset
+      ? getPresetKeys(preset)
+      : getEditedPresetKeys(adjustments, getInitialAdjustments(selectedImage?.isRaw ?? false));
+    setConfigureModalState({ isOpen: true, mode, preset, initialKeys });
+  };
+
+  /** Keeps the mode and preset while the dialog fades out, so its title does not change. */
+  const closePresetDialog = () => setConfigureModalState((state) => ({ ...state, isOpen: false }));
+
+  const handleSaveConfiguredPreset = async (name: string, keys: Set<string>) => {
+    const { mode, preset } = configureModalState;
+    const saved = preset ? updatePreset(preset.id, name, keys, mode === 'update') : addPreset(name, keys);
+    closePresetDialog();
+    if (saved) {
+      await generateSinglePreview(saved);
     }
-    setConfigureModalState({ isOpen: false, preset: null });
   };
 
   const handleAddFolder = (name: string) => {
@@ -1067,18 +1064,13 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
       options = [
         {
           icon: Save,
-          label: t('editor.presets.menu.overwrite'),
-          onClick: async () => {
-            const updated = overwritePreset(data?.id ?? null);
-            if (updated) {
-              await generateSinglePreview(updated);
-            }
-          },
+          label: t('editor.presets.menu.updateWithCurrent'),
+          onClick: () => openPresetDialog('update', data as Preset),
         },
         {
           icon: Settings2,
           label: t('editor.presets.menu.configurePreset'),
-          onClick: () => setConfigureModalState({ isOpen: true, preset: data as Preset }),
+          onClick: () => openPresetDialog('configure', data as Preset),
         },
         { type: OPTION_SEPARATOR },
         {
@@ -1118,7 +1110,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
       {
         icon: Plus,
         label: t('editor.presets.menu.newPreset'),
-        onClick: () => setConfigureModalState({ isOpen: true, preset: null }),
+        onClick: () => openPresetDialog('new'),
       },
       {
         icon: FolderPlus,
@@ -1172,7 +1164,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
               <button
                 className="p-2 rounded-full hover:bg-surface transition-colors"
                 disabled={isLoading}
-                onClick={() => setConfigureModalState({ isOpen: true, preset: null })}
+                onClick={() => openPresetDialog('new')}
                 data-tooltip={t('editor.presets.tooltips.saveNew')}
               >
                 <Plus size={18} />
@@ -1287,8 +1279,10 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
 
         <ConfigurePresetModal
           isOpen={configureModalState.isOpen}
-          initialPreset={configureModalState.preset}
-          onClose={() => setConfigureModalState({ isOpen: false, preset: null })}
+          mode={configureModalState.mode}
+          initialName={configureModalState.preset?.name ?? ''}
+          initialKeys={configureModalState.initialKeys}
+          onClose={closePresetDialog}
           onSave={handleSaveConfiguredPreset}
         />
         <CreateFolderModal

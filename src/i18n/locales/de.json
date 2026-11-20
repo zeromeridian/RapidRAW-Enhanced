@@ -953,7 +953,6 @@
         "exportPreset": "Vorgabe exportieren",
         "newFolder": "Neuer Ordner",
         "newPreset": "Neue Vorgabe",
-        "overwrite": "Überschreiben",
         "renameFolder": "Ordner umbenennen",
         "sortAll": "Alle alphabetisch sortieren"
       },
@@ -976,9 +975,7 @@
       },
       "types": {
         "folder": "Ordner",
-        "preset": "Vorgabe",
-        "style": "Stil",
-        "tool": "Werkzeug"
+        "preset": "Vorgabe"
       }
     },
     "switcher": {
@@ -1476,16 +1473,10 @@
     },
     "configurePreset": {
       "cancel": "Abbrechen",
-      "includeCropTransform": "Zuschnitt & Form einbeziehen",
-      "includeMasks": "Masken einbeziehen",
       "placeholder": "Vorgaben-Namen eingeben...",
       "save": "Speichern",
       "titleConfigure": "Vorgabe konfigurieren",
-      "titleSave": "Neue Vorgabe speichern",
-      "typeStyleDesc": "Wendet den kompletten Look an. Dies überschreibt alle aktuellen Einstellungen, um der Vorgabe exakt zu entsprechen.",
-      "typeStyleLabel": "Stil",
-      "typeToolDesc": "Wendet nur spezifische Änderungen an, ohne Ihre anderen Einstellungen zu berühren.",
-      "typeToolLabel": "Werkzeug"
+      "titleSave": "Neue Vorgabe speichern"
     },
     "confirm": {
       "cancel": "Abbrechen",

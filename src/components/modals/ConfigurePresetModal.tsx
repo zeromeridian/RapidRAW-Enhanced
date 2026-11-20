@@ -1,153 +1,102 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import clsx from 'clsx';
+import type { ParseKeys } from 'i18next';
+import { useControlLabel } from '../../hooks/useControlLabel';
 import Text from '../ui/Text';
-import { TextVariants } from '../../types/typography';
-import Switch from '../ui/Switch';
-import { Preset } from '../ui/AppProperties';
-import { ADJUSTMENT_GROUPS } from '../../utils/adjustments';
+import Button from '../ui/Button';
+import TickBox, { getTickState } from '../ui/TickBox';
+import { TextColors, TextVariants } from '../../types/typography';
+import { ADJUSTMENT_GROUPS, AdjustmentGroup, COPYABLE_ADJUSTMENT_KEYS } from '../../utils/adjustments';
+import { presetSettingUnits } from '../../utils/presetSettings';
+
+/** Save a new preset, Update one with the photo's settings, or Configure one without the photo. */
+export type PresetDialogMode = 'new' | 'update' | 'configure';
 
 interface ConfigurePresetModalProps {
   isOpen: boolean;
+  mode: PresetDialogMode;
+  initialName: string;
+  /** The settings ticked when the dialog opens. */
+  initialKeys: ReadonlySet<string>;
   onClose(): void;
-  onSave(name: string, includeMasks: boolean, includeCropTransform: boolean, presetType: 'tool' | 'style'): void;
-  initialPreset?: Preset | null;
+  onSave(name: string, keys: Set<string>): void;
 }
 
-interface PresetTypeSwitchProps {
-  selectedType: 'tool' | 'style';
-  onChange: (type: 'tool' | 'style') => void;
-}
-
-const PresetTypeSwitch = ({ selectedType, onChange }: PresetTypeSwitchProps) => {
-  const { t } = useTranslation();
-  const [bubbleStyle, setBubbleStyle] = useState({});
-  const isInitialAnimation = useRef(true);
-
-  const presetTypeOptions = useMemo(
-    () => [
-      {
-        id: 'style' as const,
-        label: t('modals.configurePreset.typeStyleLabel'),
-        title: t('modals.configurePreset.typeStyleDesc'),
-      },
-      {
-        id: 'tool' as const,
-        label: t('modals.configurePreset.typeToolLabel'),
-        title: t('modals.configurePreset.typeToolDesc'),
-      },
-    ],
-    [t],
-  );
-
-  useEffect(() => {
-    const selectedIndex = presetTypeOptions.findIndex((m) => m.id === selectedType);
-    const safeIndex = selectedIndex >= 0 ? selectedIndex : 0;
-
-    const widthPercent = 100 / presetTypeOptions.length;
-    const targetX = `${safeIndex * 100}%`;
-    const targetWidth = `${widthPercent}%`;
-
-    if (isInitialAnimation.current) {
-      let initialX = selectedType === 'style' ? '-25%' : '100%';
-
-      setBubbleStyle({
-        x: [initialX, targetX],
-        width: targetWidth,
-      });
-      isInitialAnimation.current = false;
-    } else {
-      setBubbleStyle({
-        x: targetX,
-        width: targetWidth,
-      });
-    }
-  }, [selectedType, presetTypeOptions]);
-
-  return (
-    <div className="w-full p-1.5 bg-card-active rounded-md mt-2">
-      <div className="relative flex w-full">
-        <motion.div
-          className="absolute top-0 bottom-0 z-0 bg-accent"
-          style={{ borderRadius: 4 }}
-          animate={bubbleStyle}
-          transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
-        />
-        {presetTypeOptions.map((option) => (
-          <button
-            key={option.id}
-            data-tooltip={option.title}
-            onClick={(e) => {
-              e.preventDefault();
-              onChange(option.id);
-            }}
-            className={clsx(
-              'relative flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
-              {
-                'text-text-primary hover:bg-surface': selectedType !== option.id,
-                'text-button-text': selectedType === option.id,
-              },
-            )}
-            style={{ WebkitTapHighlightColor: 'transparent' }}
-          >
-            <span className="relative z-10 flex items-center">{option.label}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+const TITLES: Record<PresetDialogMode, ParseKeys> = {
+  new: 'modals.configurePreset.titleSave',
+  update: 'modals.configurePreset.titleUpdate',
+  configure: 'modals.configurePreset.titleConfigure',
 };
 
-export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialPreset }: ConfigurePresetModalProps) {
+const HINTS: Record<PresetDialogMode, ParseKeys> = {
+  new: 'modals.configurePreset.hintFromPhoto',
+  update: 'modals.configurePreset.hintFromPhoto',
+  configure: 'modals.configurePreset.hintKeepValues',
+};
+
+interface SettingRowProps {
+  label: string;
+  state: ReturnType<typeof getTickState>;
+  onToggle(): void;
+  isPart?: boolean;
+}
+
+function SettingRow({ label, state, onToggle, isPart = false }: SettingRowProps) {
   const { t } = useTranslation();
+  return (
+    <button
+      className={`flex w-full items-center gap-2 py-0.5 text-left ${isPart ? 'pl-6' : ''}`}
+      onClick={onToggle}
+      type="button"
+    >
+      <TickBox state={state} />
+      <Text as="span" color={isPart ? TextColors.secondary : TextColors.primary}>
+        {t(label as ParseKeys)}
+      </Text>
+    </button>
+  );
+}
+
+/** The preset dialog (Lightroom Classic's New Develop Preset): a name and a tree of the settings it saves. */
+export default function ConfigurePresetModal({
+  isOpen,
+  mode,
+  initialName,
+  initialKeys,
+  onClose,
+  onSave,
+}: ConfigurePresetModalProps) {
+  const { t } = useTranslation();
+  const { sectionLabel } = useControlLabel();
   const [name, setName] = useState('');
-  const [includeMasks, setIncludeMasks] = useState(false);
-  const [includeCropTransform, setIncludeCropTransform] = useState(false);
-  const [presetType, setPresetType] = useState<'tool' | 'style'>('style');
+  const [keys, setKeys] = useState<Set<string>>(new Set());
   const [isMounted, setIsMounted] = useState(false);
   const [show, setShow] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setName(initialPreset?.name || '');
-      setIncludeMasks(
-        initialPreset?.includeMasks ??
-          (initialPreset?.adjustments?.masks && initialPreset.adjustments.masks.length > 0) ??
-          false,
-      );
-
-      const GEOMETRY_KEYS = ADJUSTMENT_GROUPS.geometry.flatMap((group) => group.keys);
-      const hasGeometry =
-        initialPreset?.adjustments && Object.keys(initialPreset.adjustments).some((key) => GEOMETRY_KEYS.includes(key));
-      setIncludeCropTransform(initialPreset?.includeCropTransform ?? hasGeometry ?? false);
-
-      setPresetType(initialPreset?.presetType || 'style');
+      setName(initialName);
+      setKeys(new Set(initialKeys));
       setIsMounted(true);
       const timer = setTimeout(() => setShow(true), 10);
       return () => clearTimeout(timer);
-    } else {
-      setShow(false);
-      const timer = setTimeout(() => {
-        setIsMounted(false);
-        setName('');
-        setIncludeMasks(false);
-        setIncludeCropTransform(false);
-        setPresetType('style');
-      }, 300);
-      return () => clearTimeout(timer);
     }
-  }, [isOpen, initialPreset]);
+    setShow(false);
+    const timer = setTimeout(() => setIsMounted(false), 300);
+    return () => clearTimeout(timer);
+  }, [isOpen, initialName, initialKeys]);
+
+  const canSave = name.trim() !== '' && keys.size > 0;
 
   const handleSave = useCallback(() => {
-    if (name.trim()) {
-      onSave(name.trim(), includeMasks, includeCropTransform, presetType);
+    if (canSave) {
+      onSave(name.trim(), keys);
       onClose();
     }
-  }, [name, includeMasks, includeCropTransform, presetType, onSave, onClose]);
+  }, [canSave, name, keys, onSave, onClose]);
 
   const handleKeyDown = useCallback(
-    (e: any) => {
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter') {
         handleSave();
       } else if (e.key === 'Escape') {
@@ -156,6 +105,17 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
     },
     [handleSave, onClose],
   );
+
+  const isTicked = (unit: AdjustmentGroup) => unit.keys.every((key) => keys.has(key));
+
+  const setTicked = (unitKeys: Array<string>, isOn: boolean) => {
+    const next = new Set(keys);
+    for (const key of unitKeys) {
+      if (isOn) next.add(key);
+      else next.delete(key);
+    }
+    setKeys(next);
+  };
 
   if (!isMounted) {
     return null;
@@ -175,35 +135,74 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
     >
       <div
         className={`
-          bg-surface rounded-lg shadow-xl p-6 w-full max-w-sm
+          bg-surface rounded-lg shadow-xl p-6 w-full max-w-3xl mx-4 flex flex-col max-h-[90vh]
           transform transition-all duration-300 ease-out
           ${show ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 -translate-y-4'}
         `}
-        onClick={(e: any) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <Text variant={TextVariants.title} className="mb-4">
-          {initialPreset ? t('modals.configurePreset.titleConfigure') : t('modals.configurePreset.titleSave')}
+          {t(TITLES[mode])}
         </Text>
         <input
           autoFocus
           className="w-full bg-bg-primary text-text-primary border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
-          onChange={(e: any) => setName(e.target.value)}
+          onChange={(e) => setName(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t('modals.configurePreset.placeholder')}
           type="text"
           value={name}
         />
 
-        <div className="mt-5 mb-4 p-1 space-y-4">
-          <Switch label={t('modals.configurePreset.includeMasks')} checked={includeMasks} onChange={setIncludeMasks} />
-          <Switch
-            label={t('modals.configurePreset.includeCropTransform')}
-            checked={includeCropTransform}
-            onChange={setIncludeCropTransform}
-          />
+        <div className="flex justify-between items-center mt-5 mb-2 gap-4">
+          <div>
+            <Text variant={TextVariants.heading}>{t('modals.configurePreset.settings')}</Text>
+            <Text variant={TextVariants.small}>{t(HINTS[mode])}</Text>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button size="sm" onClick={() => setKeys(new Set(COPYABLE_ADJUSTMENT_KEYS))}>
+              {t('modals.copyPaste.selectAll')}
+            </Button>
+            <Button size="sm" onClick={() => setKeys(new Set())}>
+              {t('modals.copyPaste.selectNone')}
+            </Button>
+          </div>
         </div>
 
-        <PresetTypeSwitch selectedType={presetType} onChange={setPresetType} />
+        <div className="bg-bg-primary p-4 rounded-md overflow-y-auto min-h-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
+            {Object.entries(ADJUSTMENT_GROUPS).map(([section, groups]) => (
+              <div key={section}>
+                <Text variant={TextVariants.label} className="mb-1.5">
+                  {sectionLabel(section)}
+                </Text>
+                {groups.map((group) => {
+                  const units = presetSettingUnits(group);
+                  const tickedCount = units.filter(isTicked).length;
+                  const state = getTickState(tickedCount, units.length);
+                  return (
+                    <div key={group.label} className="mb-1 last:mb-0">
+                      <SettingRow
+                        label={group.label}
+                        state={state}
+                        onToggle={() => setTicked(group.keys, state !== 'all')}
+                      />
+                      {group.parts?.map((part) => (
+                        <SettingRow
+                          isPart
+                          key={part.label}
+                          label={part.label}
+                          state={isTicked(part) ? 'all' : 'none'}
+                          onToggle={() => setTicked(part.keys, !isTicked(part))}
+                        />
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
 
         <div className="flex justify-end gap-3 mt-6">
           <button
@@ -214,7 +213,7 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
           </button>
           <button
             className="px-4 py-2 rounded-md bg-accent text-button-text font-semibold hover:bg-accent-hover disabled:bg-gray-500 disabled:text-white disabled:cursor-not-allowed transition-colors"
-            disabled={!name.trim()}
+            disabled={!canSave}
             onClick={handleSave}
           >
             {t('modals.configurePreset.save')}

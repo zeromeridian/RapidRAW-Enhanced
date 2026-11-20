@@ -951,7 +951,6 @@
         "exportPreset": "프리셋 내보내기",
         "newFolder": "새 폴더",
         "newPreset": "새 프리셋",
-        "overwrite": "덮어쓰기",
         "renameFolder": "폴더 이름 변경",
         "sortAll": "모두 알파벳순 정렬"
       },
@@ -974,9 +973,7 @@
       },
       "types": {
         "folder": "폴더",
-        "preset": "프리셋",
-        "style": "스타일",
-        "tool": "도구"
+        "preset": "프리셋"
       }
     },
     "switcher": {
@@ -1474,16 +1471,10 @@
     },
     "configurePreset": {
       "cancel": "취소",
-      "includeCropTransform": "자르기 및 변형 포함",
-      "includeMasks": "마스크 포함",
       "placeholder": "프리셋 이름 입력...",
       "save": "저장",
       "titleConfigure": "프리셋 구성",
-      "titleSave": "새 프리셋 저장",
-      "typeStyleDesc": "전체적인 모습을 적용합니다. 현재 모든 설정을 프리셋과 정확히 일치하도록 덮어씁니다.",
-      "typeStyleLabel": "스타일",
-      "typeToolDesc": "다른 설정을 건드리지 않고 특정 변경 사항만 적용합니다.",
-      "typeToolLabel": "도구"
+      "titleSave": "새 프리셋 저장"
     },
     "confirm": {
       "cancel": "취소",

@@ -951,7 +951,6 @@
         "exportPreset": "プリセットを書き出し",
         "newFolder": "新規フォルダ",
         "newPreset": "新規プリセット",
-        "overwrite": "上書き",
         "renameFolder": "フォルダ名を変更",
         "sortAll": "すべて名前順に並べ替え"
       },
@@ -974,9 +973,7 @@
       },
       "types": {
         "folder": "フォルダ",
-        "preset": "プリセット",
-        "style": "スタイル",
-        "tool": "ツール"
+        "preset": "プリセット"
       }
     },
     "switcher": {
@@ -1474,16 +1471,10 @@
     },
     "configurePreset": {
       "cancel": "キャンセル",
-      "includeCropTransform": "切り抜きと変形を含める",
-      "includeMasks": "マスクを含める",
       "placeholder": "プリセット名を入力...",
       "save": "保存",
       "titleConfigure": "プリセットの構成",
-      "titleSave": "新規プリセットを保存",
-      "typeStyleDesc": "全体のルックを適用します。プリセットと完全に一致するように現在の設定がすべて上書きされます。",
-      "typeStyleLabel": "スタイル",
-      "typeToolDesc": "他の設定を変更せずに、特定の設定のみを適用します。",
-      "typeToolLabel": "ツール"
+      "titleSave": "新規プリセットを保存"
     },
     "confirm": {
       "cancel": "キャンセル",

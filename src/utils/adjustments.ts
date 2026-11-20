@@ -1301,37 +1301,46 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
 export interface AdjustmentGroup {
   label: string;
   keys: string[];
+  /** The settings the preset dialog lists one by one; together they hold exactly the group's keys. */
+  parts?: AdjustmentGroup[];
 }
 
-/** The Copy & Paste Settings checkboxes, under the Adjustments sections they belong to. */
+/** A group whose every key is a setting of its own, listed under its label. */
+const groupOfSettings = (label: string, settings: Array<[key: string, label: string]>): AdjustmentGroup => ({
+  label,
+  keys: settings.map(([key]) => key),
+  parts: settings.map(([key, partLabel]) => ({ label: partLabel, keys: [key] })),
+});
+
+/**
+ * The Copy & Paste Settings checkboxes, under the Adjustments sections they belong to; the
+ * preset dialog also lists each group's parts.
+ */
 export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
   light: [
     { label: 'adjustments.color.blackAndWhite', keys: [ColorAdjustment.Monochrome] },
-    {
-      label: 'modals.copyPaste.groups.exposureToneMapper',
-      keys: [BasicAdjustment.Exposure, 'toneMapper'],
-    },
-    { label: 'modals.copyPaste.groups.whiteBalance', keys: [ColorAdjustment.Temperature, ColorAdjustment.Tint] },
-    {
-      label: 'modals.copyPaste.groups.tone',
-      keys: [
-        BasicAdjustment.Brightness,
-        BasicAdjustment.Contrast,
-        BasicAdjustment.Highlights,
-        BasicAdjustment.Shadows,
-        BasicAdjustment.Whites,
-        BasicAdjustment.Blacks,
-      ],
-    },
-    {
-      label: 'modals.copyPaste.groups.clarityDehaze',
-      keys: [
-        DetailsAdjustment.Clarity,
-        DetailsAdjustment.Structure,
-        DetailsAdjustment.Dehaze,
-        DetailsAdjustment.Centré,
-      ],
-    },
+    groupOfSettings('modals.copyPaste.groups.exposureToneMapper', [
+      [BasicAdjustment.Exposure, 'adjustments.basic.exposure'],
+      ['toneMapper', 'adjustments.basic.toneMapper'],
+    ]),
+    groupOfSettings('modals.copyPaste.groups.whiteBalance', [
+      [ColorAdjustment.Temperature, 'adjustments.color.temperature'],
+      [ColorAdjustment.Tint, 'adjustments.color.tint'],
+    ]),
+    groupOfSettings('modals.copyPaste.groups.tone', [
+      [BasicAdjustment.Brightness, 'adjustments.basic.brightness'],
+      [BasicAdjustment.Contrast, 'adjustments.basic.contrast'],
+      [BasicAdjustment.Highlights, 'adjustments.basic.highlights'],
+      [BasicAdjustment.Shadows, 'adjustments.basic.shadows'],
+      [BasicAdjustment.Whites, 'adjustments.basic.whites'],
+      [BasicAdjustment.Blacks, 'adjustments.basic.blacks'],
+    ]),
+    groupOfSettings('modals.copyPaste.groups.clarityDehaze', [
+      [DetailsAdjustment.Clarity, 'adjustments.details.clarity'],
+      [DetailsAdjustment.Structure, 'adjustments.details.structure'],
+      [DetailsAdjustment.Dehaze, 'adjustments.details.dehaze'],
+      [DetailsAdjustment.Centré, 'adjustments.details.centre'],
+    ]),
   ],
   curves: [
     {
@@ -1340,10 +1349,10 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     },
   ],
   color: [
-    {
-      label: 'modals.copyPaste.groups.presence',
-      keys: [ColorAdjustment.Saturation, ColorAdjustment.Vibrance],
-    },
+    groupOfSettings('modals.copyPaste.groups.presence', [
+      [ColorAdjustment.Saturation, 'adjustments.color.saturation'],
+      [ColorAdjustment.Vibrance, 'adjustments.color.vibrance'],
+    ]),
     {
       label: 'modals.copyPaste.groups.hueShift',
       keys: [ColorAdjustment.Hue],
@@ -1369,6 +1378,17 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         CreativeAdjustment.HalationAmount,
         CreativeAdjustment.HalationHue,
         CreativeAdjustment.FlareAmount,
+      ],
+      parts: [
+        {
+          label: 'adjustments.effects.glow',
+          keys: [CreativeAdjustment.GlowAmount, CreativeAdjustment.GlowHue, CreativeAdjustment.GlowSaturation],
+        },
+        {
+          label: 'adjustments.effects.halation',
+          keys: [CreativeAdjustment.HalationAmount, CreativeAdjustment.HalationHue],
+        },
+        { label: 'adjustments.effects.lightFlares', keys: [CreativeAdjustment.FlareAmount] },
       ],
     },
   ],
@@ -1400,6 +1420,18 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         DetailsAdjustment.AiDenoiseEnabled,
         DetailsAdjustment.AiDenoiseAmount,
         DetailsAdjustment.AiDenoiseDetail,
+      ],
+      parts: [
+        { label: 'adjustments.details.luminance', keys: [DetailsAdjustment.LumaNoiseReduction] },
+        { label: 'adjustments.details.color', keys: [DetailsAdjustment.ColorNoiseReduction] },
+        {
+          label: 'adjustments.details.aiDenoise',
+          keys: [
+            DetailsAdjustment.AiDenoiseEnabled,
+            DetailsAdjustment.AiDenoiseAmount,
+            DetailsAdjustment.AiDenoiseDetail,
+          ],
+        },
       ],
     },
     {
@@ -1454,10 +1486,10 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         LensAdjustment.LensVignetteEnabled,
       ],
     },
-    {
-      label: 'modals.copyPaste.groups.chromaticAberration',
-      keys: [DetailsAdjustment.ChromaticAberrationRedCyan, DetailsAdjustment.ChromaticAberrationBlueYellow],
-    },
+    groupOfSettings('modals.copyPaste.groups.chromaticAberration', [
+      [DetailsAdjustment.ChromaticAberrationRedCyan, 'adjustments.details.redCyan'],
+      [DetailsAdjustment.ChromaticAberrationBlueYellow, 'adjustments.details.blueYellow'],
+    ]),
   ],
   masks: [{ label: 'modals.copyPaste.groups.masks', keys: ['masks'] }],
   blendPad: [{ label: 'editor.blendPad.title', keys: ['blendPad'] }],

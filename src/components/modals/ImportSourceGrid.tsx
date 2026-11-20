@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
-import { Check, ImageOff, Loader2, Minus } from 'lucide-react';
+import { ImageOff, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import { Invokes } from '../ui/AppProperties';
 import { ImportCandidate } from '../ui/ExportImportProperties';
 import Text from '../ui/Text';
+import TickBox, { getTickState } from '../ui/TickBox';
 import { TextColors, TextVariants } from '../../types/typography';
 
 /** Previews made at once; the rest wait, so a card of thousands does not swamp the backend. */
@@ -28,21 +29,6 @@ const loadThumbnail = async (path: string): Promise<string> => {
 };
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
-
-/** A box that shows ✓ when every item is ticked, − when some are. */
-function TickBox({ state }: { state: 'all' | 'some' | 'none' }) {
-  return (
-    <span
-      className={clsx(
-        'flex items-center justify-center w-4 h-4 rounded-sm border shrink-0',
-        state === 'none' ? 'border-text-secondary bg-bg-primary/70' : 'border-accent bg-accent text-button-text',
-      )}
-    >
-      {state === 'all' && <Check size={12} strokeWidth={3} />}
-      {state === 'some' && <Minus size={12} strokeWidth={3} />}
-    </span>
-  );
-}
 
 /** One photo's tile; its preview loads once the tile scrolls into view. */
 function ImportTile({
@@ -155,7 +141,7 @@ export default function ImportSourceGrid({ candidates, checked, onCheckedChange,
     <div className="flex-1 overflow-y-auto p-1 pr-2 space-y-4">
       {days.map(({ day, photos }) => {
         const tickedCount = photos.filter((photo) => checked.has(photo.path)).length;
-        const state = tickedCount === photos.length ? 'all' : tickedCount > 0 ? 'some' : 'none';
+        const state = getTickState(tickedCount, photos.length);
         // `YYYY-MM-DD` read as a local date, so the day shown is the camera's day.
         const [year, month, date] = day.split('-').map(Number);
         return (

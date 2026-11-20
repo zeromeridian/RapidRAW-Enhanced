@@ -490,10 +490,12 @@
         "curves": "Curves",
         "detail": "Detail",
         "finish": "Finish",
+        "geometry": "Geometry",
         "light": "Light",
         "lensGeometry": "Lens & Geometry",
         "lightAtmosphere": "Light & Atmosphere",
         "look": "Look",
+        "masks": "Masks",
         "zoneTint": "Zone Editor"
       },
       "title": "Adjustments",
@@ -1007,10 +1009,12 @@
         "exportPreset": "Export Preset",
         "newFolder": "New Folder",
         "newPreset": "New Preset",
-        "overwrite": "Overwrite",
         "renameFolder": "Rename Folder",
-        "sortAll": "Sort All Alphabetically"
+        "sortAll": "Sort All Alphabetically",
+        "updateWithCurrent": "Update with Current Settings…"
       },
+      "settingsCount_one": "{{count}} setting",
+      "settingsCount_other": "{{count}} settings",
       "status": {
         "empty": "No presets saved yet. Create your own, import from a file, or explore community presets.",
         "getCommunity": "Get Community Presets",
@@ -1030,9 +1034,7 @@
       },
       "types": {
         "folder": "Folder",
-        "preset": "Preset",
-        "style": "Style",
-        "tool": "Tool"
+        "preset": "Preset"
       }
     },
     "switcher": {
@@ -1599,16 +1601,14 @@
     },
     "configurePreset": {
       "cancel": "Cancel",
-      "includeCropTransform": "Include Crop & Transform",
-      "includeMasks": "Include Masks",
+      "hintFromPhoto": "Ticked settings are saved with this photo's values; applying the preset changes only those.",
+      "hintKeepValues": "Ticked settings keep the preset's values; a setting you tick is saved at its default.",
       "placeholder": "Enter preset name...",
       "save": "Save",
+      "settings": "Settings",
       "titleConfigure": "Configure Preset",
       "titleSave": "Save New Preset",
-      "typeStyleDesc": "Applies the complete look. This will override all your current settings to match the preset exactly.",
-      "typeStyleLabel": "Style",
-      "typeToolDesc": "Only applies specific changes without touching your other settings.",
-      "typeToolLabel": "Tool"
+      "titleUpdate": "Update Preset with Current Settings"
     },
     "confirm": {
       "cancel": "Cancel",

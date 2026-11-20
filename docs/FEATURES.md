@@ -372,8 +372,8 @@ details are in `RELEASE_NOTES.MD`.
   Chromatic Aberration holds the profile's correction and the manual
   Red/Cyan and Blue/Yellow sliders; Perspective holds the geometry tools
   below. Every change applies live with undo. Lens
-  settings, including Auto mode, persist in Tool and Style presets without
-  requiring crop and transform data to be included. Auto finds the built-in
+  settings, including Auto mode, can be saved in presets without crop and
+  transform. Auto finds the built-in
   lens of fixed-lens cameras (Ricoh GR, Fujifilm X100) through the camera's
   mount; **Auto Lens Correction** in the right-click Productivity menu turns
   it on for the photo or a whole selection.
@@ -421,6 +421,15 @@ details are in `RELEASE_NOTES.MD`.
   tag them). Collapsible
   sections and a `keyword:` search query.
 - Persisted **Black & White** switch in the global Color section.
+- **Presets save chosen settings** (Lightroom Classic's New Develop
+  Preset): the save dialog lists every setting as a tree of sections,
+  groups and single sliders with Check All / Check None; a new preset
+  starts with the photo's edited settings ticked. Applying a preset
+  changes only the settings it holds. **Update with Current Settings…**
+  and **Configure Preset** open the same tree (Update takes the photo's
+  values, Configure keeps the preset's). Each preset shows how many
+  settings it holds; replaces the Tool/Style choice, and older presets
+  apply as before.
 - Named tone-curve presets with unique names, built-in Linear and contrast
   presets, modification indicators, update, save-as-new, and delete actions.
 - Tone Curve channel buttons show a dot under each adjusted channel, and the

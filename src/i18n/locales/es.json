@@ -978,7 +978,6 @@
         "exportPreset": "Exportar ajuste preestablecido",
         "newFolder": "Nueva carpeta",
         "newPreset": "Nuevo ajuste preestablecido",
-        "overwrite": "Sobrescribir",
         "renameFolder": "Renombrar carpeta",
         "sortAll": "Ordenar todo alfabéticamente"
       },
@@ -1001,9 +1000,7 @@
       },
       "types": {
         "folder": "Carpeta",
-        "preset": "Ajuste preestablecido",
-        "style": "Estilo",
-        "tool": "Herramienta"
+        "preset": "Ajuste preestablecido"
       }
     },
     "switcher": {
@@ -1508,16 +1505,10 @@
     },
     "configurePreset": {
       "cancel": "Cancelar",
-      "includeCropTransform": "Incluir recorte y transformación",
-      "includeMasks": "Incluir máscaras",
       "placeholder": "Introduce el nombre del ajuste preestablecido...",
       "save": "Guardar",
       "titleConfigure": "Configurar ajuste preestablecido",
-      "titleSave": "Guardar nuevo ajuste",
-      "typeStyleDesc": "Aplica el aspecto completo. Esto sobrescribirá todos tus ajustes actuales para que coincidan exactamente con el ajuste preestablecido.",
-      "typeStyleLabel": "Estilo",
-      "typeToolDesc": "Solo aplica cambios específicos sin tocar el resto de tus ajustes.",
-      "typeToolLabel": "Herramienta"
+      "titleSave": "Guardar nuevo ajuste"
     },
     "confirm": {
       "cancel": "Cancelar",

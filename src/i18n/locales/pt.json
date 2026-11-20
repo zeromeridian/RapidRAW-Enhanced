@@ -978,7 +978,6 @@
         "exportPreset": "Exportar Predefinição",
         "newFolder": "Nova Pasta",
         "newPreset": "Nova Predefinição",
-        "overwrite": "Substituir",
         "renameFolder": "Renomear Pasta",
         "sortAll": "Classificar Todos em Ordem Alfabética"
       },
@@ -1001,9 +1000,7 @@
       },
       "types": {
         "folder": "Pasta",
-        "preset": "Predefinição",
-        "style": "Estilo",
-        "tool": "Ferramenta"
+        "preset": "Predefinição"
       }
     },
     "switcher": {
@@ -1508,16 +1505,10 @@
     },
     "configurePreset": {
       "cancel": "Cancelar",
-      "includeCropTransform": "Incluir Corte e Transformação",
-      "includeMasks": "Incluir Máscaras",
       "placeholder": "Digite o nome da predefinição...",
       "save": "Salvar",
       "titleConfigure": "Configurar Predefinição",
-      "titleSave": "Salvar Nova Predefinição",
-      "typeStyleDesc": "Aplica o visual completo. Isso substituirá todas as suas configurações atuais para corresponder exatamente à predefinição.",
-      "typeStyleLabel": "Estilo",
-      "typeToolDesc": "Aplica apenas alterações específicas sem tocar em suas outras configurações.",
-      "typeToolLabel": "Ferramenta"
+      "titleSave": "Salvar Nova Predefinição"
     },
     "confirm": {
       "cancel": "Cancelar",

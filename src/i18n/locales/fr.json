@@ -978,7 +978,6 @@
         "exportPreset": "Exporter le paramètre prédéfini",
         "newFolder": "Nouveau dossier",
         "newPreset": "Nouveau paramètre prédéfini",
-        "overwrite": "Écraser",
         "renameFolder": "Renommer le dossier",
         "sortAll": "Trier tout par ordre alphabétique"
       },
@@ -1001,9 +1000,7 @@
       },
       "types": {
         "folder": "Dossier",
-        "preset": "Paramètre prédéfini",
-        "style": "Style",
-        "tool": "Outil"
+        "preset": "Paramètre prédéfini"
       }
     },
     "switcher": {
@@ -1508,16 +1505,10 @@
     },
     "configurePreset": {
       "cancel": "Annuler",
-      "includeCropTransform": "Inclure Recadrage & Transformation",
-      "includeMasks": "Inclure les masques",
       "placeholder": "Saisir le nom du paramètre prédéfini...",
       "save": "Enregistrer",
       "titleConfigure": "Configurer le paramètre prédéfini",
-      "titleSave": "Enregistrer le nouveau paramètre prédéfini",
-      "typeStyleDesc": "Applique le rendu complet. Cela remplacera tous vos paramètres actuels pour correspondre exactement au paramètre prédéfini.",
-      "typeStyleLabel": "Style",
-      "typeToolDesc": "N'applique que des modifications spécifiques sans toucher à vos autres paramètres.",
-      "typeToolLabel": "Outil"
+      "titleSave": "Enregistrer le nouveau paramètre prédéfini"
     },
     "confirm": {
       "cancel": "Annuler",
