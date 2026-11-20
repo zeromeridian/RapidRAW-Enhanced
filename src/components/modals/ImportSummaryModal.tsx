@@ -5,6 +5,7 @@ import Button from '../ui/Button';
 import Text from '../ui/Text';
 import { TextColor, TextColors, TextVariants } from '../../types/typography';
 import { ImportIssueKind, ImportReport } from '../ui/ExportImportProperties';
+import { displayTag } from '../../utils/keywords';
 
 interface ImportSummaryModalProps {
   /** The finished import; null closes the dialog. */
@@ -42,6 +43,7 @@ export default function ImportSummaryModal({ report, onClose, onShowFolder }: Im
   const skipped = issuesOf(ImportIssueKind.NameTaken);
   const failed = issuesOf(ImportIssueKind.Failed);
   const sourceKept = issuesOf(ImportIssueKind.SourceKept);
+  const metadataNotApplied = issuesOf(ImportIssueKind.MetadataNotApplied);
   const suffixed = imported.filter((file) => file.suffixed).length;
   const seconds = Math.max(1, Math.round(shownReport.elapsedMs / 1000));
   const folderToShow = folders.length === 1 ? folders[0] : shownReport.destination;
@@ -64,6 +66,12 @@ export default function ImportSummaryModal({ report, onClose, onShowFolder }: Im
     ...(shownReport.notStarted > 0
       ? [{ text: t('modals.importSummary.notStarted', { count: shownReport.notStarted }) }]
       : []),
+    ...(shownReport.keywords.length > 0 && imported.length > 0
+      ? [{ text: t('modals.importSummary.keywords', { keywords: shownReport.keywords.map(displayTag).join(', ') }) }]
+      : []),
+    ...(metadataNotApplied.length > 0
+      ? [{ text: t('modals.importSummary.metadataNotApplied'), color: TextColors.error }]
+      : []),
   ];
 
   const issueReason = (kind: ImportIssueKind, message: string | null) =>
@@ -71,7 +79,9 @@ export default function ImportSummaryModal({ report, onClose, onShowFolder }: Im
       ? t('modals.importSummary.reasonNameTaken')
       : kind === ImportIssueKind.SourceKept
         ? t('modals.importSummary.reasonSourceKept', { message: message ?? '' })
-        : (message ?? '');
+        : kind === ImportIssueKind.MetadataNotApplied
+          ? t('modals.importSummary.reasonMetadataNotApplied', { message: message ?? '' })
+          : (message ?? '');
 
   return (
     <div

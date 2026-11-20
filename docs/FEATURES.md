@@ -41,7 +41,8 @@ details are in `RELEASE_NOTES.MD`.
 - Customizable bottom toolbar shared by Library and Develop, with Productivity,
   Copy, Stacking, Flags, and direct color-label controls.
 - Lightroom-style **Metadata** panel next to the Library grid: file
-  information, camera details, editable author and copyright, rating and
+  information, camera details, editable author and copyright (also kept
+  in XMP as `dc:creator` / `dc:rights` with XMP sync on), rating and
   labels, GPS map, and the full EXIF of the active photo.
 - Labelled **Info**, **Tagging**, **Export**, and **Develop** switches at the
   top right of the top bar, always shown in Library and Develop, with the
@@ -160,7 +161,10 @@ details are in `RELEASE_NOTES.MD`.
   chips, inline errors, Custom Text, example name); the default export
   name is `{filename}_edited`; a photo imported under a new name
   remembers its camera name.
-- Lightroom Classic-style import (Plan item 64, phases 1–2): an Import
+- Lightroom Classic-style import (Plan item 64, phases 1–3): keywords,
+  author and copyright for every imported photo (keyword suggestions
+  from the Library; author and copyright remembered), XMP sidecars
+  imported with their photos; an Import
   button in the Library header and Cmd/Ctrl+Shift+I; a source of a
   folder (subfolders optional), single files, or a card or camera drive
   (`DCIM`, found by itself; connecting one opens Import unless turned

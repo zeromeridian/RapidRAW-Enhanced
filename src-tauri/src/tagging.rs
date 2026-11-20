@@ -818,12 +818,35 @@ pub fn add_tag_for_paths(
     app_handle: AppHandle,
 ) -> Result<String, String> {
     let tag = crate::keyword_index::existing_keyword_spelling(&app_handle, &tag);
-    modify_tags_for_paths(&paths, app_handle, |tags| {
-        if !tags.iter().any(|existing| is_same_tag(existing, &tag)) {
-            tags.push(tag.clone());
+    modify_tags_for_paths(&paths, app_handle, |tags| add_tag(tags, &tag))?;
+    Ok(tag)
+}
+
+/// Adds `tag` to `tags` unless they already hold it (`is_same_tag`).
+fn add_tag(tags: &mut Vec<String>, tag: &str) {
+    if !tags.iter().any(|existing| is_same_tag(existing, tag)) {
+        tags.push(tag.to_string());
+    }
+}
+
+/// Adds every tag of `tags` to `paths` in one write per image, each spelled as
+/// the library already spells it, as `add_tag_for_paths` does one at a time
+/// (Import's keywords, Plan item 64).
+pub(crate) fn add_tags_to_paths(
+    paths: &[String],
+    tags: &[String],
+    app_handle: &AppHandle,
+) -> Result<(), String> {
+    let tags: Vec<String> = tags
+        .iter()
+        .map(|tag| crate::keyword_index::existing_keyword_spelling(app_handle, tag))
+        .collect();
+    modify_tags_for_paths(paths, app_handle.clone(), |existing| {
+        for tag in &tags {
+            add_tag(existing, tag);
         }
     })?;
-    Ok(tag)
+    Ok(())
 }
 
 #[tauri::command]

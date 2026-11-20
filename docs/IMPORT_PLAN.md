@@ -61,9 +61,29 @@ Progress:
   thumbnails reused, dialog 96vw × 92vh, tiles from 186 px. **Owner:
   "This is good now"** (phase 2 accepted, 2026-11-19).
   `1.99.0`–`1.99.2` committed by the owner as `ac4c5634`.
-- Decision 16 built as `1.99.3` (not committed): `copy_xmp_sidecars`,
-  `remove_xmp_sidecars`, `reserved_extensions` in the name planner;
-  header Import button as tall as the view switch.
+- Decision 16 built as `1.99.3`, committed by the owner as `a59bbd1b`:
+  `copy_xmp_sidecars`, `remove_xmp_sidecars`, `reserved_extensions` in
+  the name planner; header Import button height (still off, item 65).
+- Phase 3 (`1.100.0`, 2026-11-19, not committed): `ImportSettings`
+  gains `keywords` (stored tags), `creator`, `copyright`; after the
+  copies, `apply_import_metadata` sets `Artist`/`Copyright` through
+  `file_management::update_exif_fields_for_path` (the Metadata panel's
+  path, now shared) and adds the keywords through
+  `tagging::add_tags_to_paths` (one write per photo; `add_tag` shared
+  with `add_tag_for_paths`); a failure is one `MetadataNotApplied`
+  issue. XMP: `set_xmp_bag`/`extract_xmp_bag` became
+  `set_xmp_array`/`extract_xmp_array` with `XmpArray` (Bag, Seq, Alt);
+  `XMP_EXIF_FIELDS` maps `Artist` → `dc:creator` (Seq) and `Copyright` →
+  `dc:rights` (Alt, `x-default`); `sync_metadata_to_xmp` writes them when
+  set and never removes them (a creator only Lightroom wrote stays);
+  `update_exif_fields` (now with the app handle) syncs the XMP and
+  removes a field cleared in the Metadata panel; `apply_xmp` reads them
+  back only into EXIF already read from the image (a map with just these
+  would hide the camera EXIF, `has_descriptive_exif`). Dialog: Metadata
+  section with `ImportKeywordField.tsx` (chips, commas, suggestions from
+  `useKeywordIndex`, existing spelling wins) and author/copyright
+  fields (remembered in `lastImportSettings`; keywords start empty);
+  summary lists the keywords. Report `keywords`.
 
 ## Owner's request (2026-11-19)
 

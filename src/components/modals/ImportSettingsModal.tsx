@@ -9,6 +9,7 @@ import SegmentedSwitch from '../ui/SegmentedSwitch';
 import Switch from '../ui/Switch';
 import FilenameTemplateEditor from '../ui/FilenameTemplateEditor';
 import ImportSourceGrid from './ImportSourceGrid';
+import ImportKeywordField from './ImportKeywordField';
 import {
   ImportCandidate,
   ImportNameClash,
@@ -98,6 +99,9 @@ export default function ImportSettingsModal({
   // Null until typed or loaded: then the template's saved texts, else the last ones used.
   const [customTexts, setCustomTexts] = useState<Array<string> | null>(null);
   const [nameClash, setNameClash] = useState(ImportNameClash.AddSuffix);
+  const [keywords, setKeywords] = useState<Array<string>>([]);
+  const [creator, setCreator] = useState('');
+  const [copyright, setCopyright] = useState('');
   const [exampleFolder, setExampleFolder] = useState('');
 
   const selectedPaths = useMemo(
@@ -136,6 +140,10 @@ export default function ImportSettingsModal({
       setCustomFormat(isListedFormat ? '' : last.dateFolderFormat);
       setFilenameTemplate(last.filenameTemplate);
       setNameClash(last.nameClash);
+      // Keywords start empty each time, so one shoot's never land on the next (decision 9).
+      setKeywords([]);
+      setCreator(last.creator);
+      setCopyright(last.copyright);
       setCustomTexts(null);
       setIsMounted(true);
       invoke<Array<ImportVolume>>(Invokes.ListImportVolumes)
@@ -222,6 +230,8 @@ export default function ImportSettingsModal({
           filenameTemplate: template,
           nameClash,
           includeSubfolders,
+          creator: creator.trim(),
+          copyright: copyright.trim(),
         },
       });
     }
@@ -234,12 +244,18 @@ export default function ImportSettingsModal({
         deleteAfterImport: mode === ImportMode.Move,
         nameClash,
         monthNames: months,
+        keywords,
+        creator: creator.trim(),
+        copyright: copyright.trim(),
       },
       destination,
       selectedPaths,
     );
     onClose();
   }, [
+    keywords,
+    creator,
+    copyright,
     canImport,
     onSave,
     onClose,
@@ -489,6 +505,35 @@ export default function ImportSettingsModal({
                 ]}
                 value={nameClash}
               />
+            </div>
+
+            <div className="space-y-3">
+              <Text variant={TextVariants.heading} className="block">
+                {t('modals.importSettings.metadata')}
+              </Text>
+              <div>
+                <Text variant={TextVariants.label} className="block mb-1">
+                  {t('modals.importSettings.keywords')}
+                </Text>
+                <ImportKeywordField keywords={keywords} onChange={setKeywords} />
+              </div>
+              {[
+                { label: t('editor.metadata.fields.author'), value: creator, onChange: setCreator },
+                { label: t('editor.metadata.fields.copyright'), value: copyright, onChange: setCopyright },
+              ].map((field) => (
+                <label className="block" key={field.label}>
+                  <Text as="span" variant={TextVariants.label} className="block mb-1">
+                    {field.label}
+                  </Text>
+                  <input
+                    className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
+                    onChange={(e) => field.onChange(e.target.value)}
+                    type="text"
+                    value={field.value}
+                  />
+                </label>
+              ))}
+              <Text variant={TextVariants.small}>{t('modals.importSettings.metadataHelp')}</Text>
             </div>
 
             {preview?.stem && destination && (

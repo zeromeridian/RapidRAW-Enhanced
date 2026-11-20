@@ -139,6 +139,11 @@ export interface ImportSettings {
   nameClash?: ImportNameClash;
   /** January to December in the app's language, for `MMMM`. */
   monthNames?: Array<string>;
+  /** Keywords for every imported photo, as stored tags (`user:Places|Berlin`). */
+  keywords?: Array<string>;
+  /** Creator and copyright for every imported photo; empty keeps the photo's own. */
+  creator?: string;
+  copyright?: string;
 }
 
 /** Rust `ImportCandidate`: a photo an import source holds. */
@@ -160,6 +165,7 @@ export enum ImportIssueKind {
   NameTaken = 'nameTaken',
   Failed = 'failed',
   SourceKept = 'sourceKept',
+  MetadataNotApplied = 'metadataNotApplied',
 }
 
 /** Rust `ImportReport`, sent with `import-complete`. */
@@ -171,6 +177,8 @@ export interface ImportReport {
   notStarted: number;
   cancelled: boolean;
   moved: boolean;
+  /** The keywords given to the imported photos (stored tags). */
+  keywords: Array<string>;
   folders: Array<string>;
   elapsedMs: number;
 }

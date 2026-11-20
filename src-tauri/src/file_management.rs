@@ -611,14 +611,17 @@ fn is_sidecar_of(sidecar_filename: &str, image_filename: &str) -> bool {
 
 #[cfg(test)]
 mod output_naming_tests {
+    use std::collections::HashMap;
+
     use super::{
-        DC_SUBJECT, LOCAL_ONLY_ADJUSTMENT_KEYS, LR_HIERARCHICAL_SUBJECT,
+        DC_CREATOR, DC_RIGHTS, DC_SUBJECT, LOCAL_ONLY_ADJUSTMENT_KEYS, LR_HIERARCHICAL_SUBJECT,
         apply_preset_adjustments_to_path, collect_preset_batch_folder_paths,
         compute_thumbnail_cache_hash, ensure_transfer_destination_free, extract_app_xmp_value,
-        extract_xmp_bag, extract_xmp_stack, find_all_associated_files,
+        extract_xmp_array, extract_xmp_stack, find_all_associated_files,
         generate_filename_from_template, import_rapidraw_sidecars_blocking, is_sidecar_of,
         parse_sidecar_filename, parse_virtual_path, read_xmp_from_folder_blocking,
         sanitize_filename_suffix, set_app_xmp_value, sync_metadata_from_xmp, sync_metadata_to_xmp,
+        update_exif_fields_for_path,
     };
     use crate::app_settings::AppSettings;
     use crate::image_processing::ImageMetadata;
@@ -937,11 +940,11 @@ mod output_naming_tests {
         sync_metadata_to_xmp(&image, &metadata, true);
         let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
         assert_eq!(
-            extract_xmp_bag(&xmp, DC_SUBJECT),
+            extract_xmp_array(&xmp, DC_SUBJECT),
             ["sky", "places", "germany", "berlin"]
         );
         assert_eq!(
-            extract_xmp_bag(&xmp, LR_HIERARCHICAL_SUBJECT),
+            extract_xmp_array(&xmp, LR_HIERARCHICAL_SUBJECT),
             ["places|germany|berlin"]
         );
 
@@ -956,6 +959,60 @@ mod output_naming_tests {
         let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
         assert!(!xmp.contains("<dc:subject"));
         assert!(!xmp.contains("<lr:hierarchicalSubject"));
+    }
+
+    #[test]
+    fn creator_and_copyright_round_trip_through_xmp_and_clear_only_when_asked() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("image.jpg");
+        fs::write(&image, []).unwrap();
+        let exif: HashMap<String, String> = [
+            ("Artist".to_string(), "Ann & Bo".to_string()),
+            ("Copyright".to_string(), "© 2026 Ann".to_string()),
+            ("Make".to_string(), "Canon".to_string()),
+        ]
+        .into();
+        let metadata = ImageMetadata {
+            exif: Some(exif),
+            ..ImageMetadata::default()
+        };
+
+        sync_metadata_to_xmp(&image, &metadata, true);
+        let xmp_path = image.with_extension("xmp");
+        let xmp = fs::read_to_string(&xmp_path).unwrap();
+        assert!(xmp.contains("<rdf:Seq>"));
+        assert!(xmp.contains(r#"<rdf:li xml:lang="x-default">© 2026 Ann</rdf:li>"#));
+        assert_eq!(extract_xmp_array(&xmp, DC_CREATOR), ["Ann & Bo"]);
+        assert_eq!(extract_xmp_array(&xmp, DC_RIGHTS), ["© 2026 Ann"]);
+
+        // Read back into EXIF already read from the image, never into none.
+        let mut with_exif = ImageMetadata {
+            exif: Some([("Make".to_string(), "Canon".to_string())].into()),
+            ..ImageMetadata::default()
+        };
+        sync_metadata_from_xmp(&image, &mut with_exif, false);
+        let read = with_exif.exif.unwrap();
+        assert_eq!(read.get("Artist").map(String::as_str), Some("Ann & Bo"));
+        assert_eq!(
+            read.get("Copyright").map(String::as_str),
+            Some("© 2026 Ann")
+        );
+        let mut without_exif = ImageMetadata::default();
+        sync_metadata_from_xmp(&image, &mut without_exif, false);
+        assert!(without_exif.exif.is_none());
+
+        // A sync without them keeps them (Lightroom's stay); clearing them in
+        // the Metadata panel removes them.
+        sync_metadata_to_xmp(&image, &ImageMetadata::default(), true);
+        let xmp = fs::read_to_string(&xmp_path).unwrap();
+        assert_eq!(extract_xmp_array(&xmp, DC_CREATOR), ["Ann & Bo"]);
+        let sidecar = crate::exif_processing::get_primary_sidecar_path(&image);
+        fs::write(&sidecar, serde_json::to_string(&metadata).unwrap()).unwrap();
+        let cleared: HashMap<String, String> = [("Artist".to_string(), String::new())].into();
+        update_exif_fields_for_path(&image.to_string_lossy(), &cleared, Some(false));
+        let xmp = fs::read_to_string(&xmp_path).unwrap();
+        assert!(extract_xmp_array(&xmp, DC_CREATOR).is_empty());
+        assert_eq!(extract_xmp_array(&xmp, DC_RIGHTS), ["© 2026 Ann"]);
     }
 
     #[test]
@@ -1861,45 +1918,91 @@ pub async fn read_exif_for_paths(
 pub async fn update_exif_fields(
     paths: Vec<String>,
     updates: HashMap<String, String>,
+    app_handle: AppHandle,
 ) -> Result<(), String> {
+    let xmp = xmp_sync_mode(&app_handle);
     tauri::async_runtime::spawn_blocking(move || {
-        paths.par_iter().for_each(|path| {
-            let original_path = Path::new(&path);
-            let primary_path = crate::exif_processing::get_primary_sidecar_path(original_path);
-            let temp_metadata = crate::exif_processing::load_sidecar(&primary_path);
-
-            let mut exif_data = temp_metadata.exif.unwrap_or_else(|| {
-                if let Some(existing) = crate::exif_processing::read_sidecar_exif(original_path) {
-                    existing
-                } else if let Ok(mmap) = read_file_mapped(original_path) {
-                    crate::exif_processing::read_exif_data_from_bytes(path, &mmap)
-                } else if let Ok(bytes) = fs::read(original_path) {
-                    crate::exif_processing::read_exif_data_from_bytes(path, &bytes)
-                } else {
-                    HashMap::new()
-                }
-            });
-
-            for (k, v) in &updates {
-                let trimmed = v.trim();
-                if trimmed.is_empty() {
-                    exif_data.remove(k);
-                } else {
-                    exif_data.insert(k.clone(), trimmed.to_string());
-                }
-            }
-
-            let mut final_metadata = crate::exif_processing::load_sidecar(&primary_path);
-
-            final_metadata.exif = Some(exif_data);
-            if let Ok(json) = serde_json::to_string_pretty(&final_metadata) {
-                let _ = write_metadata_file(&primary_path, &json);
-            }
-        });
+        paths
+            .par_iter()
+            .for_each(|path| update_exif_fields_for_path(path, &updates, xmp));
         Ok(())
     })
     .await
     .map_err(|e| format!("Task failed: {}", e))?
+}
+
+/// With XMP sync on, whether a missing XMP is created (`create_xmp_if_missing`); `None` with it off.
+pub(crate) fn xmp_sync_mode(app_handle: &AppHandle) -> Option<bool> {
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    settings
+        .enable_xmp_sync
+        .unwrap_or(false)
+        .then(|| settings.create_xmp_if_missing.unwrap_or(false))
+}
+
+/// Sets (or, when empty, clears) EXIF fields such as `Artist` in the image's
+/// sidecar, reading the image's EXIF first when the sidecar has none. With
+/// `xmp` (`xmp_sync_mode`) the XMP follows: `XMP_EXIF_FIELDS` are written,
+/// and one cleared here is removed from it too.
+pub(crate) fn update_exif_fields_for_path(
+    path: &str,
+    updates: &HashMap<String, String>,
+    xmp: Option<bool>,
+) {
+    let original_path = Path::new(path);
+    let primary_path = crate::exif_processing::get_primary_sidecar_path(original_path);
+    let mut metadata = crate::exif_processing::load_sidecar(&primary_path);
+
+    let mut exif_data = metadata.exif.take().unwrap_or_else(|| {
+        if let Some(existing) = crate::exif_processing::read_sidecar_exif(original_path) {
+            existing
+        } else if let Ok(mmap) = read_file_mapped(original_path) {
+            crate::exif_processing::read_exif_data_from_bytes(path, &mmap)
+        } else if let Ok(bytes) = fs::read(original_path) {
+            crate::exif_processing::read_exif_data_from_bytes(path, &bytes)
+        } else {
+            HashMap::new()
+        }
+    });
+
+    for (k, v) in updates {
+        let trimmed = v.trim();
+        if trimmed.is_empty() {
+            exif_data.remove(k);
+        } else {
+            exif_data.insert(k.clone(), trimmed.to_string());
+        }
+    }
+
+    metadata.exif = Some(exif_data);
+    if let Ok(json) = serde_json::to_string_pretty(&metadata) {
+        let _ = write_metadata_file(&primary_path, &json);
+    }
+
+    if let Some(create_if_missing) = xmp
+        && !path.contains("?vc=")
+    {
+        let (source_path, _) = parse_virtual_path(path);
+        sync_metadata_to_xmp(&source_path, &metadata, create_if_missing);
+        let cleared: Vec<(&str, XmpArray)> = XMP_EXIF_FIELDS
+            .iter()
+            .filter(|(key, _, _)| {
+                updates
+                    .get(*key)
+                    .is_some_and(|value| value.trim().is_empty())
+            })
+            .map(|&(_, property, array)| (property, array))
+            .collect();
+        if !cleared.is_empty()
+            && let Some(xmp_path) = resolve_xmp_path(&source_path)
+            && let Ok(mut content) = fs::read_to_string(&xmp_path)
+        {
+            for (property, array) in cleared {
+                set_xmp_array(&mut content, property, None, array, &[]);
+            }
+            let _ = write_metadata_file(&xmp_path, &content);
+        }
+    }
 }
 
 fn match_disk_kind(disks: &Disks, canonical: &Path) -> Option<bool> {
@@ -6511,11 +6614,40 @@ fn add_preserved_file_name_to_xmp_file(xmp_path: &Path, name: &str) {
 
 const APP_XMP_NAMESPACE: &str = "https://colrbent.com/ns/this-is-raw/1.0/";
 const LIGHTROOM_XMP_NAMESPACE: &str = "http://ns.adobe.com/lightroom/1.0/";
+const DC_XMP_NAMESPACE: &str = "http://purl.org/dc/elements/1.1/";
 const DC_SUBJECT: &str = "dc:subject";
+const DC_CREATOR: &str = "dc:creator";
+const DC_RIGHTS: &str = "dc:rights";
 const LR_HIERARCHICAL_SUBJECT: &str = "lr:hierarchicalSubject";
 
-/// Reads the items of an `rdf:Bag` property such as `dc:subject`.
-fn extract_xmp_bag(content: &str, property: &str) -> Vec<String> {
+/// The kinds of XMP array: unordered (`dc:subject`), ordered (`dc:creator`)
+/// and language alternatives (`dc:rights`, one `x-default` item here).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum XmpArray {
+    Bag,
+    Seq,
+    Alt,
+}
+
+impl XmpArray {
+    fn element(self) -> &'static str {
+        match self {
+            Self::Bag => "rdf:Bag",
+            Self::Seq => "rdf:Seq",
+            Self::Alt => "rdf:Alt",
+        }
+    }
+}
+
+/// The EXIF fields that are kept in XMP too (owner 2026-11-19, Plan item 64
+/// decision 11): EXIF key, XMP property, its array kind.
+const XMP_EXIF_FIELDS: [(&str, &str, XmpArray); 2] = [
+    ("Artist", DC_CREATOR, XmpArray::Seq),
+    ("Copyright", DC_RIGHTS, XmpArray::Alt),
+];
+
+/// Reads the items of an XMP array property (`rdf:Bag`, `rdf:Seq` or `rdf:Alt`) such as `dc:subject`.
+fn extract_xmp_array(content: &str, property: &str) -> Vec<String> {
     let block = Regex::new(&format!(
         r#"(?s)<{property}(?:\s[^>]*)?>(.*?)</{property}>"#
     ))
@@ -6533,10 +6665,16 @@ fn extract_xmp_bag(content: &str, property: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// Replaces or adds an `rdf:Bag` property, or removes it when `items` is empty.
-fn set_xmp_bag(content: &mut String, property: &str, namespace: Option<&str>, items: &[String]) {
+/// Replaces or adds an XMP array property of kind `array`, or removes it when `items` is empty.
+fn set_xmp_array(
+    content: &mut String,
+    property: &str,
+    namespace: Option<&str>,
+    array: XmpArray,
+    items: &[String],
+) {
     let existing = Regex::new(&format!(
-        r#"(?s)<{property}(?:\s[^>]*)?>\s*<rdf:Bag(?:\s[^>]*)?>.*?</rdf:Bag>\s*</{property}>"#
+        r#"(?s)<{property}(?:\s[^>]*)?>\s*<rdf:(?:Bag|Seq|Alt)(?:\s[^>]*)?>.*?</rdf:(?:Bag|Seq|Alt)>\s*</{property}>"#
     ))
     .unwrap();
     if items.is_empty() {
@@ -6550,28 +6688,73 @@ fn set_xmp_bag(content: &mut String, property: &str, namespace: Option<&str>, it
             Some(format!(" xmlns:{prefix}=\"{uri}\""))
         })
         .unwrap_or_default();
-    let mut bag = format!("<{property}{declaration}>\n    <rdf:Bag>\n");
+    let element = array.element();
+    let item_attributes = if array == XmpArray::Alt {
+        r#" xml:lang="x-default""#
+    } else {
+        ""
+    };
+    let mut block = format!("<{property}{declaration}>\n    <{element}>\n");
     for item in items {
-        bag.push_str(&format!(
-            "     <rdf:li>{}</rdf:li>\n",
+        block.push_str(&format!(
+            "     <rdf:li{item_attributes}>{}</rdf:li>\n",
             escape_xmp_text(item)
         ));
     }
-    bag.push_str(&format!("    </rdf:Bag>\n   </{property}>"));
+    block.push_str(&format!("    </{element}>\n   </{property}>"));
 
     if existing.is_match(content) {
-        *content = existing.replace(content, NoExpand(&bag)).to_string();
+        *content = existing.replace(content, NoExpand(&block)).to_string();
     } else if let Some(last_index) = content.rfind("</rdf:Description>") {
         let (start, end) = content.split_at(last_index);
-        *content = format!("{} {}\n  {}", start, bag, end);
+        *content = format!("{} {}\n  {}", start, block, end);
     }
+}
+
+/// Writes the `XMP_EXIF_FIELDS` that `exif` holds (non-empty) into `content`;
+/// a field it lacks is left as it is, so a creator only Lightroom wrote stays.
+fn write_xmp_exif_fields(content: &mut String, exif: Option<&HashMap<String, String>>) {
+    for (key, property, array) in XMP_EXIF_FIELDS {
+        if let Some(value) = exif
+            .and_then(|exif| exif.get(key))
+            .map(|value| value.trim())
+            .filter(|value| !value.is_empty())
+        {
+            set_xmp_array(
+                content,
+                property,
+                Some(DC_XMP_NAMESPACE),
+                array,
+                &[value.to_string()],
+            );
+        }
+    }
+}
+
+/// Reads the `XMP_EXIF_FIELDS` of `content` into `exif`: each one `exif` lacks,
+/// or every one with `force`. Returns whether anything changed.
+fn read_xmp_exif_fields(content: &str, exif: &mut HashMap<String, String>, force: bool) -> bool {
+    let mut changed = false;
+    for (key, property, _) in XMP_EXIF_FIELDS {
+        if let Some(value) = extract_xmp_array(content, property)
+            .into_iter()
+            .map(|value| value.trim().to_string())
+            .find(|value| !value.is_empty())
+            && (force || !exif.contains_key(key))
+            && exif.get(key) != Some(&value)
+        {
+            exif.insert(key.to_string(), value);
+            changed = true;
+        }
+    }
+    changed
 }
 
 /// Reads the keywords of an XMP file as stored tags, together with its plain `dc:subject`
 /// keywords for `merge_xmp_keyword_tags`.
 fn extract_xmp_keyword_tags(content: &str) -> (Vec<String>, Vec<String>) {
-    let subject = extract_xmp_bag(content, DC_SUBJECT);
-    let hierarchical = extract_xmp_bag(content, LR_HIERARCHICAL_SUBJECT);
+    let subject = extract_xmp_array(content, DC_SUBJECT);
+    let hierarchical = extract_xmp_array(content, LR_HIERARCHICAL_SUBJECT);
     let origin = if let Some(ai_keywords) = extract_app_xmp_value(content, "AiKeywords") {
         XmpKeywordOrigin::ThisIsRaw {
             ai_keywords: serde_json::from_str(&ai_keywords).unwrap_or_default(),
@@ -6873,6 +7056,12 @@ fn apply_xmp(content: &str, metadata: &mut ImageMetadata, force: bool) -> bool {
             metadata.adjustments = imported_adjustments;
             changed = true;
         }
+    }
+
+    // Only into EXIF already read from the image: a map holding just these would
+    // count as read (`has_descriptive_exif`) and hide the camera's EXIF.
+    if let Some(exif) = metadata.exif.as_mut() {
+        changed |= read_xmp_exif_fields(content, exif, force);
     }
 
     if let Some(name) = extract_xmp_preserved_file_name(content)
@@ -7178,13 +7367,21 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
         set_app_xmp_value(&mut content, "ConstrainCrop", Some(&constrain_crop));
 
         let keywords = XmpKeywords::from_tags(&normal_tags);
-        set_xmp_bag(&mut content, DC_SUBJECT, None, &keywords.subject);
-        set_xmp_bag(
+        set_xmp_array(
+            &mut content,
+            DC_SUBJECT,
+            None,
+            XmpArray::Bag,
+            &keywords.subject,
+        );
+        set_xmp_array(
             &mut content,
             LR_HIERARCHICAL_SUBJECT,
             Some(LIGHTROOM_XMP_NAMESPACE),
+            XmpArray::Bag,
             &keywords.hierarchical,
         );
+        write_xmp_exif_fields(&mut content, metadata.exif.as_ref());
         let ai_keywords = serde_json::to_string(&keywords.ai).unwrap_or_default();
         set_app_xmp_value(&mut content, "AiKeywords", Some(&ai_keywords));
 

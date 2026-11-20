@@ -5,6 +5,24 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.100.0-dev-streamlined-import — 2026-11-19
+
+### Library
+
+- The Import dialog has a **Metadata** section: keywords, author and
+  copyright for every imported photo. Keywords are typed with commas
+  between them (`Places > Berlin` for a hierarchy), with suggestions
+  from your keyword list; author and copyright are remembered for the
+  next import, keywords start empty each time.
+- The import summary lists the keywords that were added.
+
+### Metadata
+
+- Author and copyright are now saved in the XMP sidecar too (when XMP
+  sync is on), so Lightroom and other ThisIsRAW installations see them,
+  and they are read back from XMP. This applies to the Metadata panel
+  as well; clearing a field there removes it from the XMP.
+
 ## 1.99.3-dev-streamlined-import — 2026-11-19
 
 ### Library

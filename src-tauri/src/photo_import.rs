@@ -35,11 +35,13 @@ use crate::exif_processing;
 use crate::file_management::{
     encode_thumbnail, generate_filename_from_template, generate_thumbnail_data,
     get_cached_thumbnail_image, original_file_name, parse_virtual_path,
-    remember_original_file_name, sanitize_filename_suffix,
+    remember_original_file_name, sanitize_filename_suffix, update_exif_fields_for_path,
+    xmp_sync_mode,
 };
 use crate::formats::is_supported_image_file;
 use crate::gpu_processing::get_or_init_gpu_context;
 use crate::rename::existing_xmp;
+use crate::tagging::add_tags_to_paths;
 
 /// The highest number tried after a taken name (`IMG_1-9999`).
 const MAX_NAME_SUFFIX: usize = 9999;
@@ -269,6 +271,46 @@ pub struct ImportSettings {
     /// January to December in the app's language, for `MMMM`; English when absent.
     #[serde(default)]
     pub month_names: Vec<String>,
+    /// Keywords for every imported photo, as stored tags (`user:Places|Berlin`).
+    #[serde(default)]
+    pub keywords: Vec<String>,
+    /// Creator and copyright for every imported photo (EXIF `Artist` and
+    /// `Copyright`, `dc:creator` and `dc:rights` in XMP); empty keeps the photo's.
+    #[serde(default)]
+    pub creator: String,
+    #[serde(default)]
+    pub copyright: String,
+}
+
+/// Gives the imported photos the import's creator and copyright and its
+/// keywords, through the Metadata panel's and the Tagging panel's own paths
+/// (sidecar, then XMP when XMP sync is on).
+fn apply_import_metadata(
+    paths: &[String],
+    settings: &ImportSettings,
+    app_handle: &AppHandle,
+) -> Result<(), String> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+    let updates: HashMap<String, String> = [
+        ("Artist", &settings.creator),
+        ("Copyright", &settings.copyright),
+    ]
+    .into_iter()
+    .filter(|(_, value)| !value.trim().is_empty())
+    .map(|(key, value)| (key.to_string(), value.trim().to_string()))
+    .collect();
+    if !updates.is_empty() {
+        let xmp = xmp_sync_mode(app_handle);
+        paths
+            .par_iter()
+            .for_each(|path| update_exif_fields_for_path(path, &updates, xmp));
+    }
+    if !settings.keywords.is_empty() {
+        add_tags_to_paths(paths, &settings.keywords, app_handle)?;
+    }
+    Ok(())
 }
 
 /// The subfolders `pattern` gives a photo taken at `date`: `YYYY` is the year,
@@ -493,6 +535,9 @@ pub enum ImportIssueKind {
     Failed,
     /// Imported, but the source could not be removed (Move).
     SourceKept,
+    /// Imported, but the keywords, creator or copyright could not be written
+    /// (one issue for the whole import; `source` is the destination).
+    MetadataNotApplied,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -517,6 +562,8 @@ pub struct ImportReport {
     pub not_started: usize,
     pub cancelled: bool,
     pub moved: bool,
+    /// The keywords given to the imported photos (stored tags).
+    pub keywords: Vec<String>,
     /// The folders photos were imported into.
     pub folders: Vec<String>,
     pub elapsed_ms: u64,
@@ -786,6 +833,7 @@ pub async fn import_files(
             destination: destination_folder.clone(),
             total,
             moved: settings.delete_after_import,
+            keywords: settings.keywords.clone(),
             ..ImportReport::default()
         };
         let mut folders = BTreeSet::new();
@@ -823,6 +871,19 @@ pub async fn import_files(
             }
         }
 
+        let imported_paths: Vec<String> = report
+            .imported
+            .iter()
+            .map(|file| file.destination.clone())
+            .collect();
+        if let Err(error) = apply_import_metadata(&imported_paths, &settings, &app_handle) {
+            log::warn!("Could not add the import's keywords or creator: {error}");
+            report.issues.push(ImportIssue {
+                source: destination_folder.clone(),
+                kind: ImportIssueKind::MetadataNotApplied,
+                message: Some(error),
+            });
+        }
         report.folders = folders.into_iter().collect();
         report.elapsed_ms = started.elapsed().as_millis() as u64;
         report

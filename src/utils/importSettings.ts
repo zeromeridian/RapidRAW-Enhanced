@@ -30,6 +30,9 @@ export interface LastImportSettings {
   nameClash: ImportNameClash;
   /** Whether a folder or card source lists its subfolders' photos too. */
   includeSubfolders: boolean;
+  /** Given to every imported photo; remembered, unlike the keywords (decision 9). */
+  creator: string;
+  copyright: string;
 }
 
 const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim() !== '';
@@ -44,6 +47,8 @@ export const readLastImportSettings = (value: unknown): LastImportSettings => {
     filenameTemplate: isNonEmptyString(saved.filenameTemplate) ? saved.filenameTemplate : DEFAULT_IMPORT_TEMPLATE,
     nameClash: saved.nameClash === ImportNameClash.Skip ? ImportNameClash.Skip : ImportNameClash.AddSuffix,
     includeSubfolders: saved.includeSubfolders !== false,
+    creator: typeof saved.creator === 'string' ? saved.creator : '',
+    copyright: typeof saved.copyright === 'string' ? saved.copyright : '',
   };
 };
 
