@@ -5,6 +5,16 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.105.1-dev-delete-rejected-photos — 2026-11-20
+
+### Library
+
+- **Delete Rejected Files** is now also in the right-click menu of a
+  photo, of the Library's empty background and of the photo in Develop,
+  next to the bottom bar's button. It deletes every photo flagged
+  Rejected in the open folder after one confirmation, as the button
+  does.
+
 ## 1.105.0-dev-movable-vignette-centre — 2026-11-20
 
 ### Develop

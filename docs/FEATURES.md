@@ -104,7 +104,9 @@ details are in `RELEASE_NOTES.MD`.
   thumbnail when it is saved.
 - Rejected, Selected, Deferred, and Unflagged states with keyboard shortcuts,
   thumbnail badges, rejected-image dimming, filtering, and rejected-file
-  deletion for the currently loaded folder view.
+  deletion for the currently loaded folder view (bottom-bar button and
+  **Delete Rejected Files** in the photo, Library background and Develop
+  right-click menus).
 - **Metadata filter bar** (Lightroom Classic's Library Filter › Metadata):
   toggled from the Library header or `\`, columns above the grid list
   the values found with counts; Date as Year › Month › Day, Camera, Lens,

@@ -387,6 +387,7 @@ function App() {
   const {
     executeDelete,
     handleDeleteSelected,
+    handleDeleteRejected,
     handleCreateFolder,
     handleRenameFolder,
     handleSaveRename,
@@ -467,6 +468,7 @@ function App() {
     refreshAllFolderTrees,
     refreshImageList: handleLibraryRefresh,
     executeDelete,
+    handleDeleteRejected,
     handleTogglePinFolder,
   });
 
@@ -843,7 +845,7 @@ function App() {
                   handleRate={handleRate}
                   handleSetFlag={handleSetFlag}
                   handleSetColorLabel={handleSetColorLabel}
-                  handleDeleteRejected={(paths) => executeDelete(paths, { includeAssociated: false })}
+                  handleDeleteRejected={handleDeleteRejected}
                   handleZoomChange={handleZoomChange}
                   handleRightPanelSelect={handleRightPanelSelect}
                   requestThumbnails={requestThumbnails}
@@ -865,7 +867,7 @@ function App() {
                   handleRate={handleRate}
                   handleSetFlag={handleSetFlag}
                   handleSetColorLabel={handleSetColorLabel}
-                  handleDeleteRejected={(paths) => executeDelete(paths, { includeAssociated: false })}
+                  handleDeleteRejected={handleDeleteRejected}
                   handleThumbnailContextMenu={handleThumbnailContextMenu}
                   handleMainLibraryContextMenu={handleMainLibraryContextMenu}
                   handleContinueSession={handleContinueSession}

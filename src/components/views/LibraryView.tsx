@@ -30,7 +30,7 @@ interface LibraryViewProps {
   handleRate: (...args: any) => void;
   handleSetFlag: (flag: ImageFlag) => void;
   handleSetColorLabel: (color: string | null, paths?: string[]) => Promise<void>;
-  handleDeleteRejected: (paths: string[]) => void;
+  handleDeleteRejected: () => void;
   handleThumbnailContextMenu: (...args: any) => void;
   handleMainLibraryContextMenu: (...args: any) => void;
   handleContinueSession: (...args: any) => void;

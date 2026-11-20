@@ -84,7 +84,7 @@ interface BottomBarProps {
   onClearSelection?(): void;
   onContextMenu?(event: any, path: string): void;
   onCopy(): void;
-  onDeleteRejected?(paths: string[]): void;
+  onDeleteRejected?(): void;
   onFlag(flag: ImageFlag): void;
   onSetColorLabel(color: string | null, paths?: string[]): Promise<void>;
   onImageSelect?(path: string, event: any): void;
@@ -364,20 +364,6 @@ export default function BottomBar({
   ];
   const productivityButtonClass =
     'w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed';
-
-  const handleDeleteRejected = () => {
-    if (!onDeleteRejected || rejectedInCurrentFolder.length === 0) return;
-    setUI({
-      confirmModalState: {
-        confirmText: t('flags.deleteRejectedConfirm'),
-        confirmVariant: 'destructive',
-        isOpen: true,
-        message: t('flags.deleteRejectedMessage', { count: rejectedInCurrentFolder.length }),
-        onConfirm: () => onDeleteRejected(rejectedInCurrentFolder),
-        title: t('flags.deleteRejected'),
-      },
-    });
-  };
 
   const handleAutoAdjust = () => {
     applyBatchEditToPaths(Invokes.ApplyAutoAdjustmentsToPaths, productivityPaths).catch((err) => {
@@ -718,7 +704,7 @@ export default function BottomBar({
                   <button
                     className={productivityButtonClass}
                     disabled={!onDeleteRejected || rejectedInCurrentFolder.length === 0}
-                    onClick={handleDeleteRejected}
+                    onClick={onDeleteRejected}
                     data-tooltip={t('flags.deleteRejectedCount', { count: rejectedInCurrentFolder.length })}
                   >
                     <Trash2 size={18} />

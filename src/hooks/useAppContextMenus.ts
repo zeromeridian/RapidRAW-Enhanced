@@ -88,7 +88,7 @@ import { findImageStack, toggleImageStack, unstackImagePaths } from '../utils/im
 import { autoStackCreatedImages } from '../utils/autoStacking';
 import { isCollectionView, isPathWithin } from '../utils/libraryViews';
 import { getEnabledCopySuffix } from '../utils/outputNaming';
-import { isImageFlagTag } from '../utils/imageFlags';
+import { getRejectedPathsForLoadedFolder, isImageFlagTag } from '../utils/imageFlags';
 import { USER_TAG_PREFIX } from '../utils/keywords';
 
 export interface UseAppContextMenusProps {
@@ -100,6 +100,7 @@ export interface UseAppContextMenusProps {
   refreshAllFolderTrees: () => Promise<void>;
   refreshImageList: () => Promise<void>;
   executeDelete: (paths: string[], options: any) => Promise<void>;
+  handleDeleteRejected: () => void;
   handleTogglePinFolder: (path: string) => Promise<void>;
 }
 
@@ -143,6 +144,18 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       toast.error(t('contextMenus.toasts.failedUpgradeLensCorrection', { err }));
     });
   const { handleRate, handleSetColorLabel, handleTagsChanged } = useLibraryActions();
+
+  // The bottom bar's Delete Rejected Files, offered in the Library and Develop menus too (Plan item 68).
+  const buildDeleteRejectedOption = useCallback((): Option => {
+    const { imageList, currentFolderPath } = useLibraryStore.getState();
+    return {
+      disabled: getRejectedPathsForLoadedFolder(imageList, currentFolderPath).length === 0,
+      icon: Trash2,
+      isDestructive: true,
+      label: t('flags.deleteRejected'),
+      onClick: props.handleDeleteRejected,
+    };
+  }, [props.handleDeleteRejected, t]);
 
   const refreshFolders = useCallback(
     async (folderPaths: string[]) => {
@@ -503,11 +516,13 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             },
           ],
         },
+        buildDeleteRejectedOption(),
       ];
       showContextMenu(event.clientX, event.clientY, options);
     },
     [
       buildOpenInOption,
+      buildDeleteRejectedOption,
       getCommonTags,
       handleCopyAdjustments,
       handlePasteAdjustments,
@@ -1068,11 +1083,13 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           isDestructive: true,
           submenu: deleteSubmenu,
         },
+        buildDeleteRejectedOption(),
       ];
       showContextMenu(event.clientX, event.clientY, options);
     },
     [
       buildOpenInOption,
+      buildDeleteRejectedOption,
       getCommonTags,
       buildAddToAlbumMenu,
       handleCopyAdjustments,
@@ -1674,11 +1691,13 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           onClick: () => props.handleImportClick(currentFolderPath as string),
           disabled: !currentFolderPath || hasNoFolder,
         },
+        { type: OPTION_SEPARATOR },
+        buildDeleteRejectedOption(),
       ];
 
       showContextMenu(event.clientX, event.clientY, options);
     },
-    [props, showContextMenu, t],
+    [buildDeleteRejectedOption, props, showContextMenu, t],
   );
 
   return {

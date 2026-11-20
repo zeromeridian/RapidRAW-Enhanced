@@ -70,7 +70,7 @@ interface EditorViewProps {
   handleRate: (...args: any) => void;
   handleSetFlag: (flag: ImageFlag) => void;
   handleSetColorLabel: (color: string | null, paths?: string[]) => Promise<void>;
-  handleDeleteRejected: (paths: string[]) => void;
+  handleDeleteRejected: () => void;
   handleZoomChange: (zoom: number) => void;
   handleRightPanelSelect: (panelId: Panel) => void;
   requestThumbnails: any;

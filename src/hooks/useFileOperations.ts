@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'react-toastify';
+import { useTranslation } from 'react-i18next';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
@@ -9,6 +10,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { Invokes, LibraryViewMode } from '../components/ui/AppProperties';
 import { ImportSettings, Status } from '../components/ui/ExportImportProperties';
 import { isCollectionView, isPathWithin } from '../utils/libraryViews';
+import { getRejectedPathsForLoadedFolder } from '../utils/imageFlags';
 import { debouncedSave } from './useEditorActions';
 import { DEFAULT_IMPORT_TEMPLATE } from '../utils/filenameTemplates';
 import { DEFAULT_DATE_FOLDER_FORMAT, pickImportFiles } from '../utils/importSettings';
@@ -20,6 +22,8 @@ export function useFileOperations(
   handleBackToLibrary: () => void,
   sortedImageList: any[],
 ) {
+  const { t } = useTranslation();
+
   const getParentDir = (filePath: string): string => {
     const separator = filePath.includes('/') ? '/' : '\\';
     const lastSeparatorIndex = filePath.lastIndexOf(separator);
@@ -142,6 +146,24 @@ export function useFileOperations(
       },
     });
   }, [executeDelete]);
+
+  // Bottom bar button and context menus: every Rejected photo of the loaded folder (none in collections).
+  const handleDeleteRejected = useCallback(() => {
+    const { imageList, currentFolderPath } = useLibraryStore.getState();
+    const rejectedPaths = getRejectedPathsForLoadedFolder(imageList, currentFolderPath);
+    if (rejectedPaths.length === 0) return;
+
+    useUIStore.getState().setUI({
+      confirmModalState: {
+        confirmText: t('flags.deleteRejectedConfirm'),
+        confirmVariant: 'destructive',
+        isOpen: true,
+        message: t('flags.deleteRejectedMessage', { count: rejectedPaths.length }),
+        onConfirm: () => executeDelete(rejectedPaths, { includeAssociated: false }),
+        title: t('flags.deleteRejected'),
+      },
+    });
+  }, [executeDelete, t]);
 
   const handleCreateFolder = useCallback(
     async (folderName: string) => {
@@ -356,6 +378,7 @@ export function useFileOperations(
   return {
     executeDelete,
     handleDeleteSelected,
+    handleDeleteRejected,
     handleCreateFolder,
     handleRenameFolder,
     handleSaveRename,
