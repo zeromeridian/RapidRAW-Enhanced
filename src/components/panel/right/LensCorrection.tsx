@@ -8,8 +8,9 @@ import Slider from '../../ui/Slider';
 import Dropdown from '../../ui/Dropdown';
 import Switch from '../../ui/Switch';
 import Text from '../../ui/Text';
+import Button from '../../ui/Button';
 import { TextVariants } from '../../../types/typography';
-import { Adjustments } from '../../../utils/adjustments';
+import { Adjustments, LENS_CORRECTION_VERSION } from '../../../utils/adjustments';
 import { SelectedImage } from '../../ui/AppProperties';
 
 interface MyLens {
@@ -17,8 +18,18 @@ interface MyLens {
   model: string;
 }
 
+/** The lens a version 2 edit's choice resolves to for its photo (`get_lens_correction_info`). */
+interface LensCorrectionInfo {
+  maker: string;
+  model: string;
+  distortion: boolean;
+  tca: boolean;
+  vignetting: boolean;
+}
+
 export interface LensParams {
   lensCorrectionMode: 'auto' | 'manual';
+  lensCorrectionVersion: number;
   lensMaker: string | null;
   lensModel: string | null;
   lensDistortionAmount: number;
@@ -27,17 +38,7 @@ export interface LensParams {
   lensDistortionEnabled: boolean;
   lensTcaEnabled: boolean;
   lensVignetteEnabled: boolean;
-  lensDistortionParams: {
-    k1: number;
-    k2: number;
-    k3: number;
-    model: number;
-    tca_vr: number;
-    tca_vb: number;
-    vig_k1: number;
-    vig_k2: number;
-    vig_k3: number;
-  } | null;
+  lensDistortionParams: Adjustments['lensDistortionParams'];
 }
 
 interface LensCorrectionProps {
@@ -53,6 +54,7 @@ interface LensCorrectionProps {
 
 export const DEFAULT_LENS_PARAMS: LensParams = {
   lensCorrectionMode: 'manual',
+  lensCorrectionVersion: LENS_CORRECTION_VERSION,
   lensMaker: null,
   lensModel: null,
   lensDistortionAmount: 100,
@@ -66,6 +68,7 @@ export const DEFAULT_LENS_PARAMS: LensParams = {
 
 const lensParamsFromAdjustments = (adjustments: Adjustments): LensParams => ({
   lensCorrectionMode: adjustments.lensCorrectionMode || 'manual',
+  lensCorrectionVersion: adjustments.lensCorrectionVersion ?? 1,
   lensMaker: adjustments.lensMaker,
   lensModel: adjustments.lensModel,
   lensDistortionAmount: adjustments.lensDistortionAmount ?? 100,
@@ -77,12 +80,23 @@ const lensParamsFromAdjustments = (adjustments: Adjustments): LensParams => ({
   lensDistortionParams: adjustments.lensDistortionParams,
 });
 
-/** An EXIF field read with `parseFloat` (so "f/2.8" gives null); null when missing. */
-const parseExifFloat = (exif: any, key: 'FocalLength' | 'FNumber' | 'SubjectDistance'): number | null => {
-  if (!exif || !exif[key]) return null;
-  const val = parseFloat(exif[key]);
-  return isNaN(val) ? null : val;
-};
+/**
+ * `params` with a changed lens choice (mode or lens). Changing it moves an edit to the current
+ * lens correction, which looks the profile up for the photo instead of storing it (decision D1).
+ */
+const withLensChoice = (params: LensParams, choice: Partial<LensParams>): LensParams => ({
+  ...params,
+  ...choice,
+  lensCorrectionVersion: LENS_CORRECTION_VERSION,
+  lensDistortionParams: null,
+});
+
+/** What a version 1 edit's stored profile corrects. */
+const storedAvailability = (p: LensParams['lensDistortionParams']) => ({
+  distortion: !!p && (Math.abs(p.k1) > 1e-6 || Math.abs(p.k2) > 1e-6 || Math.abs(p.k3) > 1e-6),
+  tca: !!p && (Math.abs(p.tca_vr - 1.0) > 1e-5 || Math.abs(p.tca_vb - 1.0) > 1e-5),
+  vignetting: !!p && (Math.abs(p.vig_k1) > 1e-6 || Math.abs(p.vig_k2) > 1e-6 || Math.abs(p.vig_k3) > 1e-6),
+});
 
 interface ProfileCorrectionProps {
   amount: number;
@@ -165,24 +179,51 @@ export default function LensCorrection({
   const [makers, setMakers] = useState<string[]>([]);
   const [lenses, setLenses] = useState<string[]>([]);
   const [myLenses, setMyLenses] = useState<MyLens[]>([]);
-  const [detectionStatus, setDetectionStatus] = useState<'idle' | 'detecting' | 'not_found' | 'success'>('idle');
+  // Version 2: undefined while looking it up, null when the photo has no matching profile.
+  const [lensInfo, setLensInfo] = useState<LensCorrectionInfo | null | undefined>(undefined);
 
   const [modeBubbleStyle, setModeBubbleStyle] = useState({});
   const isModeInitialAnimation = useRef(true);
 
-  const focalLength = useMemo(() => parseExifFloat(selectedImage?.exif, 'FocalLength'), [selectedImage?.exif]);
-  const aperture = useMemo(() => parseExifFloat(selectedImage?.exif, 'FNumber'), [selectedImage?.exif]);
-  const distance = useMemo(() => parseExifFloat(selectedImage?.exif, 'SubjectDistance'), [selectedImage?.exif]);
+  const isPreviousCorrection = params.lensCorrectionVersion < LENS_CORRECTION_VERSION;
+  const hasLensChoice = params.lensCorrectionMode === 'auto' || !!(params.lensMaker && params.lensModel);
 
-  const availability = useMemo(() => {
-    if (!params.lensDistortionParams) return { distortion: false, tca: false, vignetting: false };
-    const p = params.lensDistortionParams;
-    return {
-      distortion: Math.abs(p.k1) > 1e-6 || Math.abs(p.k2) > 1e-6 || Math.abs(p.k3) > 1e-6,
-      tca: Math.abs(p.tca_vr - 1.0) > 1e-5 || Math.abs(p.tca_vb - 1.0) > 1e-5,
-      vignetting: Math.abs(p.vig_k1) > 1e-6 || Math.abs(p.vig_k2) > 1e-6 || Math.abs(p.vig_k3) > 1e-6,
+  useEffect(() => {
+    if (isPreviousCorrection || !selectedImage?.path) {
+      setLensInfo(null);
+      return;
+    }
+    let active = true;
+    setLensInfo(undefined);
+    invoke<LensCorrectionInfo | null>('get_lens_correction_info', {
+      path: selectedImage.path,
+      selection: {
+        lensCorrectionMode: params.lensCorrectionMode,
+        lensMaker: params.lensMaker,
+        lensModel: params.lensModel,
+      },
+    })
+      .then((info) => active && setLensInfo(info))
+      .catch(() => active && setLensInfo(null));
+    return () => {
+      active = false;
     };
-  }, [params.lensDistortionParams]);
+  }, [selectedImage?.path, isPreviousCorrection, params.lensCorrectionMode, params.lensMaker, params.lensModel]);
+
+  const availability = useMemo(
+    () =>
+      isPreviousCorrection
+        ? storedAvailability(params.lensDistortionParams)
+        : { distortion: !!lensInfo?.distortion, tca: !!lensInfo?.tca, vignetting: !!lensInfo?.vignetting },
+    [isPreviousCorrection, params.lensDistortionParams, lensInfo],
+  );
+
+  // The lens automatic mode found: the stored one for version 1, the looked-up one for version 2.
+  const detectedLens: Pick<LensCorrectionInfo, 'maker' | 'model'> | null | undefined = isPreviousCorrection
+    ? params.lensMaker && params.lensModel
+      ? { maker: params.lensMaker, model: params.lensModel }
+      : null
+    : lensInfo;
 
   useEffect(() => {
     const selectedIndex = params.lensCorrectionMode === 'auto' ? 0 : 1;
@@ -204,22 +245,6 @@ export default function LensCorrection({
     }
   }, [params.lensCorrectionMode]);
 
-  const fetchDistortionParams = async (maker: string, model: string) => {
-    try {
-      const distParams: any = await invoke('get_lens_distortion_params', {
-        maker,
-        model,
-        focalLength: focalLength,
-        aperture: aperture,
-        distance: distance,
-      });
-      return distParams;
-    } catch (error) {
-      console.error('Failed to fetch lens params', error);
-      return null;
-    }
-  };
-
   const updateParams = (newParams: LensParams) => {
     setParams(newParams);
     onChange(newParams);
@@ -234,7 +259,6 @@ export default function LensCorrection({
 
     const initParams = lensParamsFromAdjustments(adjustments);
     setParams(initParams);
-    setDetectionStatus('idle');
 
     invoke('get_lensfun_makers')
       .then((m: any) => setMakers(m))
@@ -252,6 +276,7 @@ export default function LensCorrection({
     setParams(lensParamsFromAdjustments(adjustments));
   }, [
     adjustments.lensCorrectionMode,
+    adjustments.lensCorrectionVersion,
     adjustments.lensMaker,
     adjustments.lensModel,
     adjustments.lensDistortionAmount,
@@ -263,139 +288,43 @@ export default function LensCorrection({
     adjustments.lensDistortionParams,
   ]);
 
+  const loadLensesForMaker = (maker: string) =>
+    invoke<string[]>('get_lensfun_lenses_for_maker', { maker }).then(setLenses).catch(console.error);
+
   const handleMakerChange = (maker: string) => {
-    const newParams = {
-      ...params,
-      lensMaker: maker,
-      lensModel: null,
-      lensDistortionParams: null,
-    };
-    updateParams(newParams);
+    updateParams(withLensChoice(params, { lensMaker: maker, lensModel: null }));
     setLenses([]);
-    setDetectionStatus('idle');
-
-    invoke('get_lensfun_lenses_for_maker', { maker })
-      .then((l: any) => setLenses(l))
-      .catch(console.error);
+    loadLensesForMaker(maker);
   };
 
-  const handleModelChange = async (model: string) => {
-    const tempParams = { ...params, lensModel: model };
-    updateParams(tempParams);
-    setDetectionStatus('idle');
-
-    if (params.lensMaker) {
-      const distortionParams = await fetchDistortionParams(params.lensMaker, model);
-      const finalParams = { ...tempParams, lensDistortionParams: distortionParams };
-      updateParams(finalParams);
-    }
+  const handleModelChange = (model: string) => {
+    updateParams(withLensChoice(params, { lensModel: model }));
   };
 
-  const handleMyLensSelect = async (val: string) => {
+  const handleMyLensSelect = (val: string) => {
     if (!val || val === 'none') return;
-    const index = parseInt(val);
-    const selected = myLenses[index];
+    const selected = myLenses[parseInt(val)];
     if (!selected) return;
-
-    const tempParams = { ...params, lensMaker: selected.maker, lensModel: selected.model };
-    updateParams(tempParams);
-    setDetectionStatus('idle');
-
-    invoke('get_lensfun_lenses_for_maker', { maker: selected.maker })
-      .then((l: any) => setLenses(l))
-      .catch(console.error);
-
-    const distortionParams = await fetchDistortionParams(selected.maker, selected.model);
-    const finalParams = { ...tempParams, lensDistortionParams: distortionParams };
-    updateParams(finalParams);
+    updateParams(withLensChoice(params, { lensMaker: selected.maker, lensModel: selected.model }));
+    loadLensesForMaker(selected.maker);
   };
 
   const handleParamChange = (key: keyof LensParams, value: number | boolean) => {
     updateParams({ ...params, [key]: value });
   };
 
-  const handleAutoDetect = async (baseParams?: LensParams) => {
-    if (!selectedImage?.exif) {
-      setDetectionStatus('not_found');
-      return;
-    }
-    const exifMaker = selectedImage.exif.Make || '';
-    const exifModel = selectedImage.exif.LensModel || '';
-    const exifCameraModel = selectedImage.exif.Model || '';
-
-    if (!exifModel && !exifCameraModel) {
-      setDetectionStatus('not_found');
-      return;
-    }
-
-    setDetectionStatus('detecting');
-
-    try {
-      const result: [string, string] | null = await invoke('autodetect_lens', {
-        maker: exifMaker,
-        model: exifModel,
-        cameraModel: exifCameraModel,
-      });
-
-      if (result) {
-        const [detectedMaker, detectedModel] = result;
-
-        invoke('get_lensfun_lenses_for_maker', { maker: detectedMaker })
-          .then((l: any) => setLenses(l))
-          .catch(console.error);
-
-        const distortionParams = await fetchDistortionParams(detectedMaker, detectedModel);
-
-        setParams((prev) => {
-          const newParams = {
-            ...(baseParams ?? prev),
-            lensMaker: detectedMaker,
-            lensModel: detectedModel,
-            lensDistortionParams: distortionParams,
-          };
-          onChange(newParams);
-          return newParams;
-        });
-
-        setDetectionStatus('success');
-
-        setTimeout(() => {
-          setDetectionStatus('idle');
-        }, 2000);
-      } else {
-        setParams((prev) => {
-          const clearedParams = {
-            ...(baseParams ?? prev),
-            lensMaker: null,
-            lensModel: null,
-            lensDistortionParams: null,
-          };
-          onChange(clearedParams);
-          return clearedParams;
-        });
-        setDetectionStatus('not_found');
-      }
-    } catch (error) {
-      console.error('Autodetection failed with error:', error);
-      setDetectionStatus('not_found');
-    }
-  };
-
   const handleReset = () => {
     setParams(DEFAULT_LENS_PARAMS);
     onReset(DEFAULT_LENS_PARAMS);
     setLenses([]);
-    setDetectionStatus('idle');
   };
 
   const handleModeChange = (mode: 'auto' | 'manual') => {
-    const newParams = { ...params, lensCorrectionMode: mode };
-    updateParams(newParams);
-
-    if (mode === 'auto') {
-      handleAutoDetect(newParams);
-    }
+    updateParams(withLensChoice(params, { lensCorrectionMode: mode }));
   };
+
+  // Decision D2: the same lens choice, corrected the current way.
+  const handleUpgrade = () => updateParams(withLensChoice(params, {}));
 
   const makerOptions = makers.map((m) => ({ label: m, value: m }));
   const lensOptions = lenses.map((m) => ({ label: m, value: m }));
@@ -455,6 +384,18 @@ export default function LensCorrection({
           </div>
         </div>
 
+        {isPreviousCorrection && hasLensChoice && (
+          <div className="p-3 bg-surface rounded-md border border-surface flex flex-col gap-2">
+            <Text as="div" variant={TextVariants.small} className="flex items-center gap-2">
+              <Info size={16} className="shrink-0" />
+              {t('modals.lensCorrection.previousCorrection')}
+            </Text>
+            <Button className="bg-surface text-text-primary w-full" onClick={handleUpgrade}>
+              {t('modals.lensCorrection.useUpdatedCorrection')}
+            </Button>
+          </div>
+        )}
+
         {params.lensCorrectionMode === 'auto' ? (
           <div>
             <Text variant={TextVariants.heading} className="mb-2">
@@ -463,25 +404,23 @@ export default function LensCorrection({
             <div
               className={clsx(
                 'w-full flex items-center justify-center gap-2 px-3 py-3 text-sm font-semibold rounded-md border',
-                detectionStatus === 'not_found'
+                detectedLens === null
                   ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                  : params.lensMaker
+                  : detectedLens
                     ? 'bg-green-500/10 text-green-400 border-green-500/20'
                     : 'bg-surface text-text-secondary border-surface',
               )}
             >
-              {detectionStatus === 'detecting' ? (
+              {detectedLens === undefined ? (
                 <>
                   <Loader size={16} className="animate-spin" /> {t('modals.lensCorrection.detectingExif')}
                 </>
-              ) : detectionStatus === 'not_found' ? (
+              ) : detectedLens === null ? (
                 t('modals.lensCorrection.lensProfileNotFound')
-              ) : params.lensMaker && params.lensModel ? (
-                <>
-                  <Check size={16} /> {params.lensMaker} - {params.lensModel}
-                </>
               ) : (
-                t('modals.lensCorrection.waitingAutoDetect')
+                <>
+                  <Check size={16} /> {detectedLens.maker} - {detectedLens.model}
+                </>
               )}
             </div>
           </div>

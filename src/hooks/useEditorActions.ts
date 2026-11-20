@@ -71,11 +71,15 @@ export const cancelCrop = () => {
 };
 
 /**
- * Runs a backend batch edit (Auto Adjust, Auto Lens Correction) on `paths`, then reloads the saved
- * adjustments of the photo open in Develop and of the Library's active photo if either was edited.
+ * Runs a backend batch edit (Auto Adjust, Auto Lens Correction, the updated lens correction) on
+ * `paths`, then reloads the saved adjustments of the photo open in Develop and of the Library's
+ * active photo if either was edited.
  */
 export const applyBatchEditToPaths = async (
-  command: Invokes.ApplyAutoAdjustmentsToPaths | Invokes.ApplyAutoLensCorrectionToPaths,
+  command:
+    | Invokes.ApplyAutoAdjustmentsToPaths
+    | Invokes.ApplyAutoLensCorrectionToPaths
+    | Invokes.UpgradeLensCorrectionForPaths,
   paths: string[],
 ) => {
   if (paths.length === 0) return;

@@ -1371,6 +1371,12 @@ async fn preview_geometry_transform(
 
     let final_image = tokio::task::spawn_blocking(move || -> DynamicImage {
         let mut adjusted_params = params;
+        // The dialog sends version 1's stored profile terms; a version 2 edit gets its photo's
+        // profile here instead.
+        let lens_edit = lens_correction::with_lens_profile(&loaded_image_path, &js_adjustments);
+        let edit_geometry = crate::image_processing::get_geometry_params_from_json(&lens_edit);
+        adjusted_params.lens_version = edit_geometry.lens_version;
+        adjusted_params.lens = edit_geometry.lens;
 
         if is_raw {
             // approximate linear vignetting correction on gamma-baked & tonemapped geometry preview
@@ -2891,8 +2897,6 @@ pub fn run() {
             culling::cull_images,
             lens_correction::get_lensfun_makers,
             lens_correction::get_lensfun_lenses_for_maker,
-            lens_correction::autodetect_lens,
-            lens_correction::get_lens_distortion_params,
             lens_correction::get_lens_correction_info,
             file_management::upgrade_lens_correction_for_paths,
             negative_conversion::preview_negative_conversion,

@@ -137,6 +137,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       console.error('Failed to apply auto lens correction to paths:', err);
       toast.error(t('contextMenus.toasts.failedApplyAutoLensCorrection', { err }));
     });
+  const upgradeLensCorrection = (paths: string[]) =>
+    applyBatchEditToPaths(Invokes.UpgradeLensCorrectionForPaths, paths).catch((err) => {
+      console.error('Failed to update the lens correction of paths:', err);
+      toast.error(t('contextMenus.toasts.failedUpgradeLensCorrection', { err }));
+    });
   const { handleRate, handleSetColorLabel, handleTagsChanged } = useLibraryActions();
 
   const refreshFolders = useCallback(
@@ -784,6 +789,12 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               icon: Aperture,
               disabled: finalSelection.length === 0,
               onClick: () => applyAutoLensCorrection(finalSelection),
+            },
+            {
+              label: t('contextMenus.thumbnail.upgradeLensCorrection', { count: selectionCount }),
+              icon: Aperture,
+              disabled: finalSelection.length === 0,
+              onClick: () => upgradeLensCorrection(finalSelection),
             },
             {
               label: denoiseLabel,

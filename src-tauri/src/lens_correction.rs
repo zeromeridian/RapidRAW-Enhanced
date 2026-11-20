@@ -1370,29 +1370,6 @@ fn find_lens_by_fuzzy_model(
         .map(|best_lens| lens_result(db, best_lens))
 }
 
-#[tauri::command]
-pub fn autodetect_lens(
-    maker: String,
-    model: String,
-    camera_model: Option<String>,
-) -> Result<Option<(String, String)>, String> {
-    Ok(database().and_then(|db| {
-        find_best_lens_match(db, &maker, &model, camera_model.as_deref().unwrap_or(""))
-    }))
-}
-
-#[tauri::command]
-pub fn get_lens_distortion_params(
-    maker: String,
-    model: String,
-    focal_length: f32,
-    aperture: Option<f32>,
-    distance: Option<f32>,
-) -> Result<Option<LensDistortionParams>, String> {
-    Ok(database()
-        .and_then(|db| resolve_lens_params(db, &maker, &model, focal_length, aperture, distance)))
-}
-
 pub fn resolve_lens_params(
     db: &LensDatabase,
     maker: &str,
