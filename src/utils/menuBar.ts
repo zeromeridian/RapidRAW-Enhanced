@@ -10,8 +10,7 @@ import { KEYWORD_SET_SIZE } from './keywords';
 export type MenuView = 'library' | 'develop';
 
 /** Entries that are no keybind action: the App's handlers (`useNativeMenuBar`'s `commands`). */
-export type MenuCommand =
-  'deleteRejected' | 'displayCull' | 'displayList' | 'refreshView' | 'renamePhotos' | 'showInFinder';
+export type MenuCommand = 'deleteRejected' | 'displayCull' | 'displayList' | 'refreshView' | 'showInFinder';
 
 /** OS-provided items (`PredefinedMenuItem`): text editing and the macOS app and window items. */
 export type NativeMenuItem =
@@ -133,7 +132,7 @@ export const MENU_BAR: MenuDefinition[] = [
         action('move_to_top_of_stack', 'contextMenus.thumbnail.moveToTopOfStack'),
       ]),
       SEPARATOR,
-      command('renamePhotos', 'menuBar.items.renamePhotos'),
+      action('rename_photos', 'menuBar.items.renamePhotos'),
     ],
   },
   {

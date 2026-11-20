@@ -19,7 +19,6 @@ import { getActionPaths } from './useLibraryActions';
 interface NativeMenuBarProps {
   handleDeleteRejected(): void;
   handleLibraryRefresh(): Promise<void>;
-  handleRenameFiles(paths: string[]): void;
 }
 
 interface MenuCommandHandler {
@@ -38,11 +37,7 @@ const setLibraryDisplayMode = (mode: LibraryDisplayMode) => {
 };
 
 /** The macOS menu bar's menus from the shared list (`utils/menuBar.ts`), rebuilt per view. */
-export function useNativeMenuBar({
-  handleDeleteRejected,
-  handleLibraryRefresh,
-  handleRenameFiles,
-}: NativeMenuBarProps) {
+export function useNativeMenuBar({ handleDeleteRejected, handleLibraryRefresh }: NativeMenuBarProps) {
   const { t, i18n } = useTranslation();
   const osPlatform = useSettingsStore((state) => state.osPlatform);
   const keybinds = useSettingsStore((state) => state.appSettings?.keybinds);
@@ -62,7 +57,6 @@ export function useNativeMenuBar({
       canRun: () => !!useLibraryStore.getState().currentFolderPath,
       run: () => void handleLibraryRefresh(),
     },
-    renamePhotos: { canRun: () => getActionPaths().length > 0, run: () => handleRenameFiles(getActionPaths()) },
     showInFinder: {
       canRun: () => getActionPaths().length === 1,
       run: () =>

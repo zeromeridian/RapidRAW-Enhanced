@@ -162,5 +162,7 @@ nothing new is added here.
     Adjust, lens corrections, Reset, Lens & Geometry, Blend Pad, Zone
     Editor, panel toggles, About in Help), Export from the Library, and
     phase 3 (Windows/Linux bar).
-  - **Needs the owner's Mac check** (accelerator behaviour cannot be run
-    in the sandbox), see `HANDOFF.md`.
+  - **Owner's Mac check 2026-11-20: "all good"** (menus per view, keys,
+    greying, keys fire once, text fields keep their keys).
+- **`1.106.1` (2026-11-20):** new keybind `rename_photos` (F2, as in LrC;
+  owner request); Library → Rename Photos… uses it instead of a command.

@@ -167,7 +167,8 @@ details are in `RELEASE_NOTES.MD`.
   naming styles move with the photo. A RAW+JPEG partner left behind keeps
   the shared stem XMP and the renamed file gets a copy. Albums, keyword
   index, thumbnails and external-edit sessions follow the new name.
-- Lightroom-style Rename dialog for one or many photos: grouped token
+- Lightroom-style Rename dialog for one or many photos (F2, rebindable, or
+  Library → Rename Photos…): grouped token
   chips, live preview of the first and last name, inline template errors,
   clash and missing-value warnings (Rename disabled on clashes), a Custom
   Text field per `{text}`/`{text2}`/`{text3}` used (kept with a saved

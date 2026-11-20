@@ -2372,6 +2372,7 @@
         "copy_files": "Copy selected file(s)",
         "cycle_zoom": "Cycle zoom (Fit, 2x Fit, 100%)",
         "delete_selected": "Delete selected file(s)",
+        "rename_photos": "Rename selected photo(s)",
         "deselect_all": "Deselect all images",
         "focus_search": "Focus search field",
         "flag_deferred": "Flag: Deferred",

@@ -89,6 +89,12 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     section: 'library',
   },
   {
+    action: 'rename_photos',
+    description: 'settings.keybinds.actions.rename_photos',
+    defaultCombo: ['F2'],
+    section: 'library',
+  },
+  {
     action: 'preview_prev',
     description: 'settings.keybinds.actions.preview_prev',
     defaultCombo: ['ArrowLeft'],

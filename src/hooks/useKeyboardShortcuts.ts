@@ -66,6 +66,7 @@ interface KeyboardShortcutsProps {
   /** Opens the Import dialog (after picking the photos). */
   handleImportClick(): Promise<void>;
   handlePasteFiles(str: string): void;
+  handleRenameFiles(paths: string[]): void;
   handleToggleFullScreen(): void;
   handleZoomChange(zoomValue: number, fitToWindow?: boolean): void;
 }
@@ -78,6 +79,7 @@ export const useKeyboardShortcuts = ({
   handleImageSelect,
   handleImportClick,
   handlePasteFiles,
+  handleRenameFiles,
   handleToggleFullScreen,
   handleZoomChange,
 }: KeyboardShortcutsProps) => {
@@ -309,6 +311,13 @@ export const useKeyboardShortcuts = ({
         execute: (e: any) => {
           e.preventDefault();
           handleDeleteSelected();
+        },
+      },
+      rename_photos: {
+        shouldFire: () => getActionPaths().length > 0,
+        execute: (e: KeyboardEvent) => {
+          e.preventDefault();
+          handleRenameFiles(getActionPaths());
         },
       },
       preview_prev: {
@@ -869,6 +878,7 @@ export const useKeyboardShortcuts = ({
     handleImageSelect,
     handleImportClick,
     handlePasteFiles,
+    handleRenameFiles,
     handleToggleFullScreen,
     handleZoomChange,
     handleRotate,

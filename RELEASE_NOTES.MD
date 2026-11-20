@@ -5,6 +5,14 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.106.1-dev-menu-bar — 2026-11-20
+
+### Library
+
+- **F2 renames the selected photos**, as in Lightroom Classic. The key
+  can be changed in Settings → Keybinds and shows beside Library →
+  Rename Photos… in the menu bar.
+
 ## 1.106.0-dev-menu-bar — 2026-11-20
 
 ### Interface

@@ -509,11 +509,12 @@ function App() {
     handleImageSelect,
     handleImportClick,
     handlePasteFiles,
+    handleRenameFiles,
     handleToggleFullScreen,
     handleZoomChange,
   });
 
-  useNativeMenuBar({ handleDeleteRejected, handleLibraryRefresh, handleRenameFiles });
+  useNativeMenuBar({ handleDeleteRejected, handleLibraryRefresh });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
