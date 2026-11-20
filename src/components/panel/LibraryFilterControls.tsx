@@ -181,7 +181,7 @@ export function QuickFilterControl({ forceExpanded = false, onExpandedWidthChang
       <div
         className={clsx(
           'flex items-center transition-all duration-300 ease-in-out overflow-hidden',
-          isFilterExpanded ? 'max-w-[52rem] opacity-100 pr-2 ml-1' : 'max-w-0 opacity-0 pr-0 ml-0',
+          isFilterExpanded ? 'max-w-[72rem] opacity-100 pr-2 ml-1' : 'max-w-0 opacity-0 pr-0 ml-0',
         )}
       >
         <div ref={contentRef} className="flex items-center gap-3 whitespace-nowrap">
@@ -617,7 +617,7 @@ export function SelectByControl({ forceExpanded = false, onExpandedWidthChange }
       <div
         className={clsx(
           'flex items-center overflow-hidden transition-all duration-300 ease-in-out',
-          isSelectByOpen ? 'ml-1 max-w-[48rem] pr-2 opacity-100' : 'ml-0 max-w-0 pr-0 opacity-0',
+          isSelectByOpen ? 'ml-1 max-w-[72rem] pr-2 opacity-100' : 'ml-0 max-w-0 pr-0 opacity-0',
         )}
       >
         <div ref={contentRef} className="flex items-center gap-3 whitespace-nowrap">

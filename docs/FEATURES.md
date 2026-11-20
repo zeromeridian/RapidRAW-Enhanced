@@ -69,6 +69,9 @@ details are in `RELEASE_NOTES.MD`.
   selections created through Select by, not ordinary thumbnail selections.
   **Deselect All** is configurable in Keyboard Shortcuts and defaults to
   Command+D on macOS or Ctrl+D on Windows and Linux.
+- **Square corners** inside the window (one theme setting in `styles.css`);
+  circles such as slider knobs and colour dots, and the macOS window
+  corners, stay round.
 - **Menu bar** (Lightroom Classic style; macOS native menus, Windows/Linux
   in-app bar planned): File, Edit, Photo, View, Window and Help, plus
   Library and Metadata in Library and Develop and Tools in Develop. Entries
