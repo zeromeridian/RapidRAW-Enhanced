@@ -124,7 +124,7 @@ export default function PresetNameModal({
           <Button variant="ghost" onClick={onClose}>
             {t('modals.confirm.cancel')}
           </Button>
-          <Button disabled={!!error} onClick={handleSave}>
+          <Button className="whitespace-nowrap" disabled={!!error} onClick={handleSave}>
             {confirmLabel}
           </Button>
         </div>

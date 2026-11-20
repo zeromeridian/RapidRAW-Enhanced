@@ -616,8 +616,8 @@ mod output_naming_tests {
     use super::{
         DC_CREATOR, DC_RIGHTS, DC_SUBJECT, LOCAL_ONLY_ADJUSTMENT_KEYS, LR_HIERARCHICAL_SUBJECT,
         apply_preset_adjustments_to_path, collect_preset_batch_folder_paths,
-        compute_thumbnail_cache_hash, ensure_transfer_destination_free, extract_app_xmp_value,
-        extract_xmp_array, extract_xmp_stack, find_all_associated_files,
+        compute_thumbnail_cache_hash, deletion_stem_for, ensure_transfer_destination_free,
+        extract_app_xmp_value, extract_xmp_array, extract_xmp_stack, find_all_associated_files,
         generate_filename_from_template, import_rapidraw_sidecars_blocking, is_sidecar_of,
         parse_sidecar_filename, parse_virtual_path, read_xmp_from_folder_blocking,
         sanitize_filename_suffix, set_app_xmp_value, sync_metadata_from_xmp, sync_metadata_to_xmp,
@@ -879,6 +879,14 @@ mod output_naming_tests {
             associated,
             ["IMG.CR2", "IMG.CR2.abc123.tirdata", "IMG.CR2.tirdata"]
         );
+    }
+
+    #[test]
+    fn deleting_with_associated_files_takes_the_xmps_of_the_name() {
+        assert_eq!(deletion_stem_for("IMG_1.CR3.xmp"), Some("IMG_1"));
+        assert_eq!(deletion_stem_for("IMG_1.XMP"), Some("IMG_1"));
+        assert_eq!(deletion_stem_for("IMG_1.JPG.tirdata"), Some("IMG_1"));
+        assert_eq!(deletion_stem_for("notes.txt"), None);
     }
 
     #[test]
@@ -6169,6 +6177,7 @@ pub(crate) fn open_external_editor(
 #[tauri::command]
 pub fn delete_files_from_disk(paths: Vec<String>, app_handle: AppHandle) -> Result<(), String> {
     let mut files_to_trash = HashSet::new();
+    let mut deleted_photos = Vec::new();
 
     let mut deletions = HashSet::new();
 
@@ -6182,6 +6191,7 @@ pub fn delete_files_from_disk(paths: Vec<String>, app_handle: AppHandle) -> Resu
             }
         } else {
             if source_path.exists() {
+                deleted_photos.push(source_path.clone());
                 match find_all_associated_files(&source_path) {
                     Ok(associated_files) => {
                         for file in associated_files {
@@ -6233,6 +6243,17 @@ pub fn delete_files_from_disk(paths: Vec<String>, app_handle: AppHandle) -> Resu
         }
     }
 
+    // After the photos, so a RAW+JPEG pair's shared XMP goes only with the
+    // last photo of its name (as an import's Move does).
+    for photo in &deleted_photos {
+        if let Err(error) = crate::photo_import::remove_xmp_sidecars(
+            photo,
+            crate::photo_import::trash_or_delete_file,
+        ) {
+            log::warn!("Could not remove the XMP of {}: {error}", photo.display());
+        }
+    }
+
     sync_album_path_changes(&app_handle, None, Some(&deletions), None);
 
     Ok(())
@@ -6251,6 +6272,12 @@ fn deletion_stem_for(filename: &str) -> Option<&str> {
         } else {
             without_sidecar
         }
+    } else if Path::new(filename)
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("xmp"))
+    {
+        // `IMG_1.CR3.xmp` and the shared `IMG_1.xmp` both belong to `IMG_1`.
+        &filename[..filename.len() - ".xmp".len()]
     } else if is_supported_image_file(filename) {
         filename
     } else {

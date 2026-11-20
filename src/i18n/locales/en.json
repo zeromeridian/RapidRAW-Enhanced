@@ -1779,7 +1779,7 @@
         "nameConflict": "An import preset with this name already exists.",
         "placeholder": "Import preset",
         "renameTitle": "Rename Import Preset",
-        "save": "Save as import preset (keywords, author, copyright, file naming)",
+        "save": "Save Preset",
         "saveTitle": "Save Import Preset"
       },
       "checkAll": "Check All",

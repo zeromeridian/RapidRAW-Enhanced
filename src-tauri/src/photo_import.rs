@@ -421,12 +421,15 @@ struct ImportNamePlanner {
     shot_suffixes: HashMap<(String, PathBuf, String), usize>,
 }
 
+/// The extension of the XMP that all photos of one name share (`IMG_1.xmp`).
+const SHARED_XMP_EXTENSION: &str = "xmp";
+
 /// The names a shot takes at the destination, as extensions of its stem: each
 /// photo's own (`CR3`), its own XMP (`CR3.xmp`) and the shared stem XMP
 /// (`xmp`). All must be free, so an imported photo never takes over an XMP
 /// already there (as in Rename).
 fn reserved_extensions<'a>(photo_extensions: impl IntoIterator<Item = &'a String>) -> Vec<String> {
-    let mut reserved = vec!["xmp".to_string()];
+    let mut reserved = vec![SHARED_XMP_EXTENSION.to_string()];
     for extension in photo_extensions {
         for name in [extension.clone(), format!("{extension}.xmp")] {
             if !reserved
@@ -462,6 +465,24 @@ impl ImportNamePlanner {
         }
     }
 
+    /// Whether `path` (a name with `extension`) is free for `shot`. A name
+    /// this import gave out stays its shot's even once it is on disk, so a
+    /// RAW+JPEG pair keeps one name; the shared stem XMP is shared by every
+    /// shot of that name (a pair whose files sit in different source
+    /// folders). Any other name is free when it is not on disk.
+    fn is_free(
+        &self,
+        shot: &str,
+        path: &Path,
+        extension: &str,
+        exists: impl Fn(&Path) -> bool,
+    ) -> bool {
+        match self.claimed.get(&path_key(path)) {
+            Some(owner) => owner == shot || extension == SHARED_XMP_EXTENSION,
+            None => !exists(path),
+        }
+    }
+
     /// The path for a file of `shot` named `stem` + `extension` in `folder`,
     /// and whether it got a number; `None` when it is skipped or no number up
     /// to `MAX_NAME_SUFFIX` is free. `exists` tells whether a path is taken
@@ -474,22 +495,16 @@ impl ImportNamePlanner {
         extension: &str,
         exists: impl Fn(&Path) -> bool,
     ) -> Option<(PathBuf, bool)> {
-        let is_free = |claimed: &HashMap<String, String>, path: &Path| {
-            claimed
-                .get(&path_key(path))
-                .is_none_or(|owner| owner == shot)
-                && !exists(path)
-        };
         let path_for =
             |suffix: usize, extension: &str| folder.join(file_name(stem, suffix, extension));
+        let is_free = |suffix: usize, extension: &str| {
+            self.is_free(shot, &path_for(suffix, extension), extension, &exists)
+        };
 
         let own = [extension.to_string()];
         if self.clash == ImportNameClash::Skip {
             let names = reserved_extensions(&own);
-            if !names
-                .iter()
-                .all(|name| is_free(&self.claimed, &path_for(0, name)))
-            {
+            if !names.iter().all(|name| is_free(0, name)) {
                 return None;
             }
             for name in &names {
@@ -506,7 +521,7 @@ impl ImportNamePlanner {
         let suffix = (first..=MAX_NAME_SUFFIX).find(|&suffix| {
             extensions
                 .iter()
-                .all(|extension| is_free(&self.claimed, &path_for(suffix, extension)))
+                .all(|extension| is_free(suffix, extension))
         })?;
         for extension in &extensions {
             self.claimed
@@ -609,12 +624,13 @@ fn read_source(source: &str) -> Result<ImportSource, String> {
     })
 }
 
-/// Puts the source in the Trash, or deletes it where there is no Trash.
-fn remove_source(path: &Path) -> Result<(), String> {
+/// Puts a file in the Trash, or deletes it where there is no Trash or
+/// trashing fails (an import's Move, a deleted photo's XMP).
+pub(crate) fn trash_or_delete_file(path: &Path) -> Result<(), String> {
     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
     if let Err(trash_error) = trash::delete(path) {
         log::warn!(
-            "Failed to trash source file {}: {}. Deleting permanently.",
+            "Failed to trash file {}: {}. Deleting permanently.",
             path.display(),
             trash_error
         );
@@ -659,9 +675,10 @@ fn copy_xmp_sidecars(source: &Path, target: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// After a Move: removes (`remove`, the Trash) the photo's own XMP, and the
-/// shared stem XMP once no photo with that stem is left beside it.
-fn remove_xmp_sidecars(
+/// After a Move or a delete (the photo is gone): removes (`remove`, the
+/// Trash) the photo's own XMP, and the shared stem XMP once no photo with
+/// that stem is left beside it.
+pub(crate) fn remove_xmp_sidecars(
     source: &Path,
     remove: impl Fn(&Path) -> Result<(), String>,
 ) -> Result<(), String> {
@@ -753,15 +770,15 @@ impl ImportRun<'_> {
                     );
                 }
                 if settings.delete_after_import {
-                    let removed = remove_source(&path)
+                    let removed = trash_or_delete_file(&path)
                         .and_then(|()| {
                             if sidecar.exists() {
-                                remove_source(&sidecar)
+                                trash_or_delete_file(&sidecar)
                             } else {
                                 Ok(())
                             }
                         })
-                        .and_then(|()| remove_xmp_sidecars(&path, remove_source));
+                        .and_then(|()| remove_xmp_sidecars(&path, trash_or_delete_file));
                     if let Err(error) = removed {
                         issues.push(ImportIssue {
                             source: source.to_string(),
@@ -1134,6 +1151,53 @@ mod tests {
             planner.plan(&other, folder, "IMG_2", "CR3", exists),
             Some((folder.join("IMG_2.CR3"), false))
         );
+    }
+
+    #[test]
+    fn a_pair_keeps_one_name_after_its_first_file_is_copied() {
+        let folder = Path::new("/dest");
+        for clash in [ImportNameClash::AddSuffix, ImportNameClash::Skip] {
+            let mut planner = planner(clash, &["/card/IMG_1.CR3", "/card/IMG_1.JPG"]);
+            let shot = partner_key(Path::new("/card/IMG_1.CR3"));
+            assert_eq!(
+                planner.plan(&shot, folder, "IMG_1", "CR3", |_| false),
+                Some((folder.join("IMG_1.CR3"), false))
+            );
+            // The RAW and the shared XMP are now on disk.
+            let copied: HashSet<PathBuf> =
+                [folder.join("IMG_1.CR3"), folder.join("IMG_1.xmp")].into();
+            assert_eq!(
+                planner.plan(&shot, folder, "IMG_1", "JPG", |path| copied.contains(path)),
+                Some((folder.join("IMG_1.JPG"), false))
+            );
+        }
+    }
+
+    #[test]
+    fn a_pair_from_two_source_folders_shares_one_name() {
+        let folder = Path::new("/dest");
+        for clash in [ImportNameClash::AddSuffix, ImportNameClash::Skip] {
+            let mut planner = planner(clash, &["/card/JPG/IMG_1.JPG", "/card/RAW/IMG_1.CR3"]);
+            let jpeg = partner_key(Path::new("/card/JPG/IMG_1.JPG"));
+            let raw = partner_key(Path::new("/card/RAW/IMG_1.CR3"));
+            assert_eq!(
+                planner.plan(&jpeg, folder, "IMG_1", "JPG", |_| false),
+                Some((folder.join("IMG_1.JPG"), false))
+            );
+            // The JPEG and the XMP it brought are now on disk.
+            let copied: HashSet<PathBuf> =
+                [folder.join("IMG_1.JPG"), folder.join("IMG_1.xmp")].into();
+            assert_eq!(
+                planner.plan(&raw, folder, "IMG_1", "CR3", |path| copied.contains(path)),
+                Some((folder.join("IMG_1.CR3"), false))
+            );
+            // Another photo of the same type and name still gets a number.
+            let other = partner_key(Path::new("/card/RAW/IMG_1.JPG"));
+            assert_ne!(
+                planner.plan(&other, folder, "IMG_1", "JPG", |path| copied.contains(path)),
+                Some((folder.join("IMG_1.JPG"), false))
+            );
+        }
     }
 
     #[test]

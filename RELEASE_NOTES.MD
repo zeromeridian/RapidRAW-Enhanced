@@ -5,6 +5,32 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.101.3-dev-streamlined-import — 2026-11-20
+
+### Library
+
+- A RAW+JPEG pair whose files sit in different folders (for example two
+  card slots, or separate RAW and JPG folders) now imports under one
+  name too, without a `-1` on the RAW and its XMP.
+
+## 1.101.2-dev-streamlined-import — 2026-11-20
+
+### Library
+
+- Deleting photos updates the folder tree's photo counts at once; an
+  emptied folder no longer keeps its old count.
+- Deleting a photo also moves its XMP sidecars to the trash. A RAW+JPEG
+  pair's shared XMP goes once the last photo of that name is deleted.
+  "Delete with associated files" includes the XMPs too.
+
+## 1.101.1-dev-streamlined-import — 2026-11-20
+
+### Library
+
+- Importing a RAW+JPEG pair no longer gives the second file a `-1`;
+  both keep the same name, as intended.
+- The Save Preset dialog's button is shorter and stays on one line.
+
 ## 1.101.0-dev-streamlined-import — 2026-11-20
 
 ### Library
