@@ -39,6 +39,7 @@ use crate::file_management::{
 };
 use crate::formats::is_supported_image_file;
 use crate::gpu_processing::get_or_init_gpu_context;
+use crate::rename::existing_xmp;
 
 /// The highest number tried after a taken name (`IMG_1-9999`).
 const MAX_NAME_SUFFIX: usize = 9999;
@@ -378,6 +379,25 @@ struct ImportNamePlanner {
     shot_suffixes: HashMap<(String, PathBuf, String), usize>,
 }
 
+/// The names a shot takes at the destination, as extensions of its stem: each
+/// photo's own (`CR3`), its own XMP (`CR3.xmp`) and the shared stem XMP
+/// (`xmp`). All must be free, so an imported photo never takes over an XMP
+/// already there (as in Rename).
+fn reserved_extensions<'a>(photo_extensions: impl IntoIterator<Item = &'a String>) -> Vec<String> {
+    let mut reserved = vec!["xmp".to_string()];
+    for extension in photo_extensions {
+        for name in [extension.clone(), format!("{extension}.xmp")] {
+            if !reserved
+                .iter()
+                .any(|known| known.eq_ignore_ascii_case(&name))
+            {
+                reserved.push(name);
+            }
+        }
+    }
+    reserved
+}
+
 impl ImportNamePlanner {
     fn new<P: AsRef<Path>>(clash: ImportNameClash, sources: impl IntoIterator<Item = P>) -> Self {
         let mut shot_extensions: HashMap<String, Vec<String>> = HashMap::new();
@@ -421,22 +441,24 @@ impl ImportNamePlanner {
         let path_for =
             |suffix: usize, extension: &str| folder.join(file_name(stem, suffix, extension));
 
+        let own = [extension.to_string()];
         if self.clash == ImportNameClash::Skip {
-            let path = path_for(0, extension);
-            if !is_free(&self.claimed, &path) {
+            let names = reserved_extensions(&own);
+            if !names
+                .iter()
+                .all(|name| is_free(&self.claimed, &path_for(0, name)))
+            {
                 return None;
             }
-            self.claimed.insert(path_key(&path), shot.to_string());
-            return Some((path, false));
+            for name in &names {
+                self.claimed
+                    .insert(path_key(&path_for(0, name)), shot.to_string());
+            }
+            return Some((path_for(0, extension), false));
         }
 
-        let mut extensions = self.shot_extensions.get(shot).cloned().unwrap_or_default();
-        if !extensions
-            .iter()
-            .any(|known| known.eq_ignore_ascii_case(extension))
-        {
-            extensions.push(extension.to_string());
-        }
+        let photo_extensions = self.shot_extensions.get(shot).into_iter().flatten();
+        let extensions = reserved_extensions(photo_extensions.chain(&own));
         let key = (shot.to_string(), folder.to_path_buf(), stem.to_string());
         let first = self.shot_suffixes.get(&key).copied().unwrap_or(0);
         let suffix = (first..=MAX_NAME_SUFFIX).find(|&suffix| {
@@ -555,6 +577,69 @@ fn remove_source(path: &Path) -> Result<(), String> {
     fs::remove_file(path).map_err(|error| error.to_string())
 }
 
+/// The photo's own XMP (`IMG_1.CR3.xmp`) and the shared stem XMP (`IMG_1.xmp`)
+/// beside `source`, each with the name it takes beside `target`.
+fn xmp_sidecars(source: &Path, target: &Path) -> Vec<(PathBuf, PathBuf)> {
+    let (source_dir, target_dir) = (
+        source.parent().unwrap_or(Path::new("")),
+        target.parent().unwrap_or(Path::new("")),
+    );
+    let names = |path: &Path| {
+        [path.file_name(), path.file_stem()]
+            .map(|name| name.unwrap_or_default().to_string_lossy().into_owned())
+    };
+    names(source)
+        .into_iter()
+        .zip(names(target))
+        .filter_map(|(source_name, target_name)| {
+            let xmp = existing_xmp(source_dir, &source_name)?;
+            let extension = xmp.extension().unwrap_or_default().to_string_lossy();
+            let to = target_dir.join(format!("{target_name}.{extension}"));
+            Some((xmp, to))
+        })
+        .collect()
+}
+
+/// Copies the XMP sidecars of `source` to beside `target` (decision 16). The
+/// planner kept their names free, so one already there is the shared XMP a
+/// partner of the same shot brought.
+fn copy_xmp_sidecars(source: &Path, target: &Path) -> Result<(), String> {
+    for (xmp, to) in xmp_sidecars(source, target) {
+        if !to.exists() {
+            fs::copy(&xmp, &to).map_err(|error| error.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+/// After a Move: removes (`remove`, the Trash) the photo's own XMP, and the
+/// shared stem XMP once no photo with that stem is left beside it.
+fn remove_xmp_sidecars(
+    source: &Path,
+    remove: impl Fn(&Path) -> Result<(), String>,
+) -> Result<(), String> {
+    let dir = source.parent().unwrap_or(Path::new(""));
+    let stem = source.file_stem().unwrap_or_default().to_string_lossy();
+    let is_photo_of_stem = |path: &Path| {
+        path.file_stem()
+            .is_some_and(|other| other.to_string_lossy().eq_ignore_ascii_case(&stem))
+            && is_supported_image_file(path)
+    };
+    for (xmp, _) in xmp_sidecars(source, source) {
+        let is_shared = xmp.file_stem().map(|name| name.to_string_lossy()) == Some(stem.clone());
+        let is_still_used = is_shared
+            && fs::read_dir(dir).is_ok_and(|entries| {
+                entries
+                    .flatten()
+                    .any(|entry| is_photo_of_stem(&entry.path()))
+            });
+        if !is_still_used {
+            remove(&xmp)?;
+        }
+    }
+    Ok(())
+}
+
 /// One import's fixed inputs and the names it has handed out.
 struct ImportRun<'a> {
     destination: &'a Path,
@@ -605,7 +690,9 @@ impl ImportRun<'_> {
                     let (_, target_sidecar) = parse_virtual_path(&target.to_string_lossy());
                     fs::copy(&sidecar, &target_sidecar).map_err(|error| error.to_string())?;
                 }
-                // A copy imported under a new name remembers the camera's (owner 2026-11-16).
+                copy_xmp_sidecars(&path, &target)?;
+                // A copy imported under a new name remembers the camera's (owner 2026-11-16);
+                // after the XMP copy, which would otherwise replace what this writes into it.
                 if target.file_stem() != path.file_stem()
                     && let Err(error) = remember_original_file_name(
                         &target,
@@ -619,13 +706,15 @@ impl ImportRun<'_> {
                     );
                 }
                 if settings.delete_after_import {
-                    let removed = remove_source(&path).and_then(|()| {
-                        if sidecar.exists() {
-                            remove_source(&sidecar)
-                        } else {
-                            Ok(())
-                        }
-                    });
+                    let removed = remove_source(&path)
+                        .and_then(|()| {
+                            if sidecar.exists() {
+                                remove_source(&sidecar)
+                            } else {
+                                Ok(())
+                            }
+                        })
+                        .and_then(|()| remove_xmp_sidecars(&path, remove_source));
                     if let Err(error) = removed {
                         issues.push(ImportIssue {
                             source: source.to_string(),
@@ -890,6 +979,54 @@ mod tests {
             ["100CANON/IMG_2.CR3", "IMG_1.CR3", "IMG_1.JPG"]
         );
         assert!(find_import_files(&[root.to_path_buf()], true, || false).is_empty());
+    }
+
+    #[test]
+    fn an_xmp_already_at_the_destination_keeps_its_name() {
+        let folder = Path::new("/dest");
+        let taken: HashSet<PathBuf> = [folder.join("IMG_1.xmp")].into();
+        let exists = |path: &Path| taken.contains(path);
+        let shot = partner_key(Path::new("/card/IMG_1.CR3"));
+        let mut adding = planner(ImportNameClash::AddSuffix, &["/card/IMG_1.CR3"]);
+        assert_eq!(
+            adding.plan(&shot, folder, "IMG_1", "CR3", exists),
+            Some((folder.join("IMG_1-1.CR3"), true))
+        );
+        let mut skipping = planner(ImportNameClash::Skip, &["/card/IMG_1.CR3"]);
+        assert_eq!(skipping.plan(&shot, folder, "IMG_1", "CR3", exists), None);
+    }
+
+    #[test]
+    fn xmp_sidecars_travel_with_their_photo_and_leave_with_the_last_partner() {
+        let source = tempfile::tempdir().unwrap();
+        let target = tempfile::tempdir().unwrap();
+        for name in ["IMG_1.CR3", "IMG_1.JPG", "IMG_1.CR3.xmp", "IMG_1.xmp"] {
+            fs::write(source.path().join(name), name).unwrap();
+        }
+        let raw = source.path().join("IMG_1.CR3");
+        let jpeg = source.path().join("IMG_1.JPG");
+        copy_xmp_sidecars(&raw, &target.path().join("beach.CR3")).unwrap();
+        copy_xmp_sidecars(&jpeg, &target.path().join("beach.JPG")).unwrap();
+        let mut copied: Vec<String> = fs::read_dir(target.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        copied.sort();
+        assert_eq!(copied, ["beach.CR3.xmp", "beach.xmp"]);
+        assert_eq!(
+            fs::read_to_string(target.path().join("beach.xmp")).unwrap(),
+            "IMG_1.xmp"
+        );
+
+        // Moving the RAW takes its own XMP; the shared one stays for the JPEG.
+        let remove = |path: &Path| fs::remove_file(path).map_err(|error| error.to_string());
+        fs::remove_file(&raw).unwrap();
+        remove_xmp_sidecars(&raw, remove).unwrap();
+        assert!(!source.path().join("IMG_1.CR3.xmp").exists());
+        assert!(source.path().join("IMG_1.xmp").exists());
+        fs::remove_file(&jpeg).unwrap();
+        remove_xmp_sidecars(&jpeg, remove).unwrap();
+        assert!(!source.path().join("IMG_1.xmp").exists());
     }
 
     fn planner(clash: ImportNameClash, sources: &[&str]) -> ImportNamePlanner {

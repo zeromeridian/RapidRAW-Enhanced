@@ -60,10 +60,10 @@ Progress:
   scan's own pool, large files previewed one at a time, Library
   thumbnails reused, dialog 96vw × 92vh, tiles from 186 px. **Owner:
   "This is good now"** (phase 2 accepted, 2026-11-19).
-- Found, not changed (ask later): import copies a photo's `.tirdata`
-  but not its `.xmp` sidecars (`IMG_1.CR3.xmp`, `IMG_1.xmp`), unlike
-  rename (`rename.rs`), so Lightroom edits on a card or in a source
-  folder stay behind.
+  `1.99.0`–`1.99.2` committed by the owner as `ac4c5634`.
+- Decision 16 built as `1.99.3` (not committed): `copy_xmp_sidecars`,
+  `remove_xmp_sidecars`, `reserved_extensions` in the name planner;
+  header Import button as tall as the view switch.
 
 ## Owner's request (2026-11-19)
 
@@ -175,6 +175,18 @@ Caps Lock, owner: leave it out.)
 15. **Auto-open:** when a card or camera (a drive with `DCIM`) is
     connected while the app runs, the Import dialog opens with it as the
     source; a Settings → Library switch turns this off (default on).
+
+16. **XMP sidecars travel with the photo** (2026-11-19): import copied
+    only the `.tirdata`, so Lightroom edits, ratings and keywords in a
+    source's `.xmp` stayed behind. Now each photo's `.xmp` sidecars
+    (`IMG_1.CR3.xmp`, `IMG_1.xmp`) are copied or moved with it under
+    the new name, a RAW+JPEG pair's shared `IMG_1.xmp` handled as
+    Rename does; Move trashes them with the photo.
+17. **A right-clicked folder stays the destination** (2026-11-19), even
+    a date folder from an earlier import; Choose… changes it.
+18. **Large TIFF previews stay as they are** (2026-11-19): photos not in
+    the Library take ≈ 2–4 s each; no embedded-thumbnail or OS preview
+    path (restart: owner request).
 
 ## Phases
 

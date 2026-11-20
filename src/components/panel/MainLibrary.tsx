@@ -655,7 +655,7 @@ export default function MainLibrary(props: MainLibraryProps) {
           ) : (
             !props.isAndroid && (
               <Button
-                className="h-10 compact:h-8 px-3 compact:px-2 shadow-shiny"
+                className="h-14 compact:h-9 px-4 compact:px-2 shadow-shiny"
                 onClick={() => props.onImportClick()}
                 data-tooltip={t('library.tooltips.importImages')}
               >

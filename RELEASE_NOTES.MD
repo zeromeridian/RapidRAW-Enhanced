@@ -5,6 +5,19 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.99.3-dev-streamlined-import — 2026-11-19
+
+### Library
+
+- Import now brings each photo's XMP sidecars along (for example
+  Lightroom edits, ratings and keywords), renamed with the photo; a
+  RAW+JPEG pair's shared XMP comes along once. Move also moves them.
+- A photo is never imported under a name whose XMP already exists at
+  the destination, so it cannot pick up another photo's edits; it gets
+  a number or is skipped, as chosen.
+- The Import button in the Library header is as tall as the buttons
+  beside it.
+
 ## 1.99.2-dev-streamlined-import — 2026-11-19
 
 ### Library

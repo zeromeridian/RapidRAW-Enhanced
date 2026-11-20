@@ -142,7 +142,7 @@ fn parent(path: &Path) -> &Path {
 }
 
 /// `name.xmp` or `name.XMP` in `dir`, whichever exists.
-fn existing_xmp(dir: &Path, name: &str) -> Option<PathBuf> {
+pub(crate) fn existing_xmp(dir: &Path, name: &str) -> Option<PathBuf> {
     ["xmp", "XMP"]
         .into_iter()
         .map(|extension| dir.join(format!("{name}.{extension}")))
