@@ -377,6 +377,17 @@ details are in `RELEASE_NOTES.MD`.
   lens of fixed-lens cameras (Ricoh GR, Fujifilm X100) through the camera's
   mount; **Auto Lens Correction** in the right-click Productivity menu turns
   it on for the photo or a whole selection.
+- **Two lens corrections, old edits unchanged** (`1.102.0`): new edits use
+  upstream's Lensfun model (sensor-size-aware distortion, chromatic
+  aberration per radius, vignetting interpolated over focal length,
+  aperture and distance, exact automatic crop, crop-aware lens matching),
+  with the profile looked up for each photo at every render, so pasted lens
+  settings fit each photo's own lens and focal length. Edits made before
+  keep the previous correction exactly (`lensCorrectionVersion`, in XMP);
+  the panel marks them and offers **Use Updated Lens Correction**, also for
+  a selection in the right-click Productivity menu. Changing the lens
+  choice moves an edit to the updated correction. The panel shows the lens
+  found and greys out corrections the profile lacks.
 - **Apply Lens Profile Automatically** (Settings → Editor → My Lenses, on by default)
   starts unedited RAW images in Auto lens correction with the profile detected
   from EXIF, in Develop, exports, and thumbnails. Images without a matching

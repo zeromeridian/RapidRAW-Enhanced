@@ -5,6 +5,34 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.102.0-dev-lens-correction-rework — 2026-11-20
+
+### Develop
+
+- **Updated lens correction.** Lens profiles now follow the Lensfun model
+  exactly: distortion takes the camera's sensor size into account,
+  chromatic aberration is corrected across the whole frame instead of by
+  one fixed amount, vignetting is matched to the focal length, aperture
+  and focus distance, and the automatic crop removes empty corners without
+  cutting away more than needed. A profile made for a smaller sensor than
+  the camera's is no longer picked.
+- New edits use the updated lens correction. Edits made before keep the
+  lens correction they had and look exactly as before; the Lens & Geometry
+  panel says so and offers **Use Updated Lens Correction**. Choosing a
+  lens or switching between Auto and Manual also moves an edit to the
+  updated correction.
+- To update many photos at once, right-click them in the Library and
+  choose **Productivity → Use Updated Lens Correction**.
+- The lens profile is looked up for each photo from its own lens, focal
+  length and aperture. Pasting lens settings onto photos taken with other
+  focal lengths or lenses now corrects each of them with its own profile.
+- The Lens & Geometry panel shows which lens was found and which
+  corrections its profile has; Distortion, Chromatic Aberration and
+  Vignetting are greyed out when the profile has none.
+- With the updated correction, Amount 100 applies exactly the measured
+  correction, and the Distortion slider in Transform acts before the lens
+  profile.
+
 ## 1.101.4-fix-header-height-slider-overflow — 2026-11-20
 
 ### Library
