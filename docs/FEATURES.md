@@ -539,6 +539,13 @@ details are in `RELEASE_NOTES.MD`.
   Flares, Gaussian Blur, Motion Blur, and Grain in addition to the existing
   tonal, color, detail, curve, glow, and halation adjustments. The mask
   editor offers no Vignette; a mask that already has one keeps its controls.
+- **Movable centre for Vignette and Centré** (upstream `b39884b3`):
+  pressing one of their sliders shows a crosshair with the effect's
+  dashed midpoint outline on the photo; dragging it moves that tool's
+  own centre (stored 0–1 in the cropped frame, `vignetteCenterX/Y`,
+  `centréX/Y`); double-click on it, or on Vignette Amount / Centré,
+  recentres. Saved in XMP, presets and Copy & Paste; older edits render
+  unchanged; a centre moved with its amount at 0 is no edit.
 - Lightroom-style **clipping indicators** in the histogram's top corners:
   grey when nothing clips, white when every channel clips, and the clipped
   channels' colour otherwise; clicking one toggles the clipping warning.

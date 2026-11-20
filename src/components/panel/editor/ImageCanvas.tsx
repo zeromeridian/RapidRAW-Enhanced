@@ -9,6 +9,7 @@ import {
   Adjustments,
   AiPatch,
   Coord,
+  INITIAL_ADJUSTMENTS,
   MaskContainer,
   RelightLight,
   aiDepthMaskRangeAround,
@@ -30,6 +31,8 @@ import type { OverlayMode } from '../right/CropPanel';
 import CompositionOverlays from './overlays/CompositionOverlays';
 import CropRotateArea from './overlays/CropRotateArea';
 import RelightLightShape, { RelightBasis } from './overlays/RelightLightShape';
+import CenterMarkerShape from './overlays/CenterMarkerShape';
+import { CENTER_MARKERS, CENTER_MARKER_CONTROLS_ATTRIBUTE } from '../../../utils/centerMarkers';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
@@ -1683,6 +1686,61 @@ const ImageCanvas = memo(
     // Every light's handle shows while the tool is open; a light is selected by its handle and moved
     // or aimed only by dragging it.
     const showRelightLights = isRelightToolOpen && !!adjustments.relightEnabled;
+
+    // Vignette's and Centré's movable centre (upstream `b39884b3`): it shows after pressing one of
+    // the tool's sliders, while its section (or the Favorites view) is open, and is stored 0–1 in
+    // the cropped frame, which the canvas draws at `imageRenderSize`.
+    const activeCenterMarker = useEditorStore((state) => state.activeCenterMarker);
+    const centerMarkerConfig = activeCenterMarker ? CENTER_MARKERS[activeCenterMarker] : null;
+    const isCenterMarkerToolOpen = useUIStore(
+      (state) =>
+        !!centerMarkerConfig &&
+        state.activeRightPanel === Panel.Adjustments &&
+        (isFavoritesView || !!state.collapsibleSectionsState[centerMarkerConfig.section]),
+    );
+    const showCenterMarker =
+      !!centerMarkerConfig && isCenterMarkerToolOpen && !isMasking && !isAiEditing && !isCropViewVisible;
+    const centerMarkerPos = useMemo((): Coord => {
+      if (!centerMarkerConfig) return { x: 0, y: 0 };
+      const [keyX, keyY] = centerMarkerConfig.keys;
+      return {
+        x: ((adjustments[keyX] as number | undefined) ?? 0.5) * imageRenderSize.width,
+        y: ((adjustments[keyY] as number | undefined) ?? 0.5) * imageRenderSize.height,
+      };
+    }, [centerMarkerConfig, adjustments, imageRenderSize.width, imageRenderSize.height]);
+    const setCenterMarker = useCallback(
+      (pos: Coord | null) => {
+        if (!centerMarkerConfig || !imageRenderSize.width || !imageRenderSize.height) return;
+        const [keyX, keyY] = centerMarkerConfig.keys;
+        const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+        setAdjustments((prev: Adjustments) => ({
+          ...prev,
+          [keyX]: pos ? clamp01(pos.x / imageRenderSize.width) : INITIAL_ADJUSTMENTS[keyX],
+          [keyY]: pos ? clamp01(pos.y / imageRenderSize.height) : INITIAL_ADJUSTMENTS[keyY],
+        }));
+      },
+      [centerMarkerConfig, imageRenderSize.width, imageRenderSize.height, setAdjustments],
+    );
+    useEffect(() => {
+      if (activeCenterMarker && !isCenterMarkerToolOpen) setEditor({ activeCenterMarker: null });
+    }, [activeCenterMarker, isCenterMarkerToolOpen, setEditor]);
+    // A press anywhere but the photo or the tool's own sliders hides the marker.
+    useEffect(() => {
+      if (!activeCenterMarker) return;
+      const handlePointerDown = (event: PointerEvent) => {
+        const target = event.target as HTMLElement;
+        if (
+          target.closest('.konvajs-content') ||
+          target.closest(`[${CENTER_MARKER_CONTROLS_ATTRIBUTE}="${activeCenterMarker}"]`)
+        ) {
+          return;
+        }
+        setEditor({ activeCenterMarker: null });
+      };
+      window.addEventListener('pointerdown', handlePointerDown, true);
+      return () => window.removeEventListener('pointerdown', handlePointerDown, true);
+    }, [activeCenterMarker, setEditor]);
+
     const brushStageSize = (brushSettings?.size ?? 0) / effectiveZoomScale;
     const brushImageSpaceSize = brushStageSize / (imageRenderSize.scale || 1);
 
@@ -3194,7 +3252,12 @@ const ImageCanvas = memo(
             </div>
           </div>
 
-          {(isMasking || isAiEditing || isWbPickerActive || isTargetedAdjustmentActive || showRelightLights) && (
+          {(isMasking ||
+            isAiEditing ||
+            isWbPickerActive ||
+            isTargetedAdjustmentActive ||
+            showRelightLights ||
+            showCenterMarker) && (
             <div
               style={{
                 position: 'absolute',
@@ -3344,6 +3407,20 @@ const ImageCanvas = memo(
                               onTouchInteraction={() => setIsMaskTouchInteracting(true)}
                             />
                           ))}
+                        {showCenterMarker && centerMarkerConfig && (
+                          <CenterMarkerShape
+                            {...centerMarkerConfig.getContour(adjustments)}
+                            pos={centerMarkerPos}
+                            imageWidth={imageRenderSize.width}
+                            imageHeight={imageRenderSize.height}
+                            zoomScale={effectiveZoomScale}
+                            onMove={setCenterMarker}
+                            onReset={() => setCenterMarker(null)}
+                            onDragStateChange={(isDragging) => setEditor({ isSliderDragging: isDragging })}
+                            onHoverChange={setIsMaskHovered}
+                            onTouchInteraction={() => setIsMaskTouchInteracting(true)}
+                          />
+                        )}
                       </Group>
                     </Group>
                   </Layer>

@@ -5,6 +5,22 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.105.0-dev-movable-vignette-centre — 2026-11-20
+
+### Develop
+
+- **Move the Vignette and Centré centre on the photo.** Press any
+  Vignette slider (or Centré) and a crosshair appears on the photo with
+  a dashed outline of the effect; drag it to place the effect's centre
+  anywhere, for example on an off-centre subject. Vignette and Centré
+  each have their own centre.
+- Double-click the crosshair, or double-click the Vignette Amount or
+  Centré slider, to put the centre back in the middle. The crosshair
+  hides when you click elsewhere in the panels.
+- The centre stays at the same place in the frame when you crop again.
+  It is saved with the edit, in XMP, presets and Copy & Paste. Edits
+  made before look exactly as they did.
+
 ## 1.104.1-dev-library-metadata-filter — 2026-11-20
 
 ### Library

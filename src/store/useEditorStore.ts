@@ -20,6 +20,7 @@ import type { SpeedEditTarget } from '../components/ui/Slider';
 import { describeHistoryChange } from '../utils/editHistory';
 import type { TargetedAdjustment } from '../utils/targetedAdjustment';
 import { INITIAL_ZONE_SELECTION, ZoneHover, ZoneSelection } from '../utils/zoneTint';
+import type { CenterMarker } from '../utils/centerMarkers';
 
 /** Undo history keeps at most this many steps; the oldest is dropped first. */
 const MAX_HISTORY_STEPS = 50;
@@ -100,6 +101,8 @@ export interface EditorState {
   /** The zones Zone Color Grading's Alt/Option mask preview shows on the photo, or null. */
   zoneTintPreviewZones: number[] | null;
   activeRelightLightId: string | null;
+  /** The tool whose movable centre shows on the photo (after touching its sliders), or null. */
+  activeCenterMarker: CenterMarker | null;
   liveRotation: number | null;
   /** The Crop panel's values when it was opened (null outside Crop); Escape restores them. */
   cropSessionSnapshot: { path: string | null; geometry: CropGeometry } | null;
@@ -136,12 +139,13 @@ export interface EditorState {
   goToHistoryIndex: (index: number) => void;
 }
 
-type CanvasToolState = Pick<EditorState, 'isWbPickerActive' | 'targetedAdjustment'>;
+type CanvasToolState = Pick<EditorState, 'isWbPickerActive' | 'targetedAdjustment' | 'activeCenterMarker'>;
 
 /** Turns every tool that takes clicks on the photo off, except `activeTool` if given (one is active at a time). */
 export const canvasToolState = (activeTool: Partial<CanvasToolState> = {}): CanvasToolState => ({
   isWbPickerActive: false,
   targetedAdjustment: null,
+  activeCenterMarker: null,
   ...activeTool,
 });
 
@@ -194,6 +198,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   zoneTintHover: null,
   zoneTintPreviewZones: null,
   activeRelightLightId: null,
+  activeCenterMarker: null,
   liveRotation: null,
   cropSessionSnapshot: null,
 

@@ -2021,8 +2021,9 @@ pub struct GlobalAdjustments {
     pub vibrance: f32,
     pub hue: f32,
     pub monochrome: u32,
-    _pad_color2: f32,
-    _pad_color3: f32,
+    /// Centré's centre in the cropped frame (0–1, middle 0.5), as upstream.
+    pub centre_x: f32,
+    pub centre_y: f32,
 
     pub sharpness: f32,
     pub luma_noise_reduction: f32,
@@ -2052,8 +2053,9 @@ pub struct GlobalAdjustments {
     /// Per-file exposure compensation (EV) of Natural RAW renders; set by
     /// `baseline_exposure::apply_natural_exposure`, 0 otherwise.
     pub natural_exposure_ev: f32,
-    _pad_lut3: f32,
-    _pad_lut4: f32,
+    /// The post-crop vignette's centre in the cropped frame (0–1, middle 0.5), as upstream.
+    pub vignette_center_x: f32,
+    pub vignette_center_y: f32,
     _pad_lut5: f32,
 
     _pad_agx1: f32,
@@ -2924,6 +2926,27 @@ fn get_global_adjustments_from_json(
     };
     let monochrome =
         is_visible("blackAndWhite") && js_adjustments["monochrome"].as_bool().unwrap_or(false);
+    // A centre (0–1 in the cropped frame) counts only while its effect is on, so a centre moved
+    // with the amount at 0 renders nothing and leaves the photo unedited (`is_image_edited`).
+    let centre_of = |group: &str, amount: f32, key_x: &str, key_y: &str| -> (f32, f32) {
+        if amount == 0.0 {
+            (0.5, 0.5)
+        } else {
+            (
+                get_val(group, key_x, 1.0, Some(0.5)),
+                get_val(group, key_y, 1.0, Some(0.5)),
+            )
+        }
+    };
+    let centré = get_val("presence", "centré", SCALES.centré, None);
+    let (centre_x, centre_y) = centre_of("presence", centré, "centréX", "centréY");
+    let vignette_amount = get_val("vignette", "vignetteAmount", SCALES.vignette_amount, None);
+    let (vignette_center_x, vignette_center_y) = centre_of(
+        "vignette",
+        vignette_amount,
+        "vignetteCenterX",
+        "vignetteCenterY",
+    );
 
     GlobalAdjustments {
         exposure: get_val("tone", "exposure", SCALES.exposure, None),
@@ -2940,8 +2963,8 @@ fn get_global_adjustments_from_json(
         vibrance: get_val("colorPresence", "vibrance", SCALES.vibrance, None),
         hue: get_val("hue", "hue", 1.0, None),
         monochrome: u32::from(monochrome),
-        _pad_color2: 0.0,
-        _pad_color3: 0.0,
+        centre_x,
+        centre_y,
 
         sharpness: get_val("sharpening", "sharpness", SCALES.sharpness, None),
         luma_noise_reduction: get_val(
@@ -2960,8 +2983,8 @@ fn get_global_adjustments_from_json(
         clarity: get_val("presence", "clarity", SCALES.clarity, None),
         dehaze: get_val("presence", "dehaze", SCALES.dehaze, None),
         structure: get_val("presence", "structure", SCALES.structure, None),
-        centré: get_val("presence", "centré", SCALES.centré, None),
-        vignette_amount: get_val("vignette", "vignetteAmount", SCALES.vignette_amount, None),
+        centré,
+        vignette_amount,
         vignette_midpoint: get_val(
             "vignette",
             "vignetteMidpoint",
@@ -3016,8 +3039,8 @@ fn get_global_adjustments_from_json(
         tonemapper_mode: tonemapper_override
             .unwrap_or_else(|| crate::tone_mapping::tone_mapper_mode(tone_mapper)),
         natural_exposure_ev: 0.0,
-        _pad_lut3: 0.0,
-        _pad_lut4: 0.0,
+        vignette_center_x,
+        vignette_center_y,
         _pad_lut5: 0.0,
 
         _pad_agx1: 0.0,
@@ -5039,6 +5062,38 @@ mod tests {
         // A point is still an edit with no shift, as a mask without adjustments is.
         assert!(is_image_edited(&point(0), true, None));
         assert!(!is_image_edited(&json!({ "pointColors": [] }), true, None));
+    }
+
+    #[test]
+    fn a_moved_centre_counts_only_while_its_effect_is_on() {
+        let natural = |extra: serde_json::Value| {
+            let mut adjustments = json!({ "toneMapper": "natural" });
+            adjustments
+                .as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            adjustments
+        };
+        let moved =
+            natural(json!({ "vignetteCenterX": 0.2, "vignetteCenterY": 0.7, "centréX": 0.3 }));
+        assert!(!is_image_edited(&moved, true, None));
+        let global = get_global_adjustments_from_json(&moved, true, None);
+        assert_eq!(
+            (global.vignette_center_x, global.vignette_center_y),
+            (0.5, 0.5)
+        );
+        assert_eq!((global.centre_x, global.centre_y), (0.5, 0.5));
+
+        let on = natural(json!({
+            "vignetteAmount": -30, "vignetteCenterX": 0.2, "vignetteCenterY": 0.7,
+            "centré": 20, "centréX": 0.3
+        }));
+        let global = get_global_adjustments_from_json(&on, true, None);
+        assert_eq!(
+            (global.vignette_center_x, global.vignette_center_y),
+            (0.2, 0.7)
+        );
+        assert_eq!((global.centre_x, global.centre_y), (0.3, 0.5));
     }
 
     fn blend_pad_at(puck_y: f64, extra: serde_json::Value) -> serde_json::Value {

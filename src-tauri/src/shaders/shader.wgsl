@@ -73,8 +73,8 @@ struct GlobalAdjustments {
     vibrance: f32,
     hue: f32,
     monochrome: u32,
-    _pad_color2: f32,
-    _pad_color3: f32,
+    centre_x: f32,
+    centre_y: f32,
 
     sharpness: f32,
     luma_noise_reduction: f32,
@@ -101,8 +101,8 @@ struct GlobalAdjustments {
     lut_intensity: f32,
     tonemapper_mode: u32,
     natural_exposure_ev: f32,
-    _pad_lut3: f32,
-    _pad_lut4: f32,
+    vignette_center_x: f32,
+    vignette_center_y: f32,
     _pad_lut5: f32,
 
     _pad_agx1: f32,
@@ -1200,9 +1200,22 @@ fn apply_local_contrast(
     return mix(processed_color_linear, final_color, midtone_mask);
 }
 
+// Centré's weight at a pixel: 1 at its centre (`centre_pos`, 0–1 in the frame), fading to 0 outside.
+fn centre_mask_at(centre_pos: vec2<f32>, coords_i: vec2<i32>) -> f32 {
+    let full_dims_f = vec2<f32>(textureDimensions(input_texture));
+    let coord_f = vec2<f32>(coords_i);
+    let midpoint = 0.4;
+    let feather = 0.375;
+    let aspect = full_dims_f.y / full_dims_f.x;
+    let uv_centered = (coord_f / full_dims_f - centre_pos) * 2.0;
+    let d = length(uv_centered * vec2<f32>(1.0, aspect)) * 0.5;
+    return 1.0 - smoothstep(midpoint - feather, midpoint + feather, d);
+}
+
 fn apply_centre_local_contrast(
     color_in: vec3<f32>,
     centre_amount: f32,
+    centre_pos: vec2<f32>,
     coords_i: vec2<i32>,
     blurred_color_srgb: vec3<f32>,
     is_raw: u32
@@ -1210,15 +1223,7 @@ fn apply_centre_local_contrast(
     if (centre_amount == 0.0) {
         return color_in;
     }
-    let full_dims_f = vec2<f32>(textureDimensions(input_texture));
-    let coord_f = vec2<f32>(coords_i);
-    let midpoint = 0.4;
-    let feather = 0.375;
-    let aspect = full_dims_f.y / full_dims_f.x;
-    let uv_centered = (coord_f / full_dims_f - 0.5) * 2.0;
-    let d = length(uv_centered * vec2<f32>(1.0, aspect)) * 0.5;
-    let vignette_mask = smoothstep(midpoint - feather, midpoint + feather, d);
-    let centre_mask = 1.0 - vignette_mask;
+    let centre_mask = centre_mask_at(centre_pos, coords_i);
 
     const CLARITY_SCALE: f32 = 0.9;
     var processed_color = color_in;
@@ -1234,20 +1239,13 @@ fn apply_centre_local_contrast(
 fn apply_centre_tonal_and_color(
     color_in: vec3<f32>,
     centre_amount: f32,
+    centre_pos: vec2<f32>,
     coords_i: vec2<i32>
 ) -> vec3<f32> {
     if (centre_amount == 0.0) {
         return color_in;
     }
-    let full_dims_f = vec2<f32>(textureDimensions(input_texture));
-    let coord_f = vec2<f32>(coords_i);
-    let midpoint = 0.4;
-    let feather = 0.375;
-    let aspect = full_dims_f.y / full_dims_f.x;
-    let uv_centered = (coord_f / full_dims_f - 0.5) * 2.0;
-    let d = length(uv_centered * vec2<f32>(1.0, aspect)) * 0.5;
-    let vignette_mask = smoothstep(midpoint - feather, midpoint + feather, d);
-    let centre_mask = 1.0 - vignette_mask;
+    let centre_mask = centre_mask_at(centre_pos, coords_i);
 
     const EXPOSURE_SCALE: f32 = 0.5;
     const VIBRANCE_SCALE: f32 = 0.4;
@@ -1274,6 +1272,7 @@ fn apply_vignette_effect(
     midpoint: f32,
     roundness: f32,
     feather: f32,
+    center: vec2<f32>,
     coords: vec2<u32>
 ) -> vec3<f32> {
     if (amount == 0.0) {
@@ -1282,7 +1281,7 @@ fn apply_vignette_effect(
     let full_dims = vec2<f32>(textureDimensions(input_texture));
     let coord = vec2<f32>(coords);
     let aspect = full_dims.y / full_dims.x;
-    let uv_centered = (coord / full_dims - 0.5) * 2.0;
+    let uv_centered = (coord / full_dims - center) * 2.0;
     let power = 1.0 - roundness;
     let uv_round = sign(uv_centered) * pow(abs(uv_centered), vec2<f32>(power, power));
     let distance = length(uv_round * vec2<f32>(1.0, aspect)) * 0.5;
@@ -2153,7 +2152,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, clarity_blurred, t_clarity, is_raw, 1u, 0.0);
     locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, structure_blurred, t_structure, is_raw, 1u, 0.0);
-    locally_contrasted_rgb = apply_centre_local_contrast(locally_contrasted_rgb, adjustments.global.centre, absolute_coord_i, clarity_blurred, is_raw);
+    let centre_pos = vec2<f32>(adjustments.global.centre_x, adjustments.global.centre_y);
+    locally_contrasted_rgb = apply_centre_local_contrast(locally_contrasted_rgb, adjustments.global.centre, centre_pos, absolute_coord_i, clarity_blurred, is_raw);
 
     var processed_rgb = apply_linear_exposure(locally_contrasted_rgb, t_exposure);
 
@@ -2197,7 +2197,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
 
     var composite_rgb_linear = apply_dehaze(processed_rgb, structure_blurred, is_raw, t_dehaze);
-    composite_rgb_linear = apply_centre_tonal_and_color(composite_rgb_linear, adjustments.global.centre, absolute_coord_i);
+    composite_rgb_linear = apply_centre_tonal_and_color(composite_rgb_linear, adjustments.global.centre, centre_pos, absolute_coord_i);
     composite_rgb_linear = apply_white_balance(composite_rgb_linear, t_temperature, t_tint);
     composite_rgb_linear = apply_filmic_exposure(composite_rgb_linear, t_brightness);
     composite_rgb_linear = apply_tonal_adjustments(composite_rgb_linear, tonal_blurred, is_raw, t_contrast, t_shadows, t_whites, t_blacks);
@@ -2261,8 +2261,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         adjustments.global.vignette_midpoint,
         adjustments.global.vignette_roundness,
         adjustments.global.vignette_feather,
+        vec2<f32>(adjustments.global.vignette_center_x, adjustments.global.vignette_center_y),
         absolute_coord
     );
+    // Masks offer no vignette any more; an older mask's vignette stays centred on the frame.
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let influence = get_mask_influence(i, absolute_coord);
         if (influence > 0.001) {
@@ -2273,6 +2275,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
                 m.vignette_midpoint,
                 m.vignette_roundness,
                 m.vignette_feather,
+                vec2<f32>(0.5, 0.5),
                 absolute_coord
             );
             composite_rgb_linear = mix(composite_rgb_linear, vignetted, influence);

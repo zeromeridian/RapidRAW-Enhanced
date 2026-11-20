@@ -1,4 +1,6 @@
 import type { AdjustmentLayout, AppSettings } from '../components/ui/AppProperties';
+import type { Adjustments } from './adjustments';
+import type { CenterMarker } from './centerMarkers';
 import {
   ADJUSTMENT_SECTIONS,
   ADJUSTMENT_TOOLS_BY_ID,
@@ -31,6 +33,10 @@ export interface AdjustmentControl {
   trackClassName?: string;
   /** The label alone does not say what it changes ("Amount"), so Favorites prefixes the tool. */
   qualify?: boolean;
+  /** Keys reset to their defaults with this slider (a double-click): the tool's movable centre. */
+  resetsWith?: Array<keyof Adjustments>;
+  /** Pressing the slider shows this tool's movable centre on the photo (photo's panel only). */
+  centerMarker?: CenterMarker;
 }
 
 const signed = { min: -100, max: 100, step: 1 };
@@ -89,7 +95,14 @@ export const ADJUSTMENT_CONTROLS: Array<AdjustmentControl> = [
   { id: DetailsAdjustment.Clarity, label: 'adjustments.details.clarity', parent: 'presence', ...signed },
   { id: DetailsAdjustment.Dehaze, label: 'adjustments.details.dehaze', parent: 'presence', ...signed },
   { id: DetailsAdjustment.Structure, label: 'adjustments.details.structure', parent: 'presence', ...signed },
-  { id: DetailsAdjustment.Centré, label: 'adjustments.details.centre', parent: 'presence', ...signed },
+  {
+    id: DetailsAdjustment.Centré,
+    label: 'adjustments.details.centre',
+    parent: 'presence',
+    ...signed,
+    resetsWith: [DetailsAdjustment.CentréX, DetailsAdjustment.CentréY],
+    centerMarker: 'centre',
+  },
   {
     id: DetailsAdjustment.LumaNoiseReduction,
     label: 'adjustments.details.luminance',
@@ -194,7 +207,15 @@ export const ADJUSTMENT_CONTROLS: Array<AdjustmentControl> = [
     ...positive,
     qualify: true,
   },
-  { id: Effect.VignetteAmount, label: 'adjustments.effects.amount', parent: 'vignette', ...signed, qualify: true },
+  {
+    id: Effect.VignetteAmount,
+    label: 'adjustments.effects.amount',
+    parent: 'vignette',
+    ...signed,
+    qualify: true,
+    resetsWith: [Effect.VignetteCenterX, Effect.VignetteCenterY],
+    centerMarker: 'vignette',
+  },
   {
     id: Effect.VignetteMidpoint,
     label: 'adjustments.effects.midpoint',
@@ -202,6 +223,7 @@ export const ADJUSTMENT_CONTROLS: Array<AdjustmentControl> = [
     ...positive,
     defaultValue: 50,
     qualify: true,
+    centerMarker: 'vignette',
   },
   {
     id: Effect.VignetteRoundness,
@@ -209,6 +231,7 @@ export const ADJUSTMENT_CONTROLS: Array<AdjustmentControl> = [
     parent: 'vignette',
     ...signed,
     qualify: true,
+    centerMarker: 'vignette',
   },
   {
     id: Effect.VignetteFeather,
@@ -217,6 +240,7 @@ export const ADJUSTMENT_CONTROLS: Array<AdjustmentControl> = [
     ...positive,
     defaultValue: 50,
     qualify: true,
+    centerMarker: 'vignette',
   },
   {
     id: Effect.GrainAmount,

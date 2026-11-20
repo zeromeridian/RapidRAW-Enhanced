@@ -72,6 +72,8 @@ export enum DetailsAdjustment {
   Dehaze = 'dehaze',
   Structure = 'structure',
   Centré = 'centré',
+  CentréX = 'centréX',
+  CentréY = 'centréY',
   ColorNoiseReduction = 'colorNoiseReduction',
   LumaNoiseReduction = 'lumaNoiseReduction',
   Sharpness = 'sharpness',
@@ -99,6 +101,8 @@ export enum Effect {
   LutPath = 'lutPath',
   LutSize = 'lutSize',
   VignetteAmount = 'vignetteAmount',
+  VignetteCenterX = 'vignetteCenterX',
+  VignetteCenterY = 'vignetteCenterY',
   VignetteFeather = 'vignetteFeather',
   VignetteMidpoint = 'vignetteMidpoint',
   VignetteRoundness = 'vignetteRoundness',
@@ -270,6 +274,9 @@ export interface Adjustments {
   blendPad: BlendPad | null;
   brightness: number;
   centré: number;
+  /** Centré's centre in the cropped frame, 0–1 (middle 0.5); upstream's keys. */
+  centréX: number;
+  centréY: number;
   clarity: number;
   chromaticAberrationBlueYellow: number;
   chromaticAberrationRedCyan: number;
@@ -397,6 +404,9 @@ export interface Adjustments {
   transformConstrainCrop: boolean;
   vibrance: number;
   vignetteAmount: number;
+  /** The vignette's centre in the cropped frame, 0–1 (middle 0.5); upstream's keys. */
+  vignetteCenterX: number;
+  vignetteCenterY: number;
   vignetteFeather: number;
   vignetteMidpoint: number;
   vignetteRoundness: number;
@@ -932,6 +942,8 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   blendPad: null,
   brightness: 0,
   centré: 0,
+  centréX: 0.5,
+  centréY: 0.5,
   clarity: 0,
   chromaticAberrationBlueYellow: 0,
   chromaticAberrationRedCyan: 0,
@@ -1047,6 +1059,8 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   transformConstrainCrop: false,
   vibrance: 0,
   vignetteAmount: 0,
+  vignetteCenterX: 0.5,
+  vignetteCenterY: 0.5,
   vignetteFeather: 50,
   vignetteMidpoint: 50,
   vignetteRoundness: 0,
@@ -1305,12 +1319,11 @@ export interface AdjustmentGroup {
   parts?: AdjustmentGroup[];
 }
 
-/** A group whose every key is a setting of its own, listed under its label. */
-const groupOfSettings = (label: string, settings: Array<[key: string, label: string]>): AdjustmentGroup => ({
-  label,
-  keys: settings.map(([key]) => key),
-  parts: settings.map(([key, partLabel]) => ({ label: partLabel, keys: [key] })),
-});
+/** A group whose settings are listed one by one; a setting is a key or keys saved together. */
+const groupOfSettings = (label: string, settings: Array<[keys: string | string[], label: string]>): AdjustmentGroup => {
+  const parts = settings.map(([keys, partLabel]) => ({ label: partLabel, keys: [keys].flat() }));
+  return { label, keys: parts.flatMap((part) => part.keys), parts };
+};
 
 /**
  * The Copy & Paste Settings checkboxes, under the Adjustments sections they belong to; the
@@ -1339,7 +1352,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
       [DetailsAdjustment.Clarity, 'adjustments.details.clarity'],
       [DetailsAdjustment.Structure, 'adjustments.details.structure'],
       [DetailsAdjustment.Dehaze, 'adjustments.details.dehaze'],
-      [DetailsAdjustment.Centré, 'adjustments.details.centre'],
+      [[DetailsAdjustment.Centré, DetailsAdjustment.CentréX, DetailsAdjustment.CentréY], 'adjustments.details.centre'],
     ]),
   ],
   curves: [
@@ -1442,7 +1455,14 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
   finish: [
     {
       label: 'modals.copyPaste.groups.vignette',
-      keys: [Effect.VignetteAmount, Effect.VignetteFeather, Effect.VignetteMidpoint, Effect.VignetteRoundness],
+      keys: [
+        Effect.VignetteAmount,
+        Effect.VignetteFeather,
+        Effect.VignetteMidpoint,
+        Effect.VignetteRoundness,
+        Effect.VignetteCenterX,
+        Effect.VignetteCenterY,
+      ],
     },
     { label: 'modals.copyPaste.groups.grain', keys: [Effect.GrainAmount, Effect.GrainRoughness, Effect.GrainSize] },
   ],
@@ -1676,6 +1696,8 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     DetailsAdjustment.Dehaze,
     DetailsAdjustment.Structure,
     DetailsAdjustment.Centré,
+    DetailsAdjustment.CentréX,
+    DetailsAdjustment.CentréY,
   ],
   curves: ['curves', 'pointCurves', 'parametricCurve', 'curveMode'],
   color: [
@@ -1746,6 +1768,8 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     Effect.VignetteFeather,
     Effect.VignetteMidpoint,
     Effect.VignetteRoundness,
+    Effect.VignetteCenterX,
+    Effect.VignetteCenterY,
     Effect.GrainAmount,
     Effect.GrainRoughness,
     Effect.GrainSize,
