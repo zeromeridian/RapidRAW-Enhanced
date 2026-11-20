@@ -105,6 +105,16 @@ details are in `RELEASE_NOTES.MD`.
 - Rejected, Selected, Deferred, and Unflagged states with keyboard shortcuts,
   thumbnail badges, rejected-image dimming, filtering, and rejected-file
   deletion for the currently loaded folder view.
+- **Metadata filter bar** (Lightroom Classic's Library Filter › Metadata):
+  toggled from the Library header or `\`, columns above the grid list
+  the values found with counts; Date as Year › Month › Day, Camera, Lens,
+  Focal Length by default, each column switchable to ISO, Shutter Speed,
+  Aperture, Keyword, Label, Flag, Rating or File Type, up to eight
+  columns. Click, Cmd/Ctrl-click and Shift-click pick values; values in
+  a column add up, columns narrow each other; counts follow the other
+  filters and the search. Picks join the active filters and Clear All;
+  columns, picks and the bar's state are remembered; photos still being
+  read wait until their EXIF is known.
 - Unified **Quick Filter** controls for unrated and rating thresholds,
   file types (RAW, JPEG, HEIF incl. `.hif` and TIFF buttons that combine; none on shows
   every type, including PNG, WebP and other formats without a button), edited/original status, color labels, and flags, with an

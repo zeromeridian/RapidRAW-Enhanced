@@ -205,6 +205,8 @@ interface UIState {
   setRightPanel: (panel: Panel | null) => void;
   // Shows a Library right panel in place of the one shown, or hides it when it is the one shown.
   toggleLibraryPanel: (panel: LibraryPanel) => void;
+  // Shows or hides the metadata filter bar above the Library grid.
+  toggleMetadataFilterBar: () => void;
   customEscapeHandler: (() => void) | null;
   setCustomEscapeHandler: (handler: (() => void) | null) => void;
   imageSelectHandler: ((path: string) => void) | null;
@@ -338,6 +340,11 @@ export const useUIStore = create<UIState>((set, get) => ({
         },
       };
     }),
+
+  toggleMetadataFilterBar: () =>
+    set((state) => ({
+      uiVisibility: { ...state.uiVisibility, metadataFilterBar: !state.uiVisibility.metadataFilterBar },
+    })),
 
   setRightPanel: (panelId) => {
     const current = get().activeRightPanel;

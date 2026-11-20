@@ -1456,6 +1456,31 @@
       "failed": "Import Failed!",
       "starting": "Starting…"
     },
+    "metadataFilter": {
+      "addColumn": "Add column",
+      "all": "All",
+      "fields": {
+        "aperture": "Aperture",
+        "camera": "Camera",
+        "date": "Date",
+        "fileType": "File Type",
+        "flag": "Flag",
+        "focalLength": "Focal Length",
+        "iso": "ISO",
+        "keyword": "Keyword",
+        "label": "Label",
+        "lens": "Lens",
+        "rating": "Rating",
+        "shutter": "Shutter Speed"
+      },
+      "noKeyword": "No Keyword",
+      "reading_one": "Reading metadata… {{count}} photo left",
+      "reading_other": "Reading metadata… {{count}} photos left",
+      "removeColumn": "Remove column",
+      "toggle": "Metadata filter",
+      "unknown": "Unknown",
+      "unknownDate": "Unknown Date"
+    },
     "items": {
       "cloudPlaceholder": "Stored in iCloud — not downloaded",
       "collapseFolder": "Collapse Folder",
@@ -2322,6 +2347,7 @@
         "toggle_masks": "Toggle Masks panel",
         "toggle_mask_overlay": "Toggle mask overlay",
         "toggle_metadata": "Toggle Metadata panel",
+        "toggle_metadata_filter": "Toggle metadata filter bar",
         "toggle_presets": "Toggle Presets panel",
         "undo": "Undo adjustment",
         "zoom_100": "Zoom to 100%",

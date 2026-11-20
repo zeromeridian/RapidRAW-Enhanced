@@ -37,6 +37,10 @@ pub struct FilterCriteria {
     pub colors: Vec<String>,
     #[serde(default)]
     pub flags: Vec<String>,
+    /// The metadata filter bar's picks: column field → picked values
+    /// (`MetadataPicks` in `metadataFilter.ts`). Absent before 1.104.0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
 }
 
 impl Default for FilterCriteria {
@@ -49,6 +53,7 @@ impl Default for FilterCriteria {
             edited_status: Some("all".to_string()),
             colors: Vec::new(),
             flags: Vec::new(),
+            metadata: None,
         }
     }
 }
@@ -925,6 +930,10 @@ pub struct AppSettings {
     pub folder_tree_sort: Option<FolderTreeSort>,
     #[serde(default)]
     pub library_display_mode: Option<String>,
+    /// The metadata filter bar's column fields, left to right; absent gives
+    /// the frontend's defaults (Date, Camera, Lens, Focal Length).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub library_filter_columns: Option<Vec<String>>,
     #[serde(default)]
     pub grouping: Option<String>,
     #[serde(default)]
@@ -1134,6 +1143,7 @@ impl Default for AppSettings {
             language: Some("en".to_string()),
             folder_tree_sort: Some(FolderTreeSort::default()),
             library_display_mode: Some("grid".to_string()),
+            library_filter_columns: None,
             grouping: Some("off".to_string()),
             require_matching_exif: Some(false),
             group_edited_files: Some(true),
@@ -1556,6 +1566,21 @@ mod tests {
 
         let restored = serde_json::to_value(&settings).expect("settings should serialize");
         assert_eq!(restored["filterCriteria"], filter);
+    }
+
+    #[test]
+    fn metadata_filter_picks_and_columns_round_trip_through_settings() {
+        let picks = json!({ "camera": ["OM-3"], "date": ["2026-11", "2025"] });
+        let columns = json!(["date", "camera", "iso"]);
+        let settings: AppSettings = serde_json::from_value(json!({
+            "filterCriteria": { "rating": 0, "metadata": picks },
+            "libraryFilterColumns": columns
+        }))
+        .expect("settings with metadata picks should deserialize");
+
+        let restored = serde_json::to_value(&settings).expect("settings should serialize");
+        assert_eq!(restored["filterCriteria"]["metadata"], picks);
+        assert_eq!(restored["libraryFilterColumns"], columns);
     }
 
     #[test]

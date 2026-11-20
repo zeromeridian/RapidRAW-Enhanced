@@ -1,7 +1,8 @@
 import { ImageFile } from '../components/ui/AppProperties';
 import { USER_TAG_PREFIX } from './keywords';
 
-const userKeywords = (image: ImageFile | undefined) =>
+/** A photo's user keyword paths, without the `user:` prefix. */
+export const userKeywords = (image: ImageFile | undefined) =>
   (image?.tags || []).filter((tag) => tag.startsWith(USER_TAG_PREFIX)).map((tag) => tag.slice(USER_TAG_PREFIX.length));
 
 interface KeywordSuggestionInput {

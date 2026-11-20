@@ -16,6 +16,7 @@ import {
   Columns,
   SlidersHorizontal,
   Rows3,
+  ListFilter,
 } from 'lucide-react';
 import CullingView from './library/CullingView';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -46,6 +47,8 @@ import SettingsPanel from './SettingsPanel';
 import LibraryGrid from './library/LibraryGrid';
 import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
 import ImportProgress from './library/ImportProgress';
+import MetadataFilterBar, { useMetadataFilterLabels } from './library/MetadataFilterBar';
+import { MetadataField, hasMetadataPicks } from '../../utils/metadataFilter';
 
 export interface ColumnWidths {
   thumbnail: number;
@@ -202,6 +205,10 @@ export default function MainLibrary(props: MainLibraryProps) {
 
   const searchCriteria = useLibraryStore((state) => state.searchCriteria);
   const filterCriteria = useLibraryStore((state) => state.filterCriteria);
+  const isMetadataFilterBarOpen = useUIStore((state) => Boolean(state.uiVisibility.metadataFilterBar));
+  const toggleMetadataFilterBar = useUIStore((state) => state.toggleMetadataFilterBar);
+  const { fieldLabel, valueLabel } = useMetadataFilterLabels();
+  const hasMetadataFilter = hasMetadataPicks(filterCriteria.metadata);
 
   useEffect(() => {
     const hasStoredLibrary = !!props.appSettings?.lastRootPath || !!props.appSettings?.rootFolders?.length;
@@ -304,8 +311,16 @@ export default function MainLibrary(props: MainLibraryProps) {
       });
     }
 
+    for (const [field, values] of Object.entries(filterCriteria.metadata ?? {}) as Array<[MetadataField, string[]]>) {
+      if (!values?.length) continue;
+      filters.push({
+        key: `metadata-${field}`,
+        label: `${fieldLabel(field)}: ${values.map((value) => valueLabel(field, value, true)).join(', ')}`,
+      });
+    }
+
     return filters;
-  }, [filterCriteria, t, translatedEditedStatusOptions, translatedRatingFilterOptions]);
+  }, [filterCriteria, fieldLabel, t, translatedEditedStatusOptions, translatedRatingFilterOptions, valueLabel]);
 
   const translatedThumbnailAspectRatioOptions = useMemo(
     () => [
@@ -686,6 +701,19 @@ export default function MainLibrary(props: MainLibraryProps) {
 
           <div className={clsx(HEADER_GROUP_CLASS, 'gap-1')}>
             <SearchInput indexingProgress={props.indexingProgress} isIndexing={props.isIndexing} />
+            <Button
+              className={clsx(
+                'relative h-12 compact:h-9 w-12 shadow-none p-0 flex items-center justify-center',
+                isMetadataFilterBarOpen ? 'bg-bg-primary text-text-primary' : 'bg-transparent text-text-primary',
+              )}
+              onClick={toggleMetadataFilterBar}
+              data-tooltip={t('library.metadataFilter.toggle')}
+            >
+              <ListFilter className="w-5 h-5" />
+              {hasMetadataFilter && !isMetadataFilterBarOpen && (
+                <span className="absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-accent" />
+              )}
+            </Button>
             <ViewOptionsDropdown
               libraryViewMode={props.libraryViewMode}
               onSelectAspectRatio={props.onThumbnailAspectRatioChange}
@@ -721,6 +749,8 @@ export default function MainLibrary(props: MainLibraryProps) {
           </div>
         </div>
       </header>
+
+      {isMetadataFilterBarOpen && <MetadataFilterBar />}
 
       {props.imageList.length > 0 ? (
         libraryDisplayMode === LibraryDisplayMode.Cull ? (

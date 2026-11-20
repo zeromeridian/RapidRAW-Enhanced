@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useLibraryStore } from '../store/useLibraryStore';
+import { SearchCriteria, useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { SortDirection, ImageFile, GroupingMode } from '../components/ui/AppProperties';
 import { buildImageGroups, GroupBadgeInfo, GroupId } from '../utils/imageGrouping';
@@ -7,32 +7,10 @@ import { applyImageStacks, getCaptureTime } from '../utils/imageStacks';
 import { getImageFlag } from '../utils/imageFlags';
 import { matchesLibraryFilter } from '../utils/libraryFilters';
 import { hasKeywordOrChild } from '../utils/keywords';
+import { getIso, parseAperture, parseFocalLength, parseShutter } from '../utils/exifValues';
 
 export const ADVANCED_QUERY_REGEX =
   /^(iso|aperture|f|shutter|s|focal|mm|rating|color|flag|camera|make|model|lens|keyword)(?=\s*[:<>=])\s*(?::)?\s*(>=|<=|>|<|=)?\s*(.+)$/i;
-
-export const parseShutter = (val: string | undefined): number => {
-  if (!val) return 0;
-  const cleanVal = val.replace(/s/i, '').trim();
-  const parts = cleanVal.split('/');
-  if (parts.length === 2) {
-    const num = parseFloat(parts[0]);
-    const den = parseFloat(parts[1]);
-    return den !== 0 ? num / den : 0;
-  }
-  const numVal = parseFloat(cleanVal);
-  return isNaN(numVal) ? 0 : numVal;
-};
-
-/** The first number in an EXIF text such as "f/2.8" or "50.0 mm"; 0 when there is none. */
-const parseExifNumber = (val: string | undefined): number => {
-  const match = val?.match(/(\d+(\.\d+)?)/);
-  const numVal = match ? parseFloat(match[0]) : 0;
-  return isNaN(numVal) ? 0 : numVal;
-};
-
-export const parseAperture = parseExifNumber;
-export const parseFocalLength = parseExifNumber;
 
 const fileNameCollator = new Intl.Collator(undefined, { numeric: true });
 
@@ -51,13 +29,17 @@ export interface GroupedLibrary {
   badges: Map<GroupId, GroupBadgeInfo> | null;
 }
 
-export function computeGroupedLibrary(libraryState: any, settingsState: any): GroupedLibrary {
-  const { imageList, imageRatings, filterCriteria, searchCriteria, sortCriteria } = libraryState;
-  const { appSettings } = settingsState;
+export interface SearchMatcher {
+  isActive: boolean;
+  /** Whether a photo matches the search text and query tags; always true while no search is active. */
+  matches(image: ImageFile): boolean;
+}
 
-  const groupingMode: GroupingMode = appSettings?.grouping ?? 'off';
-  const isGroupingActive = groupingMode !== 'off';
-
+/** The Library search (text and query tags such as `iso>800`) as a test of one photo. */
+export function createSearchMatcher(
+  searchCriteria: SearchCriteria,
+  imageRatings: Record<string, number>,
+): SearchMatcher {
   const { tags: searchTags, text: searchText, mode: searchMode } = searchCriteria;
   const lowerCaseSearchText = searchText.trim().toLowerCase();
 
@@ -77,8 +59,7 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
       let imgVal = 0;
       let qVal = parseFloat(value);
 
-      if (field === 'iso')
-        imgVal = parseInt(image.exif?.PhotographicSensitivity || image.exif?.ISOSpeedRatings || '0', 10) || 0;
+      if (field === 'iso') imgVal = getIso(image.exif);
       else if (field === 'aperture' || field === 'f') imgVal = parseAperture(image.exif?.FNumber);
       else if (field === 'focal' || field === 'mm') imgVal = parseFocalLength(image.exif?.FocalLength);
       else if (field === 'rating') imgVal = imageRatings[image.path] || 0;
@@ -155,6 +136,18 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
     return tagsMatch && textMatch;
   };
 
+  return { isActive: isSearchActive, matches: matchesSearch };
+}
+
+export function computeGroupedLibrary(libraryState: any, settingsState: any): GroupedLibrary {
+  const { imageList, imageRatings, filterCriteria, searchCriteria, sortCriteria } = libraryState;
+  const { appSettings } = settingsState;
+
+  const groupingMode: GroupingMode = appSettings?.grouping ?? 'off';
+  const isGroupingActive = groupingMode !== 'off';
+
+  const { isActive: isSearchActive, matches: matchesSearch } = createSearchMatcher(searchCriteria, imageRatings);
+
   let processedList = imageList.filter((image: ImageFile) => matchesLibraryFilter(image, imageRatings, filterCriteria));
   let searchMatchingGroupIds: Set<string> | null = null;
 
@@ -198,9 +191,7 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
         break;
       }
       case 'iso': {
-        const isoA = parseInt(a.exif?.PhotographicSensitivity || a.exif?.ISOSpeedRatings || '0', 10) || 0;
-        const isoB = parseInt(b.exif?.PhotographicSensitivity || b.exif?.ISOSpeedRatings || '0', 10) || 0;
-        comparison = isoA - isoB;
+        comparison = getIso(a.exif) - getIso(b.exif);
         break;
       }
       case 'shutter_speed': {

@@ -515,6 +515,13 @@ export const useKeyboardShortcuts = ({
           s.ui.requestSearchFocus();
         },
       },
+      toggle_metadata_filter: {
+        shouldFire: (s: ReturnType<typeof getStoreState>) => !s.editor.selectedImage,
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) => {
+          e.preventDefault();
+          s.ui.toggleMetadataFilterBar();
+        },
+      },
       toggle_crop: {
         shouldFire: (s: any) => !!s.editor.selectedImage,
         execute: (e: any, s: any) => {

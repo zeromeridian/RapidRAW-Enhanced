@@ -18,6 +18,7 @@ import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { getDisplayFilename } from '../../../utils/outputNaming';
 import { getImageDimensions } from '../../../utils/imageDimensions';
 import { isImageFlagTag } from '../../../utils/imageFlags';
+import { exifText, formatCameraName } from '../../../utils/exifValues';
 import {
   USER_TAG_PREFIX,
   formatKeyword,
@@ -72,21 +73,6 @@ const CAMERA_ICONS: Record<string, React.FC> = {
   PhotographicSensitivity: IconIso,
   FocalLengthIn35mmFilm: IconFocalLength,
 };
-
-// The EXIF reader keeps quotes around strings; empty when the tag is missing.
-function exifText(value: unknown) {
-  if (value === undefined || value === null) return '';
-  return String(value).replace(/"/g, '').trim();
-}
-
-// Make and model as one name, without repeating a make the model already starts with
-// ("Canon" + "Canon EOS R5", "NIKON CORPORATION" + "NIKON Z 6").
-function formatCameraName(make: string, model: string) {
-  const makeWord = make.split(/\s+/)[0].toLowerCase();
-  const modelLower = model.toLowerCase();
-  const repeatsMake = makeWord !== '' && (modelLower === makeWord || modelLower.startsWith(`${makeWord} `));
-  return [repeatsMake ? '' : make, model].filter(Boolean).join(' ');
-}
 
 interface CameraDetailRowProps {
   icon: React.FC;

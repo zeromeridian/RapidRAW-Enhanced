@@ -2,6 +2,7 @@ import { ExportPreset } from './ExportImportProperties';
 import { Adjustments, CopyPasteSettings } from '../../utils/adjustments';
 import { ToneCurvePreset } from '../../utils/toneCurvePresets';
 import { KeywordSet } from '../../utils/keywords';
+import type { MetadataField, MetadataPicks } from '../../utils/metadataFilter';
 import { ToolType } from '../panel/right/Masks';
 
 export const GLOBAL_KEYS = [
@@ -396,6 +397,8 @@ export interface AppSettings {
   keywordSets?: KeywordSet[];
   activeKeywordSet?: string | null;
   libraryDisplayMode?: LibraryDisplayMode;
+  /** The metadata filter bar's columns, left to right; absent gives `DEFAULT_METADATA_COLUMNS`. */
+  libraryFilterColumns?: MetadataField[];
   grouping?: GroupingMode;
   requireMatchingExif?: boolean;
   groupEditedFiles?: boolean;
@@ -505,6 +508,8 @@ export interface FilterCriteria {
   /** The file types shown; empty shows every type. */
   fileTypes: ImageFileType[];
   editedStatus?: EditedStatus;
+  /** The metadata filter bar's picks per column; absent or empty filters nothing. */
+  metadata?: MetadataPicks;
 }
 
 export interface Folder {
@@ -638,6 +643,8 @@ export interface UiVisibility {
   // The Metadata or Tagging panel next to the library grid (at most one is set)
   libraryMetadata?: boolean;
   libraryTagging?: boolean;
+  /** The metadata filter bar above the Library grid. */
+  metadataFilterBar?: boolean;
 }
 
 export interface WaveformData {

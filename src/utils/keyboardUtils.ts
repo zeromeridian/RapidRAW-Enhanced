@@ -316,6 +316,12 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     defaultCombo: ['ctrl', 'KeyF'],
     section: 'library',
   },
+  {
+    action: 'toggle_metadata_filter',
+    description: 'settings.keybinds.actions.toggle_metadata_filter',
+    defaultCombo: ['Backslash'],
+    section: 'library',
+  },
   { action: 'undo', description: 'settings.keybinds.actions.undo', defaultCombo: ['ctrl', 'KeyZ'], section: 'editing' },
   { action: 'redo', description: 'settings.keybinds.actions.redo', defaultCombo: ['ctrl', 'KeyY'], section: 'editing' },
   {

@@ -23,6 +23,7 @@ import { COLOR_LABELS } from '../../utils/adjustments';
 import { IMAGE_FLAG_FILTER_OPTIONS } from '../../utils/imageFlags';
 import { ImageFlagIcon } from '../ui/ImageFlagBadge';
 import { matchesLibraryFilter } from '../../utils/libraryFilters';
+import { hasMetadataPicks } from '../../utils/metadataFilter';
 
 const ALL_COLOR_OPTIONS = [...COLOR_LABELS, { name: 'none', color: '#9ca3af' }];
 
@@ -135,7 +136,8 @@ export function QuickFilterControl({ forceExpanded = false, onExpandedWidthChang
     (filterCriteria.fileTypes || []).length > 0 ||
     filterCriteria.editedStatus !== EditedStatus.All ||
     (filterCriteria.colors || []).length > 0 ||
-    (filterCriteria.flags || []).length > 0;
+    (filterCriteria.flags || []).length > 0 ||
+    hasMetadataPicks(filterCriteria.metadata);
   const clearFilters = () =>
     setFilterCriteria((previous) => ({
       ...previous,
@@ -145,6 +147,7 @@ export function QuickFilterControl({ forceExpanded = false, onExpandedWidthChang
       editedStatus: EditedStatus.All,
       colors: [],
       flags: [],
+      metadata: {},
     }));
 
   return (

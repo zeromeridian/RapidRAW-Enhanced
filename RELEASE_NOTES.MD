@@ -5,6 +5,35 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.104.1-dev-library-metadata-filter — 2026-11-20
+
+### Library
+
+- The metadata filter bar lists each camera, lens and keyword once, even
+  when files write it differently (for example "FUJIFILM X-M5" and
+  "Fujifilm X-M5"); picking it shows all of them.
+
+## 1.104.0-dev-library-metadata-filter — 2026-11-20
+
+### Library
+
+- **Metadata filter bar**, like Lightroom Classic's Library Filter: the
+  new filter button in the Library header (or `\`) opens columns above
+  the grid that list the values found in the folder with how many photos
+  have each: Date (by year, month and day), Camera, Lens and Focal Length
+  by default.
+- Click a value to show only those photos; Cmd/Ctrl-click adds more
+  values, Shift-click picks a run. Values picked in one column add up;
+  picks in several columns narrow each other. **All** clears a column.
+- Each column's header switches it to another field: ISO, Shutter Speed,
+  Aperture, Keyword, Label, Flag, Rating or File Type. Add columns with
+  **+** (up to eight) or remove them; the columns and the bar stay as you
+  left them.
+- The picks show among the active filters under the Library title and
+  are cleared with the Quick Filter's Clear All. While a large folder is
+  still being read, the bar says how many photos are left, and those
+  photos appear once their details are known.
+
 ## 1.103.0-dev-preset-sections — 2026-11-20
 
 ### Develop
