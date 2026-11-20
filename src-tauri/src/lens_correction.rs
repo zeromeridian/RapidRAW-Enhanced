@@ -1,9 +1,13 @@
 use crate::AppState;
+use crate::exif_processing::read_exif_without_caching;
+use crate::file_management::parse_virtual_path;
 use fuzzy_matcher::FuzzyMatcher;
 #[cfg(target_os = "android")]
 use include_dir::{Dir, include_dir};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::fs;
 use tauri::{Manager, State};
 use walkdir::WalkDir;
@@ -38,6 +42,10 @@ pub struct Tca {
     pub model: String,
     #[serde(rename = "@focal")]
     pub focal: f32,
+    #[serde(rename = "@kr")]
+    pub kr: Option<f32>,
+    #[serde(rename = "@kb")]
+    pub kb: Option<f32>,
     #[serde(rename = "@vr")]
     pub vr: Option<f32>,
     #[serde(rename = "@vb")]
@@ -525,6 +533,415 @@ fn lenses_for_maker<'a>(db: &'a LensDatabase, maker: &str) -> Vec<&'a Lens> {
         .collect()
 }
 
+/// The lens a stored `lensMaker` / `lensModel` pair names.
+fn lens_by_name<'a>(db: &'a LensDatabase, maker: &str, model: &str) -> Option<&'a Lens> {
+    let maker_lenses = lenses_for_maker(db, maker);
+    maker_lenses
+        .iter()
+        .find(|l| l.get_display_name(&maker_lenses) == model)
+        .copied()
+}
+
+// Version 2 lens correction (upstream `f9d95eaa`, Plan item 19,
+// `docs/LENS_CORRECTION_PLAN.md`): Lensfun's model with radius normalization,
+// crop factor, full TCA and interpolated vignetting, resolved per image from
+// its EXIF. Version 1 edits keep `LensDistortionParams` above.
+
+const DEFAULT_ASPECT_RATIO: f64 = 1.5;
+const DEFAULT_DISTANCE: f32 = 1000.0;
+/// TCA terms interpolated as `term × focal` (Lensfun): the radius terms, not
+/// the scale factors `vr` / `vb`.
+const TCA_FOCAL_SCALED: [bool; 6] = [false, false, true, true, true, true];
+
+/// A lens's correction at one shot's focal length, aperture and distance.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct LensProfile {
+    /// Source radius as a polynomial in the corrected radius: `[c0, c1, c2,
+    /// c3, c4]` for `c0·r + c1·r² + c2·r³ + c3·r⁴ + c4·r⁵`.
+    pub distortion: Option<[f64; 5]>,
+    /// Red and blue scale per radius: `[vr, vb, cr, cb, br, bb]` for
+    /// `v + c·r + b·r²`.
+    pub tca: Option<[f64; 6]>,
+    /// Pablo d'Angelo falloff `1 + k1·r² + k2·r⁴ + k3·r⁶`.
+    pub vignetting: Option<[f64; 3]>,
+    /// Multiplies the radius normalized to the image's half diagonal for the
+    /// distortion and TCA terms (Lensfun normalizes to the short side's half).
+    pub distortion_scale: f64,
+    /// The same for the vignetting terms (Lensfun: half diagonal).
+    pub vignetting_scale: f64,
+}
+
+/// The lens a selection resolves to, and which corrections its profile has.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+pub struct LensCorrectionInfo {
+    maker: String,
+    model: String,
+    distortion: bool,
+    tca: bool,
+    vignetting: bool,
+}
+
+/// The EXIF values the lens lookup reads.
+#[derive(Default)]
+struct Shot {
+    make: String,
+    model: String,
+    lens_model: String,
+    focal: Option<f32>,
+    aperture: Option<f32>,
+    distance: Option<f32>,
+}
+
+fn clean_exif_text(value: &str) -> &str {
+    value.trim().trim_matches('"')
+}
+
+fn parse_aspect_ratio(value: &str) -> Option<f64> {
+    match value.split_once(':') {
+        Some((w, h)) => Some(w.trim().parse::<f64>().ok()? / h.trim().parse::<f64>().ok()?),
+        None => value.trim().parse().ok(),
+    }
+}
+
+/// The leading number of an EXIF value such as `12 mm` or `f/2.8`.
+fn exif_number(exif: &HashMap<String, String>, key: &str) -> Option<f32> {
+    let text = exif.get(key)?.trim();
+    let text = text.strip_prefix("f/").unwrap_or(text);
+    let end = text
+        .find(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .unwrap_or(text.len());
+    text[..end]
+        .parse::<f32>()
+        .ok()
+        .filter(|v| v.is_finite() && *v > 0.0)
+}
+
+fn hermite(p0: f64, m0: f64, p1: f64, m1: f64, t: f64) -> f64 {
+    let t2 = t * t;
+    let t3 = t2 * t;
+    (2.0 * t3 - 3.0 * t2 + 1.0) * p0
+        + (t3 - 2.0 * t2 + t) * m0
+        + (-2.0 * t3 + 3.0 * t2) * p1
+        + (t3 - t2) * m1
+}
+
+/// Lensfun's focal interpolation: a Hermite spline through the calibrated
+/// focal lengths, clamped to the nearest one outside them.
+fn interpolate_by_focal<const N: usize>(
+    mut samples: Vec<(f32, [f64; N])>,
+    focal: f32,
+    focal_scaled: [bool; N],
+) -> Option<[f64; N]> {
+    samples.sort_by(|a, b| a.0.total_cmp(&b.0));
+    if let Some(exact) = samples.iter().find(|s| (s.0 - focal).abs() < 1e-4) {
+        return Some(exact.1);
+    }
+    let upper = samples.partition_point(|s| s.0 < focal);
+    if upper == 0 || upper == samples.len() {
+        return samples
+            .get(upper.min(samples.len().saturating_sub(1)))
+            .map(|s| s.1);
+    }
+
+    let (lo, hi) = (&samples[upper - 1], &samples[upper]);
+    let before = upper.checked_sub(2).map(|i| &samples[i]);
+    let after = samples.get(upper + 1);
+    let t = ((focal - lo.0) / (hi.0 - lo.0)) as f64;
+
+    Some(std::array::from_fn(|i| {
+        let value = |s: &(f32, [f64; N])| {
+            if focal_scaled[i] {
+                s.1[i] * s.0 as f64
+            } else {
+                s.1[i]
+            }
+        };
+        let (y_lo, y_hi) = (value(lo), value(hi));
+        let tangent_lo = before.map_or(y_hi - y_lo, |s| (y_hi - value(s)) * 0.5);
+        let tangent_hi = after.map_or(y_hi - y_lo, |s| (value(s) - y_lo) * 0.5);
+        let y = hermite(y_lo, tangent_lo, y_hi, tangent_hi, t);
+        if focal_scaled[i] { y / focal as f64 } else { y }
+    }))
+}
+
+fn distortion_terms(d: &Distortion) -> Option<[f64; 3]> {
+    let v = |x: Option<f32>| x.unwrap_or(0.0) as f64;
+    match d.model.as_str() {
+        "poly3" => Some([v(d.k1), 0.0, 0.0]),
+        "poly5" => Some([v(d.k1), v(d.k2), 0.0]),
+        "ptlens" => Some([v(d.a), v(d.b), v(d.c)]),
+        _ => None,
+    }
+}
+
+fn distortion_polynomial(model: &str, [t0, t1, t2]: [f64; 3]) -> [f64; 5] {
+    match model {
+        "poly3" => [1.0 - t0, 0.0, t0, 0.0, 0.0],
+        "poly5" => [1.0, 0.0, t0, 0.0, t1],
+        _ => [1.0 - t0 - t1 - t2, t2, t1, t0, 0.0],
+    }
+}
+
+fn tca_terms(t: &Tca) -> Option<[f64; 6]> {
+    let v = |x: Option<f32>, default: f32| x.unwrap_or(default) as f64;
+    match t.model.as_str() {
+        "linear" => Some([v(t.kr, 1.0), v(t.kb, 1.0), 0.0, 0.0, 0.0, 0.0]),
+        "poly3" => Some([
+            v(t.vr, 1.0),
+            v(t.vb, 1.0),
+            v(t.cr, 0.0),
+            v(t.cb, 0.0),
+            v(t.br, 0.0),
+            v(t.bb, 0.0),
+        ]),
+        _ => None,
+    }
+}
+
+fn vignetting_terms(v: &Vignetting) -> [f64; 3] {
+    [v.k1, v.k2, v.k3].map(|k| k.unwrap_or(0.0) as f64)
+}
+
+/// Lensfun's crop-factor score: a profile calibrated on a smaller sensor than
+/// the camera's cannot cover it (`None`); one from a much larger sensor fits
+/// less well than a matching one.
+fn crop_score(lens_crop: f32, camera_crop: Option<f32>) -> Option<i64> {
+    let Some(camera_crop) = camera_crop else {
+        return Some(0);
+    };
+    match camera_crop / lens_crop {
+        r if r < 0.96 => None,
+        r if r >= 1.41 => Some(2),
+        r if r >= 1.31 => Some(4),
+        r if r >= 1.21 => Some(6),
+        r if r >= 1.11 => Some(8),
+        r if r >= 1.01 => Some(10),
+        r if r >= 1.0 => Some(5),
+        _ => Some(3),
+    }
+}
+
+impl Shot {
+    fn from_exif(exif: &HashMap<String, String>) -> Self {
+        let text = |key: &str| exif.get(key).map_or("", |v| clean_exif_text(v)).to_string();
+        Self {
+            make: text("Make"),
+            model: text("Model"),
+            lens_model: text("LensModel"),
+            focal: exif_number(exif, "FocalLength"),
+            // `ApertureValue` holds the APEX value (written `f/…` by `exif_processing`).
+            aperture: exif_number(exif, "FNumber")
+                .or_else(|| exif_number(exif, "ApertureValue").map(|av| 2f32.powf(av / 2.0))),
+            distance: exif_number(exif, "SubjectDistance"),
+        }
+    }
+}
+
+impl Lens {
+    fn calibration_crop(&self) -> f32 {
+        self.cropfactor.filter(|c| *c > 0.0).unwrap_or(1.0)
+    }
+
+    fn aspect_ratio(&self) -> f64 {
+        self.aspect_ratio
+            .as_deref()
+            .and_then(parse_aspect_ratio)
+            .filter(|r| *r >= 1.0)
+            .unwrap_or(DEFAULT_ASPECT_RATIO)
+    }
+
+    fn calibrations(&self) -> impl Iterator<Item = &CalibrationElement> {
+        self.calibration.iter().flat_map(|c| &c.elements)
+    }
+
+    fn focal_range(&self) -> (f32, f32) {
+        let declared = self.focal.as_ref().and_then(|f| {
+            let min = f.min.or(f.value)?;
+            Some((min, f.max.or(f.value).unwrap_or(min)))
+        });
+        declared.unwrap_or_else(|| {
+            self.calibrations()
+                .map(|c| match c {
+                    CalibrationElement::Distortion(d) => d.focal,
+                    CalibrationElement::Tca(t) => t.focal,
+                    CalibrationElement::Vignetting(v) => v.focal,
+                })
+                .fold((f32::MAX, f32::MIN), |(lo, hi), f| (lo.min(f), hi.max(f)))
+        })
+    }
+
+    fn distortion_at(&self, focal: f32) -> Option<[f64; 5]> {
+        let mut model = None;
+        let samples = self
+            .calibrations()
+            .filter_map(|c| match c {
+                CalibrationElement::Distortion(d) => Some(d),
+                _ => None,
+            })
+            .filter_map(|d| {
+                let terms = distortion_terms(d)?;
+                (*model.get_or_insert(d.model.as_str()) == d.model).then_some((d.focal, terms))
+            })
+            .collect();
+        let terms = interpolate_by_focal(samples, focal, [true; 3])?;
+        let polynomial = distortion_polynomial(model?, terms);
+        (polynomial[0].abs() > 1e-6 && polynomial[1..].iter().any(|c| c.abs() > 1e-9))
+            .then_some(polynomial)
+    }
+
+    fn tca_at(&self, focal: f32) -> Option<[f64; 6]> {
+        let mut model = None;
+        let samples = self
+            .calibrations()
+            .filter_map(|c| match c {
+                CalibrationElement::Tca(t) => Some(t),
+                _ => None,
+            })
+            .filter_map(|t| {
+                let terms = tca_terms(t)?;
+                (*model.get_or_insert(t.model.as_str()) == t.model).then_some((t.focal, terms))
+            })
+            .collect();
+        let terms = interpolate_by_focal(samples, focal, TCA_FOCAL_SCALED)?;
+        let identity = [1.0, 1.0, 0.0, 0.0, 0.0, 0.0];
+        terms
+            .iter()
+            .zip(identity)
+            .any(|(t, i)| (t - i).abs() > 1e-9)
+            .then_some(terms)
+    }
+
+    /// Lensfun's vignetting interpolation: inverse-distance weighting over
+    /// normalized focal length, 4 / aperture and 0.1 / distance; nothing when
+    /// no calibration lies within distance 1.
+    fn vignetting_at(&self, focal: f32, aperture: f32, distance: f32) -> Option<[f64; 3]> {
+        let (min_focal, max_focal) = self.focal_range();
+        let focal_span = max_focal - min_focal;
+        let normalized = |f: f32| {
+            let offset = (f - min_focal) as f64;
+            if focal_span != 0.0 {
+                offset / focal_span as f64
+            } else {
+                offset
+            }
+        };
+
+        let mut weighted = [0.0f64; 3];
+        let mut total_weight = 0.0f64;
+        let mut nearest = f64::MAX;
+        for v in self.calibrations().filter_map(|c| match c {
+            CalibrationElement::Vignetting(v) if v.model == "pa" => Some(v),
+            _ => None,
+        }) {
+            let calibration_distance = v.distance.unwrap_or(0.0) as f64;
+            let separation = ((normalized(v.focal) - normalized(focal)).powi(2)
+                + (4.0 / v.aperture as f64 - 4.0 / aperture as f64).powi(2)
+                + (0.1 / calibration_distance - 0.1 / distance as f64).powi(2))
+            .sqrt();
+            if separation < 1e-4 {
+                return Some(vignetting_terms(v));
+            }
+            nearest = nearest.min(separation);
+            let weight = 1.0 / separation.powf(3.5);
+            if weight.is_finite() && weight > 0.0 {
+                for (acc, term) in weighted.iter_mut().zip(vignetting_terms(v)) {
+                    *acc += weight * term;
+                }
+                total_weight += weight;
+            }
+        }
+
+        (nearest <= 1.0 && total_weight > 0.0)
+            .then(|| weighted.map(|t| t / total_weight))
+            .filter(|terms| terms.iter().any(|k| k.abs() > 1e-9))
+    }
+
+    fn profile(&self, shot: &Shot, camera_crop: Option<f32>) -> LensProfile {
+        let focal = shot.focal.unwrap_or_else(|| self.focal_range().0);
+        let crop_ratio = camera_crop.map_or(1.0, |crop| (self.calibration_crop() / crop) as f64);
+        LensProfile {
+            distortion: self.distortion_at(focal),
+            tca: self.tca_at(focal),
+            vignetting: shot.aperture.and_then(|aperture| {
+                self.vignetting_at(focal, aperture, shot.distance.unwrap_or(DEFAULT_DISTANCE))
+            }),
+            distortion_scale: self.aspect_ratio().hypot(1.0) * crop_ratio,
+            vignetting_scale: crop_ratio,
+        }
+    }
+}
+
+impl LensDatabase {
+    fn camera_crop(&self, make: &str, model: &str) -> Option<f32> {
+        self.cameras
+            .iter()
+            .find(|c| any_name_matches(&c.maker, make) && any_name_matches(&c.model, model))
+            .map(|c| c.cropfactor)
+            .filter(|c| *c > 0.01)
+    }
+
+    /// Like `find_best_lens_match`, but never picks a profile that cannot
+    /// cover the camera's sensor and prefers one calibrated for its size.
+    fn detect_lens(&self, shot: &Shot, camera_crop: Option<f32>) -> Option<&Lens> {
+        let by_model = (!shot.lens_model.is_empty()).then(|| {
+            let maker_lenses = self
+                .lenses
+                .iter()
+                .filter(|lens| lens.get_maker().eq_ignore_ascii_case(&shot.make));
+            best_fuzzy_lens(maker_lenses, &shot.lens_model, camera_crop, true).or_else(|| {
+                best_fuzzy_lens(self.lenses.iter(), &shot.lens_model, camera_crop, false)
+            })
+        });
+        by_model
+            .flatten()
+            .or_else(|| find_lens_by_camera_mount(self, &shot.make, &shot.model))
+    }
+
+    /// The lens a selection names (`Some`) or the one detected from the shot
+    /// (`None`, automatic mode), with its profile for the shot.
+    fn resolve(
+        &self,
+        shot: &Shot,
+        selection: &Option<(String, String)>,
+    ) -> Option<(LensCorrectionInfo, LensProfile)> {
+        let camera_crop = self.camera_crop(&shot.make, &shot.model);
+        let lens = match selection {
+            Some((maker, model)) => lens_by_name(self, maker, model),
+            None => self.detect_lens(shot, camera_crop),
+        }?;
+        let profile = lens.profile(shot, camera_crop);
+        let (maker, model) = lens_result(self, lens);
+        let info = LensCorrectionInfo {
+            maker,
+            model,
+            distortion: profile.distortion.is_some(),
+            tca: profile.tca.is_some(),
+            vignetting: profile.vignetting.is_some(),
+        };
+        Some((info, profile))
+    }
+}
+
+/// The lens choice stored in an edit: `Some(None)` in automatic mode,
+/// `Some(Some((maker, model)))` for a chosen lens, `None` without one.
+fn lens_selection(adjustments: &Value) -> Option<Option<(String, String)>> {
+    if adjustments
+        .get("lensCorrectionMode")
+        .and_then(Value::as_str)
+        == Some("auto")
+    {
+        return Some(None);
+    }
+    let name = |key: &str| {
+        adjustments
+            .get(key)
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+    };
+    Some(Some((name("lensMaker")?, name("lensModel")?)))
+}
+
 pub fn load_lensfun_db(app_handle: &tauri::AppHandle) -> LensDatabase {
     let mut combined_db = LensDatabase {
         cameras: Vec::new(),
@@ -725,80 +1142,70 @@ pub fn find_best_lens_match(
     find_lens_by_camera_mount(db, maker, camera_model).map(|lens| lens_result(db, lens))
 }
 
+/// The lens whose English or canonical name best matches `model`; with
+/// `penalize_length`, names much longer than `model` score lower. With a
+/// camera crop factor, profiles that cannot cover the sensor are skipped and
+/// the score favours a matching sensor size (`crop_score`).
+fn best_fuzzy_lens<'a>(
+    lenses: impl Iterator<Item = &'a Lens>,
+    model: &str,
+    camera_crop: Option<f32>,
+    penalize_length: bool,
+) -> Option<&'a Lens> {
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().ignore_case();
+    let score = |lens: &Lens| {
+        let crop = crop_score(lens.calibration_crop(), camera_crop)?;
+        let english_name = lens.get_full_model_name();
+        let canonical_name = lens.get_canonical_model_name();
+        let score_english = matcher.fuzzy_match(&english_name, model).unwrap_or(0);
+        let score_canonical = matcher.fuzzy_match(&canonical_name, model).unwrap_or(0);
+        let score = score_english.max(score_canonical);
+        if score <= 0 {
+            return None;
+        }
+        let penalty = if penalize_length {
+            let best_name = if score_canonical > score_english {
+                &canonical_name
+            } else {
+                &english_name
+            };
+            (best_name.len() as i64 - model.len() as i64).max(0) / 2
+        } else {
+            0
+        };
+        Some(score - penalty + crop)
+    };
+    lenses
+        .filter_map(|lens| Some((score(lens)?, lens)))
+        .max_by_key(|(score, _)| *score)
+        .map(|(_, lens)| lens)
+}
+
 fn find_lens_by_fuzzy_model(
     db: &LensDatabase,
     maker: &str,
     model: &str,
 ) -> Option<(String, String)> {
-    let clean_maker = maker.trim().trim_matches('"').to_string();
-    let clean_model = model.trim().trim_matches('"').to_string();
-    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().ignore_case();
+    let clean_maker = maker.trim().trim_matches('"');
+    let clean_model = model.trim().trim_matches('"');
 
     let lenses_from_maker: Vec<&Lens> = db
         .lenses
         .iter()
-        .filter(|lens| lens.get_maker().eq_ignore_ascii_case(&clean_maker))
+        .filter(|lens| lens.get_maker().eq_ignore_ascii_case(clean_maker))
         .collect();
 
-    if !lenses_from_maker.is_empty() {
-        let best_match = lenses_from_maker
-            .iter()
-            .filter_map(|lens| {
-                let english_name = lens.get_full_model_name();
-                let canonical_name = lens.get_canonical_model_name();
-
-                let score_english = matcher
-                    .fuzzy_match(&english_name, &clean_model)
-                    .unwrap_or(0);
-                let score_canonical = matcher
-                    .fuzzy_match(&canonical_name, &clean_model)
-                    .unwrap_or(0);
-                let score = score_english.max(score_canonical);
-
-                if score > 0 {
-                    let best_name = if score_canonical > score_english {
-                        &canonical_name
-                    } else {
-                        &english_name
-                    };
-                    let length_penalty =
-                        (best_name.len() as i64 - clean_model.len() as i64).max(0) / 2;
-                    let adjusted_score = score - length_penalty;
-                    Some((adjusted_score, *lens))
-                } else {
-                    None
-                }
-            })
-            .max_by_key(|(score, _)| *score);
-
-        if let Some((_, best_lens)) = best_match {
-            return Some((
-                best_lens.get_maker(),
-                best_lens.get_display_name(&lenses_from_maker),
-            ));
-        }
+    if let Some(best_lens) =
+        best_fuzzy_lens(lenses_from_maker.iter().copied(), clean_model, None, true)
+    {
+        return Some((
+            best_lens.get_maker(),
+            best_lens.get_display_name(&lenses_from_maker),
+        ));
     }
 
-    let best_match_fallback = db
-        .lenses
-        .iter()
-        .filter_map(|lens| {
-            let english_name = lens.get_full_model_name();
-            let canonical_name = lens.get_canonical_model_name();
-
-            let score_english = matcher
-                .fuzzy_match(&english_name, &clean_model)
-                .unwrap_or(0);
-            let score_canonical = matcher
-                .fuzzy_match(&canonical_name, &clean_model)
-                .unwrap_or(0);
-            let score = score_english.max(score_canonical);
-
-            if score > 0 { Some((score, lens)) } else { None }
-        })
-        .max_by_key(|(score, _): &(i64, _)| *score);
-
-    best_match_fallback.map(|(_, best_lens)| lens_result(db, best_lens))
+    best_fuzzy_lens(db.lenses.iter(), clean_model, None, false)
+        .map(|best_lens| lens_result(db, best_lens))
 }
 
 #[tauri::command]
@@ -837,17 +1244,9 @@ pub fn get_lens_distortion_params(
         .lens_db
         .lock()
         .map_err(|e| format!("Lock poisoned: {}", e))?;
-    if let Some(db) = &*db_guard {
-        let maker_lenses = lenses_for_maker(db, &maker);
-
-        if let Some(lens) = maker_lenses
-            .iter()
-            .find(|l| l.get_display_name(&maker_lenses) == model)
-        {
-            return Ok(lens.get_distortion_params(focal_length, aperture, distance));
-        }
-    }
-    Ok(None)
+    Ok(db_guard
+        .as_deref()
+        .and_then(|db| resolve_lens_params(db, &maker, &model, focal_length, aperture, distance)))
 }
 
 pub fn resolve_lens_params(
@@ -858,21 +1257,67 @@ pub fn resolve_lens_params(
     aperture: Option<f32>,
     distance: Option<f32>,
 ) -> Option<LensDistortionParams> {
-    let maker_lenses = lenses_for_maker(db, maker);
-    if let Some(lens) = maker_lenses
-        .iter()
-        .find(|l| l.get_display_name(&maker_lenses) == model)
-    {
-        lens.get_distortion_params(focal_length, aperture, distance)
-    } else {
-        None
-    }
+    lens_by_name(db, maker, model)?.get_distortion_params(focal_length, aperture, distance)
+}
+
+/// The lens the editor's lens choice resolves to for this image (version 2
+/// lookup), and which corrections its profile has; `None` without a choice or
+/// a matching profile.
+#[tauri::command]
+pub fn get_lens_correction_info(
+    path: String,
+    selection: Value,
+    state: State<AppState>,
+) -> Result<Option<LensCorrectionInfo>, String> {
+    let Some(selection) = lens_selection(&selection) else {
+        return Ok(None);
+    };
+    let db = state
+        .lens_db
+        .lock()
+        .map_err(|e| format!("Lock poisoned: {}", e))?
+        .clone();
+    let Some(db) = db else {
+        return Ok(None);
+    };
+    let (source, _) = parse_virtual_path(&path);
+    let exif = read_exif_without_caching(&source).unwrap_or_default();
+    Ok(db
+        .resolve(&Shot::from_exif(&exif), &selection)
+        .map(|(info, _)| info))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{LensDatabase, find_best_lens_match};
+    use super::{
+        LensDatabase, Shot, crop_score, find_best_lens_match, interpolate_by_focal, lens_selection,
+    };
+    use std::collections::HashMap;
     use std::path::Path;
+
+    fn shot(pairs: &[(&str, &str)]) -> Shot {
+        let exif: HashMap<String, String> = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        Shot::from_exif(&exif)
+    }
+
+    fn olympus_12_40_shot(focal: &str, aperture: &str) -> Shot {
+        shot(&[
+            ("Make", "OLYMPUS CORPORATION"),
+            ("Model", "E-M1"),
+            ("LensModel", "Olympus M.Zuiko Digital ED 12-40mm f/2.8 Pro"),
+            ("FocalLength", focal),
+            ("FNumber", aperture),
+        ])
+    }
+
+    fn assert_close<const N: usize>(actual: [f64; N], expected: [f64; N]) {
+        for (a, e) in actual.iter().zip(expected) {
+            assert!((a - e).abs() < 1e-6, "{actual:?} != {expected:?}");
+        }
+    }
 
     /// The bundled database, parsed file by file like `load_lensfun_db`;
     /// panics on a file that does not parse.
@@ -928,5 +1373,162 @@ mod tests {
         let db = bundled_lens_db();
         let by_model = find_best_lens_match(&db, "Canon", "RF 50mm F1.4 L VCM", "Canon EOS R5");
         assert_eq!(by_model.map(|(maker, _)| maker), Some("Canon".to_string()));
+    }
+
+    #[test]
+    fn shot_reads_exif_numbers_and_apex_aperture() {
+        let s = shot(&[
+            ("Make", " \"Olympus\" "),
+            ("FocalLength", "12 mm"),
+            ("ApertureValue", "f/4"),
+            ("SubjectDistance", "2.5"),
+        ]);
+        assert_eq!(s.make, "Olympus");
+        assert_eq!(s.focal, Some(12.0));
+        assert_eq!(s.aperture, Some(4.0), "APEX 4 is f/4");
+        assert_eq!(s.distance, Some(2.5));
+        assert_eq!(shot(&[("FNumber", "f/2.8")]).aperture, Some(2.8));
+    }
+
+    #[test]
+    fn focal_interpolation_is_exact_on_samples_and_clamps_outside() {
+        let samples = vec![(10.0, [1.0]), (20.0, [2.0])];
+        assert_eq!(
+            interpolate_by_focal(samples.clone(), 10.0, [false]),
+            Some([1.0])
+        );
+        assert_eq!(
+            interpolate_by_focal(samples.clone(), 5.0, [false]),
+            Some([1.0])
+        );
+        assert_eq!(
+            interpolate_by_focal(samples.clone(), 30.0, [false]),
+            Some([2.0])
+        );
+        // Two samples: the spline is linear in the interpolated value.
+        assert_close(
+            interpolate_by_focal(samples.clone(), 15.0, [false]).unwrap(),
+            [1.5],
+        );
+        // Focal-scaled terms interpolate `term × focal`: (10 + 40) / 2 / 15.
+        assert_close(
+            interpolate_by_focal(samples, 15.0, [true]).unwrap(),
+            [25.0 / 15.0],
+        );
+        assert_eq!(interpolate_by_focal::<1>(Vec::new(), 15.0, [false]), None);
+    }
+
+    #[test]
+    fn crop_score_rejects_profiles_from_smaller_sensors() {
+        assert_eq!(crop_score(1.5, None), Some(0));
+        assert_eq!(
+            crop_score(1.5, Some(1.0)),
+            None,
+            "APS-C profile on full frame"
+        );
+        assert_eq!(crop_score(1.0, Some(1.0)), Some(5));
+        assert_eq!(
+            crop_score(1.0, Some(1.5)),
+            Some(2),
+            "full-frame profile on APS-C"
+        );
+        assert!(crop_score(1.5, Some(1.53)) > crop_score(1.0, Some(1.53)));
+    }
+
+    #[test]
+    fn lens_selection_reads_the_mode_and_the_chosen_lens() {
+        use serde_json::json;
+        assert_eq!(
+            lens_selection(&json!({ "lensCorrectionMode": "auto" })),
+            Some(None)
+        );
+        assert_eq!(
+            lens_selection(&json!({ "lensMaker": "Olympus", "lensModel": "12-40" })),
+            Some(Some(("Olympus".to_string(), "12-40".to_string())))
+        );
+        assert_eq!(
+            lens_selection(&json!({ "lensMaker": "Olympus", "lensModel": "" })),
+            None
+        );
+        assert_eq!(lens_selection(&json!({})), None);
+    }
+
+    #[test]
+    fn v2_profile_follows_the_lensfun_calibration() {
+        let db = bundled_lens_db();
+        let (info, profile) = db
+            .resolve(&olympus_12_40_shot("12", "f/4"), &None)
+            .expect("the 12-40mm Pro is in the database");
+        assert_eq!(info.maker, "Olympus");
+        assert!(info.distortion && info.tca && info.vignetting);
+
+        // PTLens a = 0.03659, b = -0.11322, c = 0.0294 at 12 mm.
+        let (a, b, c) = (0.03659f32 as f64, -0.11322f32 as f64, 0.0294f32 as f64);
+        assert_close(profile.distortion.unwrap(), [1.0 - a - b - c, c, b, a, 0.0]);
+        // poly3 TCA at 12 mm: vr, vb, cr, cb, br, bb.
+        assert_close(
+            profile.tca.unwrap(),
+            [1.0004733f32, 0.9998876, 0.0, 0.0, -0.0001355, 0.0001043].map(f64::from),
+        );
+        // `pa` vignetting at 12 mm, f/4, distance 1000 (the default).
+        assert_close(
+            profile.vignetting.unwrap(),
+            [-0.2230f32, -0.1020, -0.1210].map(f64::from),
+        );
+        // 4:3 calibration, camera and lens both crop 2.
+        assert_close([profile.distortion_scale], [(4.0f64 / 3.0).hypot(1.0)]);
+        assert_close([profile.vignetting_scale], [1.0]);
+    }
+
+    #[test]
+    fn v2_profile_interpolates_between_calibrations() {
+        let db = bundled_lens_db();
+        let (_, at_15) = db.resolve(&olympus_12_40_shot("15", "f/4"), &None).unwrap();
+        let (_, at_12) = db.resolve(&olympus_12_40_shot("12", "f/4"), &None).unwrap();
+        let (_, at_19) = db.resolve(&olympus_12_40_shot("19", "f/4"), &None).unwrap();
+        let (d15, d12, d19) = (
+            at_15.distortion.unwrap(),
+            at_12.distortion.unwrap(),
+            at_19.distortion.unwrap(),
+        );
+        for i in 1..4 {
+            let (lo, hi) = (d12[i].min(d19[i]), d12[i].max(d19[i]));
+            assert!(
+                (lo - 1e-3..=hi + 1e-3).contains(&d15[i]),
+                "term {i}: {d15:?}"
+            );
+        }
+        // A calibrated focal length, f/4: the exact calibration.
+        assert_close(
+            at_15.vignetting.unwrap(),
+            [-0.1263f32, -0.2009, 0.0074].map(f64::from),
+        );
+    }
+
+    #[test]
+    fn v2_profile_needs_an_aperture_for_vignetting_and_a_lens_for_a_profile() {
+        let db = bundled_lens_db();
+        let (info, profile) = db.resolve(&olympus_12_40_shot("12", ""), &None).unwrap();
+        assert!(!info.vignetting && profile.vignetting.is_none());
+        assert!(info.distortion);
+
+        assert!(db.resolve(&shot(&[("Make", "Nobody")]), &None).is_none());
+        let unknown = Some(("Olympus".to_string(), "No Such Lens".to_string()));
+        assert!(
+            db.resolve(&olympus_12_40_shot("12", "f/4"), &unknown)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn v2_chosen_lens_resolves_by_its_display_name() {
+        let db = bundled_lens_db();
+        let (detected, _) = db.resolve(&olympus_12_40_shot("12", "f/4"), &None).unwrap();
+        let chosen = Some((detected.maker.clone(), detected.model.clone()));
+        let (info, profile) = db
+            .resolve(&shot(&[("FocalLength", "40")]), &chosen)
+            .unwrap();
+        assert_eq!((info.maker, info.model), (detected.maker, detected.model));
+        assert!(profile.distortion.is_some());
     }
 }
