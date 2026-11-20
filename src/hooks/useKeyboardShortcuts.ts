@@ -22,6 +22,34 @@ import { KEYWORD_SET_SIZE, getActiveKeywordSet, getKeywordSets } from '../utils/
 /** While Speed Edit is on, Q and E step to the previous and next photo. */
 const SPEED_EDIT_IMAGE_DIRECTIONS: Record<string, number> = { KeyQ: -1, KeyE: 1 };
 
+/** What a shortcut action gets when the menu bar runs it: no key, no Caps Lock auto-advance. */
+const MENU_EVENT = {
+  preventDefault: () => {},
+  repeat: false,
+  getModifierState: () => false,
+} as unknown as KeyboardEvent;
+/** A native menu accelerator can follow the key press the page already handled; this long, it is the same press. */
+const SAME_PRESS_MS = 300;
+
+let shortcutRunner: { canRun(action: string): boolean; run(action: string): void } | null = null;
+let lastKeyAction: { action: string; time: number } | null = null;
+let lastKeyDownTime = 0;
+
+/**
+ * Whether a key was just pressed into a text field: a native menu accelerator fired by typing, which
+ * the field keeps, as the keydown handler does, rather than a click on the menu.
+ */
+export const isTypingKeyPress = () =>
+  isTextEntryTarget(document.activeElement) && performance.now() - lastKeyDownTime < SAME_PRESS_MS;
+
+/** Whether a keybind action applies right now (the menu bar greys out the others, Plan item 69). */
+export const canRunShortcutAction = (action: string) => shortcutRunner?.canRun(action) ?? false;
+/** Runs a keybind action as if its key were pressed, unless that key press has just run it. */
+export const runShortcutAction = (action: string) => {
+  if (lastKeyAction?.action === action && performance.now() - lastKeyAction.time < SAME_PRESS_MS) return;
+  shortcutRunner?.run(action);
+};
+
 /** The current zoom, 1 = 100 % (one rendered pixel per screen pixel). */
 const currentZoomPercent = (s: { editor: EditorState }): number => {
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
@@ -802,15 +830,37 @@ export const useKeyboardShortcuts = ({
       if (action) {
         const handler = actions[action];
         if (handler && (!handler.shouldFire || handler.shouldFire(state))) {
+          lastKeyAction = { action, time: performance.now() };
           handler.execute(event, state);
           return;
         }
       }
     };
 
+    const canRun = (action: string) => {
+      const state = getStoreState();
+      if (isModalOpen(state.ui) || state.ui.isSettingsOpen) return false;
+      const handler = actions[action];
+      return !!handler && (!handler.shouldFire || handler.shouldFire(state));
+    };
+    shortcutRunner = {
+      canRun,
+      run: (action) => {
+        if (canRun(action)) actions[action].execute(MENU_EVENT, getStoreState());
+      },
+    };
+
+    // Capture phase: also key presses a field stops from bubbling.
+    const markKeyDown = () => {
+      lastKeyDownTime = performance.now();
+    };
+
+    window.addEventListener('keydown', markKeyDown, true);
     window.addEventListener('keydown', handleKeyDown);
     return () => {
+      window.removeEventListener('keydown', markKeyDown, true);
       window.removeEventListener('keydown', handleKeyDown);
+      shortcutRunner = null;
     };
   }, [
     handleBackToLibrary,

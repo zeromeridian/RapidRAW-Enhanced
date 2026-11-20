@@ -37,6 +37,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useThumbnails } from './hooks/useThumbnails';
 import { ImageDimensions } from './hooks/useImageRenderSize';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useNativeMenuBar } from './hooks/useNativeMenuBar';
 import { useTauriListeners } from './hooks/useTauriListeners';
 import { useImportCardWatcher } from './hooks/useImportCardWatcher';
 import { useFileOperations } from './hooks/useFileOperations';
@@ -511,6 +512,8 @@ function App() {
     handleToggleFullScreen,
     handleZoomChange,
   });
+
+  useNativeMenuBar({ handleDeleteRejected, handleLibraryRefresh, handleRenameFiles });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

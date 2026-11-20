@@ -5,6 +5,18 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.106.0-dev-menu-bar — 2026-11-20
+
+### Interface
+
+- **Menu bar on the Mac, in the style of Lightroom Classic.** The menus
+  at the top of the screen now hold ThisIsRAW's commands: File, Edit,
+  Photo, View, Window and Help, plus Library and Metadata in the Library
+  and Develop and Tools in Develop. Each entry shows its keyboard
+  shortcut, including shortcuts you changed in Settings → Keybinds, and
+  is greyed out when it doesn't apply.
+- Cut, Copy, Paste and Select All keep working in text fields.
+
 ## 1.105.1-dev-delete-rejected-photos — 2026-11-20
 
 ### Library
