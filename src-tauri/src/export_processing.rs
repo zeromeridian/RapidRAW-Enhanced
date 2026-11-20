@@ -45,8 +45,8 @@ use crate::tiff_metadata::{TiffSamples, encode_tiff_with_metadata};
 use crate::cache_utils::{calculate_full_job_hash, calculate_transform_hash};
 use crate::render_source::{Effects, Frame, RenderSource};
 use crate::{
-    get_cached_or_generate_mask, hydrate_adjustments, load_settings, prepare_preview_source,
-    resolve_warped_image_for_masks,
+    get_cached_or_generate_mask, hydrate_adjustments, hydrate_adjustments_for, load_settings,
+    prepare_preview_source, resolve_warped_image_for_masks,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -2010,7 +2010,6 @@ pub(crate) async fn export_images_impl(
                         &metadata.exif,
                         &source_path,
                         &settings,
-                        &app_handle_clone,
                     );
                     metadata.adjustments
                 };
@@ -2024,7 +2023,7 @@ pub(crate) async fn export_images_impl(
                     ExportAdjustmentsMode::GlobalOverride(adj) => adj.clone(),
                 };
 
-                hydrate_adjustments(&state, &mut js_adjustments);
+                hydrate_adjustments_for(&state, &source_path_str, &mut js_adjustments);
                 let is_raw = is_raw_file(&source_path_str);
 
                 if output_path == source_path {
@@ -2573,6 +2572,7 @@ pub async fn estimate_export_sizes(
     } else {
         let metadata = crate::exif_processing::load_sidecar(&sidecar_path);
         let mut js_adjustments = metadata.adjustments;
+        crate::lens_correction::insert_lens_profile(&source_path_str, &mut js_adjustments);
 
         const ESTIMATE_DIM: u32 = 1280;
 

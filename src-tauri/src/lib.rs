@@ -387,6 +387,9 @@ pub fn get_cached_full_warped_image(
     state: &tauri::State<AppState>,
     js_adjustments: &serde_json::Value,
 ) -> Result<Arc<DynamicImage>, String> {
+    let path = editor_image_path(state).ok_or("No original image loaded")?;
+    let with_profile = lens_correction::with_lens_profile(&path, js_adjustments);
+    let js_adjustments = with_profile.as_ref();
     let geo_hash = calculate_geometry_hash(js_adjustments);
 
     {
@@ -1310,7 +1313,11 @@ async fn preview_geometry_transform(
                         | "lensTcaAmount" => {
                             obj.insert(key.to_string(), serde_json::json!(100.0));
                         }
-                        "lensDistortionParams" | "lensMaker" | "lensModel" => {
+                        "lensDistortionParams"
+                        | "resolvedLensProfile"
+                        | "lensMaker"
+                        | "lensModel"
+                        | "lensCorrectionMode" => {
                             obj.insert(key.to_string(), serde_json::Value::Null);
                         }
                         "lensDistortionEnabled" | "lensTcaEnabled" | "lensVignetteEnabled" => {
@@ -1478,7 +1485,7 @@ async fn generate_preset_preview(
 }
 
 fn generate_preset_preview_blocking(
-    js_adjustments: serde_json::Value,
+    mut js_adjustments: serde_json::Value,
     app_handle: &tauri::AppHandle,
 ) -> Result<Response, String> {
     let state = app_handle.state::<AppState>();
@@ -1491,6 +1498,7 @@ fn generate_preset_preview_blocking(
         .clone()
         .ok_or("No original image loaded for preset preview")?;
     let is_raw = loaded_image.is_raw;
+    lens_correction::insert_lens_profile(&loaded_image.path, &mut js_adjustments);
 
     const PRESET_PREVIEW_DIM: u32 = 400;
 
@@ -1605,7 +1613,7 @@ async fn generate_all_community_previews(
 
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
 
-    let mut base_thumbnails: Vec<(DynamicImage, bool, f32)> = Vec::new();
+    let mut base_thumbnails: Vec<(DynamicImage, bool, f32, String)> = Vec::new();
     for image_path in image_paths.iter() {
         let (source_path, _) = parse_virtual_path(image_path);
         let source_path_str = source_path.to_string_lossy().to_string();
@@ -1629,7 +1637,7 @@ async fn generate_all_community_previews(
             (original_image, 1.0)
         };
 
-        base_thumbnails.push((base_image, is_raw, base_scale));
+        base_thumbnails.push((base_image, is_raw, base_scale, source_path_str));
     }
 
     for preset in presets.iter() {
@@ -1640,9 +1648,11 @@ async fn generate_all_community_previews(
         preset.name.hash(&mut preset_hasher);
         let preset_hash = preset_hasher.finish();
 
-        for (i, (base_image, is_raw, base_scale)) in base_thumbnails.iter().enumerate() {
+        for (i, (base_image, is_raw, base_scale, source_path)) in base_thumbnails.iter().enumerate()
+        {
+            let with_profile = lens_correction::with_lens_profile(source_path, js_adjustments);
             let scaled_adjustments =
-                crate::image_processing::with_crop_scaled(js_adjustments, *base_scale);
+                crate::image_processing::with_crop_scaled(&with_profile, *base_scale);
 
             let source = RenderSource::edited(
                 base_image,
@@ -1897,7 +1907,7 @@ async fn save_collage(base64_data: String, first_path_str: String) -> Result<Str
 #[tauri::command]
 async fn generate_preview_for_path(
     path: String,
-    js_adjustments: Value,
+    mut js_adjustments: Value,
     app_handle: tauri::AppHandle,
 ) -> Result<Response, String> {
     tokio::task::spawn_blocking(move || {
@@ -1905,6 +1915,7 @@ async fn generate_preview_for_path(
         let context = get_or_init_gpu_context(&state, &app_handle)?;
         let (source_path, _) = parse_virtual_path(&path);
         let source_path_str = source_path.to_string_lossy().to_string();
+        lens_correction::insert_lens_profile(&source_path_str, &mut js_adjustments);
         let is_raw = is_raw_file(&source_path_str);
         let settings = load_settings(app_handle.clone()).unwrap_or_default();
 
@@ -2427,11 +2438,7 @@ pub fn run() {
                 let _ = std::fs::remove_file(&crash_flag_path);
             }
 
-            let lens_db = lens_correction::load_lensfun_db(&app_handle);
-            {
-                let state = app.state::<AppState>();
-                *state.lens_db.lock().unwrap() = Some(Arc::new(lens_db));
-            }
+            lens_correction::init_lensfun_db(&app_handle);
 
             unsafe {
                 if let Some(backend) = &settings.processing_backend
@@ -2714,7 +2721,6 @@ pub fn run() {
             patch_cache: Mutex::new(HashMap::new()),
             geometry_cache: Mutex::new(HashMap::new()),
             thumbnail_base_cache: Mutex::new(HashMap::new()),
-            lens_db: Mutex::new(None),
             load_image_generation: Arc::new(AtomicUsize::new(0)),
             full_warped_cache: Mutex::new(None),
             patched_cache: Mutex::new(None),

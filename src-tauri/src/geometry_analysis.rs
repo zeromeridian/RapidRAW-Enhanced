@@ -986,13 +986,16 @@ fn without_perspective(params: &GeometryParams) -> GeometryParams {
 #[tauri::command]
 pub async fn analyze_geometry(
     mode: AutoGeometryMode,
-    js_adjustments: serde_json::Value,
+    mut js_adjustments: serde_json::Value,
     state: tauri::State<'_, AppState>,
 ) -> Result<AutoGeometryResult, String> {
-    let original = {
+    let (original, path) = {
         let guard = state.original_image.lock().unwrap();
-        guard.as_ref().ok_or("No image loaded")?.image.clone()
+        let loaded = guard.as_ref().ok_or("No image loaded")?;
+        (loaded.image.clone(), loaded.path.clone())
     };
+    // The analysis looks for lines on the lens-corrected photo.
+    crate::lens_correction::insert_lens_profile(&path, &mut js_adjustments);
     let orientation_steps = js_adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
     // Auto, Level, and Vertical replace Guided Perspective, so its guides
     // do not shape the analysis.

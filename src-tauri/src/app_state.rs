@@ -16,7 +16,6 @@ use crate::cache_utils::DecodedImageCache;
 use crate::gpu_processing::GpuProcessor;
 use crate::image_processing::GpuContext;
 use crate::launch_request::ExternalEditSession;
-use crate::lens_correction::LensDatabase;
 use crate::lut_processing::Lut;
 
 #[derive(Serialize, Deserialize)]
@@ -309,7 +308,6 @@ pub struct AppState {
     pub patch_cache: Mutex<HashMap<String, serde_json::Value>>,
     pub geometry_cache: Mutex<HashMap<u64, DynamicImage>>,
     pub thumbnail_base_cache: Mutex<HashMap<String, ThumbnailBase>>,
-    pub lens_db: Mutex<Option<Arc<LensDatabase>>>,
     pub load_image_generation: Arc<AtomicUsize>,
     pub full_warped_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
     /// The editor's patched full-resolution base (`lib::prepare_preview_source`).

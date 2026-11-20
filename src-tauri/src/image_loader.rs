@@ -115,10 +115,11 @@ pub fn prepare_base_image<'a>(
     if !has_patches {
         return Ok(prepared);
     }
+    // Patch masks are mapped back through the geometry, lens profile included.
     Ok(Cow::Owned(composite_patches_on_image(
         &prepared,
         base_image.dimensions(),
-        adjustments,
+        &crate::lens_correction::with_lens_profile(path, adjustments),
     )?))
 }
 

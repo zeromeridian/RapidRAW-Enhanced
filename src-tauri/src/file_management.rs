@@ -1986,6 +1986,8 @@ pub(crate) fn update_exif_fields_for_path(
     if let Ok(json) = serde_json::to_string_pretty(&metadata) {
         let _ = write_metadata_file(&primary_path, &json);
     }
+    // A changed lens, focal length or aperture changes the version 2 profile.
+    crate::lens_correction::forget_lens_profiles(path);
 
     if let Some(create_if_missing) = xmp
         && !path.contains("?vc=")
@@ -3117,13 +3119,9 @@ pub fn generate_thumbnail_data(
     if let Some(meta) = metadata.as_mut()
         && !meta.adjustments.is_null()
     {
-        apply_default_lens_profile(
-            &mut meta.adjustments,
-            &meta.exif,
-            &source_path,
-            &settings,
-            app_handle,
-        );
+        apply_default_lens_profile(&mut meta.adjustments, &meta.exif, &source_path, &settings);
+        // Rendered only, never saved from here.
+        crate::lens_correction::insert_lens_profile(&source_path_str, &mut meta.adjustments);
     }
 
     let adjustments = metadata
@@ -4035,19 +4033,13 @@ pub fn apply_default_lens_profile(
     sidecar_exif: &Option<HashMap<String, String>>,
     source_path: &Path,
     settings: &AppSettings,
-    app_handle: &AppHandle,
 ) {
-    let lens_db = app_handle
-        .state::<AppState>()
-        .lens_db
-        .lock()
-        .unwrap()
-        .clone();
+    let lens_db = crate::lens_correction::database();
     link_default_lens_profile(
         adjustments,
         is_raw_file(source_path),
         settings,
-        lens_db.as_deref(),
+        lens_db,
         || exif_processing::exif_for_lens_lookup(sidecar_exif, source_path),
     );
 }
@@ -4642,11 +4634,10 @@ fn save_metadata_and_update_thumbnail_blocking(
 
     let mut final_adjustments = adjustments;
     {
-        let lens_db_guard = state.lens_db.lock().unwrap();
         resolve_lens_params_in_adjustments(
             &mut final_adjustments,
             &exif_processing::exif_for_lens_lookup(&metadata.exif, &source_path),
-            lens_db_guard.as_deref(),
+            crate::lens_correction::database(),
         );
     }
 
@@ -4801,7 +4792,7 @@ pub async fn apply_adjustments_to_paths(
         let state = write_handle.state::<AppState>();
         let enable_xmp_sync = write_settings.enable_xmp_sync.unwrap_or(false);
         let create_xmp_if_missing = write_settings.create_xmp_if_missing.unwrap_or(false);
-        let lens_db = state.lens_db.lock().unwrap().clone();
+        let lens_db = crate::lens_correction::database();
         let _merge_guard = ADJUSTMENT_MERGE_LOCK
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -4822,7 +4813,7 @@ pub async fn apply_adjustments_to_paths(
                     &mut new_adjustments,
                     is_raw_file(&source_path),
                     &write_settings,
-                    lens_db.as_deref(),
+                    lens_db,
                     || exif_processing::exif_for_lens_lookup(&existing_metadata.exif, &source_path),
                 );
                 merge_adjustment_changes(
@@ -4833,7 +4824,7 @@ pub async fn apply_adjustments_to_paths(
                 resolve_lens_params_in_adjustments(
                     &mut new_adjustments,
                     &exif_processing::exif_for_lens_lookup(&existing_metadata.exif, &source_path),
-                    lens_db.as_deref(),
+                    lens_db,
                 );
 
                 existing_metadata.adjustments = new_adjustments;
@@ -5100,12 +5091,7 @@ pub async fn apply_preset_batch(
         paths.sort();
         let total = paths.len();
         let settings = load_settings(task_app_handle.clone()).unwrap_or_default();
-        let lens_db = task_app_handle
-            .state::<AppState>()
-            .lens_db
-            .lock()
-            .unwrap()
-            .clone();
+        let lens_db = crate::lens_correction::database();
         let thumb_cache_dir = (total > 0)
             .then(|| resolve_thumbnail_cache_dir(&task_app_handle))
             .transpose()?;
@@ -5116,12 +5102,8 @@ pub async fn apply_preset_batch(
             if cancellation_token.load(Ordering::Relaxed) {
                 break;
             }
-            match apply_preset_adjustments_to_path(
-                &path,
-                &request.adjustments,
-                &settings,
-                lens_db.as_deref(),
-            ) {
+            match apply_preset_adjustments_to_path(&path, &request.adjustments, &settings, lens_db)
+            {
                 Ok(()) => {
                     applied += 1;
                     let _ = task_app_handle.emit(
@@ -5307,7 +5289,7 @@ pub async fn apply_auto_lens_correction_to_paths(
         };
 
         let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
-        let lens_db = state.lens_db.lock().unwrap().clone();
+        let lens_db = crate::lens_correction::database();
 
         paths.par_iter().for_each(|path| {
             let (source_path, sidecar_path) = parse_virtual_path(path);
@@ -5325,7 +5307,7 @@ pub async fn apply_auto_lens_correction_to_paths(
             resolve_lens_params_in_adjustments(
                 &mut existing_metadata.adjustments,
                 &exif_processing::exif_for_lens_lookup(&existing_metadata.exif, &source_path),
-                lens_db.as_deref(),
+                lens_db,
             );
 
             match serde_json::to_string_pretty(&existing_metadata) {
@@ -5602,7 +5584,6 @@ fn load_metadata_blocking(path: String, app_handle: AppHandle) -> Result<ImageMe
         &metadata.exif,
         &source_path,
         &settings,
-        &app_handle,
     );
 
     Ok(metadata)

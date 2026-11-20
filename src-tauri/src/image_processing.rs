@@ -279,7 +279,10 @@ pub fn get_geometry_params_from_json(adjustments: &serde_json::Value) -> Geometr
         lens_tca_enabled: adjustments["lensTcaEnabled"].as_bool().unwrap_or(true),
         lens_vignette_enabled: adjustments["lensVignetteEnabled"].as_bool().unwrap_or(true),
         lens_version: LensCorrectionVersion::of(adjustments),
-        lens: None,
+        lens: match LensCorrectionVersion::of(adjustments) {
+            LensCorrectionVersion::V1 => None,
+            LensCorrectionVersion::V2 => crate::lens_correction::resolved_lens_profile(adjustments),
+        },
 
         lens_dist_k1: lens_params
             .and_then(|p| p.get("k1").and_then(|k| k.as_f64()))

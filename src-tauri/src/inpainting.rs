@@ -56,10 +56,13 @@ fn prepare_source_image(
 #[tauri::command]
 pub async fn generate_manual_cleanup_patch(
     patch_definition: AiPatchDefinition,
-    current_adjustments: Value,
+    mut current_adjustments: Value,
     source_point: (f64, f64),
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
+    if let Some(path) = crate::adjustment_utils::editor_image_path(&state) {
+        crate::lens_correction::insert_lens_profile(&path, &mut current_adjustments);
+    }
     let (source_image, is_raw) =
         prepare_source_image(&state, &current_adjustments, &patch_definition.id)?;
 
@@ -342,13 +345,14 @@ pub async fn generate_manual_cleanup_patch(
 pub async fn invoke_generative_replace_with_mask_def(
     path: String,
     patch_definition: AiPatchDefinition,
-    current_adjustments: Value,
+    mut current_adjustments: Value,
     use_fast_inpaint: bool,
     token: Option<String>,
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    crate::lens_correction::insert_lens_profile(&path, &mut current_adjustments);
 
     let (source_image, is_raw) =
         prepare_source_image(&state, &current_adjustments, &patch_definition.id)?;

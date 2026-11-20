@@ -38,7 +38,36 @@ pub fn hydrate_sub_masks(
     }
 }
 
+/// The path of the photo open in the editor, which editor commands render.
+pub fn editor_image_path(state: &AppState) -> Option<String> {
+    state
+        .original_image
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map(|image| image.path.clone())
+}
+
+/// Adds what an editor render needs beside the edit: cached patch and mask data, and the
+/// open photo's version 2 lens profile (`lens_correction::insert_lens_profile`).
 pub fn hydrate_adjustments(state: &tauri::State<AppState>, adjustments: &mut serde_json::Value) {
+    match editor_image_path(state) {
+        Some(path) => hydrate_adjustments_for(state, &path, adjustments),
+        None => hydrate_cached_data(state, adjustments),
+    }
+}
+
+/// `hydrate_adjustments` for the photo at `path`, which need not be open in the editor.
+pub fn hydrate_adjustments_for(
+    state: &tauri::State<AppState>,
+    path: &str,
+    adjustments: &mut serde_json::Value,
+) {
+    hydrate_cached_data(state, adjustments);
+    crate::lens_correction::insert_lens_profile(path, adjustments);
+}
+
+fn hydrate_cached_data(state: &tauri::State<AppState>, adjustments: &mut serde_json::Value) {
     let mut cache = state.patch_cache.lock().unwrap();
 
     if let Some(patches) = adjustments

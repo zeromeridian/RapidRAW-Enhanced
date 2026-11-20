@@ -1,4 +1,3 @@
-use crate::AppState;
 use crate::exif_processing::read_exif_without_caching;
 use crate::file_management::parse_virtual_path;
 use fuzzy_matcher::FuzzyMatcher;
@@ -6,10 +5,13 @@ use fuzzy_matcher::FuzzyMatcher;
 use include_dir::{Dir, include_dir};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs;
-use tauri::{Manager, State};
+use std::path::Path;
+use std::sync::{Mutex, OnceLock};
+use tauri::Manager;
 use walkdir::WalkDir;
 #[cfg(target_os = "android")]
 static LENS_DB_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/lensfun_db");
@@ -979,7 +981,109 @@ fn lens_selection(adjustments: &Value) -> Option<Option<(String, String)>> {
     Some(Some((name("lensMaker")?, name("lensModel")?)))
 }
 
-pub fn load_lensfun_db(app_handle: &tauri::AppHandle) -> LensDatabase {
+/// The bundled Lensfun database, loaded once at start-up (`init_lensfun_db`).
+static DATABASE: OnceLock<LensDatabase> = OnceLock::new();
+
+/// Loads the bundled database; later calls keep the first one.
+pub fn init_lensfun_db(app_handle: &tauri::AppHandle) {
+    if DATABASE.set(load_lensfun_db(app_handle)).is_err() {
+        log::warn!("The Lensfun database was already loaded.");
+    }
+}
+
+/// The database, once start-up has loaded it.
+pub fn database() -> Option<&'static LensDatabase> {
+    DATABASE.get()
+}
+
+const MAX_CACHED_PROFILES: usize = 1024;
+
+/// A lens choice as `lens_selection` reads it: `None` for automatic.
+type Selection = Option<(String, String)>;
+type ResolvedLens = Option<(LensCorrectionInfo, LensProfile)>;
+
+fn profile_cache() -> &'static Mutex<HashMap<(String, Selection), ResolvedLens>> {
+    static CACHE: OnceLock<Mutex<HashMap<(String, Selection), ResolvedLens>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// The source file a photo's (or virtual copy's) path renders.
+fn source_key(path: &str) -> String {
+    parse_virtual_path(path).0.to_string_lossy().into_owned()
+}
+
+/// The lens `selection` resolves to for the photo at `path`, and its profile for the shot
+/// (version 2), from the photo's EXIF; cached per source file until `forget_lens_profiles`.
+fn resolve_for_path(path: &str, selection: Selection) -> ResolvedLens {
+    let key = (source_key(path), selection);
+    if let Some(cached) = profile_cache().lock().unwrap().get(&key) {
+        return cached.clone();
+    }
+    // Not cached while the database is still loading.
+    let db = database()?;
+    let exif = read_exif_without_caching(Path::new(&key.0)).unwrap_or_default();
+    let resolved = db.resolve(&Shot::from_exif(&exif), &key.1);
+    let mut cache = profile_cache().lock().unwrap();
+    if cache.len() >= MAX_CACHED_PROFILES {
+        cache.clear();
+    }
+    cache.insert(key, resolved.clone());
+    resolved
+}
+
+/// Drops the cached profiles of the photo at `path`, whose EXIF changed.
+pub fn forget_lens_profiles(path: &str) {
+    let source = source_key(path);
+    profile_cache()
+        .lock()
+        .unwrap()
+        .retain(|(cached, _), _| *cached != source);
+}
+
+/// The version 2 profile a render looked up for its photo: written into the render's own copy
+/// of the edit by `insert_lens_profile`, read by `image_processing::get_geometry_params_from_json`
+/// (`null` when the photo has none). Never saved: only render copies carry it, so the profile
+/// follows the database and pasted edits take each photo's own lens (decision D3).
+pub const RESOLVED_LENS_PROFILE_KEY: &str = "resolvedLensProfile";
+
+/// Writes the profile of the photo at `path` into a version 2 edit about to be rendered
+/// (`RESOLVED_LENS_PROFILE_KEY`); a version 1 edit is left as it is.
+pub fn insert_lens_profile(path: &str, adjustments: &mut Value) {
+    if LensCorrectionVersion::of(adjustments) != LensCorrectionVersion::V2 {
+        return;
+    }
+    let profile = lens_selection(adjustments)
+        .and_then(|selection| resolve_for_path(path, selection))
+        .map(|(_, profile)| profile);
+    if let Some(map) = adjustments.as_object_mut() {
+        map.insert(
+            RESOLVED_LENS_PROFILE_KEY.to_string(),
+            serde_json::to_value(profile).unwrap_or(Value::Null),
+        );
+    }
+}
+
+/// `adjustments` with the profile `insert_lens_profile` adds, copied only when a version 2 edit
+/// does not carry it yet.
+pub fn with_lens_profile<'a>(path: &str, adjustments: &'a Value) -> Cow<'a, Value> {
+    if LensCorrectionVersion::of(adjustments) != LensCorrectionVersion::V2
+        || adjustments.get(RESOLVED_LENS_PROFILE_KEY).is_some()
+    {
+        return Cow::Borrowed(adjustments);
+    }
+    let mut copy = adjustments.clone();
+    insert_lens_profile(path, &mut copy);
+    Cow::Owned(copy)
+}
+
+/// The profile `insert_lens_profile` wrote into a render's edit.
+pub fn resolved_lens_profile(adjustments: &Value) -> Option<LensProfile> {
+    adjustments
+        .get(RESOLVED_LENS_PROFILE_KEY)
+        .and_then(|value| LensProfile::deserialize(value).ok())
+}
+
+fn load_lensfun_db(app_handle: &tauri::AppHandle) -> LensDatabase {
     let mut combined_db = LensDatabase {
         cameras: Vec::new(),
         lenses: Vec::new(),
@@ -1055,43 +1159,25 @@ pub fn load_lensfun_db(app_handle: &tauri::AppHandle) -> LensDatabase {
 }
 
 #[tauri::command]
-pub fn get_lensfun_makers(state: State<AppState>) -> Result<Vec<String>, String> {
-    let db_guard = state
-        .lens_db
-        .lock()
-        .map_err(|e| format!("Lock poisoned: {}", e))?;
-    if let Some(db) = &*db_guard {
-        let mut makers: Vec<String> = db.lenses.iter().map(|lens| lens.get_maker()).collect();
-        makers.sort_unstable();
-        makers.dedup();
-        Ok(makers)
-    } else {
-        Err("Lens database not loaded".to_string())
-    }
+pub fn get_lensfun_makers() -> Result<Vec<String>, String> {
+    let db = database().ok_or("Lens database not loaded")?;
+    let mut makers: Vec<String> = db.lenses.iter().map(|lens| lens.get_maker()).collect();
+    makers.sort_unstable();
+    makers.dedup();
+    Ok(makers)
 }
 
 #[tauri::command]
-pub fn get_lensfun_lenses_for_maker(
-    maker: String,
-    state: State<AppState>,
-) -> Result<Vec<String>, String> {
-    let db_guard = state
-        .lens_db
-        .lock()
-        .map_err(|e| format!("Lock poisoned: {}", e))?;
-    if let Some(db) = &*db_guard {
-        let maker_lenses = lenses_for_maker(db, &maker);
-
-        let mut models: Vec<String> = maker_lenses
-            .iter()
-            .map(|lens| lens.get_display_name(&maker_lenses))
-            .collect();
-        models.sort_unstable();
-        models.dedup();
-        Ok(models)
-    } else {
-        Err("Lens database not loaded".to_string())
-    }
+pub fn get_lensfun_lenses_for_maker(maker: String) -> Result<Vec<String>, String> {
+    let db = database().ok_or("Lens database not loaded")?;
+    let maker_lenses = lenses_for_maker(db, &maker);
+    let mut models: Vec<String> = maker_lenses
+        .iter()
+        .map(|lens| lens.get_display_name(&maker_lenses))
+        .collect();
+    models.sort_unstable();
+    models.dedup();
+    Ok(models)
 }
 
 fn any_name_matches(names: &[MultiName], needle: &str) -> bool {
@@ -1250,22 +1336,10 @@ pub fn autodetect_lens(
     maker: String,
     model: String,
     camera_model: Option<String>,
-    state: tauri::State<AppState>,
 ) -> Result<Option<(String, String)>, String> {
-    let db_guard = state
-        .lens_db
-        .lock()
-        .map_err(|e| format!("Lock poisoned: {}", e))?;
-    if let Some(db) = &*db_guard {
-        Ok(find_best_lens_match(
-            db,
-            &maker,
-            &model,
-            camera_model.as_deref().unwrap_or(""),
-        ))
-    } else {
-        Ok(None)
-    }
+    Ok(database().and_then(|db| {
+        find_best_lens_match(db, &maker, &model, camera_model.as_deref().unwrap_or(""))
+    }))
 }
 
 #[tauri::command]
@@ -1275,14 +1349,8 @@ pub fn get_lens_distortion_params(
     focal_length: f32,
     aperture: Option<f32>,
     distance: Option<f32>,
-    state: State<AppState>,
 ) -> Result<Option<LensDistortionParams>, String> {
-    let db_guard = state
-        .lens_db
-        .lock()
-        .map_err(|e| format!("Lock poisoned: {}", e))?;
-    Ok(db_guard
-        .as_deref()
+    Ok(database()
         .and_then(|db| resolve_lens_params(db, &maker, &model, focal_length, aperture, distance)))
 }
 
@@ -1304,23 +1372,9 @@ pub fn resolve_lens_params(
 pub fn get_lens_correction_info(
     path: String,
     selection: Value,
-    state: State<AppState>,
 ) -> Result<Option<LensCorrectionInfo>, String> {
-    let Some(selection) = lens_selection(&selection) else {
-        return Ok(None);
-    };
-    let db = state
-        .lens_db
-        .lock()
-        .map_err(|e| format!("Lock poisoned: {}", e))?
-        .clone();
-    let Some(db) = db else {
-        return Ok(None);
-    };
-    let (source, _) = parse_virtual_path(&path);
-    let exif = read_exif_without_caching(&source).unwrap_or_default();
-    Ok(db
-        .resolve(&Shot::from_exif(&exif), &selection)
+    Ok(lens_selection(&selection)
+        .and_then(|selection| resolve_for_path(&path, selection))
         .map(|(info, _)| info))
 }
 
@@ -1572,5 +1626,104 @@ mod tests {
             .unwrap();
         assert_eq!((info.maker, info.model), (detected.maker, detected.model));
         assert!(profile.distortion.is_some());
+    }
+
+    /// The bundled database in the process-wide handle, as start-up loads it.
+    fn use_bundled_database() {
+        super::DATABASE.get_or_init(bundled_lens_db);
+    }
+
+    /// A photo in a fresh folder whose sidecar holds the 12-40mm Pro's EXIF at `focal`.
+    fn olympus_photo(focal: &str) -> (tempfile::TempDir, String) {
+        let folder = tempfile::tempdir().unwrap();
+        let photo = folder.path().join("P1.ORF");
+        std::fs::write(&photo, b"raw").unwrap();
+        write_olympus_exif(&photo.to_string_lossy(), focal);
+        let path = photo.to_string_lossy().into_owned();
+        (folder, path)
+    }
+
+    fn write_olympus_exif(path: &str, focal: &str) {
+        let exif = [
+            ("Make", "OLYMPUS CORPORATION"),
+            ("Model", "E-M1"),
+            ("LensModel", "Olympus M.Zuiko Digital ED 12-40mm f/2.8 Pro"),
+            ("FocalLength", focal),
+            ("FNumber", "f/4"),
+        ]
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+        let metadata = crate::image_processing::ImageMetadata {
+            exif: Some(exif),
+            ..Default::default()
+        };
+        let sidecar = crate::exif_processing::get_primary_sidecar_path(Path::new(path));
+        std::fs::write(sidecar, serde_json::to_string(&metadata).unwrap()).unwrap();
+    }
+
+    /// A render copy of a version 2 edit gets its photo's profile, which the geometry then
+    /// reads; a version 1 edit gets nothing; no lens choice gives `null`.
+    #[test]
+    fn renders_of_version_two_edits_carry_their_photos_profile() {
+        use super::{
+            RESOLVED_LENS_PROFILE_KEY, insert_lens_profile, olympus_12_40_profile,
+            with_lens_profile,
+        };
+        use serde_json::json;
+        use std::borrow::Cow;
+        use_bundled_database();
+        let (_folder, path) = olympus_photo("12");
+
+        let mut auto = json!({ "lensCorrectionVersion": 2, "lensCorrectionMode": "auto" });
+        insert_lens_profile(&path, &mut auto);
+        let geometry = crate::image_processing::get_geometry_params_from_json(&auto);
+        assert_eq!(geometry.lens, Some(olympus_12_40_profile()));
+        assert!(!crate::image_processing::is_geometry_identity(&geometry));
+
+        // A virtual copy renders its source photo's lens.
+        let mut copy = json!({ "lensCorrectionVersion": 2, "lensCorrectionMode": "auto" });
+        insert_lens_profile(&format!("{path}?vc=2"), &mut copy);
+        assert_eq!(copy, auto);
+
+        let mut none = json!({ "lensCorrectionVersion": 2, "lensCorrectionMode": "manual" });
+        insert_lens_profile(&path, &mut none);
+        assert_eq!(none[RESOLVED_LENS_PROFILE_KEY], serde_json::Value::Null);
+
+        let v1 = json!({ "lensCorrectionMode": "auto", "lensDistortionParams": { "k1": 0.1 } });
+        let mut rendered = v1.clone();
+        insert_lens_profile(&path, &mut rendered);
+        assert_eq!(rendered, v1);
+        assert!(matches!(with_lens_profile(&path, &v1), Cow::Borrowed(_)));
+        assert!(matches!(with_lens_profile(&path, &auto), Cow::Borrowed(_)));
+        let edit = json!({ "lensCorrectionVersion": 2, "lensCorrectionMode": "auto" });
+        assert_eq!(with_lens_profile(&path, &edit).as_ref(), &auto);
+    }
+
+    /// Pasting one edit onto photos taken at other focal lengths gives each its own profile,
+    /// and an edited focal length takes effect once the photo's profiles are forgotten.
+    #[test]
+    fn each_photo_resolves_its_own_shot_until_its_exif_changes() {
+        use super::{forget_lens_profiles, insert_lens_profile, resolved_lens_profile};
+        use serde_json::json;
+        use_bundled_database();
+        let edit = json!({ "lensCorrectionVersion": 2, "lensCorrectionMode": "auto" });
+        let profile_of = |path: &str| {
+            let mut rendered = edit.clone();
+            insert_lens_profile(path, &mut rendered);
+            resolved_lens_profile(&rendered)
+        };
+        let (_wide_folder, wide) = olympus_photo("12");
+        let (_long_folder, long) = olympus_photo("40");
+        assert_ne!(profile_of(&wide), profile_of(&long));
+
+        write_olympus_exif(&wide, "40");
+        assert_ne!(
+            profile_of(&wide),
+            profile_of(&long),
+            "cached until forgotten"
+        );
+        forget_lens_profiles(&wide);
+        assert_eq!(profile_of(&wide), profile_of(&long));
     }
 }
