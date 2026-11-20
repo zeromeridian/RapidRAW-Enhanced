@@ -100,6 +100,8 @@ export enum Invokes {
   ImportZoneTintPresets = 'import_zone_tint_presets',
   ExportFilenameTemplates = 'export_filename_templates',
   ImportFilenameTemplates = 'import_filename_templates',
+  ExportImportPresets = 'export_import_presets',
+  ImportImportPresets = 'import_import_presets',
   HandleExportPresetsToFile = 'handle_export_presets_to_file',
   HandleImportPresetsFromFile = 'handle_import_presets_from_file',
   HandleImportPresetsFromFiles = 'handle_import_presets_from_files',
@@ -420,6 +422,10 @@ export interface AppSettings {
   filenameCustomTexts?: Array<string> | null;
   /** The Import dialog's last choices as saved; read them through `readLastImportSettings`. */
   lastImportSettings?: unknown;
+  /** Import Presets as saved; read them through `sanitizeImportPresets`. */
+  importPresets?: Array<unknown>;
+  /** Whether picking an Import Preset clears the fields it leaves empty; absent means on. */
+  importPresetClearsEmpty?: boolean;
   /** Whether connecting a memory card or camera drive opens the Import dialog; absent means on. */
   importOnCardConnect?: boolean;
   /** Whether the Adjustments panel shows the Favorites instead of every section (its All / Favorites switch). */

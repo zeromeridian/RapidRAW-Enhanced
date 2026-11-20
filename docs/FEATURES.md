@@ -161,7 +161,11 @@ details are in `RELEASE_NOTES.MD`.
   chips, inline errors, Custom Text, example name); the default export
   name is `{filename}_edited`; a photo imported under a new name
   remembers its camera name.
-- Lightroom Classic-style import (Plan item 64, phases 1–3): keywords,
+- Lightroom Classic-style import (Plan item 64, phases 1–4): Import
+  Presets of keywords, author, copyright and file naming (shared
+  preset bar: save, update, rename, delete, export, import; the last
+  one used loads again; a switch decides whether a preset's empty
+  fields clear the dialog's); keywords,
   author and copyright for every imported photo (keyword suggestions
   from the Library; author and copyright remembered), XMP sidecars
   imported with their photos; an Import

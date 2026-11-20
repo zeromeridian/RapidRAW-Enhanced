@@ -33,6 +33,8 @@ export interface LastImportSettings {
   /** Given to every imported photo; remembered, unlike the keywords (decision 9). */
   creator: string;
   copyright: string;
+  /** The Import Preset last imported with, loaded again on opening (decision 20). */
+  presetId: string | null;
 }
 
 const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim() !== '';
@@ -49,6 +51,7 @@ export const readLastImportSettings = (value: unknown): LastImportSettings => {
     includeSubfolders: saved.includeSubfolders !== false,
     creator: typeof saved.creator === 'string' ? saved.creator : '',
     copyright: typeof saved.copyright === 'string' ? saved.copyright : '',
+    presetId: isNonEmptyString(saved.presetId) ? saved.presetId : null,
   };
 };
 

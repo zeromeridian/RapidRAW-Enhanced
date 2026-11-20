@@ -5,6 +5,21 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.101.0-dev-streamlined-import — 2026-11-20
+
+### Library
+
+- **Import Presets**: save the Import dialog's keywords, author,
+  copyright and file naming (template and custom texts) under a name,
+  and pick them again for the next shoot. Presets can be updated,
+  renamed, deleted, and exported or imported as files. Destination,
+  subfolders and the name-clash choice are not part of a preset; they
+  are remembered as before.
+- The dialog reopens with the last preset you imported with, its
+  keywords included. Without a preset, keywords still start empty.
+- A switch beside the presets decides what happens to fields a preset
+  leaves empty: on, they are cleared; off, they keep what you typed.
+
 ## 1.100.0-dev-streamlined-import — 2026-11-19
 
 ### Library

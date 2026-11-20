@@ -989,6 +989,13 @@ pub struct AppSettings {
     /// `components/modals/ImportSettingsModal.tsx`), cleaned there.
     #[serde(default)]
     pub last_import_settings: Option<Value>,
+    /// Named Import Presets (`ImportPreset` in `utils/importPresets.ts`), cleaned there.
+    #[serde(default)]
+    pub import_presets: Vec<Value>,
+    /// Whether picking an Import Preset clears the dialog's fields the preset leaves empty
+    /// (else they keep what the dialog holds); absent means on.
+    #[serde(default)]
+    pub import_preset_clears_empty: Option<bool>,
     /// Whether connecting a memory card or camera drive opens the Import dialog; absent means on.
     #[serde(default)]
     pub import_on_card_connect: Option<bool>,
@@ -1148,6 +1155,8 @@ impl Default for AppSettings {
             filename_templates: None,
             filename_custom_texts: Vec::new(),
             last_import_settings: None,
+            import_presets: Vec::new(),
+            import_preset_clears_empty: None,
             import_on_card_connect: None,
             show_favorite_adjustments: false,
             left_panel_width: None,
@@ -1394,6 +1403,31 @@ mod tests {
         assert_eq!(restored.blend_pad_presets, settings.blend_pad_presets);
         let older: AppSettings = serde_json::from_str("{}").expect("older settings load");
         assert!(older.blend_pad_presets.is_empty());
+    }
+
+    #[test]
+    fn import_presets_round_trip_through_settings() {
+        let settings = AppSettings {
+            import_presets: vec![json!({
+                "id": "import-1",
+                "name": "Wedding",
+                "keywords": ["user:Wedding"],
+                "creator": "Jane Doe",
+                "copyright": "© Jane Doe",
+                "template": "{text}-{seq}",
+                "texts": ["Wedding", "", ""]
+            })],
+            ..AppSettings::default()
+        };
+
+        let serialized = serde_json::to_string(&settings).expect("settings should serialize");
+        assert!(serialized.contains("\"importPresets\""));
+
+        let restored: AppSettings =
+            serde_json::from_str(&serialized).expect("settings should deserialize");
+        assert_eq!(restored.import_presets, settings.import_presets);
+        let older: AppSettings = serde_json::from_str("{}").expect("older settings load");
+        assert!(older.import_presets.is_empty());
     }
 
     #[test]

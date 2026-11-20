@@ -1,6 +1,7 @@
 # Streamlined Import Plan (Lightroom Classic style)
 
-Status: decided, not started in code (owner, 2026-11-19). Plan item 64
+Status: all four phases built (phase 4 waits on the owner's check,
+2026-11-20). Plan item 64
 in `UPSTREAM_FEATURE_GAP.md`, top priority (owner 2026-11-19: before
 every other Plan task). Branch `dev/streamlined-import` from `develop`
 `4f67d9b6`. Four phases, one MINOR build each, each checked by the
@@ -64,7 +65,8 @@ Progress:
 - Decision 16 built as `1.99.3`, committed by the owner as `a59bbd1b`:
   `copy_xmp_sidecars`, `remove_xmp_sidecars`, `reserved_extensions` in
   the name planner; header Import button height (still off, item 65).
-- Phase 3 (`1.100.0`, 2026-11-19, not committed): `ImportSettings`
+- Phase 3 (`1.100.0`, 2026-11-19; owner: "this is now ok"; committed
+  by the owner as `e78b232e`): `ImportSettings`
   gains `keywords` (stored tags), `creator`, `copyright`; after the
   copies, `apply_import_metadata` sets `Artist`/`Copyright` through
   `file_management::update_exif_fields_for_path` (the Metadata panel's
@@ -84,6 +86,18 @@ Progress:
   `useKeywordIndex`, existing spelling wins) and author/copyright
   fields (remembered in `lastImportSettings`; keywords start empty);
   summary lists the keywords. Report `keywords`.
+- Phase 4 (`1.101.0`, 2026-11-20, not committed): new
+  `utils/importPresets.ts`: `ImportPreset` extends `FilenameTemplate`
+  (`template`, `texts`) with `keywords`, `creator`, `copyright`, so
+  `withTemplate`/`isFilenameTemplateDirty` serve it; `applyImportPreset`
+  (decision 20's switch; an empty template always keeps the dialog's),
+  `isImportPresetDirty` (differs from what picking it would give),
+  `sanitizeImportPresets`. Settings `importPresets` and
+  `importPresetClearsEmpty` (absent = on); `lastImportSettings.presetId`
+  reloads the last preset on opening. Rust: `export_import_presets` /
+  `import_import_presets` (`photo_import.rs`, `preset_file`), settings
+  round-trip test. Dialog: "Import Preset" heading, `NamedPresetBar` and
+  the switch at the top of the settings column.
 
 ## Owner's request (2026-11-19)
 
@@ -208,6 +222,21 @@ Caps Lock, owner: leave it out.)
     the Library take ≈ 2–4 s each; no embedded-thumbnail or OS preview
     path (restart: owner request).
 
+19. **Import Presets narrowed** (owner 2026-11-20, revising 9): a preset
+    holds only author, copyright, keywords and the file name template
+    with its Custom Texts (the template as text). Destination, subfolder
+    pattern, Include subfolders and the name-clash choice stay out
+    (they are remembered as the last settings); deferred, restart: owner
+    request. No starter presets; stored in the settings.
+20. **Preset behaviour** (owner 2026-11-20): the dialog reopens with the
+    last preset used picked and loaded, its keywords included (decision
+    9 as first written; without one, keywords start empty as before);
+    the file name template menu stays inside the file name section, and
+    picking a template there marks the Import Preset as modified; a
+    switch beside the preset menu, remembered for all presets, decides
+    whether a preset's empty fields clear the dialog's (on) or leave
+    what the dialog holds (off).
+
 ## Phases
 
 1. **`1.98.0` — button, destination, subfolders, robust run, report.**
@@ -223,7 +252,9 @@ Caps Lock, owner: leave it out.)
    (decision 15).
 3. **`1.100.0` — keywords, creator and copyright**, with `dc:creator` /
    `dc:rights` in XMP for import and the Metadata panel.
-4. **`1.101.0` — Import Presets.**
+4. **`1.101.0` — Import Presets**, narrowed to author, copyright,
+   keywords and the file name template (decisions 19, 20). Built
+   2026-11-20, waiting for the owner's check.
 
 ## Out of scope
 

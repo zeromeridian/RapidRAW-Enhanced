@@ -8,6 +8,7 @@ import Dropdown from '../ui/Dropdown';
 import SegmentedSwitch from '../ui/SegmentedSwitch';
 import Switch from '../ui/Switch';
 import FilenameTemplateEditor from '../ui/FilenameTemplateEditor';
+import NamedPresetBar from '../panel/right/NamedPresetBar';
 import ImportSourceGrid from './ImportSourceGrid';
 import ImportKeywordField from './ImportKeywordField';
 import {
@@ -22,6 +23,15 @@ import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
 import { useFilenameTemplatePreview, useFilenameTemplates } from '../../hooks/useFilenameTemplates';
 import { textsForTemplate } from '../../utils/filenameTemplates';
+import {
+  ImportPreset,
+  ImportPresetFields,
+  applyImportPreset,
+  createImportPreset,
+  isImportPresetDirty,
+  sanitizeImportPresets,
+  updateImportPreset,
+} from '../../utils/importPresets';
 import {
   DATE_FOLDER_FORMATS,
   DEFAULT_DATE_FOLDER_FORMAT,
@@ -102,7 +112,13 @@ export default function ImportSettingsModal({
   const [keywords, setKeywords] = useState<Array<string>>([]);
   const [creator, setCreator] = useState('');
   const [copyright, setCopyright] = useState('');
+  const [presetId, setPresetId] = useState<string | null>(null);
   const [exampleFolder, setExampleFolder] = useState('');
+
+  const savedPresets = useSettingsStore((state) => state.appSettings?.importPresets);
+  const presets = useMemo(() => sanitizeImportPresets(savedPresets), [savedPresets]);
+  const clearsEmpty = useSettingsStore((state) => state.appSettings?.importPresetClearsEmpty !== false);
+  const selectedPreset = presets.find((preset) => preset.id === presetId) ?? null;
 
   const selectedPaths = useMemo(
     () => candidates.filter((candidate) => checked.has(candidate.path)).map((candidate) => candidate.path),
@@ -112,6 +128,7 @@ export default function ImportSettingsModal({
   const template = filenameTemplate.trim();
   const shownTexts = customTexts ?? defaultCustomTexts(template);
   const filenameTexts = textsForTemplate(template, shownTexts);
+  const presetFields: ImportPresetFields = { keywords, creator, copyright, template, texts: shownTexts };
   const examplePath = selectedPaths[0];
   const preview = useFilenameTemplatePreview(isOpen ? (examplePath ?? null) : null, template, filenameTexts);
   const exampleExtension = examplePath?.includes('.') ? examplePath.substring(examplePath.lastIndexOf('.')) : '';
@@ -127,8 +144,24 @@ export default function ImportSettingsModal({
 
   useEffect(() => {
     if (isOpen) {
-      // Every opening starts from the last choices, always as a Copy (owner 2026-11-19).
-      const last = readLastImportSettings(useSettingsStore.getState().appSettings?.lastImportSettings);
+      // Every opening starts from the last choices, always as a Copy (owner 2026-11-19), and
+      // the last Import Preset used, loaded again (decision 20).
+      const { appSettings } = useSettingsStore.getState();
+      const last = readLastImportSettings(appSettings?.lastImportSettings);
+      const lastPreset = sanitizeImportPresets(appSettings?.importPresets).find(({ id }) => id === last.presetId);
+      // Keywords start empty without a preset, so one shoot's never land on the next (decision 9).
+      // A kept `noTexts` means the template's own or the last texts, as without a preset.
+      const noTexts: Array<string> = [];
+      const opened: ImportPresetFields = {
+        keywords: [],
+        creator: last.creator,
+        copyright: last.copyright,
+        template: last.filenameTemplate,
+        texts: noTexts,
+      };
+      const fields = lastPreset
+        ? applyImportPreset(lastPreset, opened, appSettings?.importPresetClearsEmpty !== false)
+        : opened;
       const isListedFormat = (DATE_FOLDER_FORMATS as ReadonlyArray<string>).includes(last.dateFolderFormat);
       setSource(sourcePaths.length > 0 ? { paths: sourcePaths, isFiles: false } : null);
       setIncludeSubfolders(last.includeSubfolders);
@@ -138,13 +171,13 @@ export default function ImportSettingsModal({
       setDestination(targetFolder ?? last.destination ?? useLibraryStore.getState().currentFolderPath ?? '');
       setFolderChoice(!last.organizeByDate ? INTO_ONE_FOLDER : isListedFormat ? last.dateFolderFormat : CUSTOM_FORMAT);
       setCustomFormat(isListedFormat ? '' : last.dateFolderFormat);
-      setFilenameTemplate(last.filenameTemplate);
       setNameClash(last.nameClash);
-      // Keywords start empty each time, so one shoot's never land on the next (decision 9).
-      setKeywords([]);
-      setCreator(last.creator);
-      setCopyright(last.copyright);
-      setCustomTexts(null);
+      setFilenameTemplate(fields.template);
+      setCustomTexts(fields.texts === noTexts ? null : fields.texts);
+      setKeywords(fields.keywords);
+      setCreator(fields.creator);
+      setCopyright(fields.copyright);
+      setPresetId(lastPreset?.id ?? null);
       setIsMounted(true);
       invoke<Array<ImportVolume>>(Invokes.ListImportVolumes)
         .then(setVolumes)
@@ -232,6 +265,7 @@ export default function ImportSettingsModal({
           includeSubfolders,
           creator: creator.trim(),
           copyright: copyright.trim(),
+          presetId: selectedPreset?.id ?? null,
         },
       });
     }
@@ -270,7 +304,26 @@ export default function ImportSettingsModal({
     includeSubfolders,
     months,
     selectedPaths,
+    selectedPreset,
   ]);
+
+  const setPresetFields = (fields: ImportPresetFields) => {
+    setKeywords(fields.keywords);
+    setCreator(fields.creator);
+    setCopyright(fields.copyright);
+    setFilenameTemplate(fields.template);
+    setCustomTexts(fields.texts);
+  };
+
+  const savePresets = (next: Array<ImportPreset>) => {
+    const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+    if (appSettings) void handleSettingsChange({ ...appSettings, importPresets: next });
+  };
+
+  const setClearsEmpty = (value: boolean) => {
+    const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+    if (appSettings) void handleSettingsChange({ ...appSettings, importPresetClearsEmpty: value });
+  };
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -404,6 +457,46 @@ export default function ImportSettingsModal({
           </div>
 
           <div className="w-[26rem] shrink-0 overflow-y-auto space-y-6 pr-1">
+            <div className="space-y-2">
+              <Text variant={TextVariants.heading} className="block">
+                {t('modals.importSettings.presets.heading')}
+              </Text>
+              <NamedPresetBar
+                create={(name) => createImportPreset(name, presetFields)}
+                exportCommand={Invokes.ExportImportPresets}
+                importCommand={Invokes.ImportImportPresets}
+                isDirty={!!selectedPreset && isImportPresetDirty(selectedPreset, presetFields, clearsEmpty)}
+                labels={{
+                  placeholder: t('modals.importSettings.presets.placeholder'),
+                  save: t('modals.importSettings.presets.save'),
+                  saveTitle: t('modals.importSettings.presets.saveTitle'),
+                  renameTitle: t('modals.importSettings.presets.renameTitle'),
+                  deleteTitle: t('modals.importSettings.presets.deleteTitle'),
+                  deleteMessage: (name) => t('modals.importSettings.presets.deleteMessage', { name }),
+                  nameConflict: t('modals.importSettings.presets.nameConflict'),
+                  fileName: t('modals.importSettings.presets.fileName'),
+                  importNone: t('modals.importSettings.presets.importNone'),
+                  imported: (count) => t('modals.importSettings.presets.imported', { count }),
+                }}
+                onLoad={(preset) => {
+                  setPresetFields(applyImportPreset(preset, presetFields, clearsEmpty));
+                  setPresetId(preset.id);
+                }}
+                onPresetsChange={savePresets}
+                onSaved={(preset) => setPresetId(preset.id)}
+                presets={presets}
+                sanitize={sanitizeImportPresets}
+                selected={selectedPreset}
+                update={(preset) => updateImportPreset(preset, presetFields)}
+              />
+              <Switch
+                checked={clearsEmpty}
+                label={t('modals.importSettings.presets.clearsEmpty')}
+                onChange={setClearsEmpty}
+                tooltip={t('modals.importSettings.presets.clearsEmptyTooltip')}
+              />
+            </div>
+
             <div>
               <SegmentedSwitch<ImportMode>
                 onChange={setMode}

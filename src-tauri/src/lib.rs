@@ -2863,6 +2863,8 @@ pub fn run() {
             photo_import::scan_import_source,
             photo_import::list_import_volumes,
             photo_import::generate_import_thumbnail,
+            photo_import::export_import_presets,
+            photo_import::import_import_presets,
             file_management::create_virtual_copy,
             file_management::get_albums,
             file_management::save_albums,

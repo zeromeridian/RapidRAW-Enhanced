@@ -935,6 +935,23 @@ pub async fn preview_import_folder(
     .map_err(|error| error.to_string())
 }
 
+const IMPORT_PRESET_FILE_FORMAT: &str = "ThisIsRAW import presets";
+
+/// Writes Import Presets to a file (`preset_file`); the dialog builds and cleans them.
+#[tauri::command]
+pub fn export_import_presets(
+    presets: Vec<serde_json::Value>,
+    file_path: String,
+) -> Result<(), String> {
+    crate::preset_file::write(IMPORT_PRESET_FILE_FORMAT, presets, &file_path)
+}
+
+/// Reads the presets of an Import Preset file (`preset_file`); the dialog cleans every one.
+#[tauri::command]
+pub fn import_import_presets(file_path: String) -> Result<Vec<serde_json::Value>, String> {
+    crate::preset_file::read(&file_path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
