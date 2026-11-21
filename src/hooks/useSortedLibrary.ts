@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
 import { SearchCriteria, useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { useUIStore } from '../store/useUIStore';
 import { SortDirection, ImageFile, GroupingMode } from '../components/ui/AppProperties';
 import { buildImageGroups, GroupBadgeInfo, GroupId } from '../utils/imageGrouping';
 import { applyImageStacks, getCaptureTime } from '../utils/imageStacks';
 import { getImageFlag } from '../utils/imageFlags';
-import { matchesLibraryFilter } from '../utils/libraryFilters';
+import { getActiveFilterCriteria, matchesLibraryFilter } from '../utils/libraryFilters';
 import { hasKeywordOrChild } from '../utils/keywords';
 import { getIso, parseAperture, parseFocalLength, parseShutter } from '../utils/exifValues';
 
@@ -139,8 +140,13 @@ export function createSearchMatcher(
   return { isActive: isSearchActive, matches: matchesSearch };
 }
 
-export function computeGroupedLibrary(libraryState: any, settingsState: any): GroupedLibrary {
-  const { imageList, imageRatings, filterCriteria, searchCriteria, sortCriteria } = libraryState;
+export function computeGroupedLibrary(
+  libraryState: any,
+  settingsState: any,
+  isMetadataFilterBarOpen = isMetadataFilterBarShown(),
+): GroupedLibrary {
+  const { imageList, imageRatings, searchCriteria, sortCriteria } = libraryState;
+  const filterCriteria = getActiveFilterCriteria(libraryState.filterCriteria, isMetadataFilterBarOpen);
   const { appSettings } = settingsState;
 
   const groupingMode: GroupingMode = appSettings?.grouping ?? 'off';
@@ -238,12 +244,17 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
   return computeGroupedLibrary(libraryState, settingsState).displayList;
 }
 
+function isMetadataFilterBarShown() {
+  return Boolean(useUIStore.getState().uiVisibility.metadataFilterBar);
+}
+
 export function useSortedLibrary() {
   const imageList = useLibraryStore((state) => state.imageList);
   const imageRatings = useLibraryStore((state) => state.imageRatings);
   const filterCriteria = useLibraryStore((state) => state.filterCriteria);
   const searchCriteria = useLibraryStore((state) => state.searchCriteria);
   const sortCriteria = useLibraryStore((state) => state.sortCriteria);
+  const isMetadataFilterBarOpen = useUIStore((state) => Boolean(state.uiVisibility.metadataFilterBar));
 
   const appSettings = useSettingsStore((state) => state.appSettings);
 
@@ -251,8 +262,9 @@ export function useSortedLibrary() {
     return computeGroupedLibrary(
       { imageList, imageRatings, filterCriteria, searchCriteria, sortCriteria },
       { appSettings },
+      isMetadataFilterBarOpen,
     );
-  }, [imageList, sortCriteria, imageRatings, filterCriteria, searchCriteria, appSettings]);
+  }, [imageList, sortCriteria, imageRatings, filterCriteria, searchCriteria, appSettings, isMetadataFilterBarOpen]);
 
   return result;
 }

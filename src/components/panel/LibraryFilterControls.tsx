@@ -22,7 +22,7 @@ import { useLibraryActions } from '../../hooks/useLibraryActions';
 import { COLOR_LABELS } from '../../utils/adjustments';
 import { IMAGE_FLAG_FILTER_OPTIONS } from '../../utils/imageFlags';
 import { ImageFlagIcon } from '../ui/ImageFlagBadge';
-import { matchesLibraryFilter } from '../../utils/libraryFilters';
+import { getActiveFilterCriteria, matchesLibraryFilter } from '../../utils/libraryFilters';
 import { hasMetadataPicks } from '../../utils/metadataFilter';
 
 const ALL_COLOR_OPTIONS = [...COLOR_LABELS, { name: 'none', color: '#9ca3af' }];
@@ -114,10 +114,11 @@ export function QuickFilterControl({ forceExpanded = false, onExpandedWidthChang
       setFilterCriteria: state.setFilterCriteria,
     })),
   );
-  const { setUI, isToggledOpen } = useUIStore(
+  const { setUI, isToggledOpen, isMetadataFilterBarOpen } = useUIStore(
     useShallow((state) => ({
       setUI: state.setUI,
       isToggledOpen: Boolean(state.uiVisibility.quickFilter),
+      isMetadataFilterBarOpen: Boolean(state.uiVisibility.metadataFilterBar),
     })),
   );
   const isFilterExpanded = forceExpanded || isToggledOpen;
@@ -137,7 +138,7 @@ export function QuickFilterControl({ forceExpanded = false, onExpandedWidthChang
     filterCriteria.editedStatus !== EditedStatus.All ||
     (filterCriteria.colors || []).length > 0 ||
     (filterCriteria.flags || []).length > 0 ||
-    hasMetadataPicks(filterCriteria.metadata);
+    hasMetadataPicks(getActiveFilterCriteria(filterCriteria, isMetadataFilterBarOpen).metadata);
   const clearFilters = () =>
     setFilterCriteria((previous) => ({
       ...previous,

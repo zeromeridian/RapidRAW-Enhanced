@@ -84,7 +84,7 @@ import {
   stackImages,
   useLibraryActions,
 } from './useLibraryActions';
-import { findImageStack, toggleImageStack, unstackImagePaths } from '../utils/imageStacks';
+import { findImageStack, findToggleTargetStack, toggleImageStacks, unstackImagePaths } from '../utils/imageStacks';
 import { autoStackCreatedImages } from '../utils/autoStacking';
 import { isCollectionView, isPathWithin } from '../utils/libraryViews';
 import { getEnabledCopySuffix } from '../utils/outputNaming';
@@ -651,6 +651,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const mergeLabel = t('contextMenus.editor.mergeHdr');
       const imageStacks = appSettings?.imageStacks || [];
       const targetStack = findImageStack(imageStacks, path);
+      const toggleTargetStack = findToggleTargetStack(imageStacks, finalSelection, path);
       const hasSelectedStacks = imageStacks.some((stack) =>
         stack.paths.some((stackPath) => finalSelection.includes(stackPath)),
       );
@@ -664,10 +665,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         saveImageStacks((stacks) => unstackImagePaths(stacks, finalSelection));
       };
 
-      const handleToggleStack = () => {
-        if (!targetStack) return;
-        saveImageStacks((stacks) => toggleImageStack(stacks, targetStack.id));
-      };
+      const handleToggleStack = () => saveImageStacks((stacks) => toggleImageStacks(stacks, finalSelection, path));
 
       const handleMoveToTopOfStack = () => moveImageToStackTop(path);
 
@@ -929,11 +927,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               onClick: handleStackSelected,
             },
             {
-              label: targetStack?.collapsed
+              label: toggleTargetStack?.collapsed
                 ? t('contextMenus.thumbnail.expandStack')
                 : t('contextMenus.thumbnail.collapseStack'),
               icon: Layers,
-              disabled: !targetStack,
+              disabled: !toggleTargetStack,
               onClick: handleToggleStack,
             },
             {

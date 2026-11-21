@@ -5,6 +5,17 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.106.6-fix-filter-bar-and-stack-toggle — 2026-11-20
+
+### Library
+
+- **Hiding the metadata filter bar now turns its filter off.** The grid
+  shows every photo again while the bar is hidden; showing the bar
+  brings your picks back.
+- Fixed: with several stacks selected, **Expand Stack** and **Collapse
+  Stack** (right-click menu and bottom bar) changed only the active
+  photo's stack. They now expand or collapse every selected stack.
+
 ## 1.106.5-fix-folder-tree-launch-scan — 2026-11-20
 
 ### Library

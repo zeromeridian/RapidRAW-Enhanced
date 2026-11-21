@@ -255,8 +255,29 @@ export const addCaptureTimeStacks = (stacks: ImageStack[], groups: string[][]): 
   ...groups.map((paths) => ({ id: createStackId(), paths, coverPath: paths[0], collapsed: true })),
 ];
 
-export const toggleImageStack = (stacks: ImageStack[], stackId: string): ImageStack[] =>
-  stacks.map((stack) => (stack.id === stackId ? { ...stack, collapsed: !stack.collapsed } : stack));
+const isStackInPaths = (stack: ImageStack, paths: Set<string>) => stack.paths.some((path) => paths.has(path));
+
+/** The stack Expand/Collapse Stack follows for `paths`: the one holding `targetPath`, else the first touched. */
+export const findToggleTargetStack = (stacks: ImageStack[], paths: string[], targetPath?: string) => {
+  const selectedPaths = new Set(paths);
+  return (
+    (targetPath ? findImageStack(stacks, targetPath) : undefined) ??
+    stacks.find((stack) => isStackInPaths(stack, selectedPaths))
+  );
+};
+
+/** Expand/Collapse Stack: every stack holding one of `paths` takes the opposite of the target stack's state. */
+export const toggleImageStacks = (stacks: ImageStack[], paths: string[], targetPath?: string): ImageStack[] => {
+  const targetStack = findToggleTargetStack(stacks, paths, targetPath);
+  if (!targetStack) return stacks;
+  const collapsed = !targetStack.collapsed;
+  const selectedPaths = new Set(paths);
+  return stacks.map((stack) =>
+    stack.collapsed !== collapsed && (stack === targetStack || isStackInPaths(stack, selectedPaths))
+      ? { ...stack, collapsed }
+      : stack,
+  );
+};
 
 export const moveImageToTopOfStack = (stacks: ImageStack[], stackId: string, imagePath: string): ImageStack[] =>
   stacks.map((stack) =>

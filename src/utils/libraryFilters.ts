@@ -3,6 +3,10 @@ import { matchesImageFlagFilter } from './imageFlags';
 import { getImageFileType } from './imageFileTypes';
 import { matchesMetadataPicks } from './metadataFilter';
 
+/** The criteria that filter: the metadata filter bar's picks count only while the bar is shown, and come back with it. */
+export const getActiveFilterCriteria = (filterCriteria: FilterCriteria, isMetadataFilterBarOpen: boolean) =>
+  isMetadataFilterBarOpen ? filterCriteria : { ...filterCriteria, metadata: undefined };
+
 export function matchesLibraryFilter(
   image: ImageFile,
   imageRatings: Record<string, number>,

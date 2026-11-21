@@ -48,7 +48,8 @@ import LibraryGrid from './library/LibraryGrid';
 import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
 import ImportProgress from './library/ImportProgress';
 import MetadataFilterBar, { useMetadataFilterLabels } from './library/MetadataFilterBar';
-import { MetadataField, hasMetadataPicks } from '../../utils/metadataFilter';
+import { MetadataField } from '../../utils/metadataFilter';
+import { getActiveFilterCriteria } from '../../utils/libraryFilters';
 
 export interface ColumnWidths {
   thumbnail: number;
@@ -204,11 +205,14 @@ export default function MainLibrary(props: MainLibraryProps) {
   };
 
   const searchCriteria = useLibraryStore((state) => state.searchCriteria);
-  const filterCriteria = useLibraryStore((state) => state.filterCriteria);
   const isMetadataFilterBarOpen = useUIStore((state) => Boolean(state.uiVisibility.metadataFilterBar));
+  const storedFilterCriteria = useLibraryStore((state) => state.filterCriteria);
+  const filterCriteria = useMemo(
+    () => getActiveFilterCriteria(storedFilterCriteria, isMetadataFilterBarOpen),
+    [storedFilterCriteria, isMetadataFilterBarOpen],
+  );
   const toggleMetadataFilterBar = useUIStore((state) => state.toggleMetadataFilterBar);
   const { fieldLabel, valueLabel } = useMetadataFilterLabels();
-  const hasMetadataFilter = hasMetadataPicks(filterCriteria.metadata);
 
   useEffect(() => {
     const hasStoredLibrary = !!props.appSettings?.lastRootPath || !!props.appSettings?.rootFolders?.length;
@@ -703,16 +707,13 @@ export default function MainLibrary(props: MainLibraryProps) {
             <SearchInput indexingProgress={props.indexingProgress} isIndexing={props.isIndexing} />
             <Button
               className={clsx(
-                'relative h-12 compact:h-9 w-12 shadow-none p-0 flex items-center justify-center',
+                'h-12 compact:h-9 w-12 shadow-none p-0 flex items-center justify-center',
                 isMetadataFilterBarOpen ? 'bg-bg-primary text-text-primary' : 'bg-transparent text-text-primary',
               )}
               onClick={toggleMetadataFilterBar}
               data-tooltip={t('library.metadataFilter.toggle')}
             >
               <ListFilter className="w-5 h-5" />
-              {hasMetadataFilter && !isMetadataFilterBarOpen && (
-                <span className="absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-accent" />
-              )}
             </Button>
             <ViewOptionsDropdown
               libraryViewMode={props.libraryViewMode}

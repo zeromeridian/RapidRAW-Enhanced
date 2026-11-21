@@ -82,7 +82,9 @@ details are in `RELEASE_NOTES.MD`.
   move-to-top covers, and matching Develop-filmstrip presentation. Stacking a
   selection adds it to, or merges, the stacks it touches (Lightroom's Group
   into Stack); configurable Command/Ctrl+G and Shift+S shortcuts stack the
-  selection and move the active photo to the top of its stack. When filters
+  selection and move the active photo to the top of its stack. Expand/Collapse
+  Stack acts on every stack in the selection, following the active photo's
+  stack (collapsed: all expand; expanded: all collapse). When filters
   or search hide a collapsed stack's cover, its first matching member
   represents the stack.
 - Lightroom-style **Auto-Stack by Capture Time** for the selection or the
@@ -123,9 +125,11 @@ details are in `RELEASE_NOTES.MD`.
   Aperture, Keyword, Label, Flag, Rating or File Type, up to eight
   columns. Click, Cmd/Ctrl-click and Shift-click pick values; values in
   a column add up, columns narrow each other; counts follow the other
-  filters and the search. Picks join the active filters and Clear All;
-  columns, picks and the bar's state are remembered; photos still being
-  read wait until their EXIF is known.
+  filters and the search. Picks join the active filters and Clear All
+  and filter only while the bar is shown: hiding it shows every photo
+  again, showing it brings the picks back; columns, picks and the bar's
+  state are remembered; photos still being read wait until their EXIF
+  is known.
 - Unified **Quick Filter** controls for unrated and rating thresholds,
   file types (RAW, JPEG, HEIF incl. `.hif` and TIFF buttons that combine; none on shows
   every type, including PNG, WebP and other formats without a button), edited/original status, color labels, and flags, with an

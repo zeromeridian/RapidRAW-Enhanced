@@ -49,7 +49,7 @@ import { useUIStore } from '../../store/useUIStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { COLOR_LABELS } from '../../utils/adjustments';
 import { applyBatchEditToPaths } from '../../hooks/useEditorActions';
-import { findImageStack, toggleImageStack, unstackImagePaths } from '../../utils/imageStacks';
+import { findImageStack, findToggleTargetStack, toggleImageStacks, unstackImagePaths } from '../../utils/imageStacks';
 import {
   getStackTargetPath,
   moveImageToStackTop,
@@ -314,6 +314,7 @@ export default function BottomBar({
   const imageStacks = appSettings?.imageStacks || [];
   const stackTargetPath = getStackTargetPath(productivityPaths);
   const targetStack = stackTargetPath ? findImageStack(imageStacks, stackTargetPath) : undefined;
+  const toggleTargetStack = findToggleTargetStack(imageStacks, productivityPaths, stackTargetPath);
   const hasSelectedStacks = imageStacks.some((stack) =>
     stack.paths.some((stackPath) => productivityPaths.includes(stackPath)),
   );
@@ -455,10 +456,8 @@ export default function BottomBar({
     stackImages(productivityPaths, stackTargetPath);
   };
 
-  const handleToggleStack = () => {
-    if (!targetStack) return;
-    saveImageStacks((stacks) => toggleImageStack(stacks, targetStack.id));
-  };
+  const handleToggleStack = () =>
+    saveImageStacks((stacks) => toggleImageStacks(stacks, productivityPaths, stackTargetPath));
 
   const handleMoveToTopOfStack = () => {
     if (!stackTargetPath) return;
@@ -944,10 +943,10 @@ export default function BottomBar({
             {isToolbarItemVisible('toggleStack') && (
               <button
                 className={productivityButtonClass}
-                disabled={!targetStack}
+                disabled={!toggleTargetStack}
                 onClick={handleToggleStack}
                 data-tooltip={
-                  targetStack?.collapsed
+                  toggleTargetStack?.collapsed
                     ? t('contextMenus.thumbnail.expandStack')
                     : t('contextMenus.thumbnail.collapseStack')
                 }
