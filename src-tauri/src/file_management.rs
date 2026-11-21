@@ -1,5 +1,6 @@
-use memmap2::{Mmap, MmapOptions};
+use memmap2::{Mmap, MmapMut, MmapOptions};
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -3345,6 +3346,31 @@ pub fn is_cloud_placeholder(_path: &Path) -> bool {
     false
 }
 
+thread_local! {
+    static FILE_MAPPING_OFF: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Whether this thread runs inside `without_file_mapping`.
+pub fn is_file_mapping_off() -> bool {
+    FILE_MAPPING_OFF.with(Cell::get)
+}
+
+/// Runs `read` with this thread's `read_file_mapped` copying files into
+/// memory instead of mapping them. A mapped file whose drive goes away (a
+/// card or camera unplugged mid-read) ends the whole app with a bus error on
+/// the next page it touches; a copy fails with an error instead. Used for
+/// import sources, which are often cards and cameras.
+pub fn without_file_mapping<T>(read: impl FnOnce() -> T) -> T {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            FILE_MAPPING_OFF.with(|off| off.set(self.0));
+        }
+    }
+    let _restore = Restore(FILE_MAPPING_OFF.with(|off| off.replace(true)));
+    read()
+}
+
 pub fn read_file_mapped(path: &Path) -> Result<Mmap, ReadFileError> {
     if !path.is_file() {
         return Err(ReadFileError::Invalid);
@@ -3355,10 +3381,16 @@ pub fn read_file_mapped(path: &Path) -> Result<Mmap, ReadFileError> {
     if path.metadata().map_err(ReadFileError::Io)?.len() == 0 {
         return Err(ReadFileError::Empty);
     }
-    let file = fs::File::open(path).map_err(ReadFileError::Io)?;
+    let mut file = fs::File::open(path).map_err(ReadFileError::Io)?;
     // Filesystems that cannot lock, such as network shares or the Flatpak document portal, are mapped unlocked.
     if let Err(fs::TryLockError::WouldBlock) = file.try_lock_shared() {
         return Err(ReadFileError::Locked);
+    }
+    if is_file_mapping_off() {
+        let len = file.metadata().map_err(ReadFileError::Io)?.len() as usize;
+        let mut copy = MmapMut::map_anon(len).map_err(ReadFileError::Io)?;
+        std::io::Read::read_exact(&mut file, &mut copy).map_err(ReadFileError::Io)?;
+        return copy.make_read_only().map_err(ReadFileError::Io);
     }
     let mmap = unsafe {
         MmapOptions::new()

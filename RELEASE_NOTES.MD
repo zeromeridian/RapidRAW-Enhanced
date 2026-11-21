@@ -5,6 +5,14 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.107.1-develop — 2026-11-21
+
+### Import
+
+- Fixed: disconnecting a camera or memory card while the Import dialog
+  was reading it closed ThisIsRAW. The photos that could not be read now
+  fail on their own, and the app keeps running.
+
 ## 1.107.0-dev-lights-out-frameless — 2026-11-21
 
 ### Develop

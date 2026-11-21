@@ -1,6 +1,8 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::fs;
-use std::io::Cursor;
+use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 use crate::formats::is_raw_file;
@@ -219,11 +221,16 @@ pub fn is_tiff(file_bytes: &[u8]) -> bool {
 /// TIFF often keeps its IFDs after the image data, past every prefix
 /// `read_exif` tries, so that copies the whole file (≈ 850 MB per scan TIFF,
 /// owner 2026-11-19); this touches only the few pages the IFDs sit on.
-/// Classic TIFF only (not BigTIFF).
-fn tiff_capture_date(bytes: &[u8]) -> Option<NaiveDateTime> {
-    let is_little_endian = bytes.starts_with(b"II");
+/// Classic TIFF only (not BigTIFF). `read(at, len)` gives the file's bytes
+/// `at..at + len` (`bytes_in`, or a `PagedFile`).
+fn tiff_capture_date(read: impl Fn(usize, usize) -> Option<Vec<u8>>) -> Option<NaiveDateTime> {
+    let header = read(0, 4)?;
+    if !is_tiff(&header) {
+        return None;
+    }
+    let is_little_endian = header.starts_with(b"II");
     let u16_at = |at: usize| {
-        let raw: [u8; 2] = bytes.get(at..at.checked_add(2)?)?.try_into().ok()?;
+        let raw: [u8; 2] = read(at, 2)?.try_into().ok()?;
         Some(if is_little_endian {
             u16::from_le_bytes(raw)
         } else {
@@ -231,7 +238,7 @@ fn tiff_capture_date(bytes: &[u8]) -> Option<NaiveDateTime> {
         })
     };
     let u32_at = |at: usize| {
-        let raw: [u8; 4] = bytes.get(at..at.checked_add(4)?)?.try_into().ok()?;
+        let raw: [u8; 4] = read(at, 4)?.try_into().ok()?;
         Some(if is_little_endian {
             u32::from_le_bytes(raw)
         } else {
@@ -257,18 +264,122 @@ fn tiff_capture_date(bytes: &[u8]) -> Option<NaiveDateTime> {
         } else {
             u32_at(field)? as usize
         };
-        let value = bytes.get(start..start.checked_add(count)?)?;
-        parse_creation_datetime(String::from_utf8_lossy(value).trim_end_matches('\0').trim())
+        let value = read(start, count)?;
+        parse_creation_datetime(
+            String::from_utf8_lossy(&value)
+                .trim_end_matches('\0')
+                .trim(),
+        )
     };
 
-    if !is_tiff(bytes) {
-        return None;
-    }
     let ifd0 = u32_at(4)? as usize;
     let exif_ifd = entry(ifd0, 0x8769).and_then(|(_, _, field)| u32_at(field));
     exif_ifd
         .and_then(|ifd| ascii(ifd as usize, 0x9003))
         .or_else(|| ascii(ifd0, 0x0132))
+}
+
+/// `bytes` as a reader for `tiff_capture_date`.
+fn bytes_in(bytes: &[u8]) -> impl Fn(usize, usize) -> Option<Vec<u8>> + '_ {
+    |at, len| bytes.get(at..at.checked_add(len)?).map(<[u8]>::to_vec)
+}
+
+/// Size of the pieces a `PagedFile` reads.
+const FILE_PAGE_BYTES: usize = 64 * 1024;
+
+/// A file read in pages as they are asked for, so its offsets can be
+/// followed without mapping it (`without_file_mapping`) or reading it whole.
+struct PagedFile {
+    file: RefCell<fs::File>,
+    len: usize,
+    pages: RefCell<HashMap<usize, Vec<u8>>>,
+}
+
+impl PagedFile {
+    fn open(path: &Path) -> Option<Self> {
+        let file = fs::File::open(path).ok()?;
+        let len = file.metadata().ok()?.len() as usize;
+        Some(Self {
+            file: RefCell::new(file),
+            len,
+            pages: RefCell::new(HashMap::new()),
+        })
+    }
+
+    /// The bytes `at..at + len`; `None` past the end or when reading fails.
+    fn bytes_at(&self, at: usize, len: usize) -> Option<Vec<u8>> {
+        let end = at.checked_add(len).filter(|&end| end <= self.len)?;
+        let mut pages = self.pages.borrow_mut();
+        let mut bytes = Vec::with_capacity(len);
+        for page in at / FILE_PAGE_BYTES..end.div_ceil(FILE_PAGE_BYTES) {
+            let page_start = page * FILE_PAGE_BYTES;
+            let data = match pages.entry(page) {
+                Entry::Occupied(cached) => cached.into_mut(),
+                Entry::Vacant(missing) => missing.insert(self.read_page(page_start)?),
+            };
+            bytes.extend_from_slice(
+                &data[at.max(page_start) - page_start
+                    ..end.min(page_start + data.len()) - page_start],
+            );
+        }
+        Some(bytes)
+    }
+
+    fn read_page(&self, page_start: usize) -> Option<Vec<u8>> {
+        let mut data = vec![0; FILE_PAGE_BYTES.min(self.len - page_start)];
+        let mut file = self.file.borrow_mut();
+        file.seek(SeekFrom::Start(page_start as u64)).ok()?;
+        file.read_exact(&mut data).ok()?;
+        Some(data)
+    }
+}
+
+/// File prefixes tried for a capture time without mapping the file, as `read_from_prefix` tries them.
+const UNMAPPED_DATE_PREFIXES: [usize; 4] = [256 << 10, 1 << 20, 4 << 20, 16 << 20];
+
+/// The capture time a photo records, read without mapping it: TIFF tags
+/// straight from the file, then EXIF and (RAW) rawler's metadata from growing
+/// prefixes. A file that keeps them past the last prefix gives `None`.
+fn unmapped_capture_date(path: &Path) -> Option<NaiveDateTime> {
+    let file = PagedFile::open(path)?;
+    if let Some(date) = tiff_capture_date(|at, len| file.bytes_at(at, len)) {
+        return Some(date);
+    }
+    for limit in UNMAPPED_DATE_PREFIXES {
+        let is_whole = limit >= file.len;
+        let prefix = file.bytes_at(0, limit.min(file.len))?;
+        let date = if is_whole {
+            exif_or_raw_capture_date(path, &prefix, read_raw_metadata)
+        } else {
+            crate::raw_processing::try_prefix(&prefix, |bytes| {
+                exif_or_raw_capture_date(path, bytes, decode_raw_metadata)
+            })
+        };
+        if date.is_some() || is_whole {
+            return date;
+        }
+    }
+    None
+}
+
+/// The capture time in a photo's EXIF, else (RAW) in `raw_metadata` of its bytes.
+fn exif_or_raw_capture_date(
+    path: &Path,
+    bytes: &[u8],
+    raw_metadata: impl Fn(&[u8]) -> Option<RawMetadata>,
+) -> Option<NaiveDateTime> {
+    if let Some(exif_obj) = read_exif(bytes) {
+        for tag in [exif::Tag::DateTimeOriginal, exif::Tag::DateTime] {
+            if let Some(field) = exif_obj.get_field(tag, exif::In::PRIMARY)
+                && let Some(dt) = parse_creation_field(field)
+            {
+                return Some(dt);
+            }
+        }
+    }
+    let metadata = is_raw_file(path).then(|| raw_metadata(bytes)).flatten()?;
+    parse_raw_creation_date(metadata.exif.date_time_original.as_deref())
+        .or_else(|| parse_raw_creation_date(metadata.exif.create_date.as_deref()))
 }
 
 /// Smallest and largest TIFF prefix `read_exif` parses before the whole file.
@@ -305,11 +416,13 @@ pub fn read_exif_from_path(path: &Path) -> Option<Exif> {
 }
 
 pub fn read_raw_metadata(file_bytes: &[u8]) -> Option<RawMetadata> {
-    crate::raw_processing::read_from_prefix(file_bytes, |bytes, _| {
-        let raw_source = rawler::rawsource::RawSource::new_from_slice(bytes);
-        let decoder = rawler::get_decoder(&raw_source).ok()?;
-        decoder.raw_metadata(&raw_source, &Default::default()).ok()
-    })
+    crate::raw_processing::read_from_prefix(file_bytes, |bytes, _| decode_raw_metadata(bytes))
+}
+
+fn decode_raw_metadata(bytes: &[u8]) -> Option<RawMetadata> {
+    let raw_source = rawler::rawsource::RawSource::new_from_slice(bytes);
+    let decoder = rawler::get_decoder(&raw_source).ok()?;
+    decoder.raw_metadata(&raw_source, &Default::default()).ok()
 }
 
 fn read_raw_metadata_from_path(path: &Path) -> Option<RawMetadata> {
@@ -922,34 +1035,14 @@ pub fn try_get_exif_creation_date(path: &Path) -> Option<NaiveDateTime> {
         return Some(dt);
     }
 
-    if let Ok(mmap) = crate::file_management::read_file_mapped(path)
-        && let Some(dt) = tiff_capture_date(&mmap)
-    {
-        return Some(dt);
+    if crate::file_management::is_file_mapping_off() {
+        return unmapped_capture_date(path);
     }
-
-    if let Some(exif_obj) = read_exif_from_path(path) {
-        for tag in [exif::Tag::DateTimeOriginal, exif::Tag::DateTime] {
-            if let Some(field) = exif_obj.get_field(tag, exif::In::PRIMARY)
-                && let Some(dt) = parse_creation_field(field)
-            {
-                return Some(dt);
-            }
-        }
+    match crate::file_management::read_file_mapped(path) {
+        Ok(mmap) => tiff_capture_date(bytes_in(&mmap))
+            .or_else(|| exif_or_raw_capture_date(path, &mmap, read_raw_metadata)),
+        Err(_) => exif_or_raw_capture_date(path, &fs::read(path).ok()?, read_raw_metadata),
     }
-
-    if is_raw_file(path)
-        && let Some(metadata) = read_raw_metadata_from_path(path)
-    {
-        if let Some(dt) = parse_raw_creation_date(metadata.exif.date_time_original.as_deref()) {
-            return Some(dt);
-        }
-        if let Some(dt) = parse_raw_creation_date(metadata.exif.create_date.as_deref()) {
-            return Some(dt);
-        }
-    }
-
-    None
 }
 
 #[cfg(target_os = "android")]
@@ -1765,22 +1858,60 @@ mod tests {
         bytes[exif_ifd + 2..exif_ifd + 14].copy_from_slice(&original);
         place(&mut bytes, 2_000_300, "2026:03:07 09:30:15\0");
         assert_eq!(
-            tiff_capture_date(&bytes),
+            tiff_capture_date(bytes_in(&bytes)),
             parse_creation_datetime("2026:03:07 09:30:15")
         );
+
+        // Read from the file without mapping it (an import source), the tags past
+        // the image data are still found, through the file's pages.
+        let folder = tempfile::tempdir().unwrap();
+        let file = folder.path().join("scan.tif");
+        fs::write(&file, &bytes).unwrap();
+        let unmapped = crate::file_management::without_file_mapping(|| {
+            assert!(crate::file_management::is_file_mapping_off());
+            let copy = crate::file_management::read_file_mapped(&file).unwrap();
+            assert_eq!(&copy[..], &bytes[..]);
+            try_get_exif_creation_date(&file)
+        });
+        assert!(!crate::file_management::is_file_mapping_off());
+        assert_eq!(unmapped, parse_creation_datetime("2026:03:07 09:30:15"));
+        assert_eq!(try_get_exif_creation_date(&file), unmapped);
 
         // Without an Exif IFD, IFD0's DateTime; without either, none.
         let mut plain = test_tiff::little_endian(4096, 8, &[(0x0132, 2, 20, 100)]);
         place(&mut plain, 100, "2025:12:31 23:59:59\0");
         assert_eq!(
-            tiff_capture_date(&plain),
+            tiff_capture_date(bytes_in(&plain)),
             parse_creation_datetime("2025:12:31 23:59:59")
         );
         assert_eq!(
-            tiff_capture_date(&test_tiff::with_make(4096, 8, "Cam")),
+            tiff_capture_date(bytes_in(&test_tiff::with_make(4096, 8, "Cam"))),
             None
         );
-        assert_eq!(tiff_capture_date(b"\xff\xd8\xff\xe0 not a tiff"), None);
+        assert_eq!(
+            tiff_capture_date(bytes_in(b"\xff\xd8\xff\xe0 not a tiff")),
+            None
+        );
+    }
+
+    #[test]
+    fn paged_file_reads_across_pages_and_stops_at_the_end() {
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join("data.bin");
+        let bytes: Vec<u8> = (0..FILE_PAGE_BYTES * 2 + 100).map(|i| i as u8).collect();
+        fs::write(&path, &bytes).unwrap();
+        let file = PagedFile::open(&path).unwrap();
+        let across = FILE_PAGE_BYTES - 3..FILE_PAGE_BYTES * 2 + 7;
+        assert_eq!(
+            file.bytes_at(across.start, across.len()).unwrap(),
+            bytes[across]
+        );
+        assert_eq!(
+            file.bytes_at(bytes.len() - 4, 4).unwrap(),
+            bytes[bytes.len() - 4..]
+        );
+        assert_eq!(file.bytes_at(bytes.len() - 4, 5), None);
+        assert_eq!(file.bytes_at(usize::MAX, 2), None);
     }
 
     fn encoded_test_tiff() -> Vec<u8> {

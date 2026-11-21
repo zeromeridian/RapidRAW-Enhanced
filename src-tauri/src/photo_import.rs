@@ -9,6 +9,8 @@
 //! Sources are folders, single files, or memory cards and cameras mounted as
 //! drives (a `DCIM` folder); the dialog lists their photos by capture time
 //! (`scan_import_source`) with small previews (`generate_import_thumbnail`).
+//! Everything read from a source goes through `without_file_mapping`: a card
+//! or camera unplugged mid-read must fail the read, not end the app.
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
@@ -36,7 +38,7 @@ use crate::file_management::{
     encode_thumbnail, generate_filename_from_template, generate_thumbnail_data,
     get_cached_thumbnail_image, original_file_name, parse_virtual_path,
     remember_original_file_name, sanitize_filename_suffix, update_exif_fields_for_path,
-    xmp_sync_mode,
+    without_file_mapping, xmp_sync_mode,
 };
 use crate::formats::is_supported_image_file;
 use crate::gpu_processing::get_or_init_gpu_context;
@@ -148,9 +150,11 @@ pub async fn scan_import_source(
                 .filter(|_| is_current())
                 .map(|path| ImportCandidate {
                     path: path.to_string_lossy().into_owned(),
-                    capture_time: exif_processing::get_creation_date_from_path(path)
-                        .format("%Y-%m-%dT%H:%M:%S")
-                        .to_string(),
+                    capture_time: without_file_mapping(|| {
+                        exif_processing::get_creation_date_from_path(path)
+                    })
+                    .format("%Y-%m-%dT%H:%M:%S")
+                    .to_string(),
                 })
                 .collect()
         });
@@ -233,8 +237,10 @@ pub async fn generate_import_thumbnail(
         });
         let state = app_handle.state::<AppState>();
         let gpu_context = get_or_init_gpu_context(&state, &app_handle).ok();
-        let image = generate_thumbnail_data(&path, gpu_context.as_ref(), None, &app_handle)
-            .map_err(|error| error.to_string())?;
+        let image = without_file_mapping(|| {
+            generate_thumbnail_data(&path, gpu_context.as_ref(), None, &app_handle)
+        })
+        .map_err(|error| error.to_string())?;
         encode_thumbnail(&image, IMPORT_THUMBNAIL_SIZE)
             .map(Response::new)
             .map_err(|error| error.to_string())
@@ -865,7 +871,7 @@ pub async fn import_files(
                 "import-progress",
                 serde_json::json!({ "current": index, "total": total, "path": source }),
             );
-            match run.import_one(source, index, &mut report.issues) {
+            match without_file_mapping(|| run.import_one(source, index, &mut report.issues)) {
                 Ok(Some(imported)) => {
                     if let Some(folder) = Path::new(&imported.destination).parent() {
                         folders.insert(folder.to_string_lossy().into_owned());
@@ -948,7 +954,7 @@ pub async fn preview_import_folder(
             return String::new();
         };
         let (path, _) = parse_virtual_path(&path);
-        let date = exif_processing::get_creation_date_from_path(&path);
+        let date = without_file_mapping(|| exif_processing::get_creation_date_from_path(&path));
         date_subfolder(&pattern, date, &month_names)
             .to_string_lossy()
             .into_owned()

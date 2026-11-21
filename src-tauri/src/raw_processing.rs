@@ -48,18 +48,25 @@ pub fn read_from_prefix<T>(
 ) -> Option<T> {
     let mut len = 256 * 1024;
     while len < file_bytes.len() && len <= 16 * 1024 * 1024 {
-        READING_PREFIX.with(|reading| reading.set(true));
-        PREFIX_WARNED.with(|warned| warned.set(false));
-        let found = catch_unwind(AssertUnwindSafe(|| read(&file_bytes[..len], false)));
-        READING_PREFIX.with(|reading| reading.set(false));
-        if let Ok(Some(found)) = found
-            && !PREFIX_WARNED.with(Cell::get)
-        {
+        if let Some(found) = try_prefix(&file_bytes[..len], |prefix| read(prefix, false)) {
             return Some(found);
         }
         len *= 4;
     }
     read(file_bytes, true)
+}
+
+/// `read` on a prefix of a file, quietly: `None` if it panics or rawler
+/// warns (a prefix that cuts off what `read` needs). Not nested.
+pub fn try_prefix<T>(prefix: &[u8], read: impl Fn(&[u8]) -> Option<T>) -> Option<T> {
+    READING_PREFIX.with(|reading| reading.set(true));
+    PREFIX_WARNED.with(|warned| warned.set(false));
+    let found = catch_unwind(AssertUnwindSafe(|| read(prefix)));
+    READING_PREFIX.with(|reading| reading.set(false));
+    found
+        .ok()
+        .flatten()
+        .filter(|_| !PREFIX_WARNED.with(Cell::get))
 }
 
 pub fn develop_raw_image(
