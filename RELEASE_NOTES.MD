@@ -5,6 +5,14 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.106.7-dev-stack-top-color — 2026-11-21
+
+### Library
+
+- **The stack top now stands out in an expanded stack.** Its edge marker
+  is yellow, and the other photos in the stack keep the orange one.
+  This applies in the grid, the list and the filmstrip.
+
 ## 1.106.6-fix-filter-bar-and-stack-toggle — 2026-11-20
 
 ### Library

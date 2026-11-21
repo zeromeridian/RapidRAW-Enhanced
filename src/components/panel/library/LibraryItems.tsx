@@ -44,7 +44,9 @@ const STACK_SPINE_POSITION_CLASSES: Record<StackMemberPosition, string> = {
   last: 'top-0 bottom-2 rounded-b-full',
 };
 
-const STACK_ACCENT_COLOR = '#f97316';
+const STACK_MEMBER_COLOR = '#f97316';
+// The stack top (cover) gets its own spine colour, so it stands out in an expanded stack.
+const STACK_COVER_COLOR = '#facc15';
 // Corner radius of a grid thumbnail (`rounded-md`), so Lights Out lights exactly its shape.
 const THUMBNAIL_RADIUS = 6;
 
@@ -57,7 +59,7 @@ export const StackVisualCue = ({ info }: { info?: StackVisualInfo }) => {
         <div
           className={clsx('absolute left-0 z-20 w-1 pointer-events-none', STACK_SPINE_POSITION_CLASSES[info.position])}
           style={{
-            backgroundColor: STACK_ACCENT_COLOR,
+            backgroundColor: info.isCover ? STACK_COVER_COLOR : STACK_MEMBER_COLOR,
             boxShadow: '1px 0 0 rgba(0, 0, 0, 0.65)',
           }}
         />
