@@ -1,14 +1,29 @@
 # Color Profiles Plan
 
-Status (2026-11-19): **draft, not started.** No `UPSTREAM_FEATURE_GAP.md`
+Status (2026-11-21): **draft, not started; direction decided** (see
+"Owner decisions"). No `UPSTREAM_FEATURE_GAP.md`
 Plan item yet; number and position are the owner's to set (suggested:
 after item 54, Spektrafilm LUTs, since both decide how a LUT travels).
-One MINOR for Phases 1–2. Camera profiles (Phase 4) are a separate item.
+One MINOR for Phases 1–2. Camera profiles (Phase 5) are a separate item.
 
 **Goal:** Lightroom Classic style profiles, with the owner mainly
 interested in **creating his own**: bake a look from the current develop
 settings into a profile, pick it from a browser, and dial it with an
-Amount slider, the way LrC's creative profiles work.
+Amount slider, the way LrC's creative profiles work. The profile is the
+**base** of the image: choosing it moves no slider, and every slider then
+works on top of it, so the look can still be corrected with Shadows, Tone
+Curve and the rest.
+
+## Owner decisions
+
+- **Profiles as the base, not LUTs as a finishing filter** (owner
+  2026-11-21). Two options were weighed: (1) user-made LUTs in the
+  existing end-of-pipeline LUT tool, mostly built but applied after every
+  slider, so the sliders cannot correct the look (a filter over the
+  finished photo, like a LUT in DaVinci Resolve); (2) user-made profiles
+  in a new slot before the tone sliders, which behaves like LrC. The owner
+  chose (2). A finishing LUT is kept as a by-product of the same Create
+  dialog (Phase 3).
 
 ## How Lightroom Classic does it
 
@@ -50,15 +65,19 @@ Amount slider, the way LrC's creative profiles work.
 - **Range:** RAW values are linear and can exceed 1.0 (decoder headroom,
   `highlight_compression` in `raw_processing.rs::develop_internal`).
   The slot needs a shaper in front of the LUT (see "Engine").
-- **Existing "Export as LUT" is a starting point, not the bake.**
+- **Existing "Export as LUT" bakes a display LUT, not a profile.**
   `export_adjustments_as_lut` (`export_processing.rs`) renders a 33³
-  identity image with the spatial effects zeroed, which is right, but it
-  calls `get_all_adjustments_from_json(…, false, …)`, so the lattice is
-  rendered as **non-RAW**: the RAW-only branches (Basic contrast
-  emulation, Natural tone mapping, RAW branches of Dehaze and the tonal
-  sliders) are skipped. Not run yet; expected to differ from what the
-  editor shows for a RAW edit. It also bakes the whole pipeline to
-  display sRGB, which is wrong for a slot before the sliders.
+  identity image with the spatial effects zeroed and calls
+  `get_all_adjustments_from_json(…, false, …)`, so the lattice is
+  rendered as **non-RAW**: display sRGB in, display sRGB out. That is
+  right for a finishing LUT (Phase 3, video editors) and wrong for the
+  profile slot, which needs linear RAW values and its own bake (Phase 2).
+  Exposure, the tonal sliders and white balance are baked as they act on
+  a non-RAW image, so a display LUT only approximates a RAW edit; colour
+  tools and curves bake faithfully. **AgX bug:** the shader runs
+  `agx_full_transform` regardless of `is_raw`, so an edit using AgX bakes
+  AgX onto display values; Basic and Natural pass non-RAW values through,
+  so the bake should force Basic. Not run yet.
 - **LUT edits are not portable today.** Only `lutPath`, `lutName`,
   `lutIntensity` (and `lutSize`) are saved; `lutData` is listed in
   `app_settings.rs` and `INITIAL_ADJUSTMENTS` but nothing in Rust fills or
@@ -119,6 +138,18 @@ Amount slider, the way LrC's creative profiles work.
   Favorites, and hover preview (preview renders with the profile swapped
   in; reuse the LUT swatch path `generate_lut_previews` for thumbnails).
 
+## Finishing LUTs (Phase 3, by-product)
+
+- The Create dialog gets a second target, **Save as LUT**: a display LUT
+  baked the way `export_adjustments_as_lut` does it (non-RAW lattice,
+  tone mapper forced to Basic for the bake), saved into the LUT folder
+  (`import_luts_to_dir`) so it shows in the LUT browser with a swatch
+  (`generate_lut_previews`), and still exportable as `.cube`.
+- It lands in the existing Effects → LUT tool, after every slider, with
+  the limits described in "Owner decisions".
+- Same "reset the baked settings" choice as Create Profile, so the LUT
+  is not applied twice to the photo it was made from.
+
 ## Storage and portability
 
 - **Profile file:** `profiles/` in the app data folder, one file per
@@ -144,8 +175,10 @@ Amount slider, the way LrC's creative profiles work.
 1. Engine slot, shaper, Amount, embedded storage, loading `.tirprofile`
    files; Amount bug fix shared with the LUT tool.
 2. Create Profile (bake), Profile Browser, presets / Copy & Paste.
-3. Optional: import `.cube` as a profile (decision 5).
-4. Camera profiles (DCP): separate Plan item, after item 19b.
+3. Save as LUT from the same dialog (finishing LUT, see above), with the
+   AgX bake fix.
+4. Optional: import `.cube` as a profile (decision 5).
+5. Camera profiles (DCP): separate Plan item, after item 19b.
 
 ## Tests
 
@@ -159,10 +192,10 @@ Amount slider, the way LrC's creative profiles work.
 
 ## Open decisions (owner)
 
-1. **Slot.** (a) after WB + Brightness, before the tonal sliders
-   (candidate above) / (b) before Exposure / (c) keep the end-of-pipeline
-   LUT slot. **Default: (a)**, keep the current LUT as the finishing
-   Effects → LUT.
+1. **Exact slot** (the end-of-pipeline slot is ruled out by the owner's
+   2026-11-21 decision). (a) after WB + Brightness, before the tonal
+   sliders (candidate above) / (b) before Exposure. **Default: (a)**;
+   the current LUT stays as the finishing Effects → LUT.
 2. **Tonal sliders in the bake** (Contrast, Highlights, Shadows, Whites,
    Blacks): they use the edge-aware tonal base, so a lattice can only
    bake their per-pixel form. (a) exclude / (b) bake the per-pixel form
@@ -177,7 +210,9 @@ Amount slider, the way LrC's creative profiles work.
 5. **`.cube` import.** `.cube` LUTs assume display sRGB input, which the
    scene slot does not get. (a) not supported (use Effects → LUT) /
    (b) import through an assumed display transform. **Default: (a).**
-6. **`lutData`.** (a) fill it so the existing LUT tool embeds too
+6. **`lutData`.** Phase 3 makes this more pressing, since saved
+   finishing LUTs would otherwise travel as a path only. (a) fill it so
+   the existing LUT tool embeds too
    (separate PATCH/MINOR) / (b) leave it. **Default: (a)**, decided
    with item 54.
 7. **Plan item number and position.** Owner.
