@@ -10,6 +10,7 @@ import {
   Edit,
   FileEdit,
   FileInput,
+  Flag,
   Folder,
   FolderInput,
   FolderPlus,
@@ -78,6 +79,7 @@ import { Color, COLOR_LABELS, getInitialAdjustments } from '../utils/adjustments
 import TaggingSubMenu from '../context/TaggingSubMenu';
 import { applyBatchEditToPaths, debouncedSave, useEditorActions } from './useEditorActions';
 import {
+  canRefinePhotos,
   moveImageToStackTop,
   openCaptureTimeStackModal,
   saveImageStacks,
@@ -143,7 +145,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       console.error('Failed to update the lens correction of paths:', err);
       toast.error(t('contextMenus.toasts.failedUpgradeLensCorrection', { err }));
     });
-  const { handleRate, handleSetColorLabel, handleTagsChanged } = useLibraryActions();
+  const { handleRate, handleRefinePhotos, handleSetColorLabel, handleTagsChanged } = useLibraryActions();
 
   // The bottom bar's Delete Rejected Files, offered in the Library and Develop menus too (Plan item 68).
   const buildDeleteRejectedOption = useCallback((): Option => {
@@ -1694,12 +1696,18 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           disabled: !currentFolderPath || hasNoFolder,
         },
         { type: OPTION_SEPARATOR },
+        {
+          disabled: !canRefinePhotos(),
+          icon: Flag,
+          label: t('flags.refinePhotos'),
+          onClick: handleRefinePhotos,
+        },
         buildDeleteRejectedOption(),
       ];
 
       showContextMenu(event.clientX, event.clientY, options);
     },
-    [buildDeleteRejectedOption, props, showContextMenu, t],
+    [buildDeleteRejectedOption, handleRefinePhotos, props, showContextMenu, t],
   );
 
   return {

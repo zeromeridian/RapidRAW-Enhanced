@@ -80,6 +80,7 @@ nothing new is added here.
 - Stacking › Stack Selected ⌘G, Unstack, Move to Top of Stack ⇧S,
   Auto-Stack by Capture Time
 - Albums › Add to Album, Remove from Album, New Album…
+- Refine Photos… ⌥⌘R (Plan item 72, `1.108.0`)
 - Rename Photos…
 
 **Photo** (Library and Develop)
@@ -166,3 +167,5 @@ nothing new is added here.
     greying, keys fire once, text fields keep their keys).
 - **`1.106.1` (2026-11-20):** new keybind `rename_photos` (F2, as in LrC;
   owner request); Library → Rename Photos… uses it instead of a command.
+- **`1.108.0` (2026-11-21):** Library → Refine Photos… (keybind
+  `refine_photos`, ⌥⌘R; Plan item 72).

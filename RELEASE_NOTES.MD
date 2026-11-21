@@ -5,6 +5,21 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.108.0-dev-refine-photos — 2026-11-21
+
+### Library
+
+- **Refine Photos**, as in Lightroom Classic, for the next culling pass:
+  press **Cmd+Option+R** (Ctrl+Alt+R on Windows and Linux), choose
+  **Library → Refine Photos…**, or right-click the grid's empty area.
+  After you confirm, every unflagged photo in the grid becomes Rejected
+  and every Selected photo becomes Unflagged. Rejected and Deferred
+  photos keep their flags.
+- Refine Photos acts on what the grid shows after filters and search,
+  including photos in collapsed stacks. The confirmation shows both
+  counts, and **Undo** in the message that follows restores the earlier
+  flags.
+
 ## 1.107.1-develop — 2026-11-21
 
 ### Import

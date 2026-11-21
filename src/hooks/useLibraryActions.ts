@@ -1,6 +1,8 @@
 import { useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
+import { showActionToast } from '../components/ui/ActionToast';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
@@ -8,8 +10,8 @@ import { Invokes, ImageFile, ImageStack, AlbumItem, Album, AlbumGroup } from '..
 import { createImageStack, findImageStack, moveImageToTopOfStack } from '../utils/imageStacks';
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { computeSortedLibrary } from './useSortedLibrary';
-import { ImageFlag, IMAGE_FLAG_PREFIX } from '../utils/imageFlags';
+import { computeFilteredLibrary, computeSortedLibrary } from './useSortedLibrary';
+import { getRefineChanges, ImageFlag, IMAGE_FLAG_PREFIX } from '../utils/imageFlags';
 import { USER_TAG_PREFIX, isSameKeyword } from '../utils/keywords';
 
 export const clearLibrarySelection = () => {
@@ -122,7 +124,48 @@ const applyWithAutoAdvance = (changedPaths: string[], applyChange: () => void) =
   }
 };
 
+/** Gives the loaded images at `paths` `flag` in the store; `SetFlagForPaths` saves it. */
+const setFlagInLibrary = (flag: ImageFlag, paths: string[]) => {
+  const updatedPaths = new Set(paths);
+  useLibraryStore.getState().setLibrary((state) => ({
+    imageList: state.imageList.map((image) => {
+      if (!updatedPaths.has(image.path)) return image;
+      const tags = (image.tags || []).filter((tag) => !tag.startsWith(IMAGE_FLAG_PREFIX));
+      if (flag !== ImageFlag.Unflagged) tags.push(`${IMAGE_FLAG_PREFIX}${flag}`);
+      return { ...image, tags: tags.length > 0 ? tags : null };
+    }),
+  }));
+};
+
+/** Saves several flags at once, each on its paths, without moving the selection; false if any save failed. */
+const saveFlags = async (...changes: Array<[ImageFlag, string[]]>) => {
+  const pending = changes.filter(([, paths]) => paths.length > 0);
+  const results = await Promise.allSettled(
+    pending.map(([flag, paths]) => invoke(Invokes.SetFlagForPaths, { paths, flag })),
+  );
+  let isSaved = true;
+  results.forEach((result, index) => {
+    const [flag, paths] = pending[index];
+    if (result.status === 'fulfilled') setFlagInLibrary(flag, paths);
+    else {
+      isSaved = false;
+      toast.error(`Failed to set flag: ${result.reason}`);
+    }
+  });
+  return isSaved;
+};
+
+/** What Refine Photos would change: the photos the grid shows after filters and search, hidden stack members too. */
+export const getViewRefineChanges = () => getRefineChanges(computeFilteredLibrary(useLibraryStore.getState()));
+
+/** Whether Refine Photos would change anything in the current view. */
+export const canRefinePhotos = () => {
+  const { rejectPaths, unflagPaths } = getViewRefineChanges();
+  return rejectPaths.length > 0 || unflagPaths.length > 0;
+};
+
 export function useLibraryActions(handleImageSelect?: (path: string) => void) {
+  const { t } = useTranslation();
   const handleRate = useCallback((newRating: number, paths?: string[]) => {
     const { multiSelectedPaths, imageRatings, setLibrary } = useLibraryStore.getState();
     const { selectedImage } = useEditorStore.getState();
@@ -187,27 +230,47 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
   }, []);
 
   const handleSetFlag = useCallback(async (flag: ImageFlag, paths?: string[]) => {
-    const { setLibrary } = useLibraryStore.getState();
     const pathsToUpdate = paths || getActionPaths();
     if (pathsToUpdate.length === 0) return;
 
     try {
       await invoke(Invokes.SetFlagForPaths, { paths: pathsToUpdate, flag });
-      const updatedPaths = new Set(pathsToUpdate);
-      applyWithAutoAdvance(pathsToUpdate, () =>
-        setLibrary((state) => ({
-          imageList: state.imageList.map((image) => {
-            if (!updatedPaths.has(image.path)) return image;
-            const tags = (image.tags || []).filter((tag) => !tag.startsWith(IMAGE_FLAG_PREFIX));
-            if (flag !== ImageFlag.Unflagged) tags.push(`${IMAGE_FLAG_PREFIX}${flag}`);
-            return { ...image, tags: tags.length > 0 ? tags : null };
-          }),
-        })),
-      );
+      applyWithAutoAdvance(pathsToUpdate, () => setFlagInLibrary(flag, pathsToUpdate));
     } catch (err) {
       toast.error(`Failed to set flag: ${err}`);
     }
   }, []);
+
+  // Library → Refine Photos (Plan item 72): one confirmation with both counts, then an Undo toast.
+  const handleRefinePhotos = useCallback(() => {
+    const { rejectPaths, unflagPaths } = getViewRefineChanges();
+    if (rejectPaths.length === 0 && unflagPaths.length === 0) {
+      toast.info(t('flags.refineNothing'));
+      return;
+    }
+    const refine = async () => {
+      if (!(await saveFlags([ImageFlag.Rejected, rejectPaths], [ImageFlag.Unflagged, unflagPaths]))) return;
+      showActionToast(
+        t('flags.refineDone', { count: rejectPaths.length + unflagPaths.length }),
+        t('flags.refineUndo'),
+        () => void saveFlags([ImageFlag.Unflagged, rejectPaths], [ImageFlag.Selected, unflagPaths]),
+      );
+    };
+    useUIStore.getState().setUI({
+      confirmModalState: {
+        confirmText: t('flags.refineConfirm'),
+        isOpen: true,
+        message: [
+          rejectPaths.length > 0 && t('flags.refineRejects', { count: rejectPaths.length }),
+          unflagPaths.length > 0 && t('flags.refineUnflags', { count: unflagPaths.length }),
+        ]
+          .filter(Boolean)
+          .join(' '),
+        onConfirm: refine,
+        title: t('flags.refinePhotos'),
+      },
+    });
+  }, [t]);
 
   // Adds a keyword to every target image, or removes it when every target already has it.
   const handleToggleKeyword = useCallback(async (keyword: string, paths?: string[]) => {
@@ -592,6 +655,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     handleRate,
     handleSetColorLabel,
     handleSetFlag,
+    handleRefinePhotos,
     handleToggleKeyword,
     handleSetTag,
     handleTagsChanged,

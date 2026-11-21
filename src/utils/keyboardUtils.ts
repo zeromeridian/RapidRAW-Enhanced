@@ -95,6 +95,12 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     section: 'library',
   },
   {
+    action: 'refine_photos',
+    description: 'settings.keybinds.actions.refine_photos',
+    defaultCombo: ['ctrl', 'alt', 'KeyR'],
+    section: 'library',
+  },
+  {
     action: 'preview_prev',
     description: 'settings.keybinds.actions.preview_prev',
     defaultCombo: ['ArrowLeft'],

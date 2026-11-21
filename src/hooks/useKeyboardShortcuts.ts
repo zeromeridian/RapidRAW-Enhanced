@@ -10,6 +10,7 @@ import { isModalOpen, useUIStore } from '../store/useUIStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { applyCrop, cancelCrop, toggleAutoSync, useEditorActions } from './useEditorActions';
 import {
+  canRefinePhotos,
   getActionPaths,
   getStackTargetPath,
   moveImageToStackTop,
@@ -84,7 +85,8 @@ export const useKeyboardShortcuts = ({
   handleZoomChange,
 }: KeyboardShortcutsProps) => {
   const { handleRotate, handleCopyAdjustments, handlePasteAdjustments, setAdjustments } = useEditorActions();
-  const { handleRate, handleSetColorLabel, handleSetFlag, handleToggleKeyword } = useLibraryActions();
+  const { handleRate, handleSetColorLabel, handleSetFlag, handleRefinePhotos, handleToggleKeyword } =
+    useLibraryActions();
 
   const sortedListRef = useRef(sortedImageList);
   useEffect(() => {
@@ -318,6 +320,13 @@ export const useKeyboardShortcuts = ({
         execute: (e: KeyboardEvent) => {
           e.preventDefault();
           handleRenameFiles(getActionPaths());
+        },
+      },
+      refine_photos: {
+        shouldFire: (s: ReturnType<typeof getStoreState>) => !s.editor.selectedImage && canRefinePhotos(),
+        execute: (e: KeyboardEvent) => {
+          e.preventDefault();
+          handleRefinePhotos();
         },
       },
       preview_prev: {
@@ -888,6 +897,7 @@ export const useKeyboardShortcuts = ({
     handleRate,
     handleSetColorLabel,
     handleSetFlag,
+    handleRefinePhotos,
     handleToggleKeyword,
     handleCopyImagePaths,
   ]);

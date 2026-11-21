@@ -30,6 +30,21 @@ export const matchesImageFlagFilter = (tags: string[] | null | undefined, select
 
 export const isImageFlagTag = (tag: string) => tag.startsWith(IMAGE_FLAG_PREFIX);
 
+/**
+ * What Refine Photos changes among `images` (Lightroom Classic's Library → Refine Photos, Plan item 72): unflagged
+ * photos become Rejected and Selected ones unflagged, for the next culling pass; Rejected and Deferred stay.
+ */
+export const getRefineChanges = (images: Array<{ path: string; tags: string[] | null }>) => {
+  const rejectPaths: string[] = [];
+  const unflagPaths: string[] = [];
+  images.forEach((image) => {
+    const flag = getImageFlag(image.tags);
+    if (flag === ImageFlag.Unflagged) rejectPaths.push(image.path);
+    else if (flag === ImageFlag.Selected) unflagPaths.push(image.path);
+  });
+  return { rejectPaths, unflagPaths };
+};
+
 export const getRejectedPathsForLoadedFolder = (
   images: Array<{ path: string; tags: string[] | null }>,
   folderPath: string | null,

@@ -121,6 +121,12 @@ details are in `RELEASE_NOTES.MD`.
   deletion for the currently loaded folder view (bottom-bar button and
   **Delete Rejected Files** in the photo, Library background and Develop
   right-click menus).
+- **Refine Photos** (Lightroom Classic's Library → Refine Photos,
+  Cmd/Ctrl+Alt+R, Library menu and the grid background's right-click
+  menu): after one confirmation with both counts, every unflagged photo the
+  grid shows (after filters and search, including photos in collapsed
+  stacks) becomes Rejected and every Selected one Unflagged; Rejected and
+  Deferred stay. A toast offers Undo.
 - **Metadata filter bar** (Lightroom Classic's Library Filter › Metadata):
   toggled from the Library header or `\`, columns above the grid list
   the values found with counts; Date as Year › Month › Day, Camera, Lens,

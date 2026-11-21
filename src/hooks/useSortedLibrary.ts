@@ -240,6 +240,20 @@ export function computeGroupedLibrary(
   return applyImageStacks(list, imageList, appSettings?.imageStacks, badges);
 }
 
+/** Every photo that passes the Library filters and the search, members hidden in collapsed stacks included; unsorted. */
+export function computeFilteredLibrary(
+  libraryState: Pick<
+    ReturnType<typeof useLibraryStore.getState>,
+    'imageList' | 'imageRatings' | 'filterCriteria' | 'searchCriteria'
+  >,
+  isMetadataFilterBarOpen = isMetadataFilterBarShown(),
+): ImageFile[] {
+  const { imageList, imageRatings, searchCriteria } = libraryState;
+  const filterCriteria = getActiveFilterCriteria(libraryState.filterCriteria, isMetadataFilterBarOpen);
+  const { matches } = createSearchMatcher(searchCriteria, imageRatings);
+  return imageList.filter((image) => matchesLibraryFilter(image, imageRatings, filterCriteria) && matches(image));
+}
+
 export function computeSortedLibrary(libraryState: any, settingsState: any): ImageFile[] {
   return computeGroupedLibrary(libraryState, settingsState).displayList;
 }

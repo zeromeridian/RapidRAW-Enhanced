@@ -132,6 +132,7 @@ export const MENU_BAR: MenuDefinition[] = [
         action('move_to_top_of_stack', 'contextMenus.thumbnail.moveToTopOfStack'),
       ]),
       SEPARATOR,
+      action('refine_photos', 'menuBar.items.refinePhotos'),
       action('rename_photos', 'menuBar.items.renamePhotos'),
     ],
   },
