@@ -40,6 +40,7 @@ import {
   usePhotoSwap,
 } from '../../hooks/usePhotoSwap';
 import {
+  lightsOutBorderWidthIn,
   lightsOutClip,
   lightsOutColor,
   lightsOutOpacity,
@@ -366,8 +367,10 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   }, [selectedImage, adjustments.crop, adjustments.orientationSteps, isGuidedPerspectiveActive]);
 
   // Fit leaves room for the Lights Out border, which is drawn outside the photo and clipped to the stage.
-  const lightsOutBorderInset =
-    lightsOutMode === 'out' ? normalizeLightsOutBorderWidth(appSettings?.lightsOutBorderWidth) : 0;
+  const lightsOutBorderInset = lightsOutBorderWidthIn(
+    lightsOutMode,
+    normalizeLightsOutBorderWidth(appSettings?.lightsOutBorderWidth),
+  );
   const imageRenderSize = useImageRenderSize(
     imageContainerRef,
     croppedDimensions,

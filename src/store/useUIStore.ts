@@ -8,7 +8,9 @@ import {
   CullingSuggestions,
 } from '../components/ui/AppProperties';
 import { pickCropGeometry } from '../utils/adjustments';
+import { lightsOutCycle, normalizeLightsOutBorderWidth } from '../utils/lightsOut';
 import { useEditorStore } from './useEditorStore';
+import { useSettingsStore } from './useSettingsStore';
 
 /** Opening Crop records its values for Escape to restore; leaving Crop forgets them. */
 const updateCropSession = (current: Panel | null, next: Panel | null) => {
@@ -38,7 +40,8 @@ const RIGHT_PANEL_ORDER = [
   Panel.Export,
 ];
 
-export type LightsOutMode = 'off' | 'dim' | 'out';
+/** `frameless` is full Lights Out without its border around the photo. */
+export type LightsOutMode = 'off' | 'dim' | 'out' | 'frameless';
 
 /** Right panels next to the Library grid. */
 export type LibraryPanel = 'metadata' | 'tagging' | 'export';
@@ -384,8 +387,12 @@ export const useUIStore = create<UIState>((set, get) => ({
   requestSelectionClear: () => set((state) => ({ selectionClearRequest: state.selectionClearRequest + 1 })),
   cycleLightsOut: (direction = 1) =>
     set((state) => {
-      const modes: LightsOutMode[] = ['off', 'dim', 'out'];
-      const currentIndex = modes.indexOf(state.lightsOutMode);
+      const hasBorder =
+        !!useEditorStore.getState().selectedImage &&
+        normalizeLightsOutBorderWidth(useSettingsStore.getState().appSettings?.lightsOutBorderWidth) > 0;
+      const modes = lightsOutCycle(hasBorder);
+      // A frameless step left without a border to drop continues from full Lights Out.
+      const currentIndex = modes.indexOf(modes.includes(state.lightsOutMode) ? state.lightsOutMode : 'out');
       return { lightsOutMode: modes[(currentIndex + direction + modes.length) % modes.length] };
     }),
 }));

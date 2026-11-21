@@ -31,13 +31,27 @@ export const LIGHTS_OUT_SCREEN_COLORS: Record<LightsOutScreenColor, string> = {
   [LightsOutScreenColor.White]: '#ffffff',
 };
 
+/** Full Lights Out, with its border or, in the frameless step, without it. */
+export const isFullLightsOut = (mode: LightsOutMode) => mode === 'out' || mode === 'frameless';
+
+/** The border's width in this mode: only full Lights Out with its border draws one. */
+export const lightsOutBorderWidthIn = (mode: LightsOutMode, borderWidth: LightsOutBorderWidth) =>
+  mode === 'out' ? borderWidth : 0;
+
+/**
+ * The steps that Lights Out cycles through. The frameless step is offered only while a border would be drawn: a
+ * border width is set and a photo is open in Develop.
+ */
+export const lightsOutCycle = (hasBorder: boolean): LightsOutMode[] =>
+  hasBorder ? ['off', 'dim', 'out', 'frameless'] : ['off', 'dim', 'out'];
+
 /** Lights Dim always darkens with black; Lights Out uses the chosen screen colour. */
 export const lightsOutColor = (mode: Exclude<LightsOutMode, 'off'>, screenColor: LightsOutScreenColor) =>
-  mode === 'out' ? LIGHTS_OUT_SCREEN_COLORS[screenColor] : LIGHTS_OUT_SCREEN_COLORS[LightsOutScreenColor.Black];
+  isFullLightsOut(mode) ? LIGHTS_OUT_SCREEN_COLORS[screenColor] : LIGHTS_OUT_SCREEN_COLORS[LightsOutScreenColor.Black];
 
 /** How opaque the Lights Out layer is: 0 when off, the dim level in Lights Dim, fully opaque in Lights Out. */
 export const lightsOutOpacity = (mode: LightsOutMode, dimLevel: LightsOutDimLevel) =>
-  mode === 'off' ? 0 : mode === 'out' ? 1 : dimLevel / 100;
+  mode === 'off' ? 0 : isFullLightsOut(mode) ? 1 : dimLevel / 100;
 
 export const normalizeLightsOutDimLevel = (value?: number | null): LightsOutDimLevel =>
   LIGHTS_OUT_DIM_LEVELS.find((level) => level === value) ?? DEFAULT_LIGHTS_OUT_DIM_LEVEL;

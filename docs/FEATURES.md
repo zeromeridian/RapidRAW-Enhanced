@@ -34,7 +34,9 @@ details are in `RELEASE_NOTES.MD`.
   clicks outside the photo. Settings → Interface sets the **Lights Dim level**
   (50/70/80/90 %), the **Lights Out screen color** (black, three greys, white),
   and an optional **Lights Out border** around the photo in Develop (1–128 px, same
-  colors; Fit zoom leaves room for it).
+  colors; Fit zoom leaves room for it). With a border set, the cycle in
+  Develop gains a fourth step after Lights Out: the same screen without the
+  border, with the photo fitted to the full space.
 - Develop keeps the current photo on screen while the next one renders and
   then switches with a short fade, so stepping never shows a blank stage or an
   unedited preview (GPU renderer).

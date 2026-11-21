@@ -8,9 +8,11 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { PHOTO_SWAP_FADE_IN_MS, PHOTO_SWAP_FADE_OUT_MS } from '../../hooks/usePhotoSwap';
 import {
   buildLightsOutPaths,
+  isFullLightsOut,
   LIGHTS_OUT_DEACTIVATED_EVENT,
   LIGHTS_OUT_FADE_MS,
   LIGHTS_OUT_SCREEN_COLORS,
+  lightsOutBorderWidthIn,
   lightsOutColor,
   lightsOutOpacity,
   normalizeLightsOutBorderColor,
@@ -42,7 +44,7 @@ export default function LightsOutVeil() {
   const screenColor = useSettingsStore((s) => normalizeLightsOutScreenColor(s.appSettings?.lightsOutScreenColor));
   const borderColor = useSettingsStore((s) => normalizeLightsOutBorderColor(s.appSettings?.lightsOutBorderColor));
   const borderWidth = useSettingsStore((s) => normalizeLightsOutBorderWidth(s.appSettings?.lightsOutBorderWidth));
-  const isOut = lightsOutMode === 'out';
+  const isOut = isFullLightsOut(lightsOutMode);
   const opacity = lightsOutOpacity(lightsOutMode, dimLevel);
   const svgRef = useRef<SVGSVGElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
@@ -80,8 +82,7 @@ export default function LightsOutVeil() {
     };
   }, []);
 
-  // The border belongs to full Lights Out only.
-  const shownBorderWidth = shownMode === 'out' ? borderWidth : 0;
+  const shownBorderWidth = lightsOutBorderWidthIn(shownMode, borderWidth);
 
   useEffect(() => {
     const svg = svgRef.current;

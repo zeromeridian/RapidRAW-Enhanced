@@ -5,6 +5,16 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.107.0-dev-lights-out-frameless — 2026-11-21
+
+### Develop
+
+- **Lights Out has a frameless step.** When a Lights Out border is set,
+  pressing **L** once more after Lights Out shows the photo on the same
+  screen without its border. The photo then fills the space the border
+  left free. Press **L** again to return to Normal. Without a border,
+  Lights Out keeps its three steps.
+
 ## 1.106.7-dev-stack-top-color — 2026-11-21
 
 ### Library
