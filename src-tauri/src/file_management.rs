@@ -1810,6 +1810,16 @@ mod output_naming_tests {
             TONE_MAPPER_MODE_NATURAL
         );
         assert_eq!(mode(serde_json::Value::Null, false), TONE_MAPPER_MODE_BASIC);
+        // A rating read from XMP is not an edit.
+        assert_eq!(
+            mode(serde_json::json!({ "rating": 3 }), true),
+            TONE_MAPPER_MODE_NATURAL
+        );
+        assert!(!is_image_edited(
+            &serde_json::json!({ "rating": 3 }),
+            true,
+            None
+        ));
         // Saved edits without a tone mapper keep rendering as Basic.
         assert_eq!(
             mode(serde_json::json!({ "exposure": 0.5 }), true),
@@ -1897,6 +1907,86 @@ fn exif_read_pool() -> Option<&'static rayon::ThreadPool> {
             .ok()
     })
     .as_ref()
+}
+
+/// Threads that render thumbnails again after an edit was written to many photos (Auto
+/// Sync, Paste Settings, Reset, the lens commands). A pool of their own keeps those full
+/// RAW decodes off the global rayon pool, which Develop's renders use.
+const EDIT_REFRESH_THREADS: usize = 2;
+
+fn edit_refresh_pool() -> Option<&'static rayon::ThreadPool> {
+    static POOL: std::sync::OnceLock<Option<rayon::ThreadPool>> = std::sync::OnceLock::new();
+    POOL.get_or_init(|| {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(EDIT_REFRESH_THREADS)
+            .thread_name(|index| format!("edit-refresh-{index}"))
+            .build()
+            .ok()
+    })
+    .as_ref()
+}
+
+/// Renders the thumbnails of `paths` again after their sidecars changed, in the
+/// background on `edit_refresh_pool`, newest request first. A path changed again before
+/// its turn is skipped without decoding, so only its latest request renders.
+fn refresh_edited_thumbnails(app_handle: &AppHandle, paths: Vec<String>) {
+    let state = app_handle.state::<AppState>();
+    let manager = &state.thumbnail_manager;
+    let requests: Vec<(String, usize)> = paths
+        .into_iter()
+        .map(|path| {
+            let generation = manager.begin_live_update(&path);
+            (path, generation)
+        })
+        .collect();
+    let count = requests.len();
+    add_to_thumbnail_queue(&state, count, app_handle);
+    manager.edit_refresh_queue.lock().unwrap().extend(requests);
+
+    for _ in 0..count {
+        let app_handle = app_handle.clone();
+        let job = move || render_next_edit_refresh(&app_handle);
+        match edit_refresh_pool() {
+            Some(pool) => pool.spawn(job),
+            None => rayon::spawn(job),
+        }
+    }
+}
+
+fn render_next_edit_refresh(app_handle: &AppHandle) {
+    let state = app_handle.state::<AppState>();
+    let manager = &state.thumbnail_manager;
+    let Some((path, generation)) = manager.edit_refresh_queue.lock().unwrap().pop() else {
+        return;
+    };
+
+    if manager.is_latest_live_update(&path, generation) {
+        match resolve_thumbnail_cache_dir(app_handle) {
+            Ok(thumb_cache_dir) => {
+                let settings =
+                    crate::app_settings::settings_snapshot(app_handle).unwrap_or_default();
+                if let Some((thumbnail_path, rating, edit)) = generate_single_thumbnail_and_cache(
+                    &path,
+                    &thumb_cache_dir,
+                    None,
+                    None,
+                    true,
+                    app_handle,
+                    &settings,
+                ) && manager.is_latest_live_update(&path, generation)
+                {
+                    emit_thumbnail_generated(app_handle, &path, &thumbnail_path, rating, edit);
+                }
+            }
+            Err(error) => {
+                log::warn!("Unable to initialize thumbnail cache directory: {error}");
+                emit_thumbnail_cache_setup_error(app_handle, &path, &error);
+            }
+        }
+    }
+
+    manager.finish_live_update(&path, generation);
+    increment_thumbnail_progress(&state, app_handle);
 }
 
 #[tauri::command]
@@ -3485,6 +3575,14 @@ pub fn generate_thumbnail_data(
             .ok()
             .and_then(|content| serde_json::from_str(&content).ok())
     };
+
+    if let Some(meta) = metadata.as_mut() {
+        // Metadata alone (a rating read from XMP) is not an edit: render it like a
+        // photo without saved adjustments (embedded preview or the default tone mapper).
+        if crate::tone_mapping::is_unedited(&meta.adjustments) {
+            meta.adjustments = Value::Null;
+        }
+    }
 
     if let Some(meta) = metadata.as_mut()
         && !meta.adjustments.is_null()
@@ -5187,13 +5285,10 @@ pub async fn apply_adjustments_to_paths(
     changes: Option<Value>,
     app_handle: AppHandle,
 ) -> Result<(), String> {
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let write_handle = app_handle.clone();
+    let write_settings = load_settings(app_handle.clone()).unwrap_or_default();
     let write_paths = paths.clone();
-    let write_settings = settings.clone();
 
-    let live_updates = tauri::async_runtime::spawn_blocking(move || {
-        let state = write_handle.state::<AppState>();
+    tauri::async_runtime::spawn_blocking(move || {
         let enable_xmp_sync = write_settings.enable_xmp_sync.unwrap_or(false);
         let create_xmp_if_missing = write_settings.create_xmp_if_missing.unwrap_or(false);
         let lens_db = crate::lens_correction::database();
@@ -5201,104 +5296,51 @@ pub async fn apply_adjustments_to_paths(
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
 
-        write_paths
-            .par_iter()
-            .map(|path| {
-                let (source_path, sidecar_path) = parse_virtual_path(path);
-                let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+        write_paths.par_iter().for_each(|path| {
+            let (source_path, sidecar_path) = parse_virtual_path(path);
+            let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
-                let mut new_adjustments = existing_metadata.adjustments;
-                if !new_adjustments.is_object() {
-                    new_adjustments = serde_json::json!({});
-                }
-                // Persist the automatic lens profile an unedited RAW shows in
-                // Develop before this change marks the image as edited.
-                link_default_lens_profile(
-                    &mut new_adjustments,
-                    is_raw_file(&source_path),
-                    &write_settings,
-                    lens_db,
-                    || exif_processing::exif_for_lens_lookup(&existing_metadata.exif, &source_path),
-                );
-                merge_adjustment_changes(
-                    &mut new_adjustments,
-                    changes.as_ref().unwrap_or(&adjustments),
-                    &adjustments,
-                );
-                resolve_lens_params_in_adjustments(
-                    &mut new_adjustments,
-                    &exif_processing::exif_for_lens_lookup(&existing_metadata.exif, &source_path),
-                    lens_db,
-                );
+            let is_raw = is_raw_file(&source_path);
+            let mut new_adjustments = existing_metadata.adjustments;
+            // Persist the tone mapper and automatic lens profile an unedited
+            // RAW shows in Develop before this change marks the image as edited.
+            crate::tone_mapping::apply_default_tone_mapper(&mut new_adjustments, is_raw);
+            if !new_adjustments.is_object() {
+                new_adjustments = serde_json::json!({});
+            }
+            link_default_lens_profile(
+                &mut new_adjustments,
+                is_raw,
+                &write_settings,
+                lens_db,
+                || exif_processing::exif_for_lens_lookup(&existing_metadata.exif, &source_path),
+            );
+            merge_adjustment_changes(
+                &mut new_adjustments,
+                changes.as_ref().unwrap_or(&adjustments),
+                &adjustments,
+            );
+            resolve_lens_params_in_adjustments(
+                &mut new_adjustments,
+                &exif_processing::exif_for_lens_lookup(&existing_metadata.exif, &source_path),
+                lens_db,
+            );
 
-                existing_metadata.adjustments = new_adjustments;
+            existing_metadata.adjustments = new_adjustments;
 
-                if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
-                    let _ = write_metadata_file(&sidecar_path, &json_string);
-                }
+            if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
+                let _ = write_metadata_file(&sidecar_path, &json_string);
+            }
 
-                if enable_xmp_sync && !path.contains("?vc=") {
-                    sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
-                }
-
-                (
-                    path.clone(),
-                    state.thumbnail_manager.begin_live_update(path),
-                )
-            })
-            .collect::<Vec<_>>()
+            if enable_xmp_sync && !path.contains("?vc=") {
+                sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
+            }
+        });
     })
     .await
     .map_err(|e| e.to_string())?;
 
-    let state = app_handle.state::<AppState>();
-    add_to_thumbnail_queue(&state, live_updates.len(), &app_handle);
-
-    tauri::async_runtime::spawn_blocking(move || {
-        let state = app_handle.state::<AppState>();
-        let finish = |path: &str, generation: usize| {
-            state.thumbnail_manager.finish_live_update(path, generation);
-            increment_thumbnail_progress(&state, &app_handle);
-        };
-
-        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
-            Ok(dir) => dir,
-            Err(e) => {
-                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
-                for (path, generation) in &live_updates {
-                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
-                    finish(path, *generation);
-                }
-                return;
-            }
-        };
-
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
-
-        live_updates.par_iter().for_each(|(path_str, generation)| {
-            if state
-                .thumbnail_manager
-                .is_latest_live_update(path_str, *generation)
-                && let Some((thumbnail_path, rating, edit)) = generate_single_thumbnail_and_cache(
-                    path_str,
-                    &thumb_cache_dir,
-                    gpu_context.as_ref(),
-                    None,
-                    true,
-                    &app_handle,
-                    &settings,
-                )
-                && state
-                    .thumbnail_manager
-                    .is_latest_live_update(path_str, *generation)
-            {
-                emit_thumbnail_generated(&app_handle, path_str, &thumbnail_path, rating, edit);
-            }
-
-            finish(path_str, *generation);
-        });
-    });
-
+    refresh_edited_thumbnails(&app_handle, paths);
     Ok(())
 }
 
@@ -5418,6 +5460,11 @@ fn apply_preset_adjustments_to_path(
         ));
     }
     let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+    // A preset without a tone mapper keeps the one an unedited photo shows.
+    crate::tone_mapping::apply_default_tone_mapper(
+        &mut existing_metadata.adjustments,
+        is_raw_file(&source_path),
+    );
     if existing_metadata.adjustments.is_null() {
         existing_metadata.adjustments = serde_json::json!({});
     }
@@ -5592,9 +5639,6 @@ pub async fn reset_adjustments_for_paths(
     paths: Vec<String>,
     app_handle: AppHandle,
 ) -> Result<(), String> {
-    let state = app_handle.state::<AppState>();
-    add_to_thumbnail_queue(&state, paths.len(), &app_handle);
-
     tauri::async_runtime::spawn_blocking(move || {
         let settings = load_settings(app_handle.clone()).unwrap_or_default();
         let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
@@ -5625,40 +5669,7 @@ pub async fn reset_adjustments_for_paths(
             }
         });
 
-        let state = app_handle.state::<AppState>();
-        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
-            Ok(dir) => dir,
-            Err(e) => {
-                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
-                for path in &paths {
-                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
-                }
-                for _ in 0..paths.len() {
-                    increment_thumbnail_progress(&state, &app_handle);
-                }
-                return;
-            }
-        };
-
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
-
-        paths.par_iter().for_each(|path_str| {
-            let result = generate_single_thumbnail_and_cache(
-                path_str,
-                &thumb_cache_dir,
-                gpu_context.as_ref(),
-                None,
-                true,
-                &app_handle,
-                &settings,
-            );
-
-            if let Some((thumbnail_path, rating, edit)) = result {
-                emit_thumbnail_generated(&app_handle, path_str, &thumbnail_path, rating, edit);
-            }
-
-            increment_thumbnail_progress(&state, &app_handle);
-        });
+        refresh_edited_thumbnails(&app_handle, paths);
     });
 
     Ok(())
@@ -5712,69 +5723,38 @@ fn edit_sidecars_for_paths(
     app_handle: AppHandle,
     edit: impl Fn(&mut ImageMetadata) -> bool + Send + Sync + 'static,
 ) -> Result<(), String> {
-    let state = app_handle.state::<AppState>();
-    add_to_thumbnail_queue(&state, paths.len(), &app_handle);
-
     tauri::async_runtime::spawn_blocking(move || {
         let settings = load_settings(app_handle.clone()).unwrap_or_default();
         let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
         let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
-        let state = app_handle.state::<AppState>();
-        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
-            Ok(dir) => dir,
-            Err(e) => {
-                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
-                for path in &paths {
-                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
+        let edited_paths: Vec<String> = paths
+            .into_par_iter()
+            .filter(|path| {
+                let (source_path, sidecar_path) = parse_virtual_path(path);
+                let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+
+                if !edit(&mut existing_metadata) {
+                    return false;
                 }
-                for _ in 0..paths.len() {
-                    increment_thumbnail_progress(&state, &app_handle);
-                }
-                return;
-            }
-        };
 
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
-
-        paths.par_iter().for_each(|path| {
-            let (source_path, sidecar_path) = parse_virtual_path(path);
-            let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-
-            if !edit(&mut existing_metadata) {
-                increment_thumbnail_progress(&state, &app_handle);
-                return;
-            }
-
-            match serde_json::to_string_pretty(&existing_metadata) {
-                Ok(json_string) => {
-                    if let Err(e) = write_metadata_file(&sidecar_path, &json_string) {
-                        log::error!("Failed to update the sidecar of {}: {}", path, e);
+                match serde_json::to_string_pretty(&existing_metadata) {
+                    Ok(json_string) => {
+                        if let Err(e) = write_metadata_file(&sidecar_path, &json_string) {
+                            log::error!("Failed to update the sidecar of {}: {}", path, e);
+                        }
                     }
+                    Err(e) => log::error!("Failed to serialize metadata for {}: {}", path, e),
                 }
-                Err(e) => log::error!("Failed to serialize metadata for {}: {}", path, e),
-            }
 
-            if enable_xmp_sync && !path.contains("?vc=") {
-                sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
-            }
+                if enable_xmp_sync && !path.contains("?vc=") {
+                    sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
+                }
+                true
+            })
+            .collect();
 
-            let result = generate_single_thumbnail_and_cache(
-                path,
-                &thumb_cache_dir,
-                gpu_context.as_ref(),
-                None,
-                true,
-                &app_handle,
-                &settings,
-            );
-
-            if let Some((thumbnail_path, rating, edit)) = result {
-                emit_thumbnail_generated(&app_handle, path, &thumbnail_path, rating, edit);
-            }
-
-            increment_thumbnail_progress(&state, &app_handle);
-        });
+        refresh_edited_thumbnails(&app_handle, edited_paths);
     });
 
     Ok(())
@@ -5810,81 +5790,97 @@ pub async fn apply_auto_adjustments_to_paths(
 
         let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
 
-        paths.par_iter().for_each(|path| {
-            let loaded_image: Option<DynamicImage> = (|| -> Result<DynamicImage, String> {
-                let (source_path, sidecar_path) = parse_virtual_path(path);
-                let source_path_str = source_path.to_string_lossy().to_string();
+        // Full decodes, so on the edit refresh pool, off Develop's global pool.
+        let analyse_all = || {
+            paths.par_iter().for_each(|path| {
+                let loaded_image: Option<DynamicImage> = (|| -> Result<DynamicImage, String> {
+                    let (source_path, sidecar_path) = parse_virtual_path(path);
+                    let source_path_str = source_path.to_string_lossy().to_string();
 
-                let file_bytes = fs::read(&source_path).map_err(|e| e.to_string())?;
-                let image = image_loader::load_base_image_from_bytes(
-                    &file_bytes,
-                    &source_path_str,
-                    true,
-                    &settings,
-                    None,
-                )
-                .map_err(|e| e.to_string())?;
+                    let file_bytes = fs::read(&source_path).map_err(|e| e.to_string())?;
+                    let image = image_loader::load_base_image_from_bytes(
+                        &file_bytes,
+                        &source_path_str,
+                        true,
+                        &settings,
+                        None,
+                    )
+                    .map_err(|e| e.to_string())?;
 
-                let auto_results = perform_auto_analysis(&image);
-                let auto_adjustments_json = auto_results_to_json(&auto_results);
+                    let auto_results = perform_auto_analysis(&image);
+                    let auto_adjustments_json = auto_results_to_json(&auto_results);
 
-                let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+                    let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
-                if existing_metadata.adjustments.is_null() {
-                    existing_metadata.adjustments = serde_json::json!({});
-                }
+                    // Auto Adjust keeps the tone mapper an unedited photo shows.
+                    crate::tone_mapping::apply_default_tone_mapper(
+                        &mut existing_metadata.adjustments,
+                        is_raw_file(&source_path),
+                    );
+                    if existing_metadata.adjustments.is_null() {
+                        existing_metadata.adjustments = serde_json::json!({});
+                    }
 
-                if let (Some(existing_map), Some(auto_map)) = (
-                    existing_metadata.adjustments.as_object_mut(),
-                    auto_adjustments_json.as_object(),
-                ) {
-                    for (k, v) in auto_map {
-                        if k == "sectionVisibility" {
-                            if let Some(existing_vis_val) = existing_map.get_mut(k) {
-                                if let (Some(existing_vis), Some(auto_vis)) =
-                                    (existing_vis_val.as_object_mut(), v.as_object())
-                                {
-                                    for (vis_k, vis_v) in auto_vis {
-                                        existing_vis.insert(vis_k.clone(), vis_v.clone());
+                    if let (Some(existing_map), Some(auto_map)) = (
+                        existing_metadata.adjustments.as_object_mut(),
+                        auto_adjustments_json.as_object(),
+                    ) {
+                        for (k, v) in auto_map {
+                            if k == "sectionVisibility" {
+                                if let Some(existing_vis_val) = existing_map.get_mut(k) {
+                                    if let (Some(existing_vis), Some(auto_vis)) =
+                                        (existing_vis_val.as_object_mut(), v.as_object())
+                                    {
+                                        for (vis_k, vis_v) in auto_vis {
+                                            existing_vis.insert(vis_k.clone(), vis_v.clone());
+                                        }
                                     }
+                                } else {
+                                    existing_map.insert(k.clone(), v.clone());
                                 }
                             } else {
                                 existing_map.insert(k.clone(), v.clone());
                             }
-                        } else {
-                            existing_map.insert(k.clone(), v.clone());
                         }
                     }
+
+                    if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
+                        let _ = write_metadata_file(&sidecar_path, &json_string);
+                    }
+
+                    if enable_xmp_sync && !path.contains("?vc=") {
+                        sync_metadata_to_xmp(
+                            &source_path,
+                            &existing_metadata,
+                            create_xmp_if_missing,
+                        );
+                    }
+                    Ok(image)
+                })()
+                .map_err(|e| eprintln!("Failed to apply auto adjustments to {}: {}", path, e))
+                .ok();
+
+                let result = generate_single_thumbnail_and_cache(
+                    path,
+                    &thumb_cache_dir,
+                    gpu_context.as_ref(),
+                    loaded_image.as_ref(),
+                    true,
+                    &app_handle,
+                    &settings,
+                );
+
+                if let Some((thumbnail_path, rating, edit)) = result {
+                    emit_thumbnail_generated(&app_handle, path, &thumbnail_path, rating, edit);
                 }
 
-                if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
-                    let _ = write_metadata_file(&sidecar_path, &json_string);
-                }
-
-                if enable_xmp_sync && !path.contains("?vc=") {
-                    sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
-                }
-                Ok(image)
-            })()
-            .map_err(|e| eprintln!("Failed to apply auto adjustments to {}: {}", path, e))
-            .ok();
-
-            let result = generate_single_thumbnail_and_cache(
-                path,
-                &thumb_cache_dir,
-                gpu_context.as_ref(),
-                loaded_image.as_ref(),
-                true,
-                &app_handle,
-                &settings,
-            );
-
-            if let Some((thumbnail_path, rating, edit)) = result {
-                emit_thumbnail_generated(&app_handle, path, &thumbnail_path, rating, edit);
-            }
-
-            increment_thumbnail_progress(&state, &app_handle);
-        });
+                increment_thumbnail_progress(&state, &app_handle);
+            })
+        };
+        match edit_refresh_pool() {
+            Some(pool) => pool.install(analyse_all),
+            None => analyse_all(),
+        }
     });
 
     Ok(())

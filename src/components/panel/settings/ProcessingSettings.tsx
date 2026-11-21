@@ -3,6 +3,7 @@ import { Image as ImageIcon, Scaling } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Dropdown, { OptionItem } from '../../ui/Dropdown';
 import Slider from '../../ui/Slider';
+import { getDefaultToneMapper } from '../../../utils/adjustments';
 import SettingsPage, { SettingsPageProps } from './SettingsPage';
 import { SegmentedSwitch, SegmentOption, SettingSwitch } from './SettingControls';
 import { useSettingsContext } from './SettingsContext';
@@ -446,7 +447,7 @@ export default function ProcessingSettings({ query }: SettingsPageProps) {
                 <Dropdown
                   onChange={(value) => updateSetting('defaultRawTonemapper', value)}
                   options={tonemapperOptions}
-                  value={appSettings?.defaultRawTonemapper || 'agx'}
+                  value={appSettings?.defaultRawTonemapper || getDefaultToneMapper(true)}
                   className="w-full"
                   triggerClassName="bg-bg-primary"
                 />
@@ -461,7 +462,7 @@ export default function ProcessingSettings({ query }: SettingsPageProps) {
                 <Dropdown
                   onChange={(value) => updateSetting('defaultNonRawTonemapper', value)}
                   options={tonemapperOptions}
-                  value={appSettings?.defaultNonRawTonemapper || 'basic'}
+                  value={appSettings?.defaultNonRawTonemapper || getDefaultToneMapper(false)}
                   className="w-full"
                   triggerClassName="bg-bg-primary"
                 />

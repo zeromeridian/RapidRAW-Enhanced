@@ -49,13 +49,46 @@ pub fn default_tone_mapper(is_raw: bool) -> &'static str {
     }
 }
 
-/// Gives adjustments of an image without saved edits (`null`) the default
-/// tone mapper explicitly, so the editor, presets and sidecars see it.
+/// Adjustment keys that hold library metadata rather than an edit (a rating
+/// read from a camera or import XMP, `apply_xmp`).
+const METADATA_ADJUSTMENT_KEYS: [&str; 1] = ["rating"];
+
+/// Whether adjustments hold no edit: nothing saved (`null`), or only library
+/// metadata. Colour labels and flags live in the tags, not here.
+pub fn is_unedited(adjustments: &serde_json::Value) -> bool {
+    match adjustments {
+        serde_json::Value::Null => true,
+        serde_json::Value::Object(map) => map
+            .keys()
+            .all(|key| METADATA_ADJUSTMENT_KEYS.contains(&key.as_str())),
+        _ => false,
+    }
+}
+
+/// Tone mapper the adjustments render with: their `toneMapper`, else the
+/// default for an unedited image, else Basic (edits saved before the key).
+pub fn resolved_tone_mapper(adjustments: &serde_json::Value, is_raw: bool) -> &str {
+    adjustments["toneMapper"]
+        .as_str()
+        .unwrap_or(if is_unedited(adjustments) {
+            default_tone_mapper(is_raw)
+        } else {
+            TONE_MAPPER_BASIC
+        })
+}
+
+/// Gives adjustments of an unedited image the default tone mapper
+/// explicitly, so the editor, presets and sidecars see it. Metadata keys are
+/// kept.
 pub fn apply_default_tone_mapper(adjustments: &mut serde_json::Value, is_raw: bool) {
     let default = default_tone_mapper(is_raw);
-    if adjustments.is_null() && default != TONE_MAPPER_BASIC {
-        *adjustments = serde_json::json!({ "toneMapper": default });
+    if !is_unedited(adjustments) || default == TONE_MAPPER_BASIC {
+        return;
     }
+    if !adjustments.is_object() {
+        *adjustments = serde_json::json!({});
+    }
+    adjustments["toneMapper"] = serde_json::json!(default);
 }
 
 /// Scene-linear value that Natural maps to white. It matches the decoder's
@@ -202,6 +235,45 @@ mod tests {
         let mut legacy_edit = serde_json::json!({ "exposure": 0.5 });
         apply_default_tone_mapper(&mut legacy_edit, true);
         assert_eq!(legacy_edit, serde_json::json!({ "exposure": 0.5 }));
+
+        // A rating read from XMP is metadata, not an edit.
+        let mut rated_raw = serde_json::json!({ "rating": 3 });
+        apply_default_tone_mapper(&mut rated_raw, true);
+        assert_eq!(
+            rated_raw,
+            serde_json::json!({ "rating": 3, "toneMapper": TONE_MAPPER_NATURAL })
+        );
+
+        let mut rated_jpeg = serde_json::json!({ "rating": 3 });
+        apply_default_tone_mapper(&mut rated_jpeg, false);
+        assert_eq!(rated_jpeg, serde_json::json!({ "rating": 3 }));
+    }
+
+    #[test]
+    fn resolved_tone_mapper_defaults_only_unedited_images() {
+        use serde_json::json;
+        assert_eq!(
+            resolved_tone_mapper(&json!(null), true),
+            TONE_MAPPER_NATURAL
+        );
+        assert_eq!(resolved_tone_mapper(&json!({}), true), TONE_MAPPER_NATURAL);
+        assert_eq!(
+            resolved_tone_mapper(&json!({ "rating": 5 }), true),
+            TONE_MAPPER_NATURAL
+        );
+        assert_eq!(
+            resolved_tone_mapper(&json!({ "rating": 5 }), false),
+            TONE_MAPPER_BASIC
+        );
+        assert_eq!(
+            resolved_tone_mapper(&json!({ "rating": 5, "exposure": 0.0 }), true),
+            TONE_MAPPER_BASIC
+        );
+        assert_eq!(
+            resolved_tone_mapper(&json!({ "toneMapper": "agx", "rating": 1 }), true),
+            TONE_MAPPER_AGX
+        );
+        assert!(!is_unedited(&json!({ "lensCorrectionMode": "auto" })));
     }
 
     #[test]

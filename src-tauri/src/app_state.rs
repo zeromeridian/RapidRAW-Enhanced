@@ -171,6 +171,9 @@ pub struct ThumbnailManager {
     pub io_gate: Mutex<()>,
     live_update_generation: AtomicUsize,
     latest_live_update: Mutex<HashMap<String, usize>>,
+    /// Thumbnails to render again after an edit was written to many photos, with
+    /// their live-update generation; the newest request is last.
+    pub edit_refresh_queue: Mutex<Vec<(String, usize)>>,
 }
 
 impl ThumbnailManager {
@@ -187,6 +190,7 @@ impl ThumbnailManager {
             io_gate: Mutex::new(()),
             live_update_generation: AtomicUsize::new(0),
             latest_live_update: Mutex::new(HashMap::new()),
+            edit_refresh_queue: Mutex::new(Vec::new()),
         })
     }
 

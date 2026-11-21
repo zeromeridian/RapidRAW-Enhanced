@@ -2565,16 +2565,11 @@ pub fn resolve_tonemapper_override(settings: &crate::AppSettings, is_raw: bool) 
         return None;
     }
     let tm = if is_raw {
-        settings
-            .default_raw_tonemapper
-            .as_deref()
-            .unwrap_or(crate::tone_mapping::TONE_MAPPER_AGX)
+        settings.default_raw_tonemapper.as_deref()
     } else {
-        settings
-            .default_non_raw_tonemapper
-            .as_deref()
-            .unwrap_or(crate::tone_mapping::TONE_MAPPER_BASIC)
-    };
+        settings.default_non_raw_tonemapper.as_deref()
+    }
+    .unwrap_or(crate::tone_mapping::default_tone_mapper(is_raw));
     Some(crate::tone_mapping::tone_mapper_mode(tm))
 }
 
@@ -2782,13 +2777,12 @@ pub fn is_image_edited(
     }
 
     // Both the unedited default tone mapper and the legacy default (Basic,
-    // stored as no `toneMapper` key) count as unedited.
-    let default_tone_mapper = crate::tone_mapping::default_tone_mapper(is_raw);
-    let unedited = if adj.get("toneMapper").and_then(Value::as_str) == Some(default_tone_mapper) {
-        serde_json::json!({ "toneMapper": default_tone_mapper })
-    } else {
-        serde_json::json!({})
+    // also implied by an edit without a `toneMapper` key) count as unedited.
+    let reference_tone_mapper = match crate::tone_mapping::resolved_tone_mapper(adj, is_raw) {
+        crate::tone_mapping::TONE_MAPPER_BASIC => crate::tone_mapping::TONE_MAPPER_BASIC,
+        _ => crate::tone_mapping::default_tone_mapper(is_raw),
     };
+    let unedited = serde_json::json!({ "toneMapper": reference_tone_mapper });
     let current_adj = get_all_adjustments_from_json(adj, is_raw, tonemapper_override);
     let default_adj = get_all_adjustments_from_json(&unedited, is_raw, tonemapper_override);
 
@@ -2894,16 +2888,7 @@ fn get_global_adjustments_from_json(
         ColorCalibrationSettings::default()
     };
 
-    // `null` means the image has no saved edits, so it gets the default for
-    // unedited images; saved edits without a `toneMapper` key stay Basic.
-    let tone_mapper =
-        js_adjustments["toneMapper"]
-            .as_str()
-            .unwrap_or(if js_adjustments.is_null() {
-                crate::tone_mapping::default_tone_mapper(is_raw)
-            } else {
-                crate::tone_mapping::TONE_MAPPER_BASIC
-            });
+    let tone_mapper = crate::tone_mapping::resolved_tone_mapper(js_adjustments, is_raw);
     let (pipe_to_rendering, rendering_to_pipe) = calculate_agx_matrices();
 
     let (has_lut, lut_intensity) = if is_visible("lut") {

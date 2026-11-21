@@ -5,6 +5,25 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.109.3-fix-batch-sync-freeze — 2026-11-21
+
+### Develop
+
+- Syncing an edit to hundreds of photos (Auto Sync, Paste Settings,
+  Reset, Auto Adjust, lens corrections) no longer freezes editing: the
+  thumbnails are rebuilt in the background, a few at a time and newest
+  first, while the photo you are editing keeps updating at full
+  resolution. A thumbnail that has been changed again before its turn
+  is rebuilt only once.
+- New RAW photos that already carry a rating (for example from the
+  camera or an imported XMP) now open with the **Natural** tone mapper,
+  like every other unedited RAW, instead of Basic. Photos you have
+  edited keep their look.
+- Syncing, pasting, Auto Adjust or a preset applied to an unedited RAW
+  keeps its Natural look instead of switching it to Basic.
+- Settings → Processing: the tone mapper override now suggests Natural
+  for RAW files.
+
 ## 1.109.2-dev-open-as-layers — 2026-11-21
 
 ### Edit in external editors

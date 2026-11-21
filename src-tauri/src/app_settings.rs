@@ -1136,8 +1136,12 @@ impl Default for AppSettings {
             #[cfg(not(target_os = "android"))]
             image_cache_size: Some(5),
             tonemapper_override_enabled: Some(false),
-            default_raw_tonemapper: Some(crate::tone_mapping::TONE_MAPPER_AGX.to_string()),
-            default_non_raw_tonemapper: Some("basic".to_string()),
+            default_raw_tonemapper: Some(
+                crate::tone_mapping::default_tone_mapper(true).to_string(),
+            ),
+            default_non_raw_tonemapper: Some(
+                crate::tone_mapping::default_tone_mapper(false).to_string(),
+            ),
             enable_focus_mode: Some(false),
             folder_icons: Some(HashMap::new()),
             raw_preprocessing_color_nr: Some(0.5),
