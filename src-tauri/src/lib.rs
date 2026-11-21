@@ -2830,6 +2830,7 @@ pub fn run() {
             file_management::get_folder_tree,
             file_management::get_folder_children,
             file_management::get_pinned_folder_trees,
+            file_management::refresh_folder_photo_counts,
             file_management::update_thumbnail_queue,
             file_management::refresh_folder_thumbnails,
             file_management::regenerate_thumbnails,

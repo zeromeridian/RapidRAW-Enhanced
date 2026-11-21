@@ -80,6 +80,10 @@ fn open_at(path: PathBuf) -> Result<Connection, String> {
                  tree_json TEXT NOT NULL,
                  updated_at INTEGER NOT NULL
              );
+             CREATE TABLE IF NOT EXISTS folder_photo_counts (
+                 folder_key TEXT PRIMARY KEY,
+                 image_count INTEGER NOT NULL
+             );
              CREATE TABLE IF NOT EXISTS catalog_meta (
                  key TEXT PRIMARY KEY,
                  value TEXT NOT NULL
@@ -409,6 +413,166 @@ pub async fn load_catalog_folder_trees(
     })
     .await
     .map_err(|error| format!("Catalog folder-tree task failed: {error}"))?
+}
+
+/// The folder tree's remembered photo counts (Plan item 71): photos in each folder and every
+/// folder below it, keyed by `catalog_path_key`, so a launch need not walk the library roots.
+pub fn load_folder_photo_counts(app_handle: &AppHandle) -> Result<HashMap<String, usize>, String> {
+    let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+    load_folder_photo_counts_from_connection(&open(app_handle)?)
+}
+
+fn load_folder_photo_counts_from_connection(
+    connection: &Connection,
+) -> Result<HashMap<String, usize>, String> {
+    let mut statement = connection
+        .prepare("SELECT folder_key, image_count FROM folder_photo_counts")
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        })
+        .map_err(|error| error.to_string())?;
+    Ok(rows
+        .filter_map(Result::ok)
+        .map(|(key, count)| (key, usize::try_from(count).unwrap_or_default()))
+        .collect())
+}
+
+pub fn save_folder_photo_counts(
+    app_handle: &AppHandle,
+    counts: &[(String, usize)],
+) -> Result<(), String> {
+    if counts.is_empty() {
+        return Ok(());
+    }
+    let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+    save_folder_photo_counts_to_connection(&mut open(app_handle)?, counts)
+}
+
+fn save_folder_photo_counts_to_connection(
+    connection: &mut Connection,
+    counts: &[(String, usize)],
+) -> Result<(), String> {
+    let transaction = connection
+        .transaction()
+        .map_err(|error| error.to_string())?;
+    for (key, count) in counts {
+        transaction
+            .execute(
+                "INSERT INTO folder_photo_counts(folder_key, image_count) VALUES (?1, ?2)
+                 ON CONFLICT(folder_key) DO UPDATE SET image_count=excluded.image_count",
+                params![key, i64::try_from(*count).unwrap_or(i64::MAX)],
+            )
+            .map_err(|error| error.to_string())?;
+    }
+    transaction.commit().map_err(|error| error.to_string())
+}
+
+/// The key a path is stored under in the catalog's per-folder records (photo counts, scanned
+/// keyword roots): separators and, on Windows, case do not matter.
+pub fn catalog_path_key(path: &Path) -> String {
+    normalized_path(&path.to_string_lossy())
+}
+
+const KEYWORD_ROOT_META_PREFIX: &str = "keyword_index_root|";
+
+/// The library roots whose first keyword scan finished (Plan item 71), as `catalog_path_key`s.
+pub fn keyword_indexed_roots(
+    app_handle: &AppHandle,
+) -> Result<std::collections::HashSet<String>, String> {
+    let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+    keyword_indexed_roots_from_connection(&open(app_handle)?)
+}
+
+fn keyword_indexed_roots_from_connection(
+    connection: &Connection,
+) -> Result<std::collections::HashSet<String>, String> {
+    let mut statement = connection
+        .prepare("SELECT key FROM catalog_meta WHERE substr(key, 1, length(?1))=?1")
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map([KEYWORD_ROOT_META_PREFIX], |row| row.get::<_, String>(0))
+        .map_err(|error| error.to_string())?;
+    Ok(rows
+        .filter_map(Result::ok)
+        .filter_map(|key| {
+            key.strip_prefix(KEYWORD_ROOT_META_PREFIX)
+                .map(str::to_owned)
+        })
+        .collect())
+}
+
+pub fn mark_keyword_indexed_roots(app_handle: &AppHandle, roots: &[String]) -> Result<(), String> {
+    if roots.is_empty() {
+        return Ok(());
+    }
+    let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+    mark_keyword_indexed_roots_in_connection(&open(app_handle)?, roots)
+}
+
+fn mark_keyword_indexed_roots_in_connection(
+    connection: &Connection,
+    roots: &[String],
+) -> Result<(), String> {
+    for root in roots {
+        connection
+            .execute(
+                "INSERT INTO catalog_meta(key, value) VALUES (?1, '1')
+                 ON CONFLICT(key) DO NOTHING",
+                [format!(
+                    "{KEYWORD_ROOT_META_PREFIX}{}",
+                    catalog_path_key(Path::new(root))
+                )],
+            )
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+/// Forgets the photo counts of `folders` and of every folder above them, whose counts include
+/// theirs, so the folder tree counts them again; `include_subfolders` also forgets every folder
+/// below them.
+pub fn forget_folder_photo_counts(
+    app_handle: &AppHandle,
+    folders: &[PathBuf],
+    include_subfolders: bool,
+) -> Result<(), String> {
+    if folders.is_empty() {
+        return Ok(());
+    }
+    let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+    forget_folder_photo_counts_in_connection(&mut open(app_handle)?, folders, include_subfolders)
+}
+
+fn forget_folder_photo_counts_in_connection(
+    connection: &mut Connection,
+    folders: &[PathBuf],
+    include_subfolders: bool,
+) -> Result<(), String> {
+    let transaction = connection
+        .transaction()
+        .map_err(|error| error.to_string())?;
+    for folder in folders {
+        for ancestor in folder.ancestors() {
+            transaction
+                .execute(
+                    "DELETE FROM folder_photo_counts WHERE folder_key=?1",
+                    [catalog_path_key(ancestor)],
+                )
+                .map_err(|error| error.to_string())?;
+        }
+        if include_subfolders {
+            let prefix = format!("{}/", catalog_path_key(folder));
+            transaction
+                .execute(
+                    "DELETE FROM folder_photo_counts WHERE substr(folder_key, 1, length(?1))=?1",
+                    [prefix],
+                )
+                .map_err(|error| error.to_string())?;
+        }
+    }
+    transaction.commit().map_err(|error| error.to_string())
 }
 
 pub fn clear_thumbnail_index(app_handle: &AppHandle) -> Result<(), String> {
@@ -1029,6 +1193,60 @@ mod tests {
                 created_at: 7,
             }]
         );
+    }
+
+    #[test]
+    fn scanned_keyword_roots_are_remembered_once_each() {
+        let temporary = tempfile::tempdir().unwrap();
+        let connection = open_at(temporary.path().join("catalog.sqlite3")).unwrap();
+        assert!(
+            keyword_indexed_roots_from_connection(&connection)
+                .unwrap()
+                .is_empty()
+        );
+
+        let roots = ["/photos".to_string(), "/photos/".to_string()];
+        mark_keyword_indexed_roots_in_connection(&connection, &roots).unwrap();
+        mark_keyword_indexed_roots_in_connection(&connection, &roots[..1]).unwrap();
+        let indexed = keyword_indexed_roots_from_connection(&connection).unwrap();
+        assert_eq!(indexed.len(), 1);
+        assert!(indexed.contains(&catalog_path_key(Path::new("/photos"))));
+    }
+
+    #[test]
+    fn forgetting_a_folder_count_also_forgets_the_folders_above_and_optionally_below() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut connection = open_at(temporary.path().join("catalog.sqlite3")).unwrap();
+        let root = Path::new("/photos");
+        let key = |relative: &str| catalog_path_key(&root.join(relative));
+        let all = [
+            (catalog_path_key(root), 9),
+            (key("2024"), 6),
+            (key("2024/trip"), 4),
+            (key("2024/trip/day1"), 1),
+            (key("2024-old"), 3),
+            (key("2025"), 3),
+        ];
+        save_folder_photo_counts_to_connection(&mut connection, &all).unwrap();
+
+        forget_folder_photo_counts_in_connection(&mut connection, &[root.join("2024/trip")], false)
+            .unwrap();
+        let left = load_folder_photo_counts_from_connection(&connection).unwrap();
+        assert!(!left.contains_key(&catalog_path_key(root)));
+        assert!(!left.contains_key(&key("2024")));
+        assert!(!left.contains_key(&key("2024/trip")));
+        assert_eq!(left.get(&key("2024/trip/day1")), Some(&1));
+        assert_eq!(left.get(&key("2025")), Some(&3));
+
+        save_folder_photo_counts_to_connection(&mut connection, &all).unwrap();
+        forget_folder_photo_counts_in_connection(&mut connection, &[root.join("2024")], true)
+            .unwrap();
+        let left = load_folder_photo_counts_from_connection(&connection).unwrap();
+        assert!(!left.contains_key(&key("2024/trip/day1")));
+        assert!(!left.contains_key(&key("2024/trip")));
+        // A sibling whose name only starts the same is kept.
+        assert_eq!(left.get(&key("2024-old")), Some(&3));
+        assert_eq!(left.get(&key("2025")), Some(&3));
     }
 
     #[test]

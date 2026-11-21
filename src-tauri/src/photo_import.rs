@@ -901,6 +901,11 @@ pub async fn import_files(
                 message: Some(error),
             });
         }
+        let mut changed_folders: Vec<PathBuf> = folders.iter().map(PathBuf::from).collect();
+        if settings.delete_after_import {
+            changed_folders.extend(crate::file_management::parent_folders(&source_paths));
+        }
+        crate::file_management::forget_folder_photo_counts(&app_handle, changed_folders, false);
         report.folders = folders.into_iter().collect();
         report.elapsed_ms = started.elapsed().as_millis() as u64;
         report

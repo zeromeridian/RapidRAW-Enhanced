@@ -468,6 +468,12 @@ pub async fn rename_files(
     app_handle: AppHandle,
 ) -> Result<Vec<String>, String> {
     let order_handle = app_handle.clone();
+    // A rename can change whether a file is a photo (its extension).
+    let _recount = crate::file_management::recount_folders_afterwards(
+        &app_handle,
+        crate::file_management::parent_folders(&paths),
+        false,
+    );
     crate::blocking_command::run_in_file_order(&order_handle, move || {
         rename_files_blocking(
             &paths,

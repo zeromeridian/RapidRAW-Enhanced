@@ -1104,6 +1104,7 @@
       "renameKeywordButton": "Rename",
       "renameKeywordMenu": "Rename or Move…",
       "renameKeywordPlaceholder": "e.g. places > germany > berlin",
+      "rescanKeywords": "Rescan Keywords",
       "saveKeywordSet": "Save",
       "searchKeywords": "Search keywords…",
       "selectionCount_one": "Tagging {{count}} image",

@@ -128,6 +128,7 @@ export enum Invokes {
   ReadXmpFromFolder = 'read_xmp_from_folder',
   PreviewLightroomXmpEdits = 'preview_lightroom_xmp_edits',
   RegenerateThumbnails = 'regenerate_thumbnails',
+  RefreshFolderPhotoCounts = 'refresh_folder_photo_counts',
   RefreshFolderThumbnails = 'refresh_folder_thumbnails',
   RemoveTagForPaths = 'remove_tag_for_paths',
   PreviewFilenameTemplate = 'preview_filename_template',

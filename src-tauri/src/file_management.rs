@@ -2307,7 +2307,12 @@ fn list_images_in_dir_sync(path: String, app_handle: AppHandle) -> Result<Vec<Im
             path_buf,
         })
         .collect();
-    finish_listing(&path, false, tasks, generation, &settings, &app_handle)
+    let listed = finish_listing(&path, false, tasks, generation, &settings, &app_handle);
+    if listed.is_ok() {
+        recount_opened_folder(&path, &app_handle);
+        crate::keyword_index::refresh_opened_folder(&app_handle, &path, false);
+    }
+    listed
 }
 
 // Runs off the main thread: a synchronous command would block every other IPC
@@ -2337,12 +2342,17 @@ fn list_images_recursive_sync(
     let mut images = Vec::new();
 
     let mut sidecars_by_path: HashMap<PathBuf, Vec<Option<String>>> = HashMap::new();
+    let mut folders = Vec::new();
 
     for entry in WalkDir::new(root_path).into_iter().filter_map(Result::ok) {
         if !is_library_scan_current(&state, generation) {
             return Err(LIBRARY_SCAN_SUPERSEDED.to_string());
         }
         let entry_path = entry.path();
+        if entry.file_type().is_dir() {
+            folders.push(entry_path.to_path_buf());
+            continue;
+        }
         if !entry_path.is_file() {
             continue;
         }
@@ -2360,6 +2370,7 @@ fn list_images_recursive_sync(
         }
     }
 
+    let folder_counts = folder_counts_from_listing(root_path, folders, &images);
     let tasks: Vec<_> = images
         .into_iter()
         .map(|path_buf| ListingTask {
@@ -2375,7 +2386,12 @@ fn list_images_recursive_sync(
             path_buf,
         })
         .collect();
-    finish_listing(&path, true, tasks, generation, &settings, &app_handle)
+    let listed = finish_listing(&path, true, tasks, generation, &settings, &app_handle);
+    if listed.is_ok() {
+        remember_recursive_listing_counts(&path, folder_counts, &app_handle);
+        crate::keyword_index::refresh_opened_folder(&app_handle, &path, true);
+    }
+    listed
 }
 
 #[tauri::command]
@@ -2714,11 +2730,185 @@ fn has_subdirs(path: &Path) -> bool {
     false
 }
 
-fn contains_supported_image(path: &Path) -> bool {
-    WalkDir::new(path)
+/// The folder tree's photo counts (Plan item 71): photos in a folder and every folder below it,
+/// remembered in the catalog, so a launch reads only the folders it shows instead of walking the
+/// library roots. A folder without a remembered count is counted from its own files and its
+/// subfolders' counts, so only the unknown part of a tree is read.
+pub(crate) struct FolderPhotoCounts {
+    known: Mutex<HashMap<String, usize>>,
+    counted: Mutex<Vec<(String, usize)>>,
+}
+
+impl FolderPhotoCounts {
+    pub(crate) fn load(app_handle: &AppHandle) -> Self {
+        let known =
+            crate::library_catalog::load_folder_photo_counts(app_handle).unwrap_or_else(|error| {
+                log::warn!("Folder photo counts could not be read: {error}");
+                HashMap::new()
+            });
+        Self::new(known)
+    }
+
+    fn new(known: HashMap<String, usize>) -> Self {
+        Self {
+            known: Mutex::new(known),
+            counted: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Photos in `folder` and below it.
+    pub(crate) fn count(&self, folder: &Path) -> usize {
+        let key = crate::library_catalog::catalog_path_key(folder);
+        if let Some(&count) = self.known.lock().unwrap().get(&key) {
+            return count;
+        }
+        // An unreadable folder counts as empty, as the walk did, but is not remembered.
+        let Ok(entries) = fs::read_dir(folder) else {
+            return 0;
+        };
+        let mut count = 0;
+        for entry in entries.filter_map(Result::ok) {
+            match entry.file_type() {
+                Ok(file_type) if file_type.is_dir() => count += self.count(&entry.path()),
+                Ok(file_type) if file_type.is_file() && is_supported_image_file(entry.path()) => {
+                    count += 1
+                }
+                _ => {}
+            }
+        }
+        self.known.lock().unwrap().insert(key.clone(), count);
+        self.counted.lock().unwrap().push((key, count));
+        count
+    }
+
+    /// Stores the counts made since loading.
+    pub(crate) fn save(&self, app_handle: &AppHandle) {
+        let counted = std::mem::take(&mut *self.counted.lock().unwrap());
+        if let Err(error) = crate::library_catalog::save_folder_photo_counts(app_handle, &counted) {
+            log::warn!("Folder photo counts could not be saved: {error}");
+        }
+    }
+}
+
+/// Makes the folder tree count `folders` (and the folders above them) again, after ThisIsRAW
+/// changed files in them; `include_subfolders` for folders whose contents changed below them.
+pub(crate) fn forget_folder_photo_counts<P: AsRef<Path>>(
+    app_handle: &AppHandle,
+    folders: impl IntoIterator<Item = P>,
+    include_subfolders: bool,
+) {
+    let folders: Vec<PathBuf> = folders
         .into_iter()
-        .filter_map(Result::ok)
-        .any(|entry| entry.file_type().is_file() && is_supported_image_file(entry.path()))
+        .map(|folder| folder.as_ref().to_path_buf())
+        .collect();
+    if let Err(error) =
+        crate::library_catalog::forget_folder_photo_counts(app_handle, &folders, include_subfolders)
+    {
+        log::warn!("Folder photo counts could not be updated: {error}");
+    }
+}
+
+/// Forgets folders' photo counts when dropped: held by a command that changes files, so the tree
+/// counts them again after it, however the command ends (also partway through).
+pub(crate) struct RecountFoldersOnDrop {
+    app_handle: AppHandle,
+    folders: Vec<PathBuf>,
+    include_subfolders: bool,
+}
+
+impl Drop for RecountFoldersOnDrop {
+    fn drop(&mut self) {
+        forget_folder_photo_counts(
+            &self.app_handle,
+            std::mem::take(&mut self.folders),
+            self.include_subfolders,
+        );
+    }
+}
+
+pub(crate) fn recount_folders_afterwards(
+    app_handle: &AppHandle,
+    folders: Vec<PathBuf>,
+    include_subfolders: bool,
+) -> RecountFoldersOnDrop {
+    RecountFoldersOnDrop {
+        app_handle: app_handle.clone(),
+        folders,
+        include_subfolders,
+    }
+}
+
+/// `destination` joined with each source folder's name: where copied or moved folders land.
+fn landed_folders(sources: &[PathBuf], destination: &Path) -> Vec<PathBuf> {
+    sources
+        .iter()
+        .filter_map(|source| source.file_name().map(|name| destination.join(name)))
+        .collect()
+}
+
+/// The folders holding `paths` (image paths, virtual copies included), once each.
+pub(crate) fn parent_folders(paths: &[String]) -> Vec<PathBuf> {
+    let parents: HashSet<PathBuf> = paths
+        .iter()
+        .filter_map(|path| {
+            let (source_path, _) = parse_virtual_path(path);
+            source_path.parent().map(Path::to_path_buf)
+        })
+        .collect();
+    parents.into_iter().collect()
+}
+
+/// Counts an opened folder again while its disk is awake, from its own files and its subfolders'
+/// remembered counts, so the next launch shows its count without reading it.
+fn recount_opened_folder(folder: &str, app_handle: &AppHandle) {
+    let folder = PathBuf::from(folder);
+    let app_handle = app_handle.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        forget_folder_photo_counts(&app_handle, [&folder], false);
+        let counts = FolderPhotoCounts::load(&app_handle);
+        counts.count(&folder);
+        counts.save(&app_handle);
+    });
+}
+
+/// Photos in `root` and in each of `folders` below it, from the images a walk of `root` found.
+fn folder_counts_from_listing(
+    root: &Path,
+    folders: Vec<PathBuf>,
+    images: &[PathBuf],
+) -> Vec<(String, usize)> {
+    let mut counts: HashMap<PathBuf, usize> =
+        folders.into_iter().map(|folder| (folder, 0)).collect();
+    counts.insert(root.to_path_buf(), 0);
+    for image in images {
+        for folder in image.ancestors().skip(1) {
+            if !folder.starts_with(root) {
+                break;
+            }
+            *counts.entry(folder.to_path_buf()).or_default() += 1;
+        }
+    }
+    counts
+        .into_iter()
+        .map(|(folder, count)| (crate::library_catalog::catalog_path_key(&folder), count))
+        .collect()
+}
+
+/// Stores the counts a listing of `root` with its subfolders found, replacing what was remembered
+/// for it and below it (the folders above it are counted again by the tree).
+fn remember_recursive_listing_counts(
+    root: &str,
+    counts: Vec<(String, usize)>,
+    app_handle: &AppHandle,
+) {
+    let root = PathBuf::from(root);
+    let app_handle = app_handle.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        forget_folder_photo_counts(&app_handle, [&root], true);
+        if let Err(error) = crate::library_catalog::save_folder_photo_counts(&app_handle, &counts) {
+            log::warn!("Folder photo counts could not be saved: {error}");
+        }
+    });
 }
 
 fn scan_dir_lazy(
@@ -2727,7 +2917,10 @@ fn scan_dir_lazy(
     show_image_counts: bool,
     detect_images: bool,
     prefetch_one_level: bool,
+    photo_counts: &FolderPhotoCounts,
 ) -> Result<(Vec<FolderNode>, usize, bool), std::io::Error> {
+    // Hide Empty Folders needs to know whether a folder holds photos: the same count answers it.
+    let needs_counts = show_image_counts || detect_images;
     let mut children_folders = Vec::new();
     let mut current_dir_image_count = 0;
     let mut current_dir_contains_images = false;
@@ -2777,31 +2970,22 @@ fn scan_dir_lazy(
             let should_scan = is_expanded || prefetch_one_level;
             let next_prefetch = is_expanded;
 
-            let (grand_children, sub_dir_own_images, sub_dir_contains_images) = if should_scan {
-                scan_dir_lazy(
+            let (grand_children, sub_dir_contains_images) = if should_scan {
+                let (grand_children, _, own_contains_images) = scan_dir_lazy(
                     &current_path,
                     expanded_folders,
                     show_image_counts,
                     detect_images,
                     next_prefetch,
-                )?
+                    photo_counts,
+                )?;
+                (grand_children, own_contains_images)
             } else {
-                let count = if show_image_counts {
-                    WalkDir::new(&current_path)
-                        .into_iter()
-                        .filter_map(Result::ok)
-                        .filter(|e| {
-                            e.file_type().is_file()
-                                && crate::formats::is_supported_image_file(e.path())
-                        })
-                        .count()
-                } else {
-                    0
-                };
-                let contains_images =
-                    count > 0 || (detect_images && contains_supported_image(&current_path));
-                (Vec::new(), count, contains_images)
+                (Vec::new(), false)
             };
+
+            // A scanned folder's subfolders are counted by now, so this reads at most its own files.
+            let photo_count = needs_counts.then(|| photo_counts.count(&current_path));
 
             let has_any_subdirs = if should_scan {
                 grand_children.iter().any(|c| c.is_dir)
@@ -2809,17 +2993,20 @@ fn scan_dir_lazy(
                 has_subdirs(&current_path)
             };
 
-            let grand_children_sum: usize = grand_children.iter().map(|c| c.image_count).sum();
-            let total_child_count = sub_dir_own_images + grand_children_sum;
-            let contains_images =
-                sub_dir_contains_images || grand_children.iter().any(|child| child.contains_images);
+            let contains_images = match photo_count {
+                Some(count) => count > 0,
+                None => {
+                    sub_dir_contains_images
+                        || grand_children.iter().any(|child| child.contains_images)
+                }
+            };
 
             children_folders.push(FolderNode {
                 name: name_str.into_owned(),
                 path: path_str,
                 children: grand_children,
                 is_dir: true,
-                image_count: total_child_count,
+                image_count: photo_count.filter(|_| show_image_counts).unwrap_or(0),
                 contains_images,
                 has_subdirs: has_any_subdirs,
                 modified,
@@ -2847,6 +3034,7 @@ fn get_folder_tree_sync(
     expanded_folders: Vec<String>,
     show_image_counts: bool,
     detect_images: bool,
+    photo_counts: &FolderPhotoCounts,
 ) -> Result<FolderNode, String> {
     let root_path = Path::new(&path);
     if !root_path.is_dir() {
@@ -2879,6 +3067,7 @@ fn get_folder_tree_sync(
         show_image_counts,
         detect_images,
         true,
+        photo_counts,
     )
     .map_err(|e| e.to_string())?;
 
@@ -2911,11 +3100,96 @@ fn get_folder_tree_sync(
     })
 }
 
+#[cfg(test)]
+mod folder_photo_count_tests {
+    use super::*;
+    use crate::library_catalog::catalog_path_key;
+
+    fn touch(path: &Path) {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, b"").unwrap();
+    }
+
+    #[test]
+    fn counts_photos_below_a_folder_and_remembers_each_folder() {
+        let root = tempfile::tempdir().unwrap();
+        let a = root.path().join("a");
+        touch(&a.join("x.jpg"));
+        touch(&a.join("b").join("y.jpg"));
+        touch(&a.join("b").join("notes.txt"));
+        fs::create_dir_all(a.join("c")).unwrap();
+
+        let counts = FolderPhotoCounts::new(HashMap::new());
+        assert_eq!(counts.count(&a), 2);
+        let known = counts.known.lock().unwrap();
+        assert_eq!(known.get(&catalog_path_key(&a.join("b"))), Some(&1));
+        assert_eq!(known.get(&catalog_path_key(&a.join("c"))), Some(&0));
+        assert_eq!(counts.counted.lock().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn a_remembered_count_is_used_without_reading_the_folder() {
+        let root = tempfile::tempdir().unwrap();
+        let a = root.path().join("a");
+        touch(&a.join("x.jpg"));
+        touch(&a.join("b").join("y.jpg"));
+
+        let counts = FolderPhotoCounts::new(HashMap::from([(catalog_path_key(&a.join("b")), 7)]));
+        assert_eq!(counts.count(&a), 8);
+        assert_eq!(counts.counted.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn the_tree_takes_collapsed_folders_from_the_remembered_counts() {
+        let root = tempfile::tempdir().unwrap();
+        fs::create_dir_all(root.path().join("sub")).unwrap();
+        let remembered = || {
+            FolderPhotoCounts::new(HashMap::from([(
+                catalog_path_key(&root.path().join("sub")),
+                5,
+            )]))
+        };
+        let expanded = HashSet::new();
+
+        let (children, _, _) =
+            scan_dir_lazy(root.path(), &expanded, true, false, false, &remembered()).unwrap();
+        assert_eq!(children[0].image_count, 5);
+        assert!(children[0].contains_images);
+
+        // Hide Empty Folders alone: the count answers "holds photos" but is not shown.
+        let (children, _, _) =
+            scan_dir_lazy(root.path(), &expanded, false, true, false, &remembered()).unwrap();
+        assert_eq!(children[0].image_count, 0);
+        assert!(children[0].contains_images);
+    }
+
+    #[test]
+    fn a_recursive_listing_gives_every_folder_its_count() {
+        let root = PathBuf::from("/photos");
+        let images = [root.join("a/1.jpg"), root.join("a/b/2.jpg")];
+        let folders = vec![
+            root.clone(),
+            root.join("a"),
+            root.join("a/b"),
+            root.join("e"),
+        ];
+        let counts: HashMap<String, usize> = folder_counts_from_listing(&root, folders, &images)
+            .into_iter()
+            .collect();
+        assert_eq!(counts[&catalog_path_key(&root)], 2);
+        assert_eq!(counts[&catalog_path_key(&root.join("a"))], 2);
+        assert_eq!(counts[&catalog_path_key(&root.join("a/b"))], 1);
+        assert_eq!(counts[&catalog_path_key(&root.join("e"))], 0);
+        assert_eq!(counts.len(), 4);
+    }
+}
+
 #[tauri::command]
 pub async fn get_folder_children(
     path: String,
     show_image_counts: bool,
     hide_empty_folders: bool,
+    app_handle: AppHandle,
 ) -> Result<Vec<FolderNode>, String> {
     match tauri::async_runtime::spawn_blocking(move || {
         let root_path = Path::new(&path);
@@ -2923,14 +3197,17 @@ pub async fn get_folder_children(
             return Err(format!("Directory does not exist: {}", path));
         }
         let empty_set = HashSet::new();
+        let photo_counts = FolderPhotoCounts::load(&app_handle);
         let (children, _, _) = scan_dir_lazy(
             root_path,
             &empty_set,
             show_image_counts,
             hide_empty_folders,
             false,
+            &photo_counts,
         )
         .map_err(|e| e.to_string())?;
+        photo_counts.save(&app_handle);
 
         Ok(children)
     })
@@ -2951,13 +3228,18 @@ pub async fn get_folder_tree(
     app_handle: AppHandle,
 ) -> Result<FolderNode, String> {
     let task_path = path.clone();
+    let task_app_handle = app_handle.clone();
     match tauri::async_runtime::spawn_blocking(move || {
-        get_folder_tree_sync(
+        let photo_counts = FolderPhotoCounts::load(&task_app_handle);
+        let tree = get_folder_tree_sync(
             task_path,
             expanded_folders,
             show_image_counts,
             hide_empty_folders,
-        )
+            &photo_counts,
+        );
+        photo_counts.save(&task_app_handle);
+        tree
     })
     .await
     {
@@ -2977,6 +3259,20 @@ pub async fn get_folder_tree(
     }
 }
 
+/// The folder menu's Refresh: forgets the photo counts of `folder_paths` and every folder below
+/// them, so the next folder tree counts them again (Plan item 71).
+#[tauri::command]
+pub async fn refresh_folder_photo_counts(
+    folder_paths: Vec<String>,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        forget_folder_photo_counts(&app_handle, folder_paths, true);
+    })
+    .await
+    .map_err(|error| format!("Folder count refresh failed: {error}"))
+}
+
 #[tauri::command]
 pub async fn get_pinned_folder_trees(
     paths: Vec<String>,
@@ -2985,7 +3281,9 @@ pub async fn get_pinned_folder_trees(
     hide_empty_folders: bool,
     app_handle: AppHandle,
 ) -> Result<Vec<FolderNode>, String> {
+    let task_app_handle = app_handle.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
+        let photo_counts = FolderPhotoCounts::load(&task_app_handle);
         let results: Vec<Result<FolderNode, String>> = paths
             .par_iter()
             .map(|path| {
@@ -2994,9 +3292,11 @@ pub async fn get_pinned_folder_trees(
                     expanded_folders.clone(),
                     show_image_counts,
                     hide_empty_folders,
+                    &photo_counts,
                 )
             })
             .collect();
+        photo_counts.save(&task_app_handle);
 
         let mut folder_nodes = Vec::new();
         for result in results {
@@ -4176,6 +4476,13 @@ fn rename_folder_blocking(
     if !p.is_dir() {
         return Err("Path is not a directory.".to_string());
     }
+    let renamed = p
+        .parent()
+        .map(|parent| parent.join(&new_name))
+        .into_iter()
+        .chain([p.to_path_buf()])
+        .collect();
+    let _recount = recount_folders_afterwards(&app_handle, renamed, true);
     if let Some(parent) = p.parent() {
         for entry in fs::read_dir(parent).map_err(|e| e.to_string())? {
             if let Ok(entry) = entry
@@ -4279,6 +4586,12 @@ pub async fn copy_folders(
     destination_folder: String,
     app_handle: AppHandle,
 ) -> Result<(), String> {
+    let sources: Vec<PathBuf> = source_paths.iter().map(PathBuf::from).collect();
+    let _recount = recount_folders_afterwards(
+        &app_handle,
+        landed_folders(&sources, Path::new(&destination_folder)),
+        true,
+    );
     crate::blocking_command::run_in_file_order(&app_handle, move || {
         copy_folders_blocking(source_paths, destination_folder)
     })
@@ -4309,6 +4622,9 @@ pub fn move_folders(
     destination_folder: String,
     app_handle: AppHandle,
 ) -> Result<(), String> {
+    let moved: Vec<PathBuf> = source_paths.iter().map(PathBuf::from).collect();
+    let landed = landed_folders(&moved, Path::new(&destination_folder));
+    let _recount = recount_folders_afterwards(&app_handle, [moved, landed].concat(), true);
     let sources = normalize_folder_sources(source_paths)?;
     let destination = fs::canonicalize(destination_folder).map_err(|error| error.to_string())?;
     validate_folder_destination(&sources, &destination)?;
@@ -4332,6 +4648,7 @@ pub fn move_folders(
 
 #[tauri::command]
 pub fn delete_folder(path: String, app_handle: AppHandle) -> Result<(), String> {
+    let _recount = recount_folders_afterwards(&app_handle, vec![PathBuf::from(&path)], true);
     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
     {
         if let Err(trash_error) = trash::delete(&path) {
@@ -4363,6 +4680,11 @@ pub async fn duplicate_file(
     app_handle: AppHandle,
 ) -> Result<String, String> {
     let order_handle = app_handle.clone();
+    let _recount = recount_folders_afterwards(
+        &app_handle,
+        parent_folders(std::slice::from_ref(&path)),
+        false,
+    );
     crate::blocking_command::run_in_file_order(&order_handle, move || {
         duplicate_file_blocking(path, target_album_id, copy_name_suffix, app_handle)
     })
@@ -4470,6 +4792,8 @@ pub async fn copy_files(
     destination_folder: String,
     app_handle: AppHandle,
 ) -> Result<(), String> {
+    let _recount =
+        recount_folders_afterwards(&app_handle, vec![PathBuf::from(&destination_folder)], false);
     crate::blocking_command::run_in_file_order(&app_handle, move || {
         copy_files_blocking(source_paths, destination_folder)
     })
@@ -4569,6 +4893,9 @@ pub fn move_files(
     destination_folder: String,
     app_handle: AppHandle,
 ) -> Result<(), String> {
+    let mut touched = parent_folders(&source_paths);
+    touched.push(PathBuf::from(&destination_folder));
+    let _recount = recount_folders_afterwards(&app_handle, touched, false);
     let dest_path = Path::new(&destination_folder);
     if !dest_path.is_dir() {
         return Err(format!(
@@ -6234,6 +6561,7 @@ pub(crate) fn open_external_editor(
 
 #[tauri::command]
 pub fn delete_files_from_disk(paths: Vec<String>, app_handle: AppHandle) -> Result<(), String> {
+    let _recount = recount_folders_afterwards(&app_handle, parent_folders(&paths), false);
     let mut files_to_trash = HashSet::new();
     let mut deleted_photos = Vec::new();
 
@@ -6354,6 +6682,7 @@ pub fn delete_files_with_associated(
     if paths.is_empty() {
         return Ok(());
     }
+    let _recount = recount_folders_afterwards(&app_handle, parent_folders(&paths), false);
 
     let mut stems_by_dir: HashMap<PathBuf, HashSet<String>> = HashMap::new();
     let mut deletions = HashSet::new();

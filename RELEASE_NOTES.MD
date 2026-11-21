@@ -5,6 +5,37 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.106.5-fix-folder-tree-launch-scan — 2026-11-20
+
+### Library
+
+- **The Keyword List no longer reads your whole library at every
+  launch.** With the Tagging panel open, ThisIsRAW used to go through
+  every photo's sidecar on each start, which kept external disks busy
+  for minutes. Each library folder is now read once, the first time;
+  after that the list updates when you open a folder and when you add,
+  change or remove keywords in ThisIsRAW.
+- Fixed: the Keyword List could forget every keyword at launch, or when
+  a library disk was not connected, and then had to read the whole
+  library again.
+- The keyword scan keeps its progress if you quit while it runs.
+- **Rescan Keywords** in the Keyword List's right-click menu reads every
+  library folder again, for keywords added by other apps.
+
+## 1.106.4-fix-folder-tree-launch-scan — 2026-11-20
+
+### Library
+
+- **Faster launch with Folder Image Counts or Hide Empty Folders on.**
+  The folder tree now remembers how many photos each folder holds
+  instead of reading through every folder of your library at every
+  launch, so external disks no longer spin for minutes on startup. The
+  first launch after updating counts once more.
+- A folder's count is updated when you open it and when ThisIsRAW
+  imports, deletes, moves, copies or renames photos in it. Photos added
+  by another app are counted when you open that folder or choose
+  **Refresh** in the folder's right-click menu.
+
 ## 1.106.3-dev-square-corners — 2026-11-20
 
 ### Library

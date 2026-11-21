@@ -159,6 +159,10 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
   const refreshFolders = useCallback(
     async (folderPaths: string[]) => {
+      // The tree remembers folder photo counts; Refresh counts these folders again (Plan item 71).
+      await invoke(Invokes.RefreshFolderPhotoCounts, { folderPaths }).catch((err) =>
+        console.error('Failed to refresh folder photo counts:', err),
+      );
       await props.refreshAllFolderTrees();
       const includeSubfolders = useSettingsStore.getState().appSettings?.libraryViewMode === 'recursive';
       await invoke(Invokes.RefreshFolderThumbnails, { folderPaths, includeSubfolders }).catch((err) => {

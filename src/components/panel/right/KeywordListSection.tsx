@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Check, ChevronRight, Images, Loader2, Minus, Pencil, Search, Trash2 } from 'lucide-react';
+import { Check, ChevronRight, Images, Loader2, Minus, Pencil, RefreshCw, Search, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
@@ -9,10 +9,11 @@ import ConfirmModal from '../../modals/ConfirmModal';
 import RenameFolderModal from '../../modals/RenameFolderModal';
 import Text from '../../ui/Text';
 import TaggingSection from './TaggingSection';
-import { Invokes } from '../../ui/AppProperties';
+import { Invokes, OPTION_SEPARATOR } from '../../ui/AppProperties';
 import { useAppliedKeywordCounts } from './KeywordTile';
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { useKeywordIndex } from '../../../hooks/useKeywordIndex';
+import { rescanKeywordIndex, useKeywordIndex } from '../../../hooks/useKeywordIndex';
+import { isTextEntryTarget } from '../../../utils/keyboardUtils';
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useProcessStore } from '../../../store/useProcessStore';
@@ -140,6 +141,21 @@ export default function KeywordListSection({ targetPaths }: KeywordListSectionPr
     if (to !== from) void requestOperation({ kind: 'rename', from, to });
   };
 
+  // The index is not rescanned at launch (Plan item 71); this reads keywords other apps added.
+  const rescanOption = {
+    label: t('editor.tagging.rescanKeywords'),
+    icon: RefreshCw,
+    disabled: isScanning,
+    onClick: () => void rescanKeywordIndex(),
+  };
+
+  const openListContextMenu = (event: React.MouseEvent) => {
+    // The search field keeps its own text menu.
+    if (isTextEntryTarget(event.target)) return;
+    event.preventDefault();
+    showContextMenu(event.clientX, event.clientY, [rescanOption]);
+  };
+
   const openContextMenu = (event: React.MouseEvent, tag: string) => {
     event.preventDefault();
     event.stopPropagation();
@@ -163,6 +179,8 @@ export default function KeywordListSection({ targetPaths }: KeywordListSectionPr
         isDestructive: true,
         onClick: () => void requestOperation({ kind: 'delete', tag }),
       },
+      { type: OPTION_SEPARATOR },
+      rescanOption,
     ]);
   };
 
@@ -293,7 +311,7 @@ export default function KeywordListSection({ targetPaths }: KeywordListSectionPr
 
   return (
     <TaggingSection id="keywordList" title={t('editor.tagging.keywordList')}>
-      <div className="space-y-3 compact:space-y-2">
+      <div className="space-y-3 compact:space-y-2" onContextMenu={openListContextMenu}>
         <div className="flex items-center gap-2 bg-bg-primary rounded-md px-3 h-9 compact:h-7">
           <Search size={14} className="text-text-tertiary shrink-0" />
           <input

@@ -235,6 +235,10 @@ details are in `RELEASE_NOTES.MD`.
 - Persistent Library and Develop sidebar widths.
 - Optional empty-folder hiding that preserves configured and pinned roots while
   removing branches with no supported images.
+- Folder photo counts and empty-folder hiding use per-folder counts remembered
+  in the catalog (Lightroom Classic style), so a launch does not walk the
+  library roots; a folder is recounted when opened, when ThisIsRAW changes its
+  files, or with the folder menu's Refresh.
 - Responsive loading for large direct and recursive folders, with transactional
   folder/album navigation, embedded image and folder-tree catalog snapshots,
   persistent cross-launch thumbnail references, progressive root-tree
@@ -441,7 +445,10 @@ details are in `RELEASE_NOTES.MD`.
   background job. The Tagging panel is available in the editor and next to
   the Library grid (stays open across restarts; drop photos on a keyword to
   tag them). Collapsible
-  sections and a `keyword:` search query.
+  sections and a `keyword:` search query. Its index reads each library root
+  once, then follows opened folders and ThisIsRAW's own keyword edits (no
+  scan at launch); **Rescan Keywords** in its right-click menu reads the
+  library again.
 - Persisted **Black & White** switch in the global Color section.
 - **Presets save chosen settings** (Lightroom Classic's New Develop
   Preset): the save dialog lists every setting as a tree of sections,
