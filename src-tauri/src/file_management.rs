@@ -7586,7 +7586,7 @@ pub(crate) fn modified_nanos(path: &Path) -> u64 {
 /// Replaces `path` with what `fill` writes, through a temporary file in the
 /// same folder, so a crash or full disk never leaves a truncated file behind.
 /// The result gets the same permissions as a file created with `fs::write`.
-fn replace_file_atomically(
+pub(crate) fn replace_file_atomically(
     path: &Path,
     fill: impl FnOnce(&mut fs::File) -> std::io::Result<()>,
 ) -> Result<(), String> {

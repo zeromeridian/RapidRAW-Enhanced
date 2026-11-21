@@ -1,21 +1,29 @@
 //! Lightroom-style **Edit In** round trip for external editors.
 //!
-//! A rendered copy is staged in the app cache and opened in the editor. Only
-//! when the editor saves into that staging folder is the result copied beside
-//! the source (`<stem>-Edit.<ext>`) and added to the Library, so abandoned
-//! edits leave nothing behind. However the editor saves (back into the render,
-//! or Save As under another name or format), each image file it writes there
-//! gets its own copy, and later saves of that file replace the same copy.
-//! Whether the editor opens it in a new window or a tab does not matter. Sessions are
-//! kept in the catalog, so a save made while ThisIsRAW was closed is picked up
-//! on the next launch, and end once they have seen no new save for
-//! [`RETENTION`]. Ending a session deletes only its staging folder.
+//! **Open in** renders a hidden working copy beside the source
+//! (`.<stem>-Edit.<ext>`; hidden files are not listed, `formats.rs`) and
+//! opens it in the editor; **Open as Layers** does the same with one layered
+//! TIFF of several photos (`layered_tiff.rs`), beside the first. As in
+//! Lightroom Classic with Photoshop, nothing shows in the Library until the
+//! editor saves: each settled save of the working copy is copied to
+//! `<stem>-Edit.<ext>` beside the source (`-Edit-2`, … when taken), which is
+//! added to the Library stacked with the source, and later saves replace that
+//! copy. As the working copy sits in the photo's own folder, an editor whose
+//! Save asks for a location (Photo Craft) opens its dialog there. Sessions are
+//! kept in the catalog, so a save made while ThisIsRAW was closed is picked
+//! up on the next launch, and end once they have seen no new save for
+//! [`RETENTION`]; ending one deletes only its working copy. Whether the editor
+//! opens it in a new window or a tab does not matter.
+//!
+//! Versions before 1.109.0 staged the copy in the app cache, where an editor
+//! whose Save asks for a location never saved; [`finish_staged_sessions`]
+//! copies out what such sessions still hold, once, and removes them.
 //!
 //! Edit Original opens a non-RAW file itself and watches it in place.
 //!
 //! An editor that quits with an error right after it was started (for example
-//! a launcher that cannot open the file) ends its session and reports why,
-//! instead of leaving it waiting for a save.
+//! a launcher that cannot open the file) ends an unsaved session and reports
+//! why, instead of leaving it waiting for a save.
 
 use std::collections::HashMap;
 use std::fs;
@@ -32,14 +40,17 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::AppState;
 use crate::app_settings::ExternalEditFormat;
 use crate::export_processing::{
-    ExportAdjustmentsMode, ExportSettings, TiffBitDepth, export_images_impl,
+    ExportAdjustmentsMode, ExportSettings, SRGB_ICC_PROFILE, TiffBitDepth, export_images_impl,
 };
 use crate::file_management::{
     copy_file_atomically, modified_nanos, open_external_editor, parse_virtual_path,
 };
 use crate::formats::is_supported_image_file;
+use crate::layered_tiff::{LayerSource, write_layered_tiff};
 use crate::library_catalog::{self, EditorRoundTripRow, StagedFileRow};
 
+/// The app-cache folder older versions staged their copies in, and Open as
+/// Layers renders its layers in before it writes the layered file.
 const STAGING_FOLDER: &str = "external-edits";
 const EDIT_SUFFIX: &str = "-Edit";
 const SAVED_EVENT: &str = "editor-round-trip-saved";
@@ -53,6 +64,7 @@ const RETENTION: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 /// only a failure within this time counts as the editor not starting.
 const LAUNCH_WINDOW: Duration = Duration::from_secs(10);
 
+/// Open round trips: each watches its working copies (`files`).
 static SESSIONS: LazyLock<Mutex<Vec<EditorRoundTripRow>>> = LazyLock::new(Default::default);
 /// Files opened with Edit Original and the stamp last reported for each. They
 /// are watched until ThisIsRAW quits.
@@ -76,7 +88,7 @@ struct RoundTripFailed {
 struct RoundTripSaved {
     source_path: String,
     output_path: String,
-    /// The first save of this copy, which the Library has not listed yet.
+    /// A new copy, which the Library has not listed yet.
     is_new: bool,
 }
 
@@ -103,8 +115,41 @@ fn round_trip_export_settings() -> ExportSettings {
     }
 }
 
-/// Renders `source_path` with its current adjustments into a new staging
-/// folder, opens it in the editor, and starts watching for saves.
+/// Renders `source_path` with its current adjustments to `output` and waits
+/// until the file is written.
+async fn render_copy(
+    source_path: &str,
+    output: &Path,
+    output_format: &str,
+    adjustments_mode: ExportAdjustmentsMode,
+    state: tauri::State<'_, AppState>,
+    app_handle: &AppHandle,
+) -> Result<(), String> {
+    let (completion_tx, completion_rx) = tokio::sync::oneshot::channel();
+    export_images_impl(
+        vec![source_path.to_owned()],
+        output.to_string_lossy().into_owned(),
+        true,
+        Vec::new(),
+        round_trip_export_settings(),
+        output_format.to_owned(),
+        adjustments_mode,
+        Default::default(),
+        state,
+        app_handle.clone(),
+        false,
+        Some(completion_tx),
+    )
+    .await?;
+    match completion_rx.await {
+        Ok(Ok(())) if output.is_file() => Ok(()),
+        Ok(_) => Err("Could not render the copy for the external editor".into()),
+        Err(_) => Err("The external edit was cancelled".into()),
+    }
+}
+
+/// Renders `source_path` with its current adjustments into a hidden working
+/// copy beside it, opens that in the editor, and starts watching for saves.
 #[tauri::command]
 pub async fn start_editor_round_trip(
     source_path: String,
@@ -119,75 +164,165 @@ pub async fn start_editor_round_trip(
         ExternalEditFormat::Tiff => ("tif", "tiff"),
         ExternalEditFormat::Jpeg => ("jpg", "jpeg"),
     };
-    let id = uuid::Uuid::new_v4().to_string();
-    let staging_dir = staging_root(&app_handle)?.join(&id);
-    fs::create_dir_all(&staging_dir)
-        .map_err(|error| format!("Could not create the external-edit folder: {error}"))?;
-    let (physical_source, _) = parse_virtual_path(&source_path);
-    let stem = physical_source
-        .file_stem()
-        .unwrap_or_default()
-        .to_string_lossy();
-    let staged_file = staging_dir.join(format!("{stem}{EDIT_SUFFIX}.{extension}"));
+    let working = working_copy_path(&source_path, extension);
+    let adjustments_mode = ExportAdjustmentsMode::UseSidecars {
+        active_path: current_edit_path,
+        active_adjustments: current_edit_adjustments,
+    };
+    let rendered = render_copy(
+        &source_path,
+        &working,
+        output_format,
+        adjustments_mode,
+        state,
+        &app_handle,
+    )
+    .await;
+    if let Err(error) = rendered {
+        // The name was free, so anything there is this render's partial file.
+        let _ = fs::remove_file(&working);
+        return Err(error);
+    }
+    start_session(&app_handle, source_path, working, editor_path)
+}
 
-    let (completion_tx, completion_rx) = tokio::sync::oneshot::channel();
-    let rendered = async {
-        export_images_impl(
-            vec![source_path.clone()],
-            staged_file.to_string_lossy().into_owned(),
-            true,
-            Vec::new(),
-            round_trip_export_settings(),
-            output_format.to_owned(),
-            ExportAdjustmentsMode::UseSidecars {
-                active_path: current_edit_path,
-                active_adjustments: current_edit_adjustments,
-            },
-            Default::default(),
-            state,
-            app_handle.clone(),
-            false,
-            Some(completion_tx),
-        )
-        .await?;
-        match completion_rx.await {
-            Ok(Ok(())) => {}
-            Ok(Err(_)) => return Err("Could not render the copy for the external editor".into()),
-            Err(_) => return Err("The external edit was cancelled".into()),
+/// **Open as Layers**: renders each of `source_paths` (the first is the top
+/// layer) with its current adjustments, one after another, into a temporary
+/// folder, writes them as one layered 16-bit TIFF (with the first photo's
+/// EXIF) into a hidden working copy beside the first photo, opens that in the
+/// editor, and starts watching for saves; its copy is stacked with the first
+/// photo.
+#[tauri::command]
+pub async fn start_layered_round_trip(
+    source_paths: Vec<String>,
+    editor_path: String,
+    current_edit_path: Option<String>,
+    current_edit_adjustments: Option<Value>,
+    state: tauri::State<'_, AppState>,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    let [top, _, ..] = source_paths.as_slice() else {
+        return Err("Open as Layers needs at least two photos".into());
+    };
+    let top = top.clone();
+    let renders = staging_root(&app_handle)?.join(uuid::Uuid::new_v4().to_string());
+    fs::create_dir_all(&renders)
+        .map_err(|error| format!("Could not create the external-edit folder: {error}"))?;
+    let working = working_copy_path(&top, "tif");
+    let adjustments_mode = ExportAdjustmentsMode::UseSidecars {
+        active_path: current_edit_path,
+        active_adjustments: current_edit_adjustments,
+    };
+
+    let written = async {
+        let mut layers = Vec::with_capacity(source_paths.len());
+        for (index, source_path) in source_paths.iter().enumerate() {
+            let image = renders.join(format!("{index}.tif"));
+            render_copy(
+                source_path,
+                &image,
+                "tiff",
+                adjustments_mode.clone(),
+                state.clone(),
+                &app_handle,
+            )
+            .await?;
+            let (physical, _) = parse_virtual_path(source_path);
+            layers.push(LayerSource {
+                name: physical
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .into_owned(),
+                image,
+            });
         }
-        let stamp = file_stamp(&staged_file)
-            .ok_or_else(|| "The copy for the external editor was not written".to_string())?;
-        let editor = open_external_editor(editor_path, staged_file.to_string_lossy().into_owned())?;
-        Ok::<_, String>((stamp, editor))
+        let (physical_top, _) = parse_virtual_path(&top);
+        let working = working.clone();
+        tokio::task::spawn_blocking(move || {
+            let metadata = crate::exif_processing::collect_export_metadata(
+                &physical_top.to_string_lossy(),
+                false,
+                false,
+                true,
+            );
+            write_layered_tiff(&working, &layers, metadata.as_ref(), SRGB_ICC_PROFILE)
+        })
+        .await
+        .map_err(|error| format!("Could not write the layered file: {error}"))?
     }
     .await;
-    let (stamp, editor) = match rendered {
-        Ok(rendered) => rendered,
+    let _ = fs::remove_dir_all(&renders);
+    written?;
+    start_session(&app_handle, top, working, editor_path)
+}
+
+/// The free hidden `.<stem>-Edit.<extension>` name beside the photo at
+/// `source_path`.
+fn working_copy_path(source_path: &str, extension: &str) -> PathBuf {
+    let (source, _) = parse_virtual_path(source_path);
+    let stem = source.file_stem().unwrap_or_default().to_string_lossy();
+    free_destination(
+        source.parent().unwrap_or(Path::new("")),
+        &format!(".{stem}{EDIT_SUFFIX}"),
+        extension,
+    )
+}
+
+/// Opens the rendered `working` copy in the editor and records the session,
+/// which watches it for saves. The editor's Save dialog suggests the hidden
+/// name; the session also watches the visible `<stem>-Edit.<ext>` it would
+/// copy a save to, so taking the dot off there saves the copy directly.
+fn start_session(
+    app_handle: &AppHandle,
+    source_path: String,
+    working: PathBuf,
+    editor_path: String,
+) -> Result<(), String> {
+    let stamp = file_stamp(&working)
+        .ok_or_else(|| "The copy for the external editor was not written".to_string())?;
+    let editor = match open_external_editor(editor_path, working.to_string_lossy().into_owned()) {
+        Ok(editor) => editor,
         Err(error) => {
-            let _ = fs::remove_dir_all(&staging_dir);
+            let _ = fs::remove_file(&working);
             return Err(error);
         }
     };
-
+    let id = uuid::Uuid::new_v4().to_string();
     let session = EditorRoundTripRow {
         id: id.clone(),
         source_path: source_path.clone(),
-        staging_dir: staging_dir.to_string_lossy().into_owned(),
-        files: vec![StagedFileRow {
-            path: staged_file.to_string_lossy().into_owned(),
-            len: stamp.len,
-            modified: stamp.modified,
-            destination: None,
-        }],
+        staging_dir: working
+            .parent()
+            .unwrap_or(Path::new(""))
+            .to_string_lossy()
+            .into_owned(),
+        files: vec![
+            StagedFileRow {
+                path: working.to_string_lossy().into_owned(),
+                len: stamp.len,
+                modified: stamp.modified,
+                destination: None,
+            },
+            // Not there yet: its first appearance is a save.
+            StagedFileRow {
+                path: copy_path(&source_path, &working)
+                    .to_string_lossy()
+                    .into_owned(),
+                len: 0,
+                modified: 0,
+                destination: None,
+            },
+        ],
         created_at: SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_or(0, |duration| duration.as_secs() as i64),
     };
-    if let Err(error) = library_catalog::save_editor_round_trip(&app_handle, &session) {
+    if let Err(error) = library_catalog::save_editor_round_trip(app_handle, &session) {
         log::warn!("External edit will not survive a restart: {error}");
     }
     SESSIONS.lock().unwrap().push(session);
-    watch_launch(editor, app_handle, source_path, move |app_handle| {
+    watch_launch(editor, app_handle.clone(), source_path, move |app_handle| {
         // Keep a session that already received a save.
         let is_unsaved = SESSIONS
             .lock()
@@ -325,43 +460,23 @@ fn photo_craft_candidates(env: impl Fn(&str) -> Option<std::ffi::OsString>) -> V
     }
 }
 
-/// The total size of all staging folders.
-#[tauri::command]
-pub fn get_editor_round_trip_cache_size(app_handle: AppHandle) -> Result<u64, String> {
-    Ok(folder_size(&staging_root(&app_handle)?))
-}
-
-/// Ends every session. Copies already saved beside their sources are kept.
-#[tauri::command]
-pub fn clear_editor_round_trips(app_handle: AppHandle) -> Result<(), String> {
-    let ids: Vec<String> = SESSIONS
-        .lock()
-        .unwrap()
-        .iter()
-        .map(|session| session.id.clone())
-        .collect();
-    for id in ids {
-        end_session(&app_handle, &id);
-    }
-    match fs::remove_dir_all(staging_root(&app_handle)?) {
-        Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
-            Err(format!("Could not clear the external-edit folder: {error}"))
-        }
-        _ => Ok(()),
-    }
-}
-
-/// Resumes the catalog's sessions and polls their staging folders and the
-/// files opened with Edit Original.
+/// Resumes the catalog's sessions (finishing those of older versions) and
+/// polls their working copies and the files opened with Edit Original.
 pub fn start_watcher(app_handle: AppHandle) {
     thread::spawn(move || {
-        match library_catalog::load_editor_round_trips(&app_handle) {
-            Ok(rows) => SESSIONS.lock().unwrap().extend(rows),
-            Err(error) => log::warn!("Could not resume external edits: {error}"),
-        }
-        if let Ok(root) = staging_root(&app_handle) {
-            remove_orphaned_staging(&root, SystemTime::now());
-        }
+        let sessions =
+            library_catalog::load_editor_round_trips(&app_handle).unwrap_or_else(|error| {
+                log::warn!("Could not resume external edits: {error}");
+                Vec::new()
+            });
+        let staging = staging_root(&app_handle).ok();
+        let (staged, current): (Vec<_>, Vec<_>) = sessions.into_iter().partition(|session| {
+            staging
+                .as_deref()
+                .is_some_and(|root| Path::new(&session.staging_dir).starts_with(root))
+        });
+        SESSIONS.lock().unwrap().extend(current);
+        finish_staged_sessions(&app_handle, staged);
 
         // Files with an unhandled change, keyed by path, and the stamp the
         // previous poll saw.
@@ -372,13 +487,9 @@ pub fn start_watcher(app_handle: AppHandle) {
             let originals = ORIGINALS.lock().unwrap().clone();
             let mut changed: HashMap<String, FileStamp> = HashMap::new();
             for mut session in sessions {
-                let staging_dir = Path::new(&session.staging_dir);
-                let saves: Vec<_> = saved_files(staging_dir)
-                    .into_iter()
-                    .filter(|save| !is_handled(&session, save))
-                    .collect();
+                let saves = changed_working_copies(&session);
                 if saves.is_empty() {
-                    if !staging_dir.is_dir() || is_expired(&session, now) {
+                    if is_expired(&session, now) {
                         end_session(&app_handle, &session.id);
                     }
                     continue;
@@ -431,7 +542,23 @@ fn staging_root(app_handle: &AppHandle) -> Result<PathBuf, String> {
         .map_err(|error| error.to_string())
 }
 
-/// Forgets a session and deletes its staging folder.
+/// The working copies of `session` that changed since it last handled them.
+/// A working copy that is missing for a moment (an editor that deletes it
+/// before writing the save) is simply not reported.
+fn changed_working_copies(session: &EditorRoundTripRow) -> Vec<(PathBuf, FileStamp)> {
+    session
+        .files
+        .iter()
+        .filter_map(|file| {
+            let path = PathBuf::from(&file.path);
+            let stamp = file_stamp(&path)?;
+            (stamp.len != file.len || stamp.modified != file.modified).then_some((path, stamp))
+        })
+        .collect()
+}
+
+/// Forgets a session and deletes its hidden working copies; a copy saved
+/// under its visible name stays.
 fn end_session(app_handle: &AppHandle, id: &str) {
     let removed = {
         let mut sessions = SESSIONS.lock().unwrap();
@@ -441,54 +568,20 @@ fn end_session(app_handle: &AppHandle, id: &str) {
             .map(|index| sessions.remove(index))
     };
     let Some(session) = removed else { return };
-    if let Err(error) = fs::remove_dir_all(&session.staging_dir)
-        && error.kind() != std::io::ErrorKind::NotFound
+    for file in session
+        .files
+        .iter()
+        .filter(|file| is_hidden(Path::new(&file.path)))
     {
-        log::warn!("Could not remove external-edit folder: {error}");
+        if let Err(error) = fs::remove_file(&file.path)
+            && error.kind() != std::io::ErrorKind::NotFound
+        {
+            log::warn!("Could not remove an external edit's working copy: {error}");
+        }
     }
     if let Err(error) = library_catalog::delete_editor_round_trip(app_handle, id) {
         log::warn!("Could not forget external edit: {error}");
     }
-}
-
-/// Deletes staging folders that no session owns, for example after the catalog
-/// was moved, once they are older than [`RETENTION`].
-fn remove_orphaned_staging(root: &Path, now: SystemTime) {
-    let Ok(entries) = fs::read_dir(root) else {
-        return;
-    };
-    let sessions = SESSIONS.lock().unwrap().clone();
-    for path in entries.filter_map(Result::ok).map(|entry| entry.path()) {
-        let owned = sessions
-            .iter()
-            .any(|session| Path::new(&session.staging_dir) == path);
-        let is_old = fs::metadata(&path)
-            .and_then(|metadata| metadata.modified())
-            .is_ok_and(|modified| {
-                now.duration_since(modified)
-                    .is_ok_and(|age| age > RETENTION)
-            });
-        if !owned && is_old && path.is_dir() {
-            let _ = fs::remove_dir_all(&path);
-        }
-    }
-}
-
-fn folder_size(path: &Path) -> u64 {
-    let Ok(entries) = fs::read_dir(path) else {
-        return 0;
-    };
-    entries
-        .filter_map(Result::ok)
-        .filter_map(|entry| {
-            let metadata = entry.metadata().ok()?;
-            Some(if metadata.is_dir() {
-                folder_size(&entry.path())
-            } else {
-                metadata.len()
-            })
-        })
-        .sum()
 }
 
 /// No save has been handled for [`RETENTION`]. The last handled file is the
@@ -504,11 +597,6 @@ fn is_expired(session: &EditorRoundTripRow, now: SystemTime) -> bool {
         .is_ok_and(|age| age > RETENTION)
 }
 
-/// Whether the previous poll saw the file at `key` with the same stamp.
-fn is_settled(unsettled: &HashMap<String, FileStamp>, key: &str, stamp: FileStamp) -> bool {
-    unsettled.get(key) == Some(&stamp)
-}
-
 /// Whether one of the session's copies beside the source matches `filter`.
 fn has_copy(session: &EditorRoundTripRow, filter: impl Fn(&str) -> bool) -> bool {
     session
@@ -516,6 +604,98 @@ fn has_copy(session: &EditorRoundTripRow, filter: impl Fn(&str) -> bool) -> bool
         .iter()
         .filter_map(|file| file.destination.as_deref())
         .any(filter)
+}
+
+/// Copies a settled save beside the source, records it in the session and the
+/// catalog, and tells the Library.
+fn promote(
+    app_handle: &AppHandle,
+    session: &mut EditorRoundTripRow,
+    save: &(PathBuf, FileStamp),
+) -> Result<(), String> {
+    let (output_path, is_new) = copy_save(session, save)?;
+    if let Err(error) = library_catalog::save_editor_round_trip(app_handle, session) {
+        log::warn!("Could not record external edit: {error}");
+    }
+    if let Some(entry) = SESSIONS
+        .lock()
+        .unwrap()
+        .iter_mut()
+        .find(|entry| entry.id == session.id)
+    {
+        *entry = session.clone();
+    }
+    let _ = app_handle.emit(
+        SAVED_EVENT,
+        RoundTripSaved {
+            source_path: session.source_path.clone(),
+            output_path,
+            is_new,
+        },
+    );
+    Ok(())
+}
+
+/// Copies every save that a session of a version before 1.109.0 still holds
+/// in its app-cache staging folder beside its source, as those versions did,
+/// then forgets the session and deletes its folder. A session whose copy
+/// fails (its source folder is offline, say) is kept for the next launch.
+/// Staging folders no session owns are deleted.
+fn finish_staged_sessions(app_handle: &AppHandle, sessions: Vec<EditorRoundTripRow>) {
+    let mut kept = Vec::new();
+    for mut session in sessions {
+        let saves: Vec<_> = saved_files(Path::new(&session.staging_dir))
+            .into_iter()
+            .filter(|save| !is_handled(&session, save))
+            .collect();
+        let mut is_done = true;
+        for save in saves {
+            match copy_save(&mut session, &save) {
+                Ok((output_path, is_new)) => {
+                    let _ = app_handle.emit(
+                        SAVED_EVENT,
+                        RoundTripSaved {
+                            source_path: session.source_path.clone(),
+                            output_path,
+                            is_new,
+                        },
+                    );
+                }
+                Err(error) => {
+                    log::warn!("Could not save an older external edit: {error}");
+                    is_done = false;
+                }
+            }
+        }
+        if !is_done {
+            kept.push(PathBuf::from(&session.staging_dir));
+        } else if let Err(error) =
+            library_catalog::delete_editor_round_trip(app_handle, &session.id)
+        {
+            log::warn!("Could not forget an older external edit: {error}");
+            kept.push(PathBuf::from(&session.staging_dir));
+        }
+    }
+    if let Ok(root) = staging_root(app_handle) {
+        remove_staging_except(&root, &kept);
+    }
+}
+
+/// Deletes every folder in `root` but `kept`.
+fn remove_staging_except(root: &Path, kept: &[PathBuf]) {
+    let Ok(entries) = fs::read_dir(root) else {
+        return;
+    };
+    for path in entries.filter_map(Result::ok).map(|entry| entry.path()) {
+        if path.is_dir() && !kept.contains(&path) {
+            let _ = fs::remove_dir_all(&path);
+        }
+    }
+}
+
+/// Whether the previous poll saw the file at `key` with the same stamp.
+fn is_settled(unsettled: &HashMap<String, FileStamp>, key: &str, stamp: FileStamp) -> bool {
+    unsettled.get(key) == Some(&stamp)
 }
 
 fn file_stamp(path: &Path) -> Option<FileStamp> {
@@ -543,7 +723,7 @@ fn visible_entries(dir: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-/// The images in the staging folder and its subfolders (editors that export
+/// The images in a staging folder and its subfolders (editors that export
 /// into a folder of their own): the render and everything the editor saved.
 /// Hidden files and folders and files ThisIsRAW cannot open, such as editor
 /// temporaries and PSDs, are ignored.
@@ -570,13 +750,8 @@ fn is_handled(session: &EditorRoundTripRow, (file, stamp): &(PathBuf, FileStamp)
     })
 }
 
-/// The saved file's name beside the source (`<stem>-Edit.<ext>` for the
-/// render, the chosen name after a Save As), with `-2`, `-3`, … when taken.
-fn free_destination(source_path: &str, saved_file: &Path) -> PathBuf {
-    let (source, _) = parse_virtual_path(source_path);
-    let folder = source.parent().unwrap_or(Path::new(""));
-    let stem = saved_file.file_stem().unwrap_or_default().to_string_lossy();
-    let extension = saved_file.extension().unwrap_or_default().to_string_lossy();
+/// `<stem>.<extension>` in `folder`, with `-2`, `-3`, … when taken.
+fn free_destination(folder: &Path, stem: &str, extension: &str) -> PathBuf {
     (1u32..)
         .map(|number| {
             let counter = if number == 1 {
@@ -617,71 +792,72 @@ pub fn follow_renames(app_handle: &AppHandle, renames: &HashMap<String, String>)
     }
 }
 
-/// Copies a settled save beside the source, records it in the session and the
-/// catalog, and tells the Library.
-fn promote(
-    app_handle: &AppHandle,
-    session: &mut EditorRoundTripRow,
-    save: &(PathBuf, FileStamp),
-) -> Result<(), String> {
-    let (output_path, is_new) = copy_save(session, save)?;
-    if let Err(error) = library_catalog::save_editor_round_trip(app_handle, session) {
-        log::warn!("Could not record external edit: {error}");
-    }
-    if let Some(entry) = SESSIONS
-        .lock()
-        .unwrap()
-        .iter_mut()
-        .find(|entry| entry.id == session.id)
-    {
-        *entry = session.clone();
-    }
-    let _ = app_handle.emit(
-        SAVED_EVENT,
-        RoundTripSaved {
-            source_path: session.source_path.clone(),
-            output_path,
-            is_new,
-        },
-    );
-    Ok(())
+/// The free name beside the photo at `source_path` that a save of `saved` is
+/// copied to: its name without a hidden working copy's leading dot.
+fn copy_path(source_path: &str, saved: &Path) -> PathBuf {
+    let (source, _) = parse_virtual_path(source_path);
+    free_destination(
+        source.parent().unwrap_or(Path::new("")),
+        saved
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .trim_start_matches('.'),
+        &saved.extension().unwrap_or_default().to_string_lossy(),
+    )
 }
 
-/// Copies a save beside the source, replacing the copy an earlier save of the
-/// same file made, and marks it handled. Returns the copy's path and whether
-/// it is new.
+/// Records a save: copies it beside the source, replacing the copy an earlier
+/// save of the same file made, unless it was saved there under a visible name
+/// already, which makes it the copy itself. Returns the copy's path and
+/// whether the Library has yet to list it.
 fn copy_save(
     session: &mut EditorRoundTripRow,
     (file, stamp): &(PathBuf, FileStamp),
 ) -> Result<(String, bool), String> {
     let path = file.to_string_lossy().into_owned();
-    let previous = session
-        .files
-        .iter()
-        .find(|handled| handled.path == path)
-        .and_then(|handled| handled.destination.clone());
-    let is_new = previous.is_none();
-    let destination = previous
-        .map(PathBuf::from)
-        .unwrap_or_else(|| free_destination(&session.source_path, file));
-    copy_file_atomically(file, &destination)?;
-
+    let (source, _) = parse_virtual_path(&session.source_path);
+    let is_copy_itself = !is_hidden(file) && file.parent() == source.parent();
+    let destination = if is_copy_itself {
+        file.clone()
+    } else {
+        session
+            .files
+            .iter()
+            .find(|handled| handled.path == path)
+            .and_then(|handled| handled.destination.as_deref())
+            .map_or_else(|| copy_path(&session.source_path, file), PathBuf::from)
+    };
     let output_path = destination.to_string_lossy().into_owned();
+    let is_new = !has_copy(session, |copy| copy == output_path);
+    if !is_copy_itself {
+        copy_file_atomically(file, &destination)?;
+    }
+
+    record_handled(session, &path, *stamp, &output_path);
+    // The copy just written is watched too when it carries the visible name;
+    // it must not count as another save.
+    if !is_copy_itself
+        && session.files.iter().any(|file| file.path == output_path)
+        && let Some(copy_stamp) = file_stamp(&destination)
+    {
+        record_handled(session, &output_path, copy_stamp, &output_path);
+    }
+    Ok((output_path, is_new))
+}
+
+/// Marks `path` handled at `stamp`, with the copy its saves update.
+fn record_handled(session: &mut EditorRoundTripRow, path: &str, stamp: FileStamp, copy: &str) {
     let handled = StagedFileRow {
-        path,
+        path: path.to_owned(),
         len: stamp.len,
         modified: stamp.modified,
-        destination: Some(output_path.clone()),
+        destination: Some(copy.to_owned()),
     };
-    match session
-        .files
-        .iter_mut()
-        .find(|entry| entry.path == handled.path)
-    {
+    match session.files.iter_mut().find(|entry| entry.path == path) {
         Some(entry) => *entry = handled,
         None => session.files.push(handled),
     }
-    Ok((output_path, is_new))
 }
 
 #[cfg(test)]
@@ -773,7 +949,7 @@ mod tests {
         };
         let copy = |name: &str| photos.path().join(name).to_string_lossy().into_owned();
 
-        // Save, then Save As to JPEG and to a second TIFF name in one poll.
+        // Save, then Save As to JPEG and to a second TIFF name.
         fs::write(&staged, b"saved").unwrap();
         fs::write(staging.path().join("IMG_1-Edit.jpg"), b"jpeg").unwrap();
         fs::write(staging.path().join("IMG_1-Edit-bw.tif"), b"bw").unwrap();
@@ -806,33 +982,17 @@ mod tests {
     }
 
     #[test]
-    fn sessions_expire_after_a_week_without_a_save() {
-        let saved = UNIX_EPOCH + Duration::from_secs(1_800_000_000);
-        let session = session_for(
-            Path::new("/cache/external-edits/session/IMG_1-Edit.tif"),
-            FileStamp {
-                len: 1,
-                modified: saved.duration_since(UNIX_EPOCH).unwrap().as_nanos() as u64,
-            },
-        );
-        assert!(!is_expired(&session, saved + RETENTION));
-        assert!(is_expired(
-            &session,
-            saved + RETENTION + Duration::from_secs(1)
-        ));
-    }
-
-    #[test]
-    fn only_old_unowned_staging_folders_are_removed() {
+    fn only_kept_staging_folders_survive() {
         let root = tempfile::tempdir().unwrap();
-        let orphan = root.path().join("orphan");
-        fs::create_dir(&orphan).unwrap();
-        fs::write(orphan.join("IMG_1-Edit.tif"), b"render").unwrap();
+        let (kept, finished) = (root.path().join("kept"), root.path().join("finished"));
+        for folder in [&kept, &finished] {
+            fs::create_dir(folder).unwrap();
+            fs::write(folder.join("IMG_1-Edit.tif"), b"render").unwrap();
+        }
 
-        remove_orphaned_staging(root.path(), SystemTime::now());
-        assert!(orphan.is_dir());
-        remove_orphaned_staging(root.path(), SystemTime::now() + RETENTION * 2);
-        assert!(!orphan.exists());
+        remove_staging_except(root.path(), std::slice::from_ref(&kept));
+        assert!(kept.is_dir());
+        assert!(!finished.exists());
     }
 
     #[test]
@@ -868,29 +1028,151 @@ mod tests {
     }
 
     #[test]
-    fn free_destination_counts_up_past_existing_copies() {
+    fn working_copies_are_hidden_and_count_up_past_existing_ones() {
         let folder = tempfile::tempdir().unwrap();
         let source = folder.path().join("IMG_1.CR3");
         let source_path = format!("{}?vc=2", source.display());
-        let staged = |name: &str| Path::new("/cache/external-edits/session").join(name);
         assert_eq!(
-            free_destination(&source_path, &staged("IMG_1-Edit.tif")),
-            folder.path().join("IMG_1-Edit.tif")
+            working_copy_path(&source_path, "tif"),
+            folder.path().join(".IMG_1-Edit.tif")
         );
+        assert!(!is_supported_image_file(working_copy_path(
+            &source_path,
+            "tif"
+        )));
 
-        fs::write(folder.path().join("IMG_1-Edit.tif"), b"").unwrap();
-        fs::write(folder.path().join("IMG_1-Edit-2.tif"), b"").unwrap();
+        fs::write(folder.path().join(".IMG_1-Edit.tif"), b"").unwrap();
+        fs::write(folder.path().join(".IMG_1-Edit-2.tif"), b"").unwrap();
         assert_eq!(
-            free_destination(&source_path, &staged("IMG_1-Edit.tif")),
-            folder.path().join("IMG_1-Edit-3.tif")
+            working_copy_path(&source_path, "tif"),
+            folder.path().join(".IMG_1-Edit-3.tif")
         );
         assert_eq!(
-            free_destination(&source_path, &staged("IMG_1-Edit.jpg")),
-            folder.path().join("IMG_1-Edit.jpg")
+            working_copy_path(&source_path, "jpg"),
+            folder.path().join(".IMG_1-Edit.jpg")
         );
         assert_eq!(
-            free_destination(&source_path, &staged("Sunset.tif")),
+            free_destination(folder.path(), "Sunset", "tif"),
             folder.path().join("Sunset.tif")
         );
+    }
+
+    #[test]
+    fn only_a_saved_working_copy_becomes_a_visible_copy() {
+        let folder = tempfile::tempdir().unwrap();
+        let source = folder.path().join("IMG_1.CR3");
+        let working = folder.path().join(".IMG_1-Edit.tif");
+        fs::write(&working, b"render").unwrap();
+        let mut session = session_for(&working, file_stamp(&working).unwrap());
+        session.source_path = source.to_string_lossy().into_owned();
+        assert!(changed_working_copies(&session).is_empty());
+
+        // The editor saves; its copy loses the dot. A copy already there
+        // (another photo's, or an earlier edit's) is kept.
+        fs::write(folder.path().join("IMG_1-Edit.tif"), b"earlier").unwrap();
+        fs::write(&working, b"saved").unwrap();
+        let saves = changed_working_copies(&session);
+        assert_eq!(saves.len(), 1);
+        let (copy, is_new) = copy_save(&mut session, &saves[0]).unwrap();
+        assert!(is_new);
+        assert_eq!(PathBuf::from(&copy), folder.path().join("IMG_1-Edit-2.tif"));
+        assert_eq!(fs::read(&copy).unwrap(), b"saved");
+        assert!(changed_working_copies(&session).is_empty());
+
+        // The next save replaces that copy; a missing working copy is no save.
+        fs::write(&working, b"saved again").unwrap();
+        let saves = changed_working_copies(&session);
+        assert_eq!(
+            copy_save(&mut session, &saves[0]).unwrap(),
+            (copy.clone(), false)
+        );
+        assert_eq!(fs::read(&copy).unwrap(), b"saved again");
+        fs::remove_file(&working).unwrap();
+        assert!(changed_working_copies(&session).is_empty());
+    }
+
+    /// A session as `start_session` records it: the working copy and the
+    /// visible name its saves are copied to, not there yet.
+    fn session_with_copy_name(folder: &Path) -> (EditorRoundTripRow, PathBuf, PathBuf) {
+        let source = folder.join("IMG_1.CR3");
+        let working = folder.join(".IMG_1-Edit.tif");
+        fs::write(&working, b"render").unwrap();
+        let mut session = session_for(&working, file_stamp(&working).unwrap());
+        session.source_path = source.to_string_lossy().into_owned();
+        let copy = copy_path(&session.source_path, &working);
+        session.files.push(StagedFileRow {
+            path: copy.to_string_lossy().into_owned(),
+            len: 0,
+            modified: 0,
+            destination: None,
+        });
+        (session, working, copy)
+    }
+
+    #[test]
+    fn saving_under_the_visible_name_makes_that_file_the_copy() {
+        let folder = tempfile::tempdir().unwrap();
+        let (mut session, working, copy) = session_with_copy_name(folder.path());
+        assert_eq!(copy, folder.path().join("IMG_1-Edit.tif"));
+        assert!(changed_working_copies(&session).is_empty());
+
+        // The dot taken off in the editor's Save dialog.
+        fs::write(&copy, b"saved").unwrap();
+        let saves = changed_working_copies(&session);
+        assert_eq!(saves, vec![(copy.clone(), file_stamp(&copy).unwrap())]);
+        let expected = copy.to_string_lossy().into_owned();
+        assert_eq!(
+            copy_save(&mut session, &saves[0]).unwrap(),
+            (expected.clone(), true)
+        );
+        assert_eq!(fs::read(&working).unwrap(), b"render");
+        assert!(changed_working_copies(&session).is_empty());
+
+        fs::write(&copy, b"saved again").unwrap();
+        let saves = changed_working_copies(&session);
+        assert_eq!(
+            copy_save(&mut session, &saves[0]).unwrap(),
+            (expected, false)
+        );
+
+        // Ending the session deletes only the hidden working copy.
+        let hidden: Vec<&str> = session
+            .files
+            .iter()
+            .map(|file| file.path.as_str())
+            .filter(|path| is_hidden(Path::new(path)))
+            .collect();
+        assert_eq!(hidden, vec![working.to_string_lossy()]);
+    }
+
+    #[test]
+    fn a_save_under_the_hidden_name_is_copied_once() {
+        let folder = tempfile::tempdir().unwrap();
+        let (mut session, working, copy) = session_with_copy_name(folder.path());
+        fs::write(&working, b"saved").unwrap();
+        let saves = changed_working_copies(&session);
+        assert_eq!(saves.len(), 1);
+        let (output, is_new) = copy_save(&mut session, &saves[0]).unwrap();
+        assert_eq!((PathBuf::from(output), is_new), (copy.clone(), true));
+        assert_eq!(fs::read(&copy).unwrap(), b"saved");
+        // The copy it wrote is not another save.
+        assert!(changed_working_copies(&session).is_empty());
+    }
+
+    #[test]
+    fn sessions_expire_after_a_week_without_a_save() {
+        let saved = UNIX_EPOCH + Duration::from_secs(1_800_000_000);
+        let session = session_for(
+            Path::new("/photos/.IMG_1-Edit.tif"),
+            FileStamp {
+                len: 1,
+                modified: saved.duration_since(UNIX_EPOCH).unwrap().as_nanos() as u64,
+            },
+        );
+        assert!(!is_expired(&session, saved + RETENTION));
+        assert!(is_expired(
+            &session,
+            saved + RETENTION + Duration::from_secs(1)
+        ));
     }
 }

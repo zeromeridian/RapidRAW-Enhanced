@@ -104,16 +104,24 @@ details are in `RELEASE_NOTES.MD`.
   Export (an installed Photo Craft is found and offered automatically),
   choose TIFF, JPEG, or ask-each-time per editor, then right-click one image
   in the Library or the image being edited in Develop (**Open in**) to open a
-  16-bit TIFF or JPEG copy in that editor. The copy appears beside the original as `<name>-Edit` only
-  once it is saved in the editor, later saves update it in place. However
-  the editor saves (back into the copy, or Save As under another name or
-  format) and whether it opens a window or a tab, each saved image gets
-  its own copy beside the original under the name it was saved with. Several
-  edits can run at once, and saves made while ThisIsRAW was closed are
-  picked up on the next launch. A save into a subfolder of the editor's
-  working folder counts too, and an editor that quits with an error right
-  after starting is reported instead of being waited for. Unsaved working
-  copies are removed after 7 days or from Settings → Storage.
+  16-bit TIFF or JPEG copy in that editor. As in Lightroom Classic with
+  Photoshop, the copy appears beside the original as `<name>-Edit`
+  (`-Edit-2`, … when taken), stacked with it, only once it is saved in the
+  editor; later saves update it. The editor works on a hidden working copy
+  in the photo's own folder, so a Save that asks for a location (Photo
+  Craft) opens there. Several edits can run at once, saves made while
+  ThisIsRAW was closed are picked up on the next launch, and unsaved
+  working copies are removed after 7 days. An editor that quits with an
+  error right after starting is reported instead of being waited for.
+  Hidden files (dot names) are never listed in the Library.
+  With several photos selected, each editor entry opens every one as its
+  own copy, one after another, as Lightroom Classic's Edit In does.
+  **Open in → Open as Layers** (two or more photos selected, as in
+  Lightroom Classic): one 16-bit layered TIFF, one layer per photo named
+  after its file, the first selected on top, different sizes centred on a
+  canvas that fits the largest; once saved, it appears beside the first
+  photo as `<name>-Edit.tif` with its EXIF, stacked with it; editors
+  without layers show the combined image; above 10 photos it asks first.
   **Open in → Original File** opens a non-RAW file itself and refreshes its
   thumbnail when it is saved.
 - Rejected, Selected, Deferred, and Unflagged states with keyboard shortcuts,

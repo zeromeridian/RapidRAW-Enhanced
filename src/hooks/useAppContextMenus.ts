@@ -93,6 +93,9 @@ import { getEnabledCopySuffix } from '../utils/outputNaming';
 import { getRejectedPathsForLoadedFolder, isImageFlagTag } from '../utils/imageFlags';
 import { USER_TAG_PREFIX } from '../utils/keywords';
 
+/** Open as Layers asks first above this many photos: each is a full-size 16-bit layer. */
+const OPEN_AS_LAYERS_CONFIRM_ABOVE = 10;
+
 export interface UseAppContextMenusProps {
   handleImageSelect: (path: string) => void;
   handleBackToLibrary: () => void;
@@ -272,20 +275,22 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
     [albumIcons, t],
   );
 
+  // `paths` in selection order: each photo opens as its own rendered copy (one after another, as Lightroom's
+  // Edit In does), several also as the layers of one file (Open as Layers, the first on top), and a single
+  // non-RAW photo as itself.
   const buildOpenInOption = useCallback(
-    (sourcePath: string, { disabled, canEditOriginal }: { disabled: boolean; canEditOriginal: boolean }): Option => {
-      const startExternalEdit = async (format: ExternalEditFormat, editor: ExternalEditor) => {
+    (paths: string[], { canEditOriginal }: { canEditOriginal: boolean }): Option => {
+      const [sourcePath] = paths;
+      const runExternalEdit = async (command: Invokes, args: Record<string, unknown>) => {
         const { selectedImage, adjustments } = useEditorStore.getState();
         useProcessStore.getState().setExportState({
           status: Status.Exporting,
-          progress: { current: 0, total: 1 },
+          progress: { current: 0, total: paths.length },
           errorMessage: '',
         });
         try {
-          await invoke(Invokes.StartEditorRoundTrip, {
-            sourcePath,
-            editorPath: editor.path,
-            format,
+          await invoke(command, {
+            ...args,
             currentEditPath: selectedImage?.path || null,
             currentEditAdjustments: adjustments || null,
           });
@@ -294,6 +299,28 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           toast.error(message);
           useProcessStore.getState().setExportState({ status: Status.Error, errorMessage: message });
         }
+      };
+      const startExternalEdit = async (format: ExternalEditFormat, editor: ExternalEditor) => {
+        for (const path of paths) {
+          await runExternalEdit(Invokes.StartEditorRoundTrip, { sourcePath: path, editorPath: editor.path, format });
+        }
+      };
+      const openAsLayers = (editor: ExternalEditor) => {
+        const start = () =>
+          runExternalEdit(Invokes.StartLayeredRoundTrip, { sourcePaths: paths, editorPath: editor.path });
+        if (paths.length <= OPEN_AS_LAYERS_CONFIRM_ABOVE) {
+          void start();
+          return;
+        }
+        useUIStore.getState().setUI({
+          confirmModalState: {
+            confirmText: t('contextMenus.thumbnail.openAsLayersConfirm'),
+            isOpen: true,
+            message: t('contextMenus.thumbnail.openAsLayersMessage', { count: paths.length }),
+            onConfirm: start,
+            title: t('contextMenus.thumbnail.openAsLayers'),
+          },
+        });
       };
 
       const editOriginal = async (editor: ExternalEditor) => {
@@ -307,10 +334,15 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const externalEditors = (useSettingsStore.getState().appSettings?.externalEditors || []).filter(
         (editor: ExternalEditor) => editor.path,
       );
-      return {
-        disabled: disabled || externalEditors.length === 0,
+      const menu = {
+        disabled: externalEditors.length === 0,
         icon: ExternalLink,
         label: t('contextMenus.thumbnail.openIn'),
+      };
+      const editorSubmenu = (onClick: (editor: ExternalEditor) => void) =>
+        externalEditors.map((editor: ExternalEditor) => ({ label: editor.name, onClick: () => onClick(editor) }));
+      return {
+        ...menu,
         submenu: [
           ...externalEditors.map((editor: ExternalEditor) => {
             const { format } = editor;
@@ -328,14 +360,13 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                 };
           }),
           { type: OPTION_SEPARATOR },
-          {
-            disabled: !canEditOriginal,
-            label: t('contextMenus.thumbnail.originalFile'),
-            submenu: externalEditors.map((editor: ExternalEditor) => ({
-              label: editor.name,
-              onClick: () => editOriginal(editor),
-            })),
-          },
+          paths.length > 1
+            ? { label: t('contextMenus.thumbnail.openAsLayers'), submenu: editorSubmenu(openAsLayers) }
+            : {
+                disabled: !canEditOriginal,
+                label: t('contextMenus.thumbnail.originalFile'),
+                submenu: editorSubmenu(editOriginal),
+              },
         ],
       };
     },
@@ -366,7 +397,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           onClick: () => setRightPanel(Panel.Export),
         },
         // RAW files have no pixels an editor could save back, so only a rendered copy is offered.
-        buildOpenInOption(selectedImage.path, { disabled: false, canEditOriginal: !selectedImage.isRaw }),
+        buildOpenInOption([selectedImage.path], { canEditOriginal: !selectedImage.isRaw }),
         { type: OPTION_SEPARATOR },
         { label: t('contextMenus.editor.undo'), icon: Undo, onClick: undo, disabled: !canUndo },
         { label: t('contextMenus.editor.redo'), icon: Redo, onClick: redo, disabled: !canRedo },
@@ -713,8 +744,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       };
 
       // RAW files have no pixels an editor could save back, so only a rendered copy is offered.
-      const openInOption = buildOpenInOption(finalSelection[0], {
-        disabled: !isSingleSelection,
+      const openInOption = buildOpenInOption(finalSelection, {
         canEditOriginal: imageList.some((image) => image.path === finalSelection[0] && !image.is_raw),
       });
 

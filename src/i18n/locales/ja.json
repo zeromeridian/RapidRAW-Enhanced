@@ -1959,8 +1959,7 @@
         "confirmClearCache": "キャッシュを削除",
         "confirmDeleteAllEdits": "すべての編集を削除",
         "confirmTitle": "削除の確認",
-        "sidecarMessage": "本当にすべてのサイドカーファイルを削除しますか？\n\nアクティブなルートフォルダとそのサブフォルダ内にある、すべての画像の編集内容が完全に削除されます。",
-        "externalEditsMessage": "外部編集用コピーを消去してもよろしいですか？\n\n外部エディターで開いたままの編集は ThisIsRAW に戻されなくなります。写真の横にすでに保存されたコピーは残ります。"
+        "sidecarMessage": "本当にすべてのサイドカーファイルを削除しますか？\n\nアクティブなルートフォルダとそのサブフォルダ内にある、すべての画像の編集内容が完全に削除されます。"
       },
       "noFolders": "フォルダが選択されていません",
       "statuses": {
@@ -1985,9 +1984,7 @@
         "aiDenoiseSuccess": "AIノイズ除去キャッシュを消去しました。",
         "aiUpscaleSuccess": "AI超解像キャッシュを消去しました。",
         "clearingAiUpscale": "AI超解像キャッシュを消去中...",
-        "clearingAiDenoise": "AIノイズ除去キャッシュを消去中...",
-        "clearingExternalEdits": "外部編集用コピーを消去しています...",
-        "externalEditsSuccess": "外部編集用コピーを消去しました。"
+        "clearingAiDenoise": "AIノイズ除去キャッシュを消去中..."
       },
       "title": "データ管理",
       "clearAiDenoise": "AIノイズ除去キャッシュを消去",
@@ -1995,10 +1992,7 @@
       "clearAiUpscale": "AI超解像キャッシュを消去",
       "clearAiUpscaleButton": "消去",
       "clearAiUpscaleDesc": "キャッシュされたAI超解像の結果（{{size}}）を削除します。AI超解像が有効な画像は、次に開いたときに再度拡大処理されます。",
-      "clearAiDenoiseDesc": "キャッシュされたAIノイズ除去の結果（{{size}}）を削除します。AIノイズ除去が有効な画像は、次に開いたときに再計算されます。",
-      "clearExternalEdits": "外部編集用コピーを消去",
-      "clearExternalEditsButton": "消去",
-      "clearExternalEditsDesc": "外部エディターで開いている作業用コピー（{{size}}）を削除します。写真の横にすでに保存されたコピーは残ります。保存されないまま7日経過したコピーは自動的に削除されます。"
+      "clearAiDenoiseDesc": "キャッシュされたAIノイズ除去の結果（{{size}}）を削除します。AIノイズ除去が有効な画像は、次に開いたときに再計算されます。"
     },
     "general": {
       "copyNameSuffix": "Copy Name Suffix",

@@ -141,7 +141,9 @@ pub fn encode_tiff_with_metadata(
     Ok(buffer.into_inner())
 }
 
-fn write_sub_ifd<W: Write + Seek>(
+/// Writes the EXIF or GPS sub-IFD of `metadata` and returns its offset for
+/// the main IFD's pointer, or `None` when it has no tags.
+pub(crate) fn write_sub_ifd<W: Write + Seek>(
     encoder: &mut TiffEncoder<W>,
     metadata: Option<&Metadata>,
     group: ExifTagGroup,
@@ -174,7 +176,9 @@ fn write_sub_ifd<W: Write + Seek>(
     Ok(Some(offset.pointer.0 as u32))
 }
 
-fn write_main_ifd<W: Write + Seek>(
+/// Writes the ICC profile, the sub-IFD pointers and the main IFD's tags of
+/// `metadata` into an image's directory.
+pub(crate) fn write_main_ifd<W: Write + Seek>(
     directory: &mut DirectoryEncoder<'_, W, tiff::encoder::TiffKindStandard>,
     metadata: Option<&Metadata>,
     exif_ifd: Option<u32>,

@@ -43,6 +43,7 @@ mod image_processing;
 mod inpainting;
 mod keyword_index;
 mod launch_request;
+mod layered_tiff;
 mod lens_blur;
 mod lens_correction;
 mod library_catalog;
@@ -2801,10 +2802,9 @@ pub fn run() {
             export_processing::cancel_export,
             export_processing::estimate_export_sizes,
             editor_round_trip::start_editor_round_trip,
+            editor_round_trip::start_layered_round_trip,
             editor_round_trip::start_editing_original,
             editor_round_trip::detect_external_editors,
-            editor_round_trip::get_editor_round_trip_cache_size,
-            editor_round_trip::clear_editor_round_trips,
             image_processing::calculate_auto_adjustments,
             mask_generation::generate_mask_overlay,
             mask_generation::sample_mask_luminance,

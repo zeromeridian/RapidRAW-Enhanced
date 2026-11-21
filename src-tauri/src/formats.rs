@@ -105,19 +105,20 @@ pub fn is_raw_file<P: AsRef<Path>>(path: P) -> bool {
         .any(|(raw_ext, _)| raw_ext.eq_ignore_ascii_case(ext))
 }
 
-/// Whether `name` is an AppleDouble file (`._photo.CR3`): macOS writes one beside each file
-/// it copies to a volume without native metadata support (exFAT, FAT, SMB). It holds
-/// metadata only and is never an image, even though it keeps the image's extension.
-fn is_apple_double_file(path: &Path) -> bool {
+/// Whether `path` names a hidden file (`.name`), which the Library never lists, as the folder
+/// tree skips hidden entries: an AppleDouble file (`._photo.CR3`, which macOS writes beside each
+/// file it copies to a volume without native metadata support; metadata only, though it keeps
+/// the image's extension), or an external edit's working copy (`editor_round_trip.rs`).
+fn is_hidden_file(path: &Path) -> bool {
     path.file_name()
         .and_then(|name| name.to_str())
-        .is_some_and(|name| name.starts_with("._"))
+        .is_some_and(|name| name.starts_with('.'))
 }
 
 pub fn is_supported_image_file<P: AsRef<Path>>(path: P) -> bool {
     let path = path.as_ref();
 
-    if is_apple_double_file(path) {
+    if is_hidden_file(path) {
         return false;
     }
 
@@ -151,14 +152,14 @@ mod tests {
     }
 
     #[test]
-    fn apple_double_files_are_not_images() {
+    fn hidden_files_are_not_images() {
         assert!(!is_supported_image_file("._260102-0143-R7-RAW.CR3"));
         assert!(!is_supported_image_file(
             "/Volumes/Card/DCIM/._IMG_0001.JPG"
         ));
+        assert!(!is_supported_image_file("/photos/.IMG_0001-Edit.tif"));
         assert!(is_supported_image_file("/Volumes/Card/DCIM/IMG_0001.JPG"));
         assert!(is_supported_image_file("260102-0143-R7-RAW.CR3"));
-        // Other names starting with a dot keep their current handling.
-        assert!(is_supported_image_file(".hidden.jpg"));
+        assert!(is_supported_image_file("/photos/IMG_0001-Edit.tif"));
     }
 }

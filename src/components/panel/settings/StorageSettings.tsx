@@ -35,10 +35,6 @@ export default function StorageSettings({ query }: SettingsPageProps) {
     clearing: t('settings.data.statuses.clearingAiUpscale'),
     success: t('settings.data.statuses.aiUpscaleSuccess'),
   });
-  const externalEditCache = useClearableCache(Invokes.GetEditorRoundTripCacheSize, Invokes.ClearEditorRoundTrips, {
-    clearing: t('settings.data.statuses.clearingExternalEdits'),
-    success: t('settings.data.statuses.externalEditsSuccess'),
-  });
 
   useEffect(() => {
     invoke<string>(Invokes.GetLogFilePath)
@@ -198,12 +194,6 @@ export default function StorageSettings({ query }: SettingsPageProps) {
               description: 'settings.data.clearAiUpscaleDesc',
               button: 'settings.data.clearAiUpscaleButton',
               message: 'settings.data.modals.aiUpscaleMessage',
-            }),
-            cacheRow('clear-external-edits', externalEditCache, {
-              title: 'settings.data.clearExternalEdits',
-              description: 'settings.data.clearExternalEditsDesc',
-              button: 'settings.data.clearExternalEditsButton',
-              message: 'settings.data.modals.externalEditsMessage',
             }),
             {
               id: 'logs',

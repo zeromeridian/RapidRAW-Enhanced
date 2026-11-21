@@ -784,7 +784,9 @@ fn keyword_image_paths_from_connection(
     Ok(rows.filter_map(Result::ok).collect())
 }
 
-/// One external-editor round trip (`editor_round_trip.rs`).
+/// One external-editor round trip (`editor_round_trip.rs`): since 1.109.0 a
+/// hidden working copy beside the source (`staging_dir` is its folder),
+/// before that a folder in the app cache.
 #[derive(Clone, Debug, PartialEq)]
 pub struct EditorRoundTripRow {
     pub id: String,
@@ -1112,49 +1114,61 @@ mod tests {
     }
 
     #[test]
-    fn editor_round_trips_insert_update_and_delete() {
+    fn editor_round_trips_load_their_files_and_delete() {
         let temporary = tempfile::tempdir().unwrap();
         let connection = open_at(temporary.path().join("catalog.sqlite3")).unwrap();
-        let render = StagedFileRow {
-            path: "/cache/external-edits/session/IMG_1-Edit.tif".to_owned(),
-            len: 10,
-            modified: 1_800_000_000_000_000_000,
-            destination: None,
+        connection
+            .execute_batch(
+                "INSERT INTO editor_round_trips
+                     (id, source_path, staging_dir, destination, saved_file, saved_len, saved_modified, created_at)
+                 VALUES ('session', '/photos/IMG_1.CR3?vc=2', '/cache/external-edits/session',
+                         '/photos/IMG_1-Edit.jpg', '/cache/external-edits/session/IMG_1-Edit.jpg', 5, 3, 7);
+                 INSERT INTO editor_round_trip_files (session_id, staged_file, len, modified, destination)
+                 VALUES ('session', '/cache/external-edits/session/IMG_1-Edit.jpg', 5, 3, '/photos/IMG_1-Edit.jpg'),
+                        ('session', '/cache/external-edits/session/IMG_1-Edit.tif', 20, 2, NULL);",
+            )
+            .unwrap();
+        let file = |name: &str, len, modified, destination: Option<&str>| StagedFileRow {
+            path: format!("/cache/external-edits/session/{name}"),
+            len,
+            modified,
+            destination: destination.map(str::to_owned),
         };
-        let mut row = EditorRoundTripRow {
+        assert_eq!(
+            load_editor_round_trips_from_connection(&connection).unwrap(),
+            vec![EditorRoundTripRow {
+                id: "session".to_owned(),
+                source_path: "/photos/IMG_1.CR3?vc=2".to_owned(),
+                staging_dir: "/cache/external-edits/session".to_owned(),
+                files: vec![
+                    file("IMG_1-Edit.tif", 20, 2, None),
+                    file("IMG_1-Edit.jpg", 5, 3, Some("/photos/IMG_1-Edit.jpg")),
+                ],
+                created_at: 7,
+            }]
+        );
+
+        // A save of the working copy replaces the files; the source, folder
+        // and creation time never change.
+        let saved = EditorRoundTripRow {
             id: "session".to_owned(),
             source_path: "/photos/IMG_1.CR3?vc=2".to_owned(),
             staging_dir: "/cache/external-edits/session".to_owned(),
-            files: vec![render.clone()],
-            created_at: 7,
-        };
-        save_editor_round_trip_to_connection(&connection, &row).unwrap();
-
-        let saved = EditorRoundTripRow {
-            files: vec![
-                StagedFileRow {
-                    len: 20,
-                    modified: render.modified + 1,
-                    destination: Some("/photos/IMG_1-Edit.tif".to_owned()),
-                    ..render.clone()
-                },
-                StagedFileRow {
-                    path: "/cache/external-edits/session/IMG_1-Edit.jpg".to_owned(),
-                    len: 5,
-                    modified: render.modified + 2,
-                    destination: Some("/photos/IMG_1-Edit.jpg".to_owned()),
-                },
-            ],
-            // The source, staging folder, and creation time never change.
+            files: vec![file(
+                "IMG_1-Edit.tif",
+                30,
+                4,
+                Some("/photos/IMG_1-Edit.tif"),
+            )],
             created_at: 99,
-            ..row.clone()
         };
         save_editor_round_trip_to_connection(&connection, &saved).unwrap();
-
-        row.files = saved.files.clone();
         assert_eq!(
             load_editor_round_trips_from_connection(&connection).unwrap(),
-            vec![row]
+            vec![EditorRoundTripRow {
+                created_at: 7,
+                ..saved
+            }]
         );
 
         delete_editor_round_trip_from_connection(&connection, "session").unwrap();

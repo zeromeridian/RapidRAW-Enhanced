@@ -434,7 +434,10 @@
       "unstack": "Unstack Photos",
       "virtualCopy": "Virtual Copy",
       "autoStackByCaptureTime": "Auto-Stack by Capture Time…",
-      "originalFile": "Original File"
+      "originalFile": "Original File",
+      "openAsLayers": "Open as Layers",
+      "openAsLayersConfirm": "Open as Layers",
+      "openAsLayersMessage": "Open {{count}} photos as layers of one file? Every photo is rendered at full size into a single 16-bit TIFF, which can take a while and use several gigabytes."
     },
     "toasts": {
       "couldNotShowExplorer": "Could not show file in explorer: {{err}}",
@@ -2247,8 +2250,7 @@
         "confirmClearCache": "Clear Cache",
         "confirmDeleteAllEdits": "Delete All Edits",
         "confirmTitle": "Confirm Deletion",
-        "sidecarMessage": "Are you sure you want to delete all sidecar files?\n\nThis will permanently remove all your edits for all images inside all active root folders and their subfolders.",
-        "externalEditsMessage": "Are you sure you want to clear the external edit copies?\n\nEdits still open in an external editor will no longer be saved back to ThisIsRAW. Copies already saved beside your photos are kept."
+        "sidecarMessage": "Are you sure you want to delete all sidecar files?\n\nThis will permanently remove all your edits for all images inside all active root folders and their subfolders."
       },
       "noFolders": "No folders selected",
       "statuses": {
@@ -2273,9 +2275,7 @@
         "aiDenoiseSuccess": "AI Denoise cache cleared successfully.",
         "aiUpscaleSuccess": "AI Super Resolution cache cleared successfully.",
         "clearingAiUpscale": "Clearing AI Super Resolution cache...",
-        "clearingAiDenoise": "Clearing AI Denoise cache...",
-        "clearingExternalEdits": "Clearing external edit copies...",
-        "externalEditsSuccess": "External edit copies cleared successfully."
+        "clearingAiDenoise": "Clearing AI Denoise cache..."
       },
       "title": "Data Management",
       "clearAiDenoise": "Clear AI Denoise Cache",
@@ -2283,10 +2283,7 @@
       "clearAiUpscale": "Clear AI Super Resolution Cache",
       "clearAiUpscaleButton": "Clear",
       "clearAiUpscaleDesc": "Deletes the cached AI Super Resolution results ({{size}}). Images with AI Super Resolution enabled are upscaled again the next time they are opened.",
-      "clearAiDenoiseDesc": "Deletes the cached AI Denoise results ({{size}}). Images with AI Denoise enabled recalculate it the next time they are opened.",
-      "clearExternalEdits": "Clear External Edit Copies",
-      "clearExternalEditsButton": "Clear",
-      "clearExternalEditsDesc": "Deletes the working copies opened in external editors ({{size}}). Copies already saved beside your photos are kept. Copies are removed automatically after 7 days without a save."
+      "clearAiDenoiseDesc": "Deletes the cached AI Denoise results ({{size}}). Images with AI Denoise enabled recalculate it the next time they are opened."
     },
     "general": {
       "autoStackCreatedImages": "Automatically Stack Created Images",

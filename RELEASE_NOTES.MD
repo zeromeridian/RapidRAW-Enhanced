@@ -5,6 +5,58 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.109.2-dev-open-as-layers — 2026-11-21
+
+### Edit in external editors
+
+- With several photos selected, **Open in → (editor)** opens each of them
+  as its own copy, one after another, as Lightroom Classic's Edit In
+  does. **Open as Layers** is offered below the editors.
+- When the editor's Save dialog suggests the hidden name (starting with a
+  dot), you can simply remove the dot: the file saved as
+  `-Edit.tif` is then your copy, listed and stacked with the photo, and
+  later saves go straight to it. Keeping the dot still works too.
+
+## 1.109.1-dev-open-as-layers — 2026-11-21
+
+### Edit in external editors
+
+- **Open in** and **Open as Layers** work as in Lightroom Classic with
+  Photoshop again: nothing new appears in the Library until you save in
+  the editor. Then `-Edit.tif` (or `-Edit.jpg`) appears beside the photo,
+  stacked with it, and every later save updates it.
+- The file the editor opens is a hidden working copy in the photo's own
+  folder, so an editor that asks where to save, as Photo Craft does,
+  opens its dialog in the right place: confirm the suggested name. A
+  working copy that is never saved is removed after 7 days.
+- Hidden files (names starting with a dot) are no longer listed in the
+  Library.
+
+## 1.109.0-dev-open-as-layers — 2026-11-21
+
+### Edit in external editors
+
+- **Open as Layers**, as in Lightroom Classic: select two or more photos,
+  right-click and choose **Open in → Open as Layers → (editor)**. ThisIsRAW
+  renders each photo with its edits into one 16-bit layered TIFF, one
+  layer per photo named after its file, with the first selected photo on
+  top. Photos of different sizes are centred on a canvas that fits the
+  largest. The file is saved beside the first photo as `-Edit.tif`,
+  stacked with it, and opened in the editor; editors without layers show
+  the combined image. With more than 10 photos, ThisIsRAW asks first.
+- **Open in** now writes its copy straight beside your photo
+  (`-Edit.tif` or `-Edit.jpg`), adds it to the Library stacked with the
+  photo, and opens it. When your editor asks where to save, as Photo
+  Craft does, save over that file in the photo's folder. Before, saves
+  had to go into a hidden working folder and were missed whenever the
+  editor's Save dialog pointed elsewhere.
+- Every save of the copy refreshes its thumbnail, also when you save
+  while ThisIsRAW is closed. An edit you abandon leaves the copy; delete
+  it like any photo.
+- **Settings → Storage → Clear External Edit Copies** is gone: there is no
+  hidden working folder any more. Saves still waiting in it from an
+  earlier version are placed beside their photos at the next launch.
+
 ## 1.108.0-dev-refine-photos — 2026-11-21
 
 ### Library

@@ -1309,7 +1309,7 @@ fn encode_grayscale_to_png(bitmap: &GrayImage) -> Result<Vec<u8>, String> {
 }
 
 /// Exports are sRGB-encoded; tagging them lets color-managed apps read them correctly.
-const SRGB_ICC_PROFILE: &[u8] = include_bytes!("../icc/sRGB-v2-magic.icc");
+pub(crate) const SRGB_ICC_PROFILE: &[u8] = include_bytes!("../icc/sRGB-v2-magic.icc");
 
 /// Encodes an export. A TIFF gets `tiff_metadata` written by its encoder; the other formats
 /// get their metadata afterwards from `exif_processing::write_image_with_metadata`.

@@ -2049,8 +2049,7 @@
         "confirmClearCache": "Wyczyść pamięć podręczną",
         "confirmDeleteAllEdits": "Usuń wszystkie edycje",
         "confirmTitle": "Potwierdź usunięcie",
-        "sidecarMessage": "Czy na pewno chcesz usunąć wszystkie pliki sidecar?\n\nTo trwale usunie wszystkie twoje edycje dla wszystkich obrazów wewnątrz wszystkich aktywnych folderów głównych oraz ich podfolderów.",
-        "externalEditsMessage": "Czy na pewno chcesz wyczyścić kopie edycji zewnętrznej?\n\nEdycje nadal otwarte w zewnętrznym edytorze nie wrócą już do ThisIsRAW. Kopie już zapisane obok zdjęć zostają zachowane."
+        "sidecarMessage": "Czy na pewno chcesz usunąć wszystkie pliki sidecar?\n\nTo trwale usunie wszystkie twoje edycje dla wszystkich obrazów wewnątrz wszystkich aktywnych folderów głównych oraz ich podfolderów."
       },
       "noFolders": "Nie wybrano żadnych folderów",
       "statuses": {
@@ -2081,9 +2080,7 @@
         "aiDenoiseSuccess": "Pamięć podręczna odszumiania AI została wyczyszczona.",
         "aiUpscaleSuccess": "Pamięć podręczna superrozdzielczości AI została wyczyszczona.",
         "clearingAiUpscale": "Czyszczenie pamięci podręcznej superrozdzielczości AI...",
-        "clearingAiDenoise": "Czyszczenie pamięci podręcznej odszumiania AI...",
-        "clearingExternalEdits": "Czyszczenie kopii edycji zewnętrznej...",
-        "externalEditsSuccess": "Kopie edycji zewnętrznej zostały wyczyszczone."
+        "clearingAiDenoise": "Czyszczenie pamięci podręcznej odszumiania AI..."
       },
       "title": "Zarządzanie danymi",
       "clearAiDenoise": "Wyczyść pamięć podręczną odszumiania AI",
@@ -2091,10 +2088,7 @@
       "clearAiUpscale": "Wyczyść pamięć podręczną superrozdzielczości AI",
       "clearAiUpscaleButton": "Wyczyść",
       "clearAiUpscaleDesc": "Usuwa zapisane wyniki superrozdzielczości AI ({{size}}). Zdjęcia z włączoną superrozdzielczością AI zostaną powiększone ponownie przy następnym otwarciu.",
-      "clearAiDenoiseDesc": "Usuwa zapisane wyniki odszumiania AI ({{size}}). Zdjęcia z włączonym odszumianiem AI przeliczą je przy następnym otwarciu.",
-      "clearExternalEdits": "Wyczyść kopie edycji zewnętrznej",
-      "clearExternalEditsButton": "Wyczyść",
-      "clearExternalEditsDesc": "Usuwa kopie robocze otwarte w zewnętrznych edytorach ({{size}}). Kopie już zapisane obok zdjęć zostają zachowane. Kopie są usuwane automatycznie po 7 dniach bez zapisu."
+      "clearAiDenoiseDesc": "Usuwa zapisane wyniki odszumiania AI ({{size}}). Zdjęcia z włączonym odszumianiem AI przeliczą je przy następnym otwarciu."
     },
     "general": {
       "copyNameSuffix": "Copy Name Suffix",

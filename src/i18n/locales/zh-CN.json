@@ -1959,8 +1959,7 @@
         "confirmClearCache": "清除缓存",
         "confirmDeleteAllEdits": "删除所有编辑",
         "confirmTitle": "确认删除",
-        "sidecarMessage": "您确定要删除所有附属文件吗？\n\n这将永久删除所有活动根文件夹及其子文件夹中所有图像的所有编辑数据。",
-        "externalEditsMessage": "确定要清除外部编辑副本吗？\n\n仍在外部编辑器中打开的编辑将不再回传到 ThisIsRAW。已保存在照片旁边的副本会保留。"
+        "sidecarMessage": "您确定要删除所有附属文件吗？\n\n这将永久删除所有活动根文件夹及其子文件夹中所有图像的所有编辑数据。"
       },
       "noFolders": "未选择文件夹",
       "statuses": {
@@ -1985,9 +1984,7 @@
         "aiDenoiseSuccess": "AI 降噪缓存已成功清除。",
         "aiUpscaleSuccess": "AI 超分辨率缓存已成功清除。",
         "clearingAiUpscale": "正在清除 AI 超分辨率缓存...",
-        "clearingAiDenoise": "正在清除 AI 降噪缓存...",
-        "clearingExternalEdits": "正在清除外部编辑副本...",
-        "externalEditsSuccess": "外部编辑副本已成功清除。"
+        "clearingAiDenoise": "正在清除 AI 降噪缓存..."
       },
       "title": "数据管理",
       "clearAiDenoise": "清除 AI 降噪缓存",
@@ -1995,10 +1992,7 @@
       "clearAiUpscale": "清除 AI 超分辨率缓存",
       "clearAiUpscaleButton": "清除",
       "clearAiUpscaleDesc": "删除已缓存的 AI 超分辨率结果（{{size}}）。启用了 AI 超分辨率的图像会在下次打开时重新放大。",
-      "clearAiDenoiseDesc": "删除已缓存的 AI 降噪结果（{{size}}）。启用了 AI 降噪的图像会在下次打开时重新计算。",
-      "clearExternalEdits": "清除外部编辑副本",
-      "clearExternalEditsButton": "清除",
-      "clearExternalEditsDesc": "删除在外部编辑器中打开的工作副本（{{size}}）。已保存在照片旁边的副本会保留。7 天内未保存的副本会被自动删除。"
+      "clearAiDenoiseDesc": "删除已缓存的 AI 降噪结果（{{size}}）。启用了 AI 降噪的图像会在下次打开时重新计算。"
     },
     "general": {
       "copyNameSuffix": "Copy Name Suffix",

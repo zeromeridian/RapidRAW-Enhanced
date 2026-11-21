@@ -2005,8 +2005,7 @@
         "confirmClearCache": "Effacer le cache",
         "confirmDeleteAllEdits": "Supprimer toutes les retouches",
         "confirmTitle": "Confirmer la suppression",
-        "sidecarMessage": "Êtes-vous sûr de vouloir supprimer tous les fichiers annexes ?\n\nCeci supprimera définitivement toutes vos retouches pour toutes les images à l'intérieur de tous les dossiers racine actifs et de leurs sous-dossiers.",
-        "externalEditsMessage": "Voulez-vous vraiment effacer les copies d’édition externe ?\n\nLes modifications encore ouvertes dans un éditeur externe ne seront plus renvoyées à ThisIsRAW. Les copies déjà enregistrées à côté de vos photos sont conservées."
+        "sidecarMessage": "Êtes-vous sûr de vouloir supprimer tous les fichiers annexes ?\n\nCeci supprimera définitivement toutes vos retouches pour toutes les images à l'intérieur de tous les dossiers racine actifs et de leurs sous-dossiers."
       },
       "noFolders": "Aucun dossier sélectionné",
       "statuses": {
@@ -2034,9 +2033,7 @@
         "aiDenoiseSuccess": "Cache du débruitage IA vidé avec succès.",
         "aiUpscaleSuccess": "Cache de la super-résolution IA vidé avec succès.",
         "clearingAiUpscale": "Vidage du cache de la super-résolution IA...",
-        "clearingAiDenoise": "Vidage du cache du débruitage IA...",
-        "clearingExternalEdits": "Effacement des copies d’édition externe...",
-        "externalEditsSuccess": "Copies d’édition externe effacées avec succès."
+        "clearingAiDenoise": "Vidage du cache du débruitage IA..."
       },
       "title": "Gestion des données",
       "clearAiDenoise": "Vider le cache du débruitage IA",
@@ -2044,10 +2041,7 @@
       "clearAiUpscale": "Vider le cache de la super-résolution IA",
       "clearAiUpscaleButton": "Vider",
       "clearAiUpscaleDesc": "Supprime les résultats de la super-résolution IA mis en cache ({{size}}). Les images avec la super-résolution IA activée seront agrandies à nouveau à leur prochaine ouverture.",
-      "clearAiDenoiseDesc": "Supprime les résultats du débruitage IA mis en cache ({{size}}). Les images avec le débruitage IA activé le recalculeront à leur prochaine ouverture.",
-      "clearExternalEdits": "Effacer les copies d’édition externe",
-      "clearExternalEditsButton": "Effacer",
-      "clearExternalEditsDesc": "Supprime les copies de travail ouvertes dans des éditeurs externes ({{size}}). Les copies déjà enregistrées à côté de vos photos sont conservées. Les copies sont supprimées automatiquement après 7 jours sans enregistrement."
+      "clearAiDenoiseDesc": "Supprime les résultats du débruitage IA mis en cache ({{size}}). Les images avec le débruitage IA activé le recalculeront à leur prochaine ouverture."
     },
     "general": {
       "copyNameSuffix": "Copy Name Suffix",
