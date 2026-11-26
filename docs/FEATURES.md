@@ -306,7 +306,9 @@ details are in `RELEASE_NOTES.MD`.
   Edit Profile (its settings back on the sliders, then Update Profile;
   photos using it keep their version), Rename (name, group, B&W), Export
   or Delete; Import Profiles adds `.tirprofile` files; Save to my profiles
-  keeps a photo's embedded profile. The profile is embedded in
+  keeps a photo's embedded profile. The same dialog can **Save as LUT**:
+  the ticked settings as a finishing LUT for Look → LUT (the photo left
+  as it is). The profile is embedded in
   the edit and XMP, so it renders without the file; Copy & Paste, presets
   and Auto Sync carry it. With a profile, Color Calibration acts before it.
 - **Adjustments sections in workflow order**: Light (Profile, Black &

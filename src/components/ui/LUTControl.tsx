@@ -94,9 +94,10 @@ export default function LUTControl({
     }
   }, []);
 
+  // Listed again whenever the browser opens, so LUTs saved meanwhile (Save as LUT) appear.
   useEffect(() => {
     refreshList();
-  }, [refreshList]);
+  }, [refreshList, isExpanded]);
 
   useEffect(() => {
     if (!isExpanded || !selectedImagePath || !isImageReady || entries.length === 0) {

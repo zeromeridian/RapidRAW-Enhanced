@@ -1591,21 +1591,29 @@ fn export_masks_for_image(
     Ok(())
 }
 
-fn export_adjustments_as_lut(
+/// The edit as a `.cube` display LUT (33³): an identity lattice rendered as a non-RAW image
+/// through every per-pixel adjustment, the spatial ones off. Used by Export as LUT and by
+/// Create Profile's Save as LUT (`custom_profile::save_as_lut`).
+pub(crate) fn export_adjustments_as_lut(
     js_adjustments: &Value,
     context: &Arc<GpuContext>,
     state: &tauri::State<AppState>,
-    app_handle: &tauri::AppHandle,
     cancellation_token: &AtomicBool,
 ) -> Result<Vec<u8>, String> {
     ensure_export_not_cancelled(cancellation_token)?;
     let lut_size = 33;
     let identity_image = generate_identity_lut_image(lut_size);
 
-    let tm_override = resolve_tonemapper_override_from_handle(app_handle, false);
-    let mut all_adjustments = get_all_adjustments_from_json(js_adjustments, false, tm_override);
+    let mut all_adjustments = get_all_adjustments_from_json(js_adjustments, false, None);
+    // The lattice is display sRGB already: Basic passes it through, while AgX (the edit's or a
+    // Settings override) would tone-map it a second time.
+    all_adjustments.global.tonemapper_mode = crate::tone_mapping::TONE_MAPPER_MODE_BASIC;
 
     all_adjustments.global.show_clipping = 0;
+    all_adjustments.global.point_color_visualize = 0;
+    all_adjustments.global.gaussian_blur_amount = 0.0;
+    all_adjustments.global.zone_tint.smoothing = [0.0; 4];
+    all_adjustments.global.profile_zone_tint.smoothing = [0.0; 4];
     all_adjustments.global.vignette_amount = 0.0;
     all_adjustments.global.grain_amount = 0.0;
     all_adjustments.global.sharpness = 0.0;
@@ -2050,7 +2058,6 @@ pub(crate) async fn export_images_impl(
                             &js_adjustments,
                             &context_clone,
                             &state,
-                            &app_handle_clone,
                             &cancellation_token_clone,
                         )?;
                         ensure_export_not_cancelled(&cancellation_token_clone)?;

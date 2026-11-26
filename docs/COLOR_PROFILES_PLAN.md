@@ -1,9 +1,9 @@
 # Color Profiles Plan
 
-Status (2026-11-26): **Phases 1 and 2 built as `1.112.0`** on
-`dev/custom-profiles` (owner said go 2026-11-26; the owner commits);
-decisions 1–7 taken by the owner (below). Plan item 83 in
-`UPSTREAM_FEATURE_GAP.md`. Phase 3 and decision 6 (`lutData`) open.
+Status (2026-11-26): **all phases built**, `1.112.0`–`1.116.0` on
+`dev/custom-profiles` (the owner commits; `1.116.0` awaits the owner's
+check); decisions 1–7 taken by the owner (below). Plan item 83 in
+`UPSTREAM_FEATURE_GAP.md`.
 
 ## Progress
 
@@ -69,7 +69,18 @@ decisions 1–7 taken by the owner (below). Plan item 83 in
   `lutData`. **Bug found and fixed:** a missing LUT file left `has_lut`
   on with the empty placeholder texture, mixing black into the photo;
   `gpu_processing` now clears `has_lut` (and `has_profile`) without a
-  table. Next: Phase 3 (Save as LUT).
+  table. Owner's check: "looks ok" (`b60c995f`).
+- **`1.116.0` (Phase 3, step 5b):** Create Profile's dialog has a
+  Profile | LUT switch; **Save as LUT** (`save_settings_as_lut`) bakes
+  the ticked settings (`recipe_of`) through `export_adjustments_as_lut`
+  into a `.cube` in the LUT folder; the photo is left unchanged (agent
+  choice, so a LUT baked on display values is never applied over the
+  same settings; differs from the plan's "reset" option below). **AgX
+  bake fix:** the display-LUT bake forces the Basic tone mapper and no
+  Settings override (also fixes Export as LUT), and turns off Gaussian
+  Blur, Point Color Visualize and Zone Editor mask smoothing. The LUT
+  browser lists again whenever it opens. **Plan item 83 complete** apart
+  from the owner's checks.
 - **Deviations from the design below (agent, 2026-11-26):** table stored
   as 16-bit integers and uploaded as `Rgba32Float` (not f16: the
   shaper-encoded values needed the precision); shaper 16 stops below and

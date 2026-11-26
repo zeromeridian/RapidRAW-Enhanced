@@ -2770,6 +2770,7 @@ pub fn run() {
             custom_profile::import_custom_profiles,
             custom_profile::export_custom_profile,
             custom_profile::generate_profile_previews,
+            custom_profile::save_settings_as_lut,
             fetch_community_presets,
             generate_all_community_previews,
             save_temp_file,

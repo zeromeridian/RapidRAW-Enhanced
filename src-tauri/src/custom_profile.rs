@@ -900,6 +900,55 @@ pub async fn export_custom_profile(
     .await
 }
 
+/// Save as LUT (Create Profile's second target): the ticked settings of the open photo baked
+/// into a `.cube` finishing LUT in the LUT folder, for Look → LUT on any photo. A LUT acts on
+/// the finished photo, after every slider, so it matches JPEGs closely and RAW photos only
+/// approximately. The photo itself is left as it is. Returns the new file's path.
+#[tauri::command]
+pub async fn save_settings_as_lut(
+    request: CreateProfileRequest,
+    app_handle: AppHandle,
+) -> Result<String, String> {
+    crate::blocking_command::run_blocking(move || {
+        let name = request.name.trim();
+        if name.is_empty() {
+            return Err("A LUT needs a name".to_string());
+        }
+        let state = app_handle.state::<AppState>();
+        let context = Arc::new(crate::image_processing::get_or_init_gpu_context(
+            &state,
+            &app_handle,
+        )?);
+        let mut edit = recipe_of(&request.adjustments, &request.keys);
+        if let Some(visibility) = request.adjustments.get("sectionVisibility") {
+            edit["sectionVisibility"] = visibility.clone();
+        }
+        edit["monochrome"] = request.monochrome.into();
+        let cube = crate::export_processing::export_adjustments_as_lut(
+            &edit,
+            &context,
+            &state,
+            &std::sync::atomic::AtomicBool::new(false),
+        )?;
+
+        let data_dir = app_handle
+            .path()
+            .app_data_dir()
+            .map_err(|e| e.to_string())?;
+        let dir = crate::lut_processing::get_luts_dir(&data_dir).map_err(|e| e.to_string())?;
+        let stem = crate::naming::clean_file_stem(name);
+        let path = crate::lut_processing::unique_destination(
+            &dir,
+            if stem.is_empty() { "LUT" } else { &stem },
+            "cube",
+        );
+        fs::write(&path, cube).map_err(|e| e.to_string())?;
+        log::info!("Saved settings as LUT {}", path.display());
+        Ok(path.to_string_lossy().into_owned())
+    })
+    .await
+}
+
 /// One profile's preview in the Profile browser's grid.
 #[derive(Serialize)]
 pub struct ProfilePreview {

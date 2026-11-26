@@ -5,6 +5,19 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.116.0-dev-custom-profiles — 2026-11-26
+
+### Develop
+
+- **Save as LUT**: in Create Profile (the **+** in the Profile row),
+  choose **LUT** at the top to save the ticked settings as a LUT instead
+  of a profile. It appears in Look → LUT for any photo; the photo you made
+  it from stays as it is. A LUT works on the finished photo, after every
+  slider, so it matches JPEGs closely and RAW photos only approximately.
+- Export as LUT (`.cube`) no longer applies the AgX tone mapper or the
+  Settings tone mapper override a second time, so the exported LUT
+  matches the edit.
+
 ## 1.115.1-dev-custom-profiles — 2026-11-26
 
 ### Develop

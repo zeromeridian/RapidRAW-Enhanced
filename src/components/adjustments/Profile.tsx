@@ -382,8 +382,26 @@ export default function ProfilePanel({
     }
   };
 
+  /** Save as LUT: the ticked settings into a finishing LUT in Look → LUT; the photo stays as it is. */
+  const handleSaveLut = async (choice: CreateProfileChoice) => {
+    const keys = PROFILE_BAKE_GROUPS.filter((bake) => choice.groups.has(bake.id)).flatMap((bake) => bake.keys);
+    setIsBaking(true);
+    try {
+      await invoke<string>(Invokes.SaveSettingsAsLut, {
+        request: { name: choice.name, group: '', keys, monochrome: choice.monochrome, adjustments },
+      });
+      toast.success(t('modals.createProfile.lutSaved', { name: choice.name }));
+      setDialog(null);
+    } catch (err) {
+      toast.error(t('modals.createProfile.lutFailed', { error: String(err) }));
+    } finally {
+      setIsBaking(false);
+    }
+  };
+
   const handleDialogSubmit = (choice: CreateProfileChoice) => {
     if (dialog?.mode === 'rename') handleRename(dialog.entry, choice);
+    else if (choice.target === 'lut') handleSaveLut(choice);
     else handleBake(choice, dialog?.mode === 'update' ? dialog.entry : undefined);
   };
 

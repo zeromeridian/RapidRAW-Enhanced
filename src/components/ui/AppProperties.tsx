@@ -67,6 +67,7 @@ export enum Invokes {
   ImportCustomProfiles = 'import_custom_profiles',
   ExportCustomProfile = 'export_custom_profile',
   GenerateProfilePreviews = 'generate_profile_previews',
+  SaveSettingsAsLut = 'save_settings_as_lut',
   CreateFolder = 'create_folder',
   CreateVirtualCopy = 'create_virtual_copy',
   CullImages = 'cull_images',

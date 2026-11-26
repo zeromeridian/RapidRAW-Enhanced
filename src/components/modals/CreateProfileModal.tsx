@@ -8,12 +8,16 @@ import TickBox from '../ui/TickBox';
 import { TextColors, TextVariants } from '../../types/typography';
 import { PROFILE_BAKE_GROUPS } from '../../utils/adjustments';
 
+/** What Create makes: a profile (the base of the look) or a finishing LUT (Save as LUT). */
+export type CreateTarget = 'profile' | 'lut';
+
 export interface CreateProfileChoice {
   name: string;
   group: string;
   /** The `PROFILE_BAKE_GROUPS` ids to bake (none when renaming). */
   groups: Set<string>;
   monochrome: boolean;
+  target: CreateTarget;
 }
 
 /** Create a profile, bake a new revision of the one being edited, or rename one. */
@@ -70,6 +74,7 @@ export default function CreateProfileModal({
   const [group, setGroup] = useState('');
   const [groups, setGroups] = useState<Set<string>>(new Set());
   const [monochrome, setMonochrome] = useState(false);
+  const [target, setTarget] = useState<CreateTarget>('profile');
   const [isMounted, setIsMounted] = useState(false);
   const [show, setShow] = useState(false);
   const wasOpen = useRef(false);
@@ -82,6 +87,7 @@ export default function CreateProfileModal({
         setGroup(initialGroup);
         setGroups(new Set(initialGroups));
         setMonochrome(initialMonochrome);
+        setTarget('profile');
       }
       wasOpen.current = true;
       setIsMounted(true);
@@ -95,12 +101,20 @@ export default function CreateProfileModal({
   }, [isOpen, initialName, initialGroup, initialGroups, initialMonochrome]);
 
   const canSubmit = name.trim() !== '' && !isBusy;
+  // Only a new bake can be a LUT; Update and Rename are for profiles.
+  const isLut = mode === 'create' && target === 'lut';
 
   const handleSubmit = useCallback(() => {
     if (canSubmit) {
-      onSubmit({ name: name.trim(), group: group.trim(), groups: mode === 'rename' ? new Set() : groups, monochrome });
+      onSubmit({
+        name: name.trim(),
+        group: group.trim(),
+        groups: mode === 'rename' ? new Set() : groups,
+        monochrome,
+        target: isLut ? 'lut' : 'profile',
+      });
     }
-  }, [canSubmit, group, groups, mode, monochrome, name, onSubmit]);
+  }, [canSubmit, group, groups, isLut, mode, monochrome, name, onSubmit]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -158,26 +172,46 @@ export default function CreateProfileModal({
         onClick={(e) => e.stopPropagation()}
       >
         <Text variant={TextVariants.title} className="mb-4">
-          {t(TITLES[mode])}
+          {t(isLut ? 'modals.createProfile.titleLut' : TITLES[mode])}
         </Text>
+        {mode === 'create' && (
+          <div className="flex mb-3 p-1 rounded-md bg-bg-primary" role="radiogroup">
+            {(['profile', 'lut'] as const).map((option) => (
+              <button
+                aria-checked={target === option}
+                className={`flex-1 px-3 py-1 rounded-sm text-sm transition-colors ${
+                  target === option ? 'bg-accent text-button-text' : 'text-text-secondary hover:text-text-primary'
+                }`}
+                key={option}
+                onClick={() => setTarget(option)}
+                role="radio"
+                type="button"
+              >
+                {t(option === 'lut' ? 'modals.createProfile.targetLut' : 'modals.createProfile.targetProfile')}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex flex-col gap-2">
           <input
             autoFocus
             className={INPUT_CLASS}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={t('modals.createProfile.namePlaceholder')}
+            placeholder={t(isLut ? 'modals.createProfile.lutNamePlaceholder' : 'modals.createProfile.namePlaceholder')}
             type="text"
             value={name}
           />
-          <input
-            className={INPUT_CLASS}
-            onChange={(e) => setGroup(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={t('modals.createProfile.groupPlaceholder')}
-            type="text"
-            value={group}
-          />
+          {!isLut && (
+            <input
+              className={INPUT_CLASS}
+              onChange={(e) => setGroup(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={t('modals.createProfile.groupPlaceholder')}
+              type="text"
+              value={group}
+            />
+          )}
         </div>
 
         {mode === 'rename' ? (
@@ -188,7 +222,13 @@ export default function CreateProfileModal({
               <div>
                 <Text variant={TextVariants.heading}>{t('modals.createProfile.settings')}</Text>
                 <Text variant={TextVariants.small}>
-                  {t(mode === 'update' ? 'modals.createProfile.hintUpdate' : 'modals.createProfile.hint')}
+                  {t(
+                    isLut
+                      ? 'modals.createProfile.hintLut'
+                      : mode === 'update'
+                        ? 'modals.createProfile.hintUpdate'
+                        : 'modals.createProfile.hint',
+                  )}
                 </Text>
               </div>
               <div className="flex gap-2 shrink-0">
@@ -236,7 +276,7 @@ export default function CreateProfileModal({
             disabled={!canSubmit}
             onClick={handleSubmit}
           >
-            {t(SUBMIT_LABELS[mode])}
+            {t(isLut ? 'modals.createProfile.saveLut' : SUBMIT_LABELS[mode])}
           </button>
         </div>
       </div>
