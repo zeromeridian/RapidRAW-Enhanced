@@ -4,8 +4,6 @@ import { Coord } from '../../../../utils/adjustments';
 import { MAX_FINE_ROTATION } from '../../../../utils/cropUtils';
 import { placeHud } from './hudPlacement';
 
-/** Side of the square rotate zone diagonally outside each crop corner, in screen pixels (owner 2026-11-16). */
-const ROTATE_ZONE = 40;
 const CURSOR_STEP = 45;
 const CROP_SELECTION_SELECTOR = '.ReactCrop__crop-selection';
 
@@ -36,12 +34,9 @@ const centerOf = (rect: DOMRect): Coord => ({ x: rect.left + rect.width / 2, y: 
 // Ctrl/Cmd outside the frame moves the crop (`Editor.tsx`), so a modified press never rotates.
 const hasMoveModifier = (e: React.PointerEvent) => e.metaKey || e.ctrlKey;
 
-/** Whether `point` lies in one of the square zones just outside the selection's corners. */
-const isInCornerZone = (point: Coord, selection: DOMRect) => {
-  const dx = Math.max(selection.left - point.x, point.x - selection.right);
-  const dy = Math.max(selection.top - point.y, point.y - selection.bottom);
-  return dx > 0 && dy > 0 && dx <= ROTATE_ZONE && dy <= ROTATE_ZONE;
-};
+/** Whether `point` lies outside the selection, where a drag rotates (Lightroom style, owner 2026-11-26). */
+const isOutsideSelection = (point: Coord, selection: DOMRect) =>
+  point.x < selection.left || point.x > selection.right || point.y < selection.top || point.y > selection.bottom;
 
 interface CropRotateAreaProps extends React.HTMLAttributes<HTMLDivElement> {
   enabled: boolean;
@@ -52,9 +47,10 @@ interface CropRotateAreaProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 /**
- * The crop view's container, Lightroom style (Plan item 37): dragging in a square just outside a
- * corner of the crop frame rotates the photo around the frame's centre (Shift for fine rotation),
- * with the angle in a label beside the cursor. Everywhere else the crop gestures stay as they are.
+ * The crop view's container, Lightroom style (Plan items 37 and 80): dragging anywhere outside the
+ * crop frame rotates the photo around the frame's centre (Shift for fine rotation), with the angle
+ * in a label beside the cursor, so a drag there never draws a new frame. Inside the frame, and
+ * Ctrl/Cmd-drags outside it, the crop gestures stay as they are.
  */
 export default function CropRotateArea({
   enabled,
@@ -126,7 +122,7 @@ export default function CropRotateArea({
     if (e.target instanceof Element && e.target.closest(CROP_SELECTION_SELECTOR)) return;
     const selection = getSelectionRect();
     const point = clientPoint(e);
-    if (!selection || !isInCornerZone(point, selection)) return;
+    if (!selection || !isOutsideSelection(point, selection)) return;
 
     // Keep ReactCrop from starting a new selection and the canvas from panning.
     e.preventDefault();
@@ -153,7 +149,7 @@ export default function CropRotateArea({
     if (!drag) {
       if (e.buttons !== 0) return;
       const selection = getSelectionRect();
-      if (selection && !hasMoveModifier(e) && isInCornerZone(point, selection)) {
+      if (selection && !hasMoveModifier(e) && isOutsideSelection(point, selection)) {
         setRotateCursor(centerOf(selection), point);
       } else {
         setCursor('');

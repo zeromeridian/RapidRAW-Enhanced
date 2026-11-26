@@ -380,9 +380,10 @@ details are in `RELEASE_NOTES.MD`.
 - Optional neutral grey editor canvas and click-to-100% zoom.
 - Single-row photo information bar in Develop (file name, resolution, and
   capture details); clicking it hides or shows the capture details, and the
-  choice persists. Its fine rotation can
-  be adjusted either precisely with the existing slider or directly by dragging
-  outside a corner of the crop frame.
+  choice persists.
+- In Crop, the fine rotation can be adjusted either precisely with the slider
+  or, as in Lightroom Classic, by dragging anywhere outside the crop frame
+  (Shift for fine rotation; Cmd/Ctrl-drag there moves the frame instead).
 - Dedicated **Crop** and **Geometry** modules separate composition from
   perspective work. Geometry includes full **Auto** correction that jointly
   balances rotation and both perspective axes (and remains useful for a

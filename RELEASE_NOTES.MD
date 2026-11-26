@@ -12,6 +12,13 @@ description.
 - OM System **.ORI** files (the original frame the camera keeps beside a
   computational shot) are now listed and open like any other RAW.
 
+### Develop
+
+- Crop: drag anywhere outside the crop frame to rotate the photo, as in
+  Lightroom Classic, not only just outside its corners. Dragging there no
+  longer draws a new crop frame; Cmd/Ctrl-drag still moves the frame and
+  Shift still rotates finely.
+
 ## 1.109.3-fix-batch-sync-freeze — 2026-11-21
 
 ### Develop
