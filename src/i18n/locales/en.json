@@ -2435,6 +2435,7 @@
         "zoom_out": "Zoom out",
         "zoom_out_step": "Zoom out (by step)",
         "toggle_auto_sync": "Toggle Auto Sync",
+        "reset_adjustments": "Reset all edits of the photo",
         "apply_keyword_1": "Toggle keyword 1 of the keyword set",
         "apply_keyword_2": "Toggle keyword 2 of the keyword set",
         "apply_keyword_3": "Toggle keyword 3 of the keyword set",

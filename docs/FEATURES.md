@@ -312,6 +312,11 @@ details are in `RELEASE_NOTES.MD`.
   gradation). Non-RAW images render as in Basic. Existing edits keep their
   tone mapper; Reset returns a RAW to Natural, and syncing, pasting or a
   preset applied to an unedited RAW keeps it.
+- Lightroom-style **Reset** in Develop: a button in the bottom bar,
+  Cmd/Ctrl+Shift+R (rebindable), Develop → Reset in the menu bar and the
+  photo's right-click menu remove every edit of the photo (sliders, crop,
+  masks, lens and geometry, Blend Pad, Zone Editor, AI edits) as one History
+  step that Undo brings back.
 - Lightroom-style **Auto Sync**: with several images selected, each edit made
   in Develop is applied to every selected image. Only the changed control is
   synced (one Color Mixer channel, for example), and the Copy & Paste Settings

@@ -287,8 +287,7 @@ function App() {
   );
   const compactEditorPanelCollapsedHeight = 96;
 
-  const { handleCopyAdjustments, handlePasteAdjustments, handleResetAdjustments, handleZoomChange } =
-    useEditorActions();
+  const { handleCopyAdjustments, handlePasteAdjustments, handleResetEdit, handleZoomChange } = useEditorActions();
 
   const navigationRefs = useMemo(
     () => ({
@@ -846,6 +845,7 @@ function App() {
                   handleClearSelection={handleClearSelection}
                   handleCopyAdjustments={handleCopyAdjustments}
                   handlePasteAdjustments={handlePasteAdjustments}
+                  handleResetEdit={handleResetEdit}
                   handleRate={handleRate}
                   handleSetFlag={handleSetFlag}
                   handleSetColorLabel={handleSetColorLabel}
@@ -881,7 +881,6 @@ function App() {
                   handleLibraryRefresh={handleLibraryRefresh}
                   handleCopyAdjustments={handleCopyAdjustments}
                   handlePasteAdjustments={handlePasteAdjustments}
-                  handleResetAdjustments={handleResetAdjustments}
                   requestThumbnails={requestThumbnails}
                 />
               )}

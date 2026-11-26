@@ -355,6 +355,12 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     section: 'editing',
   },
   {
+    action: 'reset_adjustments',
+    description: 'settings.keybinds.actions.reset_adjustments',
+    defaultCombo: ['ctrl', 'shift', 'KeyR'],
+    section: 'editing',
+  },
+  {
     action: 'rotate_left',
     description: 'settings.keybinds.actions.rotate_left',
     defaultCombo: ['ctrl', 'BracketLeft'],

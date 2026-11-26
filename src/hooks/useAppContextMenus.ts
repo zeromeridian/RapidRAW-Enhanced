@@ -75,7 +75,7 @@ import {
   LibraryViewMode,
 } from '../components/ui/AppProperties';
 import { Status } from '../components/ui/ExportImportProperties';
-import { Color, COLOR_LABELS, getInitialAdjustments } from '../utils/adjustments';
+import { Color, COLOR_LABELS } from '../utils/adjustments';
 import TaggingSubMenu from '../context/TaggingSubMenu';
 import { applyBatchEditToPaths, debouncedSave, useEditorActions } from './useEditorActions';
 import {
@@ -133,6 +133,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
   const {
     handleAutoAdjustments,
     handleResetAdjustments,
+    handleResetEdit,
     handleCopyAdjustments,
     handlePasteAdjustments,
     applyAdjustmentsToPaths,
@@ -379,8 +380,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       event.stopPropagation();
 
       const editorState = useEditorStore.getState();
-      const { selectedImage, history, historyIndex, undo, redo, resetHistory, copiedAdjustments, setEditor } =
-        editorState;
+      const { selectedImage, history, historyIndex, undo, redo, copiedAdjustments } = editorState;
       const { appSettings } = useSettingsStore.getState();
       const { setRightPanel, setUI } = useUIStore.getState();
 
@@ -530,29 +530,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           ],
         },
         { type: OPTION_SEPARATOR },
-        {
-          label: t('contextMenus.editor.resetAdjustments'),
-          icon: RotateCcw,
-          submenu: [
-            { label: t('contextMenus.editor.cancel'), icon: X, onClick: () => {} },
-            {
-              label: t('contextMenus.editor.confirmReset'),
-              icon: Check,
-              isDestructive: true,
-              onClick: () => {
-                const originalAspectRatio =
-                  selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
-                const resetData = {
-                  ...getInitialAdjustments(selectedImage.isRaw),
-                  aspectRatio: originalAspectRatio,
-                  aiPatches: [],
-                };
-                resetHistory(resetData);
-                setEditor({ adjustments: resetData });
-              },
-            },
-          ],
-        },
+        { label: t('contextMenus.editor.resetAdjustments'), icon: RotateCcw, onClick: handleResetEdit },
         buildDeleteRejectedOption(),
       ];
       showContextMenu(event.clientX, event.clientY, options);
@@ -564,6 +542,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       handleCopyAdjustments,
       handlePasteAdjustments,
       handleAutoAdjustments,
+      handleResetEdit,
       applyAdjustmentsToPaths,
       handleRate,
       handleSetColorLabel,

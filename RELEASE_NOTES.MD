@@ -18,6 +18,12 @@ description.
   Lightroom Classic, not only just outside its corners. Dragging there no
   longer draws a new crop frame; Cmd/Ctrl-drag still moves the frame and
   Shift still rotates finely.
+- **Reset** is now in Develop's bottom bar, whatever tool is open, and on
+  Cmd/Ctrl+Shift+R (change it in Settings → Shortcuts) and Develop → Reset
+  in the menu bar. It removes every edit of the photo, including crop,
+  masks, lens and geometry, Blend Pad, Zone Editor and AI edits, as one
+  History step: Undo brings the edit back. The photo's right-click Reset
+  works the same way and no longer asks for confirmation.
 
 ## 1.109.3-fix-batch-sync-freeze — 2026-11-21
 
@@ -38,7 +44,7 @@ description.
 - Settings → Processing: the tone mapper override now suggests Natural
   for RAW files.
 
-## 1.109.2-dev-open-as-layers — 2026-11-21
+1## 1.109.2-dev-open-as-layers — 2026-11-21
 
 ### Edit in external editors
 

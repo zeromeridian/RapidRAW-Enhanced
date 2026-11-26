@@ -67,6 +67,7 @@ interface EditorViewProps {
   handleClearSelection: () => void;
   handleCopyAdjustments: () => void;
   handlePasteAdjustments: () => void;
+  handleResetEdit: () => void;
   handleRate: (...args: any) => void;
   handleSetFlag: (flag: ImageFlag) => void;
   handleSetColorLabel: (color: string | null, paths?: string[]) => Promise<void>;
@@ -96,6 +97,7 @@ export default function EditorView({
   handleClearSelection,
   handleCopyAdjustments,
   handlePasteAdjustments,
+  handleResetEdit,
   handleRate,
   handleSetFlag,
   handleSetColorLabel,
@@ -181,6 +183,7 @@ export default function EditorView({
       isPasted={isPasted}
       isPasteDisabled={useEditorStore.getState().copiedAdjustments === null}
       isRatingDisabled={!selectedImage}
+      isResetDisabled={!selectedImage}
       isResizing={isResizing}
       multiSelectedPaths={multiSelectedPaths}
       onClearSelection={handleClearSelection}
@@ -194,6 +197,7 @@ export default function EditorView({
       onLibraryRefresh={handleLibraryRefresh}
       onPaste={() => handlePasteAdjustments()}
       onRate={handleRate}
+      onReset={handleResetEdit}
       onRequestThumbnails={requestThumbnails}
       onZoomChange={handleZoomChange}
       rating={imageRatings[selectedImage?.path || ''] || 0}

@@ -15,6 +15,7 @@ import {
   Layers,
   PencilSparkles,
   ListCollapse,
+  RotateCcw,
   Settings,
   SlidersHorizontal,
   SquaresUnite,
@@ -338,6 +339,7 @@ export default function BottomBar({
     { id: 'copySettings', label: t('ui.bottomBar.tooltips.copySettings') },
     { id: 'pasteSettings', label: t('ui.bottomBar.tooltips.pasteSettings') },
     { id: 'copyPasteSettings', label: t('ui.bottomBar.tooltips.copyPasteSettings') },
+    { id: 'resetSettings', label: t('contextMenus.editor.resetAdjustments') },
     { id: 'applyPreset', label: t('presetBatch.applyPreset') },
     { id: 'autoAdjust', label: t('contextMenus.thumbnail.autoAdjust', { count: 1 }) },
     { id: 'denoise', label: t('contextMenus.thumbnail.denoise', { count: 1 }) },
@@ -791,6 +793,17 @@ export default function BottomBar({
                 data-tooltip={t('ui.bottomBar.tooltips.copyPasteSettings')}
               >
                 <Settings size={18} />
+              </button>
+            )}
+
+            {onReset && isToolbarItemVisible('resetSettings') && (
+              <button
+                className={productivityButtonClass}
+                disabled={isResetDisabled}
+                onClick={onReset}
+                data-tooltip={t('contextMenus.editor.resetAdjustments')}
+              >
+                <RotateCcw size={18} />
               </button>
             )}
           </div>

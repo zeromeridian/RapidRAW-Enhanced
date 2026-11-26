@@ -40,7 +40,6 @@ interface LibraryViewProps {
   handleLibraryRefresh: () => Promise<void>;
   handleCopyAdjustments: () => void;
   handlePasteAdjustments: () => void;
-  handleResetAdjustments: () => void;
   requestThumbnails: any;
 }
 
@@ -70,7 +69,6 @@ export default function LibraryView({
   handleLibraryRefresh,
   handleCopyAdjustments,
   handlePasteAdjustments,
-  handleResetAdjustments,
   requestThumbnails,
 }: LibraryViewProps) {
   const { activeView, setUI } = useUIStore(
@@ -186,7 +184,6 @@ export default function LibraryView({
             isPasted={isPasted}
             isPasteDisabled={useEditorStore.getState().copiedAdjustments === null || multiSelectedPaths.length === 0}
             isRatingDisabled={multiSelectedPaths.length === 0}
-            isResetDisabled={multiSelectedPaths.length === 0}
             multiSelectedPaths={multiSelectedPaths}
             onCopy={handleCopyAdjustments}
             onDeleteRejected={handleDeleteRejected}
@@ -196,7 +193,6 @@ export default function LibraryView({
             onLibraryRefresh={handleLibraryRefresh}
             onPaste={() => handlePasteAdjustments()}
             onRate={handleRate}
-            onReset={() => handleResetAdjustments()}
             rating={imageRatings[libraryActivePath || ''] || 0}
             thumbnailAspectRatio={thumbnailAspectRatio}
             thumbnailSize={thumbnailSize}

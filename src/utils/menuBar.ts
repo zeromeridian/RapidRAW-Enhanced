@@ -188,6 +188,7 @@ export const MENU_BAR: MenuDefinition[] = [
       action('copy_adjustments', 'contextMenus.editor.copyAdjustments'),
       action('paste_adjustments', 'contextMenus.editor.pasteAdjustments'),
       action('toggle_auto_sync', 'menuBar.items.autoSync'),
+      action('reset_adjustments', 'contextMenus.editor.resetAdjustments'),
       SEPARATOR,
       action('show_original', 'menuBar.items.showOriginal'),
     ],

@@ -84,7 +84,8 @@ export const useKeyboardShortcuts = ({
   handleToggleFullScreen,
   handleZoomChange,
 }: KeyboardShortcutsProps) => {
-  const { handleRotate, handleCopyAdjustments, handlePasteAdjustments, setAdjustments } = useEditorActions();
+  const { handleRotate, handleCopyAdjustments, handlePasteAdjustments, handleResetEdit, setAdjustments } =
+    useEditorActions();
   const { handleRate, handleSetColorLabel, handleSetFlag, handleRefinePhotos, handleToggleKeyword } =
     useLibraryActions();
 
@@ -242,6 +243,13 @@ export const useKeyboardShortcuts = ({
         execute: (e: KeyboardEvent) => {
           e.preventDefault();
           toggleAutoSync();
+        },
+      },
+      reset_adjustments: {
+        shouldFire: (s: ReturnType<typeof getStoreState>) => !!s.editor.selectedImage,
+        execute: (e: KeyboardEvent) => {
+          e.preventDefault();
+          handleResetEdit();
         },
       },
       copy_image_path: {
@@ -893,6 +901,7 @@ export const useKeyboardShortcuts = ({
     handleRotate,
     handleCopyAdjustments,
     handlePasteAdjustments,
+    handleResetEdit,
     setAdjustments,
     handleRate,
     handleSetColorLabel,

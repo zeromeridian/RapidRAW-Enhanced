@@ -19,7 +19,7 @@ import {
   normalizeLoadedAdjustments,
 } from '../utils/adjustments';
 import { calculateCenteredCrop } from '../utils/cropUtils';
-import { Invokes, Panel } from '../components/ui/AppProperties';
+import { Invokes, Panel, SelectedImage } from '../components/ui/AppProperties';
 import { globalImageCache } from '../utils/ImageLRUCache';
 
 export { debouncedSetHistory };
@@ -41,6 +41,12 @@ export const toggleAutoSync = () => {
     copyPasteSettings: { ...copyPasteSettings, autoSync: !copyPasteSettings.autoSync },
   });
 };
+
+/** A photo's adjustments with every edit removed: its defaults, with the crop's aspect ratio of the uncropped photo. */
+const getResetAdjustments = (image: SelectedImage): Adjustments => ({
+  ...getInitialAdjustments(image.isRaw),
+  aspectRatio: image.width && image.height ? image.width / image.height : null,
+});
 
 /** Keeps the crop and leaves the Crop panel (Enter in Crop). */
 export const applyCrop = () => {
@@ -229,9 +235,7 @@ export function useEditorActions() {
             setLibrary({ libraryActiveAdjustments: getInitialAdjustments(isRaw) });
           }
           if (selectedImage && pathsToReset.includes(selectedImage.path)) {
-            const aspect =
-              selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
-            const resetData = { ...getInitialAdjustments(selectedImage.isRaw), aspectRatio: aspect, aiPatches: [] };
+            const resetData = getResetAdjustments(selectedImage);
             resetHistory(resetData);
             setEditor({ adjustments: resetData });
           }
@@ -240,6 +244,25 @@ export function useEditorActions() {
     },
     [setEditor],
   );
+
+  /**
+   * Develop's Reset (Plan item 81): removes every edit of the open photo (sliders, crop, masks, lens
+   * and geometry, Blend Pad, Zone Editor, AI edits) as one undoable History step, as in Lightroom.
+   */
+  const handleResetEdit = useCallback(() => {
+    const { selectedImage, zoneTintSelection } = useEditorStore.getState();
+    if (!selectedImage) return;
+    // The removed masks, AI edits, lights and zone grades can no longer be selected.
+    setEditor({
+      activeMaskId: null,
+      activeMaskContainerId: null,
+      activeAiPatchContainerId: null,
+      activeAiSubMaskId: null,
+      activeRelightLightId: null,
+      zoneTintSelection: { ...zoneTintSelection, gradeId: null },
+    });
+    setAdjustments(() => getResetAdjustments(selectedImage), t('contextMenus.editor.resetAdjustments'));
+  }, [setAdjustments, setEditor, t]);
 
   const handleCopyAdjustments = useCallback(async (pathOrEvent?: string | any) => {
     const pathOverride = typeof pathOrEvent === 'string' ? pathOrEvent : undefined;
@@ -449,6 +472,7 @@ export function useEditorActions() {
     handleLutSelect,
     setLutPreviewOverride,
     handleResetAdjustments,
+    handleResetEdit,
     handleCopyAdjustments,
     handlePasteAdjustments,
     applyAdjustmentsToPaths,
