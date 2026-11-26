@@ -129,6 +129,7 @@ export const MENU_BAR: MenuDefinition[] = [
       SEPARATOR,
       submenu('contextMenus.thumbnail.stacking', [
         action('stack_selected', 'menuBar.items.stackSelected'),
+        action('toggle_stack', 'ui.bottomBar.tooltips.toggleStack'),
         action('move_to_top_of_stack', 'contextMenus.thumbnail.moveToTopOfStack'),
       ]),
       SEPARATOR,
