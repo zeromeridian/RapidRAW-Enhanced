@@ -41,9 +41,16 @@ decisions 1–7 taken by the owner (below). Plan item 83 in
   (`update_custom_profile`); **Rename…** changes name, group, B&W flag
   and the file name (`rename_custom_profile`, `save_profile`). `1.112.x`
   profiles have no recipe: rename only. Also the decision 4 table format
-  version 2. Next steps (owner-approved order): 3 Save to my profiles and
-  `.tirprofile` import/export, 4 Favorites and thumbnails, 5 `lutData`
-  and Phase 3.
+  version 2.
+- **`1.114.0` (step 3):** a Lightroom-style Profile row (label, field with
+  the chosen profile opening the list, clear / create / import buttons;
+  owner 2026-11-26: the name at the block's edge got lost); **Save to my
+  profiles** for an embedded profile not in the folder
+  (`save_embedded_custom_profile`), **Import Profiles…** and right-click
+  **Export…** (`import_custom_profiles`, `export_custom_profile`); a
+  profile added with an id already in the folder gets a new id
+  (`add_to_folder`); table format version 3. Next (owner-approved
+  order): 4 Favorites and thumbnails, 5 `lutData` and Phase 3.
 - **Deviations from the design below (agent, 2026-11-26):** table stored
   as 16-bit integers and uploaded as `Rgba32Float` (not f16: the
   shaper-encoded values needed the precision); shaper 16 stops below and
@@ -312,8 +319,18 @@ Curve and the rest.
    `.tirdata` with one 139 KB. **Decided (owner 2026-11-26): shrink it
    losslessly**, 33³ kept: format version 2 (`1.113.0`) stores each
    entry's step from "no change" along red, bytes split (`encode_table`);
-   a smooth 33³ test look 200 KB → 23 KB; version 1 still loads. Real
-   sizes to confirm in the app.
+   a smooth 33³ test look 200 KB → 23 KB; version 1 still loads.
+   **Real profile (owner's "test 3", every group ticked, `1.113.0`):**
+   file 82 KB, `.tirdata` 85 KB; table 76 KB as stored. Measured
+   alternatives (lossless): red steps with channels planar and zigzag
+   55 KB; 3D (Lorenzo) prediction 62 KB; raw residual 68–88 KB. Jumps of
+   up to 30,720 of 65,535 sit in the deepest shadows (Color Grading's and
+   the colour tools' shifts on near-black values, large in the log
+   shaper), so ~55 KB is the lossless floor for such a profile.
+   **Decided (owner 2026-11-26): adopt it** as format version 3
+   (`1.114.0`: red steps zigzag-coded, channels one after another; smooth
+   test look 23 → 14 KB); versions 1–2 still load, a newer version is
+   refused instead of misread.
 5. **`.cube` import.** `.cube` LUTs assume display sRGB input, which the
    scene slot does not get. **Decided (owner 2026-11-26): not
    supported**; `.cube` files stay finishing LUTs in Effects → LUT, and

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronDown, Pencil, Plus, TextCursorInput, Trash2, X } from 'lucide-react';
+import { open, save } from '@tauri-apps/plugin-dialog';
+import { ChevronDown, Pencil, Plus, Save, Share2, TextCursorInput, Trash2, Upload, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ParseKeys } from 'i18next';
 import { toast } from 'react-toastify';
@@ -18,6 +19,7 @@ import {
   CustomProfileEntry,
   INITIAL_ADJUSTMENTS,
   PROFILE_BAKE_GROUPS,
+  PROFILE_FILE_EXTENSION,
   ProfileAdjustment,
   getProfileBakeGroupOfKey,
 } from '../../utils/adjustments';
@@ -218,6 +220,49 @@ export default function ProfilePanel({
     }
   };
 
+  const handleImport = async () => {
+    try {
+      const selected = await open({
+        multiple: true,
+        filters: [{ name: t('adjustments.profile.fileType'), extensions: [PROFILE_FILE_EXTENSION] }],
+      });
+      const sourcePaths = Array.isArray(selected) ? selected : selected ? [selected] : [];
+      if (sourcePaths.length === 0) return;
+      const list = await invoke<CustomProfileEntry[]>(Invokes.ImportCustomProfiles, { sourcePaths });
+      const added = list.length - entries.length;
+      setEntries(list);
+      setIsExpanded(true);
+      if (added < sourcePaths.length) {
+        toast.warn(t('adjustments.profile.importSkipped', { count: sourcePaths.length - added }));
+      }
+    } catch (err) {
+      toast.error(t('adjustments.profile.importFailed', { error: String(err) }));
+    }
+  };
+
+  const handleExport = async (entry: CustomProfileEntry) => {
+    try {
+      const destination = await save({
+        defaultPath: `${entry.name}.${PROFILE_FILE_EXTENSION}`,
+        filters: [{ name: t('adjustments.profile.fileType'), extensions: [PROFILE_FILE_EXTENSION] }],
+      });
+      if (!destination) return;
+      await invoke(Invokes.ExportCustomProfile, { path: entry.path, destination });
+    } catch (err) {
+      toast.error(t('adjustments.profile.exportFailed', { error: String(err) }));
+    }
+  };
+
+  /** Save to my profiles: the photo's embedded profile into the profile folder. */
+  const handleSaveEmbedded = async () => {
+    if (!profile) return;
+    try {
+      setEntries(await invoke<CustomProfileEntry[]>(Invokes.SaveEmbeddedCustomProfile, { profile }));
+    } catch (err) {
+      toast.error(t('adjustments.profile.saveFailed', { error: String(err) }));
+    }
+  };
+
   const handleContextMenu = (event: React.MouseEvent, entry: CustomProfileEntry) => {
     event.preventDefault();
     event.stopPropagation();
@@ -232,6 +277,11 @@ export default function ProfilePanel({
         label: t('adjustments.profile.rename'),
         icon: TextCursorInput,
         onClick: () => setDialog({ mode: 'rename', entry }),
+      },
+      {
+        label: t('adjustments.profile.export'),
+        icon: Share2,
+        onClick: () => handleExport(entry),
       },
       {
         label: t('adjustments.profile.delete'),
@@ -322,9 +372,39 @@ export default function ProfilePanel({
   }
 
   return (
-    <AdjustmentTool
-      id="profile"
-      actions={
+    <AdjustmentTool id="profile" isUntitled>
+      {/* As Lightroom Classic's Profile row: the label, the chosen profile in a field that opens the list. */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm compact:text-xs font-medium text-text-primary select-none shrink-0">
+          {t('adjustments.profile.title')}
+        </span>
+        <button
+          onClick={() => setIsExpanded((value) => !value)}
+          className={clsx(
+            'flex-1 min-w-0 flex items-center justify-between gap-2 px-2.5 py-1.5 compact:py-1 rounded-md bg-bg-primary border text-sm compact:text-xs transition-colors',
+            isExpanded ? 'border-accent' : 'border-border hover:border-text-secondary',
+          )}
+          data-tooltip={isSaved ? t('adjustments.profile.browse') : t('adjustments.profile.notSaved')}
+        >
+          <span
+            className={clsx('truncate', profile ? 'text-text-primary' : 'text-text-secondary', !isSaved && 'italic')}
+          >
+            {profile?.name ?? t('adjustments.profile.none')}
+          </span>
+          <ChevronDown
+            size={16}
+            className={`shrink-0 text-text-secondary transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {profile && (
+          <button
+            onClick={handleClear}
+            className="p-0.5 rounded-sm text-text-secondary hover:text-text-primary transition-colors"
+            data-tooltip={t('adjustments.profile.clear')}
+          >
+            <X size={16} />
+          </button>
+        )}
         <button
           className="p-0.5 rounded-sm text-text-secondary hover:text-text-primary transition-colors"
           data-tooltip={t('adjustments.profile.create')}
@@ -332,32 +412,24 @@ export default function ProfilePanel({
         >
           <Plus size={16} />
         </button>
-      }
-    >
-      <div className="flex justify-end items-center gap-1">
-        {profile && (
-          <button
-            onClick={handleClear}
-            className="flex items-center justify-center p-0.5 rounded-full bg-bg-tertiary hover:bg-surface text-text-secondary hover:text-text-primary transition-colors"
-            data-tooltip={t('adjustments.profile.clear')}
-          >
-            <X size={14} />
-          </button>
-        )}
         <button
-          onClick={() => setIsExpanded((value) => !value)}
-          className="flex items-center gap-1 text-sm text-text-secondary select-none cursor-pointer hover:text-accent transition-colors min-w-0"
-          data-tooltip={isSaved ? t('adjustments.profile.browse') : t('adjustments.profile.notSaved')}
+          className="p-0.5 rounded-sm text-text-secondary hover:text-text-primary transition-colors"
+          data-tooltip={t('adjustments.profile.import')}
+          onClick={handleImport}
         >
-          <span className={clsx('truncate text-right', !isSaved && 'italic')}>
-            {profile?.name ?? t('adjustments.profile.none')}
-          </span>
-          <ChevronDown
-            size={16}
-            className={`shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-          />
+          <Upload size={16} />
         </button>
       </div>
+
+      {profile && !isSaved && (
+        <button
+          className="mt-2 flex items-center gap-1.5 text-xs text-text-secondary hover:text-accent transition-colors"
+          onClick={handleSaveEmbedded}
+        >
+          <Save size={14} />
+          {t('adjustments.profile.saveToProfiles')}
+        </button>
+      )}
 
       {editing && (
         <div className="mt-2 p-2 rounded-sm bg-surface flex items-center justify-between gap-2 text-xs">

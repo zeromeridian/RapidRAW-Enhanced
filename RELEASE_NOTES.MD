@@ -5,6 +5,20 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.114.0-dev-custom-profiles — 2026-11-26
+
+### Develop
+
+- The Profile now has its own row at the top of Light, as in Lightroom
+  Classic: the chosen profile in a field you click to open the list, with
+  buttons beside it to remove it, create a profile and import profiles.
+- **Import Profiles…** adds `.tirprofile` files, and right-click a
+  profile → **Export…** saves a copy, so profiles can be shared or moved
+  to another computer.
+- A photo whose profile is not in your list (for example opened from
+  another computer) shows **Save to my profiles** under the Profile row.
+- New profiles are stored more compactly again, with the same quality.
+
 ## 1.113.0-dev-custom-profiles — 2026-11-26
 
 ### Develop

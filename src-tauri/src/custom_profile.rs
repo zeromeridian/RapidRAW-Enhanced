@@ -24,9 +24,10 @@ pub const PROFILE_AMOUNT_KEY: &str = "profileAmount";
 /// The profile tool's eye (`sectionVisibility`).
 const PROFILE_GROUP: &str = "profile";
 
-/// 1: the table's values as they are (`1.112.x`); 2: their steps from "no change"
-/// (`encode_table`). Both still load.
-const FORMAT_VERSION: u32 = 2;
+/// How the table is stored (`encode_table`): 1, its values as they are (`1.112.x`); 2, their
+/// steps from "no change", interleaved (`1.113.0`); 3, the same steps zigzag-coded, channel by
+/// channel (`1.114.0`). Every version still loads.
+const FORMAT_VERSION: u32 = 3;
 const FILE_FORMAT: &str = "ThisIsRAW custom profile";
 const FILE_EXTENSION: &str = "tirprofile";
 const DEFAULT_LATTICE_SIZE: u32 = 33;
@@ -235,10 +236,22 @@ fn has_red_neighbour(index: usize, size: usize) -> bool {
     !(index / 3).is_multiple_of(size)
 }
 
-/// `values` (shaper-encoded, 0–1) as a profile stores them (`FORMAT_VERSION` 2, exact to 16
+/// A step (two's complement in 16 bits) with small sizes first, either sign: 0, −1, 1, −2, …
+fn zigzag(step: u16) -> u16 {
+    let signed = step as i16;
+    ((signed << 1) ^ (signed >> 15)) as u16
+}
+
+fn unzigzag(code: u16) -> u16 {
+    (code >> 1) ^ 0u16.wrapping_sub(code & 1)
+}
+
+/// `values` (shaper-encoded, 0–1) as a profile stores them (`FORMAT_VERSION` 3, exact to 16
 /// bits): each entry's distance from "no change", then that distance's step from its neighbour
-/// along red, low bytes first and high bytes after. A smooth look leaves small, repetitive
-/// numbers there, which zstd packs far tighter than the values themselves (version 1).
+/// along red, zigzag-coded so small steps of either sign stay small, red, green and blue
+/// channels one after another, low bytes first and high bytes after. A look leaves small,
+/// repetitive numbers there, which zstd packs far tighter than the values themselves
+/// (version 1: the values; version 2: interleaved, two's complement steps).
 fn encode_table(values: &[f32], size: u32) -> Result<String, String> {
     let size_usize = size as usize;
     if values.len() != table_len(size)? {
@@ -249,27 +262,33 @@ fn encode_table(values: &[f32], size: u32) -> Result<String, String> {
         .enumerate()
         .map(|(index, value)| quantize(*value).wrapping_sub(identity_entry(index, size_usize)))
         .collect();
-    let steps: Vec<u16> = (0..residuals.len())
-        .map(|index| {
-            if has_red_neighbour(index, size_usize) {
-                residuals[index].wrapping_sub(residuals[index - 3])
-            } else {
-                residuals[index]
-            }
-        })
+    let step = |index: usize| {
+        if has_red_neighbour(index, size_usize) {
+            residuals[index].wrapping_sub(residuals[index - 3])
+        } else {
+            residuals[index]
+        }
+    };
+    let codes: Vec<u16> = (0..3)
+        .flat_map(|channel| (channel..residuals.len()).step_by(3))
+        .map(|index| zigzag(step(index)))
         .collect();
-    let bytes: Vec<u8> = steps
+    let bytes: Vec<u8> = codes
         .iter()
-        .map(|step| step.to_le_bytes()[0])
-        .chain(steps.iter().map(|step| step.to_le_bytes()[1]))
+        .map(|code| code.to_le_bytes()[0])
+        .chain(codes.iter().map(|code| code.to_le_bytes()[1]))
         .collect();
     let compressed = zstd::encode_all(bytes.as_slice(), 19).map_err(|e| e.to_string())?;
     Ok(general_purpose::STANDARD.encode(compressed))
 }
 
-/// A stored table back to shaper-encoded values: `version` 1 holds the values themselves,
-/// 2 and later the steps `encode_table` writes.
+/// A stored table back to shaper-encoded values, in any `FORMAT_VERSION` (`encode_table`).
 fn decode_table(encoded: &str, size: u32, version: u32) -> Result<Vec<f32>, String> {
+    if version > FORMAT_VERSION {
+        return Err(format!(
+            "The profile was made by a newer ThisIsRAW (format {version})"
+        ));
+    }
     let expected = table_len(size)?;
     let compressed = general_purpose::STANDARD
         .decode(encoded)
@@ -291,9 +310,15 @@ fn decode_table(encoded: &str, size: u32, version: u32) -> Result<Vec<f32>, Stri
     }
     let (low, high) = bytes.split_at(expected);
     let size_usize = size as usize;
+    let points = expected / 3;
     let mut residuals = vec![0u16; expected];
     for index in 0..expected {
-        let step = u16::from_le_bytes([low[index], high[index]]);
+        let step = if version == 2 {
+            u16::from_le_bytes([low[index], high[index]])
+        } else {
+            let stored = (index % 3) * points + index / 3;
+            unzigzag(u16::from_le_bytes([low[stored], high[stored]]))
+        };
         residuals[index] = if has_red_neighbour(index, size_usize) {
             residuals[index - 3].wrapping_add(step)
         } else {
@@ -808,6 +833,71 @@ pub async fn rename_custom_profile(
     .await
 }
 
+/// Adds a profile from elsewhere (a photo's edit, an imported file) to the profile folder,
+/// after checking that its table loads; one whose id is already there becomes a profile of its
+/// own, so choosing either never picks the other.
+fn add_to_folder(dir: &Path, mut profile: ProfileData) -> Result<PathBuf, String> {
+    decode_table(&profile.table, profile.size, profile.version)?;
+    if list_profiles_in(dir)?
+        .iter()
+        .any(|entry| entry.id == profile.id)
+    {
+        profile.id = uuid::Uuid::new_v4().to_string();
+    }
+    save_profile(dir, &profile, None)
+}
+
+/// Save to my profiles: keeps a profile that only a photo's edit holds (from another machine,
+/// or deleted from the folder) in the profile folder.
+#[tauri::command]
+pub async fn save_embedded_custom_profile(
+    profile: ProfileData,
+    app_handle: AppHandle,
+) -> Result<Vec<ProfileEntry>, String> {
+    crate::blocking_command::run_blocking(move || {
+        let dir = profiles_dir(&app_handle)?;
+        add_to_folder(&dir, profile)?;
+        list_profiles_in(&dir)
+    })
+    .await
+}
+
+/// Copies `.tirprofile` files into the profile folder; files that are not profiles, or whose
+/// table does not load, are skipped and named in the log.
+#[tauri::command]
+pub async fn import_custom_profiles(
+    source_paths: Vec<String>,
+    app_handle: AppHandle,
+) -> Result<Vec<ProfileEntry>, String> {
+    crate::blocking_command::run_blocking(move || {
+        let dir = profiles_dir(&app_handle)?;
+        for source in &source_paths {
+            if let Err(error) = read_profile_file(Path::new(source))
+                .and_then(|profile| add_to_folder(&dir, profile))
+            {
+                log::warn!("Skipping custom profile import {}: {}", source, error);
+            }
+        }
+        list_profiles_in(&dir)
+    })
+    .await
+}
+
+/// Copies the profile at `path` to `destination`, a file the user chose, to share it.
+#[tauri::command]
+pub async fn export_custom_profile(
+    path: String,
+    destination: String,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    crate::blocking_command::run_blocking(move || {
+        let source = profile_path_in(&profiles_dir(&app_handle)?, &path)?;
+        fs::copy(source, destination).map_err(|e| e.to_string())?;
+        Ok(())
+    })
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -863,22 +953,58 @@ mod tests {
     fn a_table_survives_encoding_exactly_to_sixteen_bits() {
         let size = 9;
         let values = smooth_look(size as usize);
-        let decoded = decode_table(&encode_table(&values, size).unwrap(), size, 2).unwrap();
+        let encoded = encode_table(&values, size).unwrap();
+        let decoded = decode_table(&encoded, size, FORMAT_VERSION).unwrap();
         assert_eq!(decoded.len(), values.len());
         for (a, b) in values.iter().zip(&decoded) {
             assert_eq!(quantize(*a), quantize(*b));
         }
         assert!(encode_table(&values, 4).is_err());
-        assert!(decode_table(&encode_table(&values, size).unwrap(), 4, 2).is_err());
+        assert!(decode_table(&encoded, 4, FORMAT_VERSION).is_err());
     }
 
     #[test]
-    fn version_1_tables_still_load() {
+    fn zigzag_coding_is_exact_for_every_step() {
+        assert_eq!([0, 0xffff, 1, 0xfffe].map(zigzag), [0, 1, 2, 3]);
+        assert!((0..=u16::MAX).all(|step| unzigzag(zigzag(step)) == step));
+    }
+
+    /// The `1.113.0` storage (version 2), kept here to prove its tables still load.
+    fn encode_version_2(values: &[f32], size: usize) -> String {
+        let residuals: Vec<u16> = values
+            .iter()
+            .enumerate()
+            .map(|(index, value)| quantize(*value).wrapping_sub(identity_entry(index, size)))
+            .collect();
+        let steps: Vec<u16> = (0..residuals.len())
+            .map(|index| {
+                if has_red_neighbour(index, size) {
+                    residuals[index].wrapping_sub(residuals[index - 3])
+                } else {
+                    residuals[index]
+                }
+            })
+            .collect();
+        let bytes: Vec<u8> = steps
+            .iter()
+            .map(|step| step.to_le_bytes()[0])
+            .chain(steps.iter().map(|step| step.to_le_bytes()[1]))
+            .collect();
+        general_purpose::STANDARD.encode(zstd::encode_all(bytes.as_slice(), 19).unwrap())
+    }
+
+    #[test]
+    fn version_1_and_2_tables_still_load() {
         let size = 5;
         let values = smooth_look(size as usize);
-        let decoded = decode_table(&encode_version_1(&values), size, 1).unwrap();
-        for (a, b) in values.iter().zip(&decoded) {
-            assert_eq!(quantize(*a), quantize(*b));
+        for (version, encoded) in [
+            (1, encode_version_1(&values)),
+            (2, encode_version_2(&values, size as usize)),
+        ] {
+            let decoded = decode_table(&encoded, size, version).unwrap();
+            for (a, b) in values.iter().zip(&decoded) {
+                assert_eq!(quantize(*a), quantize(*b), "version {version}");
+            }
         }
     }
 
@@ -886,10 +1012,20 @@ mod tests {
     fn storing_steps_from_no_change_packs_a_look_tighter() {
         let size = DEFAULT_LATTICE_SIZE;
         let values = smooth_look(size as usize);
-        let before = encode_version_1(&values).len();
-        let after = encode_table(&values, size).unwrap().len();
-        eprintln!("33³ smooth look: version 1 {before} bytes, version 2 {after} bytes");
-        assert!(after * 2 < before, "{after} is not under half of {before}");
+        let version_1 = encode_version_1(&values).len();
+        let version_2 = encode_version_2(&values, size as usize).len();
+        let current = encode_table(&values, size).unwrap().len();
+        eprintln!(
+            "33³ smooth look: version 1 {version_1} bytes, version 2 {version_2}, version 3 {current}"
+        );
+        assert!(
+            current * 2 < version_1,
+            "{current} is not under half of {version_1}"
+        );
+        assert!(
+            current <= version_2,
+            "{current} is larger than version 2's {version_2}"
+        );
     }
 
     #[test]
@@ -1024,6 +1160,33 @@ mod tests {
             !entries[0].can_edit,
             "a profile without a recipe cannot be edited"
         );
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn adding_a_profile_keeps_ids_apart_and_refuses_a_broken_table() {
+        let dir = std::env::temp_dir().join(format!("tir-profiles-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let profile: ProfileData = serde_json::from_value(base_profile()).unwrap();
+
+        add_to_folder(&dir, profile.clone()).unwrap();
+        add_to_folder(&dir, profile.clone()).unwrap();
+        let entries = list_profiles_in(&dir).unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_ne!(entries[0].id, entries[1].id);
+        assert!(entries.iter().any(|entry| entry.id == "base"));
+
+        let broken = ProfileData {
+            table: "not a table".to_string(),
+            ..profile.clone()
+        };
+        assert!(add_to_folder(&dir, broken).is_err());
+        let newer = ProfileData {
+            version: FORMAT_VERSION + 1,
+            ..profile
+        };
+        assert!(add_to_folder(&dir, newer).is_err());
+        assert_eq!(list_profiles_in(&dir).unwrap().len(), 2);
         fs::remove_dir_all(&dir).unwrap();
     }
 

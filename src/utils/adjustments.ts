@@ -255,6 +255,9 @@ export interface CustomProfile {
   recipe?: Partial<Adjustments>;
 }
 
+/** A profile file's extension (`custom_profile::FILE_EXTENSION`). */
+export const PROFILE_FILE_EXTENSION = 'tirprofile';
+
 /** A profile in the profile folder, without its table (`custom_profile::ProfileEntry`). */
 export interface CustomProfileEntry {
   path: string;
