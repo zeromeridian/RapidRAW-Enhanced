@@ -2908,7 +2908,7 @@ fn get_global_adjustments_from_json(
 
     let (has_lut, lut_intensity) = if is_visible("lut") {
         (
-            if js_adjustments["lutPath"].is_string() {
+            if js_adjustments["lutPath"].is_string() || js_adjustments["lutData"].is_string() {
                 1
             } else {
                 0

@@ -180,7 +180,9 @@ export function useEditorActions() {
     async (path: string) => {
       const isAndroid = useSettingsStore.getState().osPlatform === 'android';
       try {
-        const result: { size: number } = await invoke('load_and_parse_lut', { path });
+        // `data` is the LUT's table for the edit to embed, so the look travels with the photo
+        // (`lut_processing::lut_for_adjustments`); null for a LUT too large to embed.
+        const result: { size: number; data: string | null } = await invoke('load_and_parse_lut', { path });
         let name =
           isAndroid && path.startsWith('content://')
             ? await invoke<string>('resolve_android_content_uri_name', { uriStr: path })
@@ -190,6 +192,7 @@ export function useEditorActions() {
           lutPath: path,
           lutName: name,
           lutSize: result.size,
+          lutData: result.data,
           lutIntensity: 100,
           sectionVisibility: { ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility), lut: true },
         }));
@@ -206,10 +209,12 @@ export function useEditorActions() {
         if (!path) return { previewOverride: null };
         const name = path.split(/[\\/]/).pop() || 'LUT';
         return {
+          // Without the chosen LUT's embedded table, so the hovered file is what renders.
           previewOverride: {
             ...state.adjustments,
             lutPath: path,
             lutName: name,
+            lutData: null,
             lutIntensity: state.adjustments.lutIntensity,
           },
         };

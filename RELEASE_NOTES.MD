@@ -5,6 +5,18 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.115.1-dev-custom-profiles — 2026-11-26
+
+### Develop
+
+- A LUT chosen in Look → LUT now travels with the photo: its look is saved
+  in the edit and the XMP sidecar, so the photo looks the same on another
+  computer, or after the LUT file is moved or deleted. Photos edited
+  before keep using the LUT file; choose the LUT again to store it with
+  the photo.
+- A photo whose LUT file cannot be found no longer turns black; it shows
+  without the LUT instead.
+
 ## 1.115.0-dev-custom-profiles — 2026-11-26
 
 ### Develop

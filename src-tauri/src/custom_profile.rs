@@ -27,7 +27,7 @@ const PROFILE_GROUP: &str = "profile";
 /// How the table is stored (`encode_table`): 1, its values as they are (`1.112.x`); 2, their
 /// steps from "no change", interleaved (`1.113.0`); 3, the same steps zigzag-coded, channel by
 /// channel (`1.114.0`). Every version still loads.
-const FORMAT_VERSION: u32 = 3;
+pub(crate) const FORMAT_VERSION: u32 = 3;
 const FILE_FORMAT: &str = "ThisIsRAW custom profile";
 const FILE_EXTENSION: &str = "tirprofile";
 const DEFAULT_LATTICE_SIZE: u32 = 33;
@@ -213,7 +213,7 @@ pub fn table_for_adjustments(adjustments: &Value) -> Option<Arc<ProfileTable>> {
 
 fn table_len(size: u32) -> Result<usize, String> {
     if !(2..=MAX_LATTICE_SIZE).contains(&size) {
-        return Err(format!("Unsupported profile table size {}", size));
+        return Err(format!("Unsupported table size {}", size));
     }
     Ok((size as usize).pow(3) * 3)
 }
@@ -246,16 +246,18 @@ fn unzigzag(code: u16) -> u16 {
     (code >> 1) ^ 0u16.wrapping_sub(code & 1)
 }
 
-/// `values` (shaper-encoded, 0–1) as a profile stores them (`FORMAT_VERSION` 3, exact to 16
-/// bits): each entry's distance from "no change", then that distance's step from its neighbour
-/// along red, zigzag-coded so small steps of either sign stay small, red, green and blue
-/// channels one after another, low bytes first and high bytes after. A look leaves small,
-/// repetitive numbers there, which zstd packs far tighter than the values themselves
-/// (version 1: the values; version 2: interleaved, two's complement steps).
-fn encode_table(values: &[f32], size: u32) -> Result<String, String> {
+/// A 3D table's `values` (0–1, RGB per lattice point, red fastest: a profile's shaper-encoded
+/// table, or a finishing LUT, `lut_processing::lut_for_adjustments`) as they are stored
+/// (`FORMAT_VERSION` 3, exact to 16 bits; values outside 0–1 are clamped): each entry's
+/// distance from "no change", then that distance's step from its neighbour along red,
+/// zigzag-coded so small steps of either sign stay small, red, green and blue channels one
+/// after another, low bytes first and high bytes after. A look leaves small, repetitive numbers
+/// there, which zstd packs far tighter than the values themselves (version 1: the values;
+/// version 2: interleaved, two's complement steps).
+pub(crate) fn encode_table(values: &[f32], size: u32) -> Result<String, String> {
     let size_usize = size as usize;
     if values.len() != table_len(size)? {
-        return Err("Profile table does not match its size".to_string());
+        return Err("The table does not match its size".to_string());
     }
     let residuals: Vec<u16> = values
         .iter()
@@ -282,8 +284,8 @@ fn encode_table(values: &[f32], size: u32) -> Result<String, String> {
     Ok(general_purpose::STANDARD.encode(compressed))
 }
 
-/// A stored table back to shaper-encoded values, in any `FORMAT_VERSION` (`encode_table`).
-fn decode_table(encoded: &str, size: u32, version: u32) -> Result<Vec<f32>, String> {
+/// A stored table back to its values, in any `FORMAT_VERSION` (`encode_table`).
+pub(crate) fn decode_table(encoded: &str, size: u32, version: u32) -> Result<Vec<f32>, String> {
     if version > FORMAT_VERSION {
         return Err(format!(
             "The profile was made by a newer ThisIsRAW (format {version})"
@@ -296,7 +298,7 @@ fn decode_table(encoded: &str, size: u32, version: u32) -> Result<Vec<f32>, Stri
     let bytes = zstd::decode_all(compressed.as_slice()).map_err(|e| e.to_string())?;
     if bytes.len() != expected * 2 {
         return Err(format!(
-            "Profile table holds {} bytes, expected {}",
+            "The table holds {} bytes, expected {}",
             bytes.len(),
             expected * 2
         ));
@@ -976,9 +978,7 @@ pub async fn generate_profile_previews(
                             &state,
                             &source,
                             all_adjustments,
-                            edit["lutPath"].as_str().and_then(|lut_path| {
-                                crate::lut_processing::get_or_load_lut(&state, lut_path).ok()
-                            }),
+                            crate::lut_processing::lut_for_adjustments(&state, &edit),
                             table_for_adjustments(&edit),
                             "generate_profile_previews",
                         )

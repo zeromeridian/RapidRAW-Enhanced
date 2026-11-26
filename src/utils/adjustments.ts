@@ -1804,7 +1804,14 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     ColorAdjustment.PointColors,
     'colorCalibration',
   ],
-  look: [ColorAdjustment.ColorGrading, Effect.LutIntensity, Effect.LutName, Effect.LutPath, Effect.LutSize],
+  look: [
+    ColorAdjustment.ColorGrading,
+    Effect.LutIntensity,
+    Effect.LutName,
+    Effect.LutPath,
+    Effect.LutSize,
+    Effect.LutData,
+  ],
   lightAtmosphere: [
     Effect.RelightEnabled,
     Effect.RelightLights,

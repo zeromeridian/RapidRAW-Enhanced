@@ -736,6 +736,9 @@ details are in `RELEASE_NOTES.MD`.
   aspect ratio, all saved in export presets.
 - Several preset files can be imported at once, and the LUT browser lists
   HALD image LUTs.
+- A chosen LUT travels with the photo: its table is embedded in the edit
+  and XMP (up to 65³), so the look renders without the LUT file; a LUT
+  that cannot be found is left out instead of darkening the photo.
 - Consolidated EXIF export controls with optional GPS removal.
 - Complete readable EXIF preservation for JPEG and TIFF (TIFF exports write
   their EXIF and GPS blocks while encoding, with UTF-8 text), and EXIF in

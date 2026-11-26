@@ -37,7 +37,7 @@ use crate::image_processing::{
     process_and_get_dynamic_image_with_precision, resolve_tonemapper_override_from_handle,
 };
 use crate::lut_processing::{
-    convert_image_to_cube_lut, generate_identity_lut_image, get_or_load_lut,
+    convert_image_to_cube_lut, generate_identity_lut_image, lut_for_adjustments,
 };
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::tiff_metadata::{TiffSamples, encode_tiff_with_metadata};
@@ -1135,8 +1135,7 @@ fn process_image_for_export_pipeline(
     crate::baseline_exposure::apply_natural_exposure(&mut all_adjustments, path);
     all_adjustments.global.show_clipping = 0;
 
-    let lut_path = js_adjustments["lutPath"].as_str();
-    let lut = lut_path.and_then(|p| get_or_load_lut(state, p).ok());
+    let lut = lut_for_adjustments(state, js_adjustments);
 
     process_and_get_dynamic_image_with_precision(
         context,
@@ -1495,8 +1494,7 @@ fn export_masks_for_image(
         let mut all_adjustments =
             get_all_adjustments_from_json(js_adjustments, is_raw, tm_override);
         crate::baseline_exposure::apply_natural_exposure(&mut all_adjustments, source_path_str);
-        let lut_path = js_adjustments["lutPath"].as_str();
-        let lut = lut_path.and_then(|p| get_or_load_lut(state, p).ok());
+        let lut = lut_for_adjustments(state, js_adjustments);
         let output_dir = output_path_obj.parent().unwrap_or(output_path_obj);
         let stem = output_path_obj
             .file_stem()
@@ -1623,8 +1621,7 @@ fn export_adjustments_as_lut(
     all_adjustments.global.chromatic_aberration_red_cyan = 0.0;
     all_adjustments.global.chromatic_aberration_blue_yellow = 0.0;
 
-    let lut_path = js_adjustments["lutPath"].as_str();
-    let lut = lut_path.and_then(|p| get_or_load_lut(state, p).ok());
+    let lut = lut_for_adjustments(state, js_adjustments);
     // The identity image depends only on its size, so its id is not the photo's.
     let identity_id = {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -2523,9 +2520,7 @@ pub async fn estimate_export_sizes(
         crate::baseline_exposure::apply_natural_exposure(&mut all_adjustments, &source_path_str);
         all_adjustments.global.show_clipping = 0;
 
-        let lut = adjustments_clone["lutPath"]
-            .as_str()
-            .and_then(|p| get_or_load_lut(&state, p).ok());
+        let lut = lut_for_adjustments(&state, &adjustments_clone);
 
         let processed_preview = process_and_get_dynamic_image_with_precision(
             &context,
@@ -2665,9 +2660,7 @@ pub async fn estimate_export_sizes(
         crate::baseline_exposure::apply_natural_exposure(&mut all_adjustments, &source_path_str);
         all_adjustments.global.show_clipping = 0;
 
-        let lut = js_adjustments["lutPath"]
-            .as_str()
-            .and_then(|p| get_or_load_lut(&state, p).ok());
+        let lut = lut_for_adjustments(&state, &js_adjustments);
 
         let processed_preview = process_and_get_dynamic_image_with_precision(
             &context,

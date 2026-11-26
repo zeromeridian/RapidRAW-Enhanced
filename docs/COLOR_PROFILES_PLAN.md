@@ -58,8 +58,18 @@ decisions 1–7 taken by the owner (below). Plan item 83 in
   (`profileBrowserGrid`, default grid); starred profiles listed first
   under Favorites (`favoriteProfiles`, by id, in the app settings).
   Previews do not follow slider moves while the grid is open; they are
-  rendered again when it reopens with another edit. Next: 5 `lutData`
-  and Phase 3.
+  rendered again when it reopens with another edit. Owner's check: all
+  good (`dd525f46`).
+- **`1.115.1` (step 5a, decision 6):** choosing a LUT embeds its table in
+  the edit (`lutData` = `<format>:<table>`, profile table storage, exact
+  to 16 bits; values outside 0–1 clamped; LUTs over 65³ stay path-only);
+  one `lut_processing::lut_for_adjustments` (embedded first, then the
+  file) replaces the twelve path lookups; LUT hover previews drop
+  `lutData` so the hovered file renders; Look's section keys include
+  `lutData`. **Bug found and fixed:** a missing LUT file left `has_lut`
+  on with the empty placeholder texture, mixing black into the photo;
+  `gpu_processing` now clears `has_lut` (and `has_profile`) without a
+  table. Next: Phase 3 (Save as LUT).
 - **Deviations from the design below (agent, 2026-11-26):** table stored
   as 16-bit integers and uploaded as `Rgba32Float` (not f16: the
   shaper-encoded values needed the precision); shaper 16 stops below and
@@ -348,7 +358,7 @@ Curve and the rest.
    finishing LUTs would otherwise travel as a path only. **Decided
    (owner 2026-11-26): embed it**: fill `lutData` so the existing LUT
    tool's table travels in the edit (separate PATCH/MINOR); edits
-   without it keep loading from `lutPath`.
+   without it keep loading from `lutPath`. **Done in `1.115.1`.**
 7. **Plan item number and position. Decided (owner 2026-11-26):** new
    Plan item 83, the next new item, ahead of 57 → 53 → 54; item 54
    (Spektrafilm) later reuses the embedded `lutData` work.

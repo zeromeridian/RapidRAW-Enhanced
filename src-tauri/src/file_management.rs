@@ -9,8 +9,8 @@ use std::hash::{Hash, Hasher};
 use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 use std::thread;
 
 use anyhow::Result;
@@ -3802,19 +3802,7 @@ pub fn generate_thumbnail_data(
         let mut gpu_adjustments =
             get_all_adjustments_from_json(&meta.adjustments, is_raw, tm_override);
         crate::baseline_exposure::apply_natural_exposure(&mut gpu_adjustments, path_str);
-        let lut_path = meta.adjustments["lutPath"].as_str();
-        let lut = lut_path.and_then(|p| {
-            let mut cache = state.lut_cache.lock().unwrap();
-            if let Some(cached_lut) = cache.get(p) {
-                return Some(cached_lut.clone());
-            }
-            if let Ok(loaded_lut) = crate::lut_processing::parse_lut_file(p) {
-                let arc_lut = Arc::new(loaded_lut);
-                cache.insert(p.to_string(), arc_lut.clone());
-                return Some(arc_lut);
-            }
-            None
-        });
+        let lut = crate::lut_processing::lut_for_adjustments(&state, &meta.adjustments);
 
         if let Ok(processed_image) = gpu_processing::process_thumbnail_image(
             context,

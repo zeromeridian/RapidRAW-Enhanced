@@ -1752,9 +1752,14 @@ impl GpuProcessor {
             .map(|profile| upload_profile_table(device, queue, profile));
 
         let mut adjustments = request.adjustments;
+        // Without its table a profile or LUT cannot render (a LUT file moved or missing on
+        // this machine), so the photo renders without it rather than mixing in the empty
+        // placeholder's black.
         if profile_texture_view.is_none() {
-            // Without its table the profile cannot render, so the photo renders without it.
             adjustments.global.has_profile = 0;
+        }
+        if request.lut.is_none() {
+            adjustments.global.has_lut = 0;
         }
         let flare_amount = flare_generation_amount(&adjustments);
         if flare_amount > 0.0 {

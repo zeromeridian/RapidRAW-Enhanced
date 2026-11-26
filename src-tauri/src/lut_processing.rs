@@ -36,6 +36,8 @@ pub struct LutEntry {
 #[derive(Serialize)]
 pub struct LutParseResult {
     pub size: u32,
+    /// The table for the edit to embed (`lutData`), so the look travels with the photo.
+    pub data: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -448,7 +450,7 @@ pub fn convert_image_to_cube_lut(image: &DynamicImage, size: u32) -> Result<Vec<
     Ok(out.into_bytes())
 }
 
-pub fn get_or_load_lut(state: &State<AppState>, path: &str) -> Result<Arc<Lut>, String> {
+pub fn get_or_load_lut(state: &AppState, path: &str) -> Result<Arc<Lut>, String> {
     let mut cache = state.lut_cache.lock().unwrap();
     if let Some(lut) = cache.get(path) {
         return Ok(lut.clone());
@@ -458,6 +460,53 @@ pub fn get_or_load_lut(state: &State<AppState>, path: &str) -> Result<Arc<Lut>, 
     let arc_lut = Arc::new(lut);
     cache.insert(path.to_string(), arc_lut.clone());
     Ok(arc_lut)
+}
+
+/// The finishing LUT's table as an edit embeds it (`lutData`): `<format>:<table>`, the table
+/// stored as custom profiles store theirs (`custom_profile::encode_table`), exact to 16 bits.
+/// `None` for a LUT that does not fit that storage (larger than 65³).
+fn embed_lut(lut: &Lut) -> Option<String> {
+    let table = crate::custom_profile::encode_table(&lut.data, lut.size).ok()?;
+    Some(format!(
+        "{}:{}",
+        crate::custom_profile::FORMAT_VERSION,
+        table
+    ))
+}
+
+fn unembed_lut(embedded: &str, size: u32) -> Result<Lut, String> {
+    let (version, table) = embedded
+        .split_once(':')
+        .ok_or("The embedded LUT has no format")?;
+    let version = version
+        .parse()
+        .map_err(|_| "The embedded LUT's format is unreadable")?;
+    let data = crate::custom_profile::decode_table(table, size, version)?;
+    Ok(Lut { size, data })
+}
+
+/// The edit's finishing LUT: the table it embeds (`lutData`), so it renders the same on every
+/// machine, else the file at `lutPath` (edits from before `1.115.1`, or a LUT too large to embed).
+pub fn lut_for_adjustments(state: &AppState, adjustments: &serde_json::Value) -> Option<Arc<Lut>> {
+    let embedded = adjustments["lutData"].as_str();
+    let size = adjustments["lutSize"].as_u64().map(|size| size as u32);
+    if let (Some(embedded), Some(size)) = (embedded, size) {
+        let key = format!("embedded:{}", blake3::hash(embedded.as_bytes()));
+        if let Some(lut) = state.lut_cache.lock().unwrap().get(&key) {
+            return Some(lut.clone());
+        }
+        match unembed_lut(embedded, size) {
+            Ok(lut) => {
+                let lut = Arc::new(lut);
+                state.lut_cache.lock().unwrap().insert(key, lut.clone());
+                return Some(lut);
+            }
+            Err(error) => log::warn!("Ignoring an unreadable embedded LUT: {}", error),
+        }
+    }
+    adjustments["lutPath"]
+        .as_str()
+        .and_then(|path| get_or_load_lut(state, path).ok())
 }
 
 #[tauri::command]
@@ -683,10 +732,54 @@ pub fn generate_lut_previews(
 #[tauri::command]
 pub fn load_and_parse_lut(path: String, state: State<AppState>) -> Result<LutParseResult, String> {
     let lut = parse_lut_file(&path).map_err(|e| e.to_string())?;
-    let lut_size = lut.size;
+    let result = LutParseResult {
+        size: lut.size,
+        data: embed_lut(&lut),
+    };
 
     let mut cache = state.lut_cache.lock().unwrap();
     cache.insert(path, Arc::new(lut));
 
-    Ok(LutParseResult { size: lut_size })
+    Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A 5³ `.cube` with a warm cast, as `parse_cube` reads it.
+    fn warm_lut() -> Lut {
+        let size = 5;
+        let text: String = std::iter::once(format!("LUT_3D_SIZE {size}\n"))
+            .chain((0..size * size * size).map(|index| {
+                let [r, g, b] = [index % size, index / size % size, index / (size * size)]
+                    .map(|axis| axis as f32 / (size - 1) as f32);
+                format!("{} {} {}\n", (r * 1.05).min(1.0), g, b * 0.9)
+            }))
+            .collect();
+        parse_cube(BufReader::new(Cursor::new(text))).unwrap()
+    }
+
+    #[test]
+    fn an_embedded_lut_comes_back_to_sixteen_bits() {
+        let lut = warm_lut();
+        let embedded = embed_lut(&lut).unwrap();
+        assert!(embedded.starts_with(&format!("{}:", crate::custom_profile::FORMAT_VERSION)));
+        let back = unembed_lut(&embedded, lut.size).unwrap();
+        assert_eq!(back.size, lut.size);
+        for (a, b) in lut.data.iter().zip(&back.data) {
+            assert!((a - b).abs() <= 0.5 / 65535.0 + f32::EPSILON);
+        }
+        assert!(unembed_lut("not a table", lut.size).is_err());
+        assert!(unembed_lut(&embedded, lut.size + 1).is_err());
+    }
+
+    #[test]
+    fn a_lut_larger_than_a_profile_table_is_not_embedded() {
+        let lut = Lut {
+            size: 66,
+            data: vec![0.5; 66 * 66 * 66 * 3],
+        };
+        assert!(embed_lut(&lut).is_none());
+    }
 }

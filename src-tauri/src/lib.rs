@@ -511,9 +511,7 @@ impl EditorRender {
         Self {
             adjustments: all_adjustments,
             mask_bitmaps,
-            lut: adjustments["lutPath"]
-                .as_str()
-                .and_then(|p| lut_processing::get_or_load_lut(state, p).ok()),
+            lut: lut_processing::lut_for_adjustments(state, adjustments),
             profile: custom_profile::table_for_adjustments(adjustments),
             motion_blur: crate::motion_blur::MotionBlurs::new(
                 adjustments,
@@ -1146,8 +1144,7 @@ fn render_uncropped_preview(app_handle: &tauri::AppHandle, job: UncroppedPreview
     let mut uncropped_adjustments =
         get_all_adjustments_from_json(&adjustments_clone, is_raw, tm_override);
     crate::baseline_exposure::apply_natural_exposure(&mut uncropped_adjustments, &path);
-    let lut_path = adjustments_clone["lutPath"].as_str();
-    let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
+    let lut = lut_processing::lut_for_adjustments(&state, &adjustments_clone);
 
     if let Ok(processed_image) = process_and_get_dynamic_image(
         &context,
@@ -1346,8 +1343,7 @@ async fn preview_geometry_transform(
                 &mut all_adjustments,
                 &loaded_image_path,
             );
-            let lut_path = temp_adjustments["lutPath"].as_str();
-            let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
+            let lut = lut_processing::lut_for_adjustments(&state, &temp_adjustments);
             let mask_bitmaps = Vec::new();
 
             let processed_base = process_and_get_dynamic_image(
@@ -1555,8 +1551,7 @@ fn generate_preset_preview_blocking(
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
     let mut all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw, tm_override);
     crate::baseline_exposure::apply_natural_exposure(&mut all_adjustments, &loaded_image.path);
-    let lut_path = js_adjustments["lutPath"].as_str();
-    let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
+    let lut = lut_processing::lut_for_adjustments(&state, &js_adjustments);
 
     let processed_image = process_and_get_dynamic_image(
         &context,
@@ -1699,8 +1694,7 @@ async fn generate_all_community_previews(
             let mut all_adjustments =
                 get_all_adjustments_from_json(&scaled_adjustments, *is_raw, tm_override);
             crate::baseline_exposure::apply_natural_exposure(&mut all_adjustments, &image_paths[i]);
-            let lut_path = js_adjustments["lutPath"].as_str();
-            let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
+            let lut = lut_processing::lut_for_adjustments(&state, js_adjustments);
 
             let processed_image_dynamic = crate::image_processing::process_and_get_dynamic_image(
                 &context,
@@ -1995,8 +1989,7 @@ async fn generate_preview_for_path(
         let mut all_adjustments =
             get_all_adjustments_from_json(&js_adjustments, is_raw, tm_override);
         crate::baseline_exposure::apply_natural_exposure(&mut all_adjustments, &path);
-        let lut_path = js_adjustments["lutPath"].as_str();
-        let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
+        let lut = lut_processing::lut_for_adjustments(&state, &js_adjustments);
 
         let final_image = process_and_get_dynamic_image(
             &context,
