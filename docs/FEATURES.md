@@ -301,7 +301,9 @@ details are in `RELEASE_NOTES.MD`.
   photo. The profile is the base of the look: applied after White Balance
   and Brightness on linear, unclipped light, so every later slider works on
   its whole result without a cap. Grouped profile list with a live preview
-  on hover, Amount 0–200, delete from the list. The profile is embedded in
+  on hover, Amount 0–200; right-click to Edit Profile (its settings back on
+  the sliders, then Update Profile; photos using it keep their version),
+  Rename (name, group, B&W) or Delete. The profile is embedded in
   the edit and XMP, so it renders without the file; Copy & Paste, presets
   and Auto Sync carry it. With a profile, Color Calibration acts before it.
 - **Adjustments sections in workflow order**: Light (Profile, Black &

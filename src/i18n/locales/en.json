@@ -236,16 +236,23 @@
       "amount": "Amount",
       "blackAndWhite": "B&W",
       "browse": "Choose a profile",
+      "cancelEdit": "Cancel",
       "clear": "Remove profile",
       "create": "Create Profile…",
       "delete": "Delete Profile",
       "deleteFailed": "Could not delete the profile: {{error}}",
+      "edit": "Edit Profile",
+      "editing": "Editing “{{name}}”",
       "empty": "No profiles yet. Set up a look, then choose Create Profile.",
       "loadFailed": "Could not load the profile: {{error}}",
+      "noRecipe": "This profile was made before profiles kept their settings, so it can be renamed but not edited.",
       "none": "None",
       "notSaved": "Embedded in this photo; not in your profiles.",
+      "rename": "Rename…",
+      "renameFailed": "Could not rename the profile: {{error}}",
       "title": "Profile",
-      "ungrouped": "Profiles"
+      "ungrouped": "Profiles",
+      "update": "Update Profile"
     },
     "zoneTint": {
       "fill": "Fill between",
@@ -1801,12 +1808,17 @@
       "failed": "Could not create the profile: {{error}}",
       "groupPlaceholder": "Group (optional)",
       "hint": "Ticked settings are baked into the profile and reset in this photo, which keeps its look with the profile applied.",
+      "hintUpdate": "Ticked settings are baked into the profile again. Photos already using it keep the version they have.",
       "kept": "Kept in the photo: {{settings}}. The current profile already carries one, and a profile holds only one.",
       "namePlaceholder": "Enter profile name...",
+      "save": "Save",
       "selectAll": "Select All",
       "selectNone": "Select None",
       "settings": "Settings to bake",
-      "title": "Create Profile"
+      "title": "Create Profile",
+      "titleRename": "Rename Profile",
+      "titleUpdate": "Update Profile",
+      "update": "Update"
     },
     "culling": {
       "actionDelete": "Move to Trash",

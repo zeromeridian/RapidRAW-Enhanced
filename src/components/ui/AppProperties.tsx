@@ -61,6 +61,8 @@ export enum Invokes {
   DeleteCustomProfile = 'delete_custom_profile',
   ListCustomProfiles = 'list_custom_profiles',
   LoadCustomProfile = 'load_custom_profile',
+  RenameCustomProfile = 'rename_custom_profile',
+  UpdateCustomProfile = 'update_custom_profile',
   CreateFolder = 'create_folder',
   CreateVirtualCopy = 'create_virtual_copy',
   CullImages = 'cull_images',

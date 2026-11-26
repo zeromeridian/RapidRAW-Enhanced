@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronDown, Plus, Trash2, X } from 'lucide-react';
+import { ChevronDown, Pencil, Plus, TextCursorInput, Trash2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ParseKeys } from 'i18next';
 import { toast } from 'react-toastify';
@@ -36,22 +36,42 @@ interface CreatedProfile {
   keptKeys: string[];
 }
 
+/** The profile dialog that is open: a new profile, a new revision of the one being edited, or a rename. */
+type ProfileDialog =
+  { mode: 'create' } | { mode: 'update'; entry: CustomProfileEntry } | { mode: 'rename'; entry: CustomProfileEntry };
+
+/** A profile's recipe on the sliders (Edit Profile), and the edit to go back to on Cancel. */
+interface ProfileEditing {
+  entry: CustomProfileEntry;
+  before: Adjustments;
+  /** The bake groups the recipe holds, ticked again by Update Profile. */
+  recipeGroups: Set<string>;
+}
+
+/** A profile as edits embed it: without its recipe, which only its file keeps. */
+const toEmbedded = (profile: CustomProfile): CustomProfile => {
+  const embedded = { ...profile };
+  delete embedded.recipe;
+  return embedded;
+};
+
 /** The edit with `profile` as its base: Amount kept when a profile was already set, B&W as the profile says. */
 const withProfile = <T extends Partial<Adjustments>>(adjustments: T, profile: CustomProfile): T => ({
   ...adjustments,
-  profile,
+  profile: toEmbedded(profile),
   profileAmount: adjustments.profile ? (adjustments.profileAmount ?? 100) : 100,
   monochrome: profile.monochrome,
   sectionVisibility: { ...adjustments.sectionVisibility, profile: true },
 });
 
+const isChanged = (adjustments: Partial<Adjustments>, key: string) =>
+  JSON.stringify(adjustments[key]) !== JSON.stringify(INITIAL_ADJUSTMENTS[key]);
+
 /** The bake groups the photo has changed from their defaults; White Balance starts unticked. */
 const changedBakeGroups = (adjustments: Adjustments): Set<string> =>
   new Set(
     PROFILE_BAKE_GROUPS.filter(
-      (bake) =>
-        bake.id !== 'whiteBalance' &&
-        bake.keys.some((key) => JSON.stringify(adjustments[key]) !== JSON.stringify(INITIAL_ADJUSTMENTS[key])),
+      (bake) => bake.id !== 'whiteBalance' && bake.keys.some((key) => isChanged(adjustments, key)),
     ).map((bake) => bake.id),
   );
 
@@ -68,13 +88,18 @@ export default function ProfilePanel({
   const { t } = useTranslation();
   const { showContextMenu } = useContextMenu();
   const setEditor = useEditorStore((state) => state.setEditor);
+  const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
   const [entries, setEntries] = useState<CustomProfileEntry[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+  const [dialog, setDialog] = useState<ProfileDialog | null>(null);
+  const [editing, setEditing] = useState<ProfileEditing | null>(null);
+  const [isBaking, setIsBaking] = useState(false);
   const loaded = useRef<Map<string, CustomProfile>>(new Map());
   const hoveredPath = useRef<string | null>(null);
   const profile = adjustments.profile ?? null;
+
+  // Editing belongs to the photo it started on.
+  useEffect(() => setEditing(null), [selectedImagePath]);
 
   const refreshList = useCallback(async () => {
     try {
@@ -136,10 +161,78 @@ export default function ProfilePanel({
 
   const handleClear = () => setAdjustments((prev) => ({ ...prev, profile: null, profileAmount: 100 }));
 
+  /** Edit Profile: the recipe back on the sliders, the profile itself taken off the photo. */
+  const handleEdit = async (entry: CustomProfileEntry) => {
+    endPreview();
+    try {
+      const data = await loadProfile(entry.path);
+      const recipe = data.recipe;
+      if (!recipe) {
+        toast.info(t('adjustments.profile.noRecipe'));
+        return;
+      }
+      setEditing({
+        entry,
+        before: adjustments,
+        recipeGroups: new Set(
+          PROFILE_BAKE_GROUPS.filter((bake) => bake.keys.some((key) => key in recipe)).map((bake) => bake.id),
+        ),
+      });
+      setAdjustments(
+        (prev) => ({
+          ...prev,
+          profile: null,
+          profileAmount: 100,
+          ...structuredClone(recipe),
+          monochrome: data.monochrome,
+        }),
+        t('adjustments.profile.edit'),
+      );
+    } catch (err) {
+      toast.error(t('adjustments.profile.loadFailed', { error: String(err) }));
+    }
+  };
+
+  const handleCancelEdit = () => {
+    if (!editing) return;
+    const { before } = editing;
+    setEditing(null);
+    setAdjustments(() => before, t('adjustments.profile.cancelEdit'));
+  };
+
+  const handleRename = async (entry: CustomProfileEntry, choice: CreateProfileChoice) => {
+    try {
+      setEntries(
+        await invoke<CustomProfileEntry[]>(Invokes.RenameCustomProfile, {
+          path: entry.path,
+          name: choice.name,
+          group: choice.group,
+          monochrome: choice.monochrome,
+        }),
+      );
+      loaded.current.clear();
+      setEditing(null);
+      setDialog(null);
+    } catch (err) {
+      toast.error(t('adjustments.profile.renameFailed', { error: String(err) }));
+    }
+  };
+
   const handleContextMenu = (event: React.MouseEvent, entry: CustomProfileEntry) => {
     event.preventDefault();
     event.stopPropagation();
     showContextMenu(event.clientX, event.clientY, [
+      {
+        label: t('adjustments.profile.edit'),
+        icon: Pencil,
+        disabled: !entry.canEdit,
+        onClick: () => handleEdit(entry),
+      },
+      {
+        label: t('adjustments.profile.rename'),
+        icon: TextCursorInput,
+        onClick: () => setDialog({ mode: 'rename', entry }),
+      },
       {
         label: t('adjustments.profile.delete'),
         icon: Trash2,
@@ -148,6 +241,7 @@ export default function ProfilePanel({
           try {
             setEntries(await invoke<CustomProfileEntry[]>(Invokes.DeleteCustomProfile, { path: entry.path }));
             loaded.current.delete(entry.path);
+            if (editing?.entry.path === entry.path) setEditing(null);
           } catch (err) {
             toast.error(t('adjustments.profile.deleteFailed', { error: String(err) }));
           }
@@ -156,13 +250,16 @@ export default function ProfilePanel({
     ]);
   };
 
-  const handleCreate = async (choice: CreateProfileChoice) => {
+  /** Create Profile, or Update Profile for the profile being edited: bake the ticked settings. */
+  const handleBake = async (choice: CreateProfileChoice, entry?: CustomProfileEntry) => {
     const keys = PROFILE_BAKE_GROUPS.filter((bake) => choice.groups.has(bake.id)).flatMap((bake) => bake.keys);
-    setIsCreating(true);
+    setIsBaking(true);
     try {
-      const created = await invoke<CreatedProfile>(Invokes.CreateCustomProfile, {
-        request: { name: choice.name, group: choice.group, keys, monochrome: choice.monochrome, adjustments },
-      });
+      const request = { name: choice.name, group: choice.group, keys, monochrome: choice.monochrome, adjustments };
+      const created = entry
+        ? await invoke<CreatedProfile>(Invokes.UpdateCustomProfile, { path: entry.path, request })
+        : await invoke<CreatedProfile>(Invokes.CreateCustomProfile, { request });
+      if (entry) loaded.current.delete(entry.path);
       loaded.current.set(created.path, created.profile);
       // The baked settings move into the profile, so the photo keeps its look at Amount 100;
       // what the profile could not take (its own curve or Zone Editor won) stays in the photo.
@@ -180,7 +277,7 @@ export default function ProfilePanel({
           ),
           monochrome: choice.monochrome,
         }),
-        t('modals.createProfile.title'),
+        t(entry ? 'modals.createProfile.titleUpdate' : 'modals.createProfile.title'),
       );
       if (created.keptKeys.length > 0) {
         const settings = created.keptKeys
@@ -190,13 +287,19 @@ export default function ProfilePanel({
           .join(', ');
         toast.info(t('modals.createProfile.kept', { settings }));
       }
-      setIsCreateOpen(false);
+      setDialog(null);
+      setEditing(null);
       refreshList();
     } catch (err) {
       toast.error(t('modals.createProfile.failed', { error: String(err) }));
     } finally {
-      setIsCreating(false);
+      setIsBaking(false);
     }
+  };
+
+  const handleDialogSubmit = (choice: CreateProfileChoice) => {
+    if (dialog?.mode === 'rename') handleRename(dialog.entry, choice);
+    else handleBake(choice, dialog?.mode === 'update' ? dialog.entry : undefined);
   };
 
   const groupedEntries = useMemo(() => {
@@ -206,7 +309,12 @@ export default function ProfilePanel({
     }
     return [...groups.entries()];
   }, [entries]);
-  const initialGroups = useMemo(() => changedBakeGroups(adjustments), [adjustments]);
+  // Update Profile ticks what the recipe held as well as what the photo has changed since.
+  const initialGroups = useMemo(
+    () => new Set([...changedBakeGroups(adjustments), ...(editing?.recipeGroups ?? [])]),
+    [adjustments, editing],
+  );
+  const dialogEntry = dialog && dialog.mode !== 'create' ? dialog.entry : null;
   const isSaved = !profile || entries.some((entry) => entry.id === profile.id);
 
   if (isForMask) {
@@ -220,7 +328,7 @@ export default function ProfilePanel({
         <button
           className="p-0.5 rounded-sm text-text-secondary hover:text-text-primary transition-colors"
           data-tooltip={t('adjustments.profile.create')}
-          onClick={() => setIsCreateOpen(true)}
+          onClick={() => setDialog({ mode: 'create' })}
         >
           <Plus size={16} />
         </button>
@@ -250,6 +358,28 @@ export default function ProfilePanel({
           />
         </button>
       </div>
+
+      {editing && (
+        <div className="mt-2 p-2 rounded-sm bg-surface flex items-center justify-between gap-2 text-xs">
+          <span className="truncate text-text-primary">
+            {t('adjustments.profile.editing', { name: editing.entry.name })}
+          </span>
+          <div className="flex gap-1 shrink-0">
+            <button
+              className="px-2 py-1 rounded-sm text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
+              onClick={handleCancelEdit}
+            >
+              {t('adjustments.profile.cancelEdit')}
+            </button>
+            <button
+              className="px-2 py-1 rounded-sm bg-accent text-button-text font-semibold hover:bg-accent-hover transition-colors"
+              onClick={() => setDialog({ mode: 'update', entry: editing.entry })}
+            >
+              {t('adjustments.profile.update')}
+            </button>
+          </div>
+        </div>
+      )}
 
       <AnimatePresence initial={false}>
         {isExpanded && (
@@ -310,13 +440,16 @@ export default function ProfilePanel({
       )}
 
       <CreateProfileModal
-        isOpen={isCreateOpen}
+        isOpen={dialog !== null}
+        mode={dialog?.mode ?? 'create'}
         currentProfileName={profile?.name ?? null}
+        initialName={dialogEntry?.name ?? ''}
+        initialGroup={dialogEntry?.group ?? ''}
         initialGroups={initialGroups}
-        initialMonochrome={adjustments.monochrome}
-        isCreating={isCreating}
-        onClose={() => setIsCreateOpen(false)}
-        onCreate={handleCreate}
+        initialMonochrome={dialog?.mode === 'rename' ? dialog.entry.monochrome : adjustments.monochrome}
+        isBusy={isBaking}
+        onClose={() => setDialog(null)}
+        onSubmit={handleDialogSubmit}
       />
     </AdjustmentTool>
   );

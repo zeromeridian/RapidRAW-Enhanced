@@ -2771,6 +2771,8 @@ pub fn run() {
             custom_profile::load_custom_profile,
             custom_profile::delete_custom_profile,
             custom_profile::create_custom_profile,
+            custom_profile::update_custom_profile,
+            custom_profile::rename_custom_profile,
             fetch_community_presets,
             generate_all_community_previews,
             save_temp_file,

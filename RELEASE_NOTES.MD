@@ -5,6 +5,23 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.113.0-dev-custom-profiles — 2026-11-26
+
+### Develop
+
+- Profiles can now be edited: right-click a profile and choose **Edit
+  Profile**. The settings it was made from come back on the sliders of
+  the open photo; change them and click **Update Profile** to bake it
+  again, or **Cancel** to go back. Photos that already use the profile
+  keep the version they have.
+- Right-click a profile and choose **Rename…** to change its name, its
+  group or whether it is a Black & White profile.
+- Profiles made with the previous version can be renamed but not edited,
+  as they do not keep the settings they were made from.
+- New profiles are stored much more compactly, with the same quality, so
+  photos that use one keep small sidecar files. Existing profiles keep
+  working.
+
 ## 1.112.1-dev-custom-profiles — 2026-11-26
 
 ### Develop

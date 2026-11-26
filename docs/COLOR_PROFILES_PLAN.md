@@ -32,6 +32,18 @@ decisions 1–7 taken by the owner (below). Plan item 83 in
   Amount other than 100 passes its curve and Zone Editor on at full
   strength (its table is baked at its Amount). Not bakeable: everything
   spatial, the tone mapper and the finishing LUT.
+- **`1.113.0` (owner's step 2, 2026-11-26; photos keep their copy, owner
+  choice):** profiles keep a `recipe` (the ticked settings as the edit
+  held them, file only, stripped from edits by `toEmbedded`) and a
+  `revision`; right-click **Edit Profile** puts the recipe on the open
+  photo's sliders with the profile taken off (Cancel restores the edit),
+  **Update Profile** bakes a new revision into the same file and id
+  (`update_custom_profile`); **Rename…** changes name, group, B&W flag
+  and the file name (`rename_custom_profile`, `save_profile`). `1.112.x`
+  profiles have no recipe: rename only. Also the decision 4 table format
+  version 2. Next steps (owner-approved order): 3 Save to my profiles and
+  `.tirprofile` import/export, 4 Favorites and thumbnails, 5 `lutData`
+  and Phase 3.
 - **Deviations from the design below (agent, 2026-11-26):** table stored
   as 16-bit integers and uploaded as `Rgba32Float` (not f16: the
   shaper-encoded values needed the precision); shaper 16 stops below and
@@ -296,6 +308,12 @@ Curve and the rest.
 4. **Lattice and embedding. Decided (owner 2026-11-26): measure first,
    then 33³ embedded** if the compressed XMP size stays reasonable;
    fall back to 17³ embedded with 33³ in the file only if it does not.
+   **Measured (owner, `1.112.1`):** profile files 119–131 KB, a photo's
+   `.tirdata` with one 139 KB. **Decided (owner 2026-11-26): shrink it
+   losslessly**, 33³ kept: format version 2 (`1.113.0`) stores each
+   entry's step from "no change" along red, bytes split (`encode_table`);
+   a smooth 33³ test look 200 KB → 23 KB; version 1 still loads. Real
+   sizes to confirm in the app.
 5. **`.cube` import.** `.cube` LUTs assume display sRGB input, which the
    scene slot does not get. **Decided (owner 2026-11-26): not
    supported**; `.cube` files stay finishing LUTs in Effects → LUT, and

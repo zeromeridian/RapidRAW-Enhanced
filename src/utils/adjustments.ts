@@ -248,6 +248,11 @@ export interface CustomProfile {
   shaper: { stopsBelow: number; stopsAbove: number };
   table: string;
   curves?: Curves;
+  zoneTint?: ZoneTint;
+  /** How often Update Profile has baked it again; photos keep the revision they were given. */
+  revision?: number;
+  /** The settings it was baked from; only the profile's file has it, never an edit. */
+  recipe?: Partial<Adjustments>;
 }
 
 /** A profile in the profile folder, without its table (`custom_profile::ProfileEntry`). */
@@ -257,6 +262,8 @@ export interface CustomProfileEntry {
   name: string;
   group: string;
   monochrome: boolean;
+  /** It keeps its recipe, so Edit Profile can reopen it (profiles from `1.112.x` cannot). */
+  canEdit: boolean;
 }
 
 export interface ProfileBakeGroup {

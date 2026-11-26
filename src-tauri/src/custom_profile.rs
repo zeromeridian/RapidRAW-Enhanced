@@ -24,7 +24,9 @@ pub const PROFILE_AMOUNT_KEY: &str = "profileAmount";
 /// The profile tool's eye (`sectionVisibility`).
 const PROFILE_GROUP: &str = "profile";
 
-const FORMAT_VERSION: u32 = 1;
+/// 1: the table's values as they are (`1.112.x`); 2: their steps from "no change"
+/// (`encode_table`). Both still load.
+const FORMAT_VERSION: u32 = 2;
 const FILE_FORMAT: &str = "ThisIsRAW custom profile";
 const FILE_EXTENSION: &str = "tirprofile";
 const DEFAULT_LATTICE_SIZE: u32 = 33;
@@ -106,6 +108,14 @@ pub struct ProfileData {
     /// A Zone Editor block, as the edit's `zoneTint`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub zone_tint: Option<Value>,
+    /// How often Update Profile has baked it again; photos keep the revision they were given.
+    #[serde(default)]
+    pub revision: u32,
+    /// The ticked settings it was baked from, as the photo's edit held them, so Edit Profile can
+    /// put them back on the sliders. Only the profile's file keeps it; edits embed the profile
+    /// without it (profiles from `1.112.x` have none and can only be renamed).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recipe: Option<Value>,
 }
 
 /// The shader's view of the edit's profile: what the uniforms need, read without decoding
@@ -185,7 +195,8 @@ pub fn table_for_adjustments(adjustments: &Value) -> Option<Arc<ProfileTable>> {
         cache.push(entry);
         return Some(table);
     }
-    let table = match decode_table(encoded, size) {
+    let version = profile["version"].as_u64().unwrap_or(1) as u32;
+    let table = match decode_table(encoded, size, version) {
         Ok(data) => Arc::new(ProfileTable { size, data }),
         Err(error) => {
             log::warn!("Ignoring an unreadable custom profile: {}", error);
@@ -206,17 +217,59 @@ fn table_len(size: u32) -> Result<usize, String> {
     Ok((size as usize).pow(3) * 3)
 }
 
-/// `values` (shaper-encoded, 0–1) as stored in a profile.
-fn encode_table(values: &[f32]) -> Result<String, String> {
-    let bytes: Vec<u8> = values
+fn quantize(value: f32) -> u16 {
+    (value.clamp(0.0, 1.0) * 65535.0).round() as u16
+}
+
+/// The value of the table's `index`th entry (RGB interleaved, red fastest) when the profile
+/// changes nothing: the lattice point's own shaper-encoded channel.
+fn identity_entry(index: usize, size: usize) -> u16 {
+    let point = index / 3;
+    let axis = [point % size, point / size % size, point / (size * size)][index % 3];
+    quantize(axis as f32 / (size - 1) as f32)
+}
+
+/// Whether the entry before `index` along red is the same channel of the lattice point next to
+/// it (not the last point of the previous row).
+fn has_red_neighbour(index: usize, size: usize) -> bool {
+    !(index / 3).is_multiple_of(size)
+}
+
+/// `values` (shaper-encoded, 0–1) as a profile stores them (`FORMAT_VERSION` 2, exact to 16
+/// bits): each entry's distance from "no change", then that distance's step from its neighbour
+/// along red, low bytes first and high bytes after. A smooth look leaves small, repetitive
+/// numbers there, which zstd packs far tighter than the values themselves (version 1).
+fn encode_table(values: &[f32], size: u32) -> Result<String, String> {
+    let size_usize = size as usize;
+    if values.len() != table_len(size)? {
+        return Err("Profile table does not match its size".to_string());
+    }
+    let residuals: Vec<u16> = values
         .iter()
-        .flat_map(|value| ((value.clamp(0.0, 1.0) * 65535.0).round() as u16).to_le_bytes())
+        .enumerate()
+        .map(|(index, value)| quantize(*value).wrapping_sub(identity_entry(index, size_usize)))
+        .collect();
+    let steps: Vec<u16> = (0..residuals.len())
+        .map(|index| {
+            if has_red_neighbour(index, size_usize) {
+                residuals[index].wrapping_sub(residuals[index - 3])
+            } else {
+                residuals[index]
+            }
+        })
+        .collect();
+    let bytes: Vec<u8> = steps
+        .iter()
+        .map(|step| step.to_le_bytes()[0])
+        .chain(steps.iter().map(|step| step.to_le_bytes()[1]))
         .collect();
     let compressed = zstd::encode_all(bytes.as_slice(), 19).map_err(|e| e.to_string())?;
     Ok(general_purpose::STANDARD.encode(compressed))
 }
 
-fn decode_table(encoded: &str, size: u32) -> Result<Vec<f32>, String> {
+/// A stored table back to shaper-encoded values: `version` 1 holds the values themselves,
+/// 2 and later the steps `encode_table` writes.
+fn decode_table(encoded: &str, size: u32, version: u32) -> Result<Vec<f32>, String> {
     let expected = table_len(size)?;
     let compressed = general_purpose::STANDARD
         .decode(encoded)
@@ -229,9 +282,28 @@ fn decode_table(encoded: &str, size: u32) -> Result<Vec<f32>, String> {
             expected * 2
         ));
     }
-    Ok(bytes
-        .chunks_exact(2)
-        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]) as f32 / 65535.0)
+    let to_value = |quantized: u16| quantized as f32 / 65535.0;
+    if version <= 1 {
+        return Ok(bytes
+            .chunks_exact(2)
+            .map(|pair| to_value(u16::from_le_bytes([pair[0], pair[1]])))
+            .collect());
+    }
+    let (low, high) = bytes.split_at(expected);
+    let size_usize = size as usize;
+    let mut residuals = vec![0u16; expected];
+    for index in 0..expected {
+        let step = u16::from_le_bytes([low[index], high[index]]);
+        residuals[index] = if has_red_neighbour(index, size_usize) {
+            residuals[index - 3].wrapping_add(step)
+        } else {
+            step
+        };
+    }
+    Ok(residuals
+        .iter()
+        .enumerate()
+        .map(|(index, residual)| to_value(residual.wrapping_add(identity_entry(index, size_usize))))
         .collect())
 }
 
@@ -499,6 +571,8 @@ pub struct ProfileEntry {
     pub name: String,
     pub group: String,
     pub monochrome: bool,
+    /// It keeps the settings it was baked from, so Edit Profile can reopen them.
+    pub can_edit: bool,
 }
 
 fn list_profiles_in(dir: &Path) -> Result<Vec<ProfileEntry>, String> {
@@ -512,6 +586,7 @@ fn list_profiles_in(dir: &Path) -> Result<Vec<ProfileEntry>, String> {
         .filter_map(|path| match read_profile_file(&path) {
             Ok(profile) => Some(ProfileEntry {
                 path: path.to_string_lossy().into_owned(),
+                can_edit: profile.recipe.is_some(),
                 id: profile.id,
                 name: profile.name,
                 group: profile.group,
@@ -580,65 +655,155 @@ pub struct CreatedProfile {
     kept_keys: Vec<String>,
 }
 
-/// Bakes the open photo's chosen settings into a new profile and saves it in the profile folder.
+/// The ticked settings as the edit holds them, for Edit Profile (`ProfileData::recipe`); a
+/// current profile among them is kept without its own recipe.
+fn recipe_of(edit: &Value, keys: &[String]) -> Value {
+    let mut recipe = serde_json::Map::new();
+    for key in keys {
+        if let Some(value) = edit.get(key) {
+            let mut value = value.clone();
+            if key == PROFILE_KEY
+                && let Some(profile) = value.as_object_mut()
+            {
+                profile.remove("recipe");
+            }
+            recipe.insert(key.clone(), value);
+        }
+    }
+    Value::Object(recipe)
+}
+
+/// Writes `profile` into the profile folder, named after it: at `previous` when that file
+/// already has the name, else at a new free name, removing `previous`.
+fn save_profile(
+    dir: &Path,
+    profile: &ProfileData,
+    previous: Option<&Path>,
+) -> Result<PathBuf, String> {
+    let stem = crate::naming::clean_file_stem(&profile.name);
+    let stem = if stem.is_empty() { "Profile" } else { &stem };
+    let path = match previous {
+        Some(previous) if previous.file_stem().is_some_and(|current| current == stem) => {
+            previous.to_path_buf()
+        }
+        _ => crate::lut_processing::unique_destination(dir, stem, FILE_EXTENSION),
+    };
+    let file = ProfileFile {
+        format: FILE_FORMAT.to_string(),
+        profile: profile.clone(),
+    };
+    let text = serde_json::to_string_pretty(&file).map_err(|e| e.to_string())?;
+    fs::write(&path, text).map_err(|e| e.to_string())?;
+    if let Some(previous) = previous.filter(|previous| *previous != path) {
+        fs::remove_file(previous).map_err(|e| e.to_string())?;
+    }
+    log::info!(
+        "Saved custom profile '{}' revision {} ({} bytes of table) to {}",
+        profile.name,
+        profile.revision,
+        profile.table.len(),
+        path.display()
+    );
+    Ok(path)
+}
+
+/// Bakes the open photo's chosen settings into a profile and saves it: a new one, or a new
+/// revision of `previous` (its file and id), which photos already using it do not follow.
+fn bake_and_save(
+    app_handle: &AppHandle,
+    request: &CreateProfileRequest,
+    previous: Option<(&Path, ProfileData)>,
+) -> Result<CreatedProfile, String> {
+    let state = app_handle.state::<AppState>();
+    let name = request.name.trim();
+    if name.is_empty() {
+        return Err("A profile needs a name".to_string());
+    }
+    let is_raw = state
+        .original_image
+        .lock()
+        .unwrap()
+        .as_ref()
+        .is_none_or(|image| image.is_raw);
+    let context = crate::image_processing::get_or_init_gpu_context(&state, app_handle)?;
+    let bake = Bake::new(&request.adjustments, &request.keys, is_raw);
+    let values = bake_lattice(&context, &bake, DEFAULT_LATTICE_SIZE)?;
+
+    let (previous_path, id, revision) = match previous {
+        Some((path, profile)) => (Some(path), profile.id, profile.revision + 1),
+        None => (None, uuid::Uuid::new_v4().to_string(), 0),
+    };
+    let profile = ProfileData {
+        version: FORMAT_VERSION,
+        id,
+        name: name.to_string(),
+        group: request.group.trim().to_string(),
+        monochrome: request.monochrome,
+        size: DEFAULT_LATTICE_SIZE,
+        shaper: bake.shaper,
+        table: encode_table(&values, DEFAULT_LATTICE_SIZE)?,
+        curves: bake.curves,
+        zone_tint: bake.zone_tint,
+        revision,
+        recipe: Some(recipe_of(&request.adjustments, &request.keys)),
+    };
+    let path = save_profile(&profiles_dir(app_handle)?, &profile, previous_path)?;
+    Ok(CreatedProfile {
+        path: path.to_string_lossy().into_owned(),
+        profile,
+        kept_keys: bake.kept,
+    })
+}
+
+/// Bakes the open photo's chosen settings into a new profile in the profile folder.
 #[tauri::command]
 pub async fn create_custom_profile(
     request: CreateProfileRequest,
     app_handle: AppHandle,
 ) -> Result<CreatedProfile, String> {
+    crate::blocking_command::run_blocking(move || bake_and_save(&app_handle, &request, None)).await
+}
+
+/// Bakes the open photo's chosen settings again into the profile at `path` (Update Profile).
+#[tauri::command]
+pub async fn update_custom_profile(
+    path: String,
+    request: CreateProfileRequest,
+    app_handle: AppHandle,
+) -> Result<CreatedProfile, String> {
     crate::blocking_command::run_blocking(move || {
-        let state = app_handle.state::<AppState>();
-        let name = request.name.trim();
+        let path = profile_path_in(&profiles_dir(&app_handle)?, &path)?;
+        let previous = read_profile_file(&path)?;
+        bake_and_save(&app_handle, &request, Some((&path, previous)))
+    })
+    .await
+}
+
+/// Renames the profile at `path`, moves it to `group` and sets its Black & White flag; its look
+/// stays as it is.
+#[tauri::command]
+pub async fn rename_custom_profile(
+    path: String,
+    name: String,
+    group: String,
+    monochrome: bool,
+    app_handle: AppHandle,
+) -> Result<Vec<ProfileEntry>, String> {
+    crate::blocking_command::run_blocking(move || {
+        let dir = profiles_dir(&app_handle)?;
+        let path = profile_path_in(&dir, &path)?;
+        let name = name.trim();
         if name.is_empty() {
             return Err("A profile needs a name".to_string());
         }
-        let is_raw = state
-            .original_image
-            .lock()
-            .unwrap()
-            .as_ref()
-            .is_none_or(|image| image.is_raw);
-        let context = crate::image_processing::get_or_init_gpu_context(&state, &app_handle)?;
-        let bake = Bake::new(&request.adjustments, &request.keys, is_raw);
-        let values = bake_lattice(&context, &bake, DEFAULT_LATTICE_SIZE)?;
-
         let profile = ProfileData {
-            version: FORMAT_VERSION,
-            id: uuid::Uuid::new_v4().to_string(),
             name: name.to_string(),
-            group: request.group.trim().to_string(),
-            monochrome: request.monochrome,
-            size: DEFAULT_LATTICE_SIZE,
-            shaper: bake.shaper,
-            table: encode_table(&values)?,
-            curves: bake.curves,
-            zone_tint: bake.zone_tint,
+            group: group.trim().to_string(),
+            monochrome,
+            ..read_profile_file(&path)?
         };
-
-        let dir = profiles_dir(&app_handle)?;
-        let stem = crate::naming::clean_file_stem(name);
-        let path = crate::lut_processing::unique_destination(
-            &dir,
-            if stem.is_empty() { "Profile" } else { &stem },
-            FILE_EXTENSION,
-        );
-        let file = ProfileFile {
-            format: FILE_FORMAT.to_string(),
-            profile: profile.clone(),
-        };
-        let text = serde_json::to_string_pretty(&file).map_err(|e| e.to_string())?;
-        fs::write(&path, text).map_err(|e| e.to_string())?;
-        log::info!(
-            "Saved custom profile '{}' ({} bytes of table) to {}",
-            profile.name,
-            profile.table.len(),
-            path.display()
-        );
-        Ok(CreatedProfile {
-            path: path.to_string_lossy().into_owned(),
-            profile,
-            kept_keys: bake.kept,
-        })
+        save_profile(&dir, &profile, Some(&path))?;
+        list_profiles_in(&dir)
     })
     .await
 }
@@ -670,17 +835,61 @@ mod tests {
         }
     }
 
+    /// A smooth, strong look on a lattice of `size`: a lift, a channel cross-talk and a cast,
+    /// as a baked profile has them.
+    fn smooth_look(size: usize) -> Vec<f32> {
+        (0..size.pow(3) * 3)
+            .map(|index| {
+                let point = index / 3;
+                let rgb = [point % size, point / size % size, point / (size * size)]
+                    .map(|axis| axis as f32 / (size - 1) as f32);
+                let channel = rgb[index % 3];
+                (channel + 0.04 * (3.0 * rgb[0] + 2.0 * rgb[1]).sin() + 0.02 * rgb[2] - 0.01)
+                    .clamp(0.0, 1.0)
+            })
+            .collect()
+    }
+
+    /// The `1.112.x` storage, kept here to prove its tables still load.
+    fn encode_version_1(values: &[f32]) -> String {
+        let bytes: Vec<u8> = values
+            .iter()
+            .flat_map(|value| quantize(*value).to_le_bytes())
+            .collect();
+        general_purpose::STANDARD.encode(zstd::encode_all(bytes.as_slice(), 19).unwrap())
+    }
+
     #[test]
-    fn a_table_survives_encoding_within_sixteen_bits() {
-        let size = 3;
-        let values: Vec<f32> = (0..27 * 3).map(|i| i as f32 / 80.0).collect();
-        let encoded = encode_table(&values).unwrap();
-        let decoded = decode_table(&encoded, size).unwrap();
+    fn a_table_survives_encoding_exactly_to_sixteen_bits() {
+        let size = 9;
+        let values = smooth_look(size as usize);
+        let decoded = decode_table(&encode_table(&values, size).unwrap(), size, 2).unwrap();
         assert_eq!(decoded.len(), values.len());
         for (a, b) in values.iter().zip(&decoded) {
-            assert!((a - b).abs() <= 0.5 / 65535.0 + f32::EPSILON);
+            assert_eq!(quantize(*a), quantize(*b));
         }
-        assert!(decode_table(&encoded, 4).is_err());
+        assert!(encode_table(&values, 4).is_err());
+        assert!(decode_table(&encode_table(&values, size).unwrap(), 4, 2).is_err());
+    }
+
+    #[test]
+    fn version_1_tables_still_load() {
+        let size = 5;
+        let values = smooth_look(size as usize);
+        let decoded = decode_table(&encode_version_1(&values), size, 1).unwrap();
+        for (a, b) in values.iter().zip(&decoded) {
+            assert_eq!(quantize(*a), quantize(*b));
+        }
+    }
+
+    #[test]
+    fn storing_steps_from_no_change_packs_a_look_tighter() {
+        let size = DEFAULT_LATTICE_SIZE;
+        let values = smooth_look(size as usize);
+        let before = encode_version_1(&values).len();
+        let after = encode_table(&values, size).unwrap().len();
+        eprintln!("33³ smooth look: version 1 {before} bytes, version 2 {after} bytes");
+        assert!(after * 2 < before, "{after} is not under half of {before}");
     }
 
     #[test]
@@ -717,12 +926,12 @@ mod tests {
     /// A current profile as the edit embeds it: a valid 2³ table and a bent tone curve.
     fn base_profile() -> Value {
         json!({
-            "version": 1,
+            "version": FORMAT_VERSION,
             "id": "base",
             "name": "Base",
             "size": 2,
             "shaper": { "stopsBelow": 12.0, "stopsAbove": 6.0 },
-            "table": encode_table(&[0.5; 24]).unwrap(),
+            "table": encode_table(&[0.5; 24], 2).unwrap(),
             "curves": serde_json::from_str::<Value>(BENT_CURVE).unwrap(),
         })
     }
@@ -780,6 +989,45 @@ mod tests {
     }
 
     #[test]
+    fn the_recipe_keeps_the_ticked_settings_without_a_nested_recipe() {
+        let mut current = base_profile();
+        current["recipe"] = json!({ "exposure": 2.0 });
+        let edit =
+            json!({ "exposure": 0.5, "contrast": 30, "profile": current, "curveMode": "point" });
+        let recipe = recipe_of(&edit, &keys(&["exposure", "profile", "curveMode", "hue"]));
+        assert_eq!(recipe["exposure"], 0.5);
+        assert_eq!(recipe["curveMode"], "point");
+        assert!(recipe.get("contrast").is_none() && recipe.get("hue").is_none());
+        assert_eq!(recipe["profile"]["id"], "base");
+        assert!(recipe["profile"].get("recipe").is_none());
+    }
+
+    #[test]
+    fn saving_follows_the_name_and_keeps_one_file() {
+        let dir = std::env::temp_dir().join(format!("tir-profiles-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let mut profile: ProfileData = serde_json::from_value(base_profile()).unwrap();
+
+        let first = save_profile(&dir, &profile, None).unwrap();
+        assert_eq!(first.file_name().unwrap(), "Base.tirprofile");
+        assert_eq!(save_profile(&dir, &profile, Some(&first)).unwrap(), first);
+        assert_eq!(read_profile_file(&first).unwrap().name, "Base");
+
+        profile.name = "Warm: Film".to_string();
+        let renamed = save_profile(&dir, &profile, Some(&first)).unwrap();
+        assert_eq!(renamed.file_name().unwrap(), "Warm_ Film.tirprofile");
+        assert!(!first.exists());
+        let entries = list_profiles_in(&dir).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "Warm: Film");
+        assert!(
+            !entries[0].can_edit,
+            "a profile without a recipe cannot be edited"
+        );
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
     fn a_straight_curve_is_not_carried() {
         let straight = json!({ "luma": [{ "x": 0, "y": 0 }, { "x": 255, "y": 255 }], "red": [] });
         assert!(is_identity_curve(&straight));
@@ -809,14 +1057,20 @@ mod tests {
 
         let identity = bake_lattice(&context, &Bake::new(&json!({}), &[], true), size).unwrap();
         assert_eq!(identity.len(), (size as usize).pow(3) * 3);
-        for (index, value) in identity.iter().enumerate() {
-            let point = index / 3;
-            let axis = [point % 9, point / 9 % 9, point / 81][index % 3] as u32;
-            let expected = encode(shaper, node(axis));
-            assert!(
-                (value - expected).abs() < 1e-4,
-                "point {point}: {value} vs {expected}"
-            );
+        for (point, rgb) in identity.chunks_exact(3).enumerate() {
+            let axes = [point % 9, point / 9 % 9, point / 81].map(|axis| node(axis as u32));
+            // Judged against the colour's brightest channel, as the eye sees it: the colour
+            // mixer's hue round trip (run even with no band set, as in every render) leaves
+            // float noise that is large only relative to a channel many stops darker.
+            let peak = axes.iter().fold(0f32, |peak, value| peak.max(*value));
+            for (value, expected) in rgb.iter().zip(axes) {
+                let error = (decode(shaper, *value) - expected).abs();
+                assert!(
+                    error <= 1e-4 * peak + 1e-7,
+                    "point {point}: {} vs {expected}",
+                    decode(shaper, *value)
+                );
+            }
         }
 
         let brighter = Bake::new(&json!({ "exposure": 1.0 }), &keys(&["exposure"]), true);
