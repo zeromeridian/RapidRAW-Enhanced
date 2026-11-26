@@ -18,6 +18,8 @@ export interface CreateProfileChoice {
 
 interface CreateProfileModalProps {
   isOpen: boolean;
+  /** The photo's current profile, which can be baked in; null without one. */
+  currentProfileName: string | null;
   /** The bake groups ticked when the dialog opens (those the photo has changed). */
   initialGroups: ReadonlySet<string>;
   initialMonochrome: boolean;
@@ -32,6 +34,7 @@ const INPUT_CLASS =
 /** Adobe Camera Raw's Create Profile: a name, a group and the settings to bake into the look. */
 export default function CreateProfileModal({
   isOpen,
+  currentProfileName,
   initialGroups,
   initialMonochrome,
   isCreating,
@@ -78,6 +81,8 @@ export default function CreateProfileModal({
     },
     [handleCreate, onClose],
   );
+
+  const bakeGroups = PROFILE_BAKE_GROUPS.filter((bake) => !bake.needsProfile || currentProfileName !== null);
 
   const toggle = (id: string) => {
     const next = new Set(groups);
@@ -139,7 +144,7 @@ export default function CreateProfileModal({
             <Text variant={TextVariants.small}>{t('modals.createProfile.hint')}</Text>
           </div>
           <div className="flex gap-2 shrink-0">
-            <Button size="sm" onClick={() => setGroups(new Set(PROFILE_BAKE_GROUPS.map((bake) => bake.id)))}>
+            <Button size="sm" onClick={() => setGroups(new Set(bakeGroups.map((bake) => bake.id)))}>
               {t('modals.createProfile.selectAll')}
             </Button>
             <Button size="sm" onClick={() => setGroups(new Set())}>
@@ -149,7 +154,7 @@ export default function CreateProfileModal({
         </div>
 
         <div className="bg-bg-primary p-4 rounded-md overflow-y-auto min-h-0">
-          {PROFILE_BAKE_GROUPS.map((bake) => (
+          {bakeGroups.map((bake) => (
             <button
               className="flex w-full items-center gap-2 py-0.5 text-left"
               data-tooltip={bake.isApproximate ? t('modals.createProfile.approximateHint') : undefined}
@@ -158,7 +163,7 @@ export default function CreateProfileModal({
               type="button"
             >
               <TickBox state={groups.has(bake.id) ? 'all' : 'none'} />
-              <Text as="span">{t(bake.label as ParseKeys)}</Text>
+              <Text as="span">{t(bake.label as ParseKeys, { name: currentProfileName })}</Text>
               {bake.isApproximate && (
                 <Text as="span" color={TextColors.secondary} variant={TextVariants.small}>
                   ({t('modals.createProfile.approximate')})

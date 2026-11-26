@@ -18,6 +18,20 @@ decisions 1–7 taken by the owner (below). Plan item 83 in
   Profile block (`Profile.tsx`: grouped list, hover preview, Amount,
   clear, delete) and `CreateProfileModal.tsx`; Copy & Paste group,
   History labels; LUT Intensity 0 fix (`Effects.tsx`).
+- **`1.112.1` (owner 2026-11-26: "add everything that can be added"):**
+  the bake also takes Color Calibration (exact, at its place: before the
+  profile when the photo has one, after the tonal sliders otherwise), the
+  tone sliders one by one (only Shadows and Blacks approximate: they alone
+  read the surround), the Zone Editor (carried like the tone curve, its
+  mask smoothing included, applied before the photo's own and in the mask
+  blend backdrop, blended by Amount) and the photo's current profile at
+  its Amount (`Bake`, `bake_profile` binds its table; the new table takes
+  its shaper). A profile carries one curve and one Zone Editor: when the
+  current profile, baked in, has one, it wins and the photo keeps its own
+  (`kept_keys`, a toast says so). Known limit: a current profile at an
+  Amount other than 100 passes its curve and Zone Editor on at full
+  strength (its table is baked at its Amount). Not bakeable: everything
+  spatial, the tone mapper and the finishing LUT.
 - **Deviations from the design below (agent, 2026-11-26):** table stored
   as 16-bit integers and uploaded as `Rgba32Float` (not f16: the
   shaper-encoded values needed the precision); shaper 16 stops below and

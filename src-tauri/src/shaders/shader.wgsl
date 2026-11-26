@@ -168,6 +168,8 @@ struct GlobalAdjustments {
     profile_red_curve_count: u32,
     profile_green_curve_count: u32,
     profile_blue_curve_count: u32,
+    // The custom profile's own Zone Editor, applied before the photo's.
+    profile_zone_tint: ZoneTint,
 }
 
 struct MaskAdjustments {
@@ -1892,6 +1894,25 @@ fn apply_profile(color: vec3<f32>) -> vec3<f32> {
     return max(color + adjustments.global.profile_amount * (looked - color), vec3<f32>(0.0));
 }
 
+// The custom profile's Zone Editor, blended by its Amount, then the photo's own (whose mask
+// smoothing factor `main` has already measured).
+fn apply_zone_tints(srgb: vec3<f32>, coord: vec2<u32>, is_raw: u32, photo_smoothing_factor: f32) -> vec3<f32> {
+    var toned = srgb;
+    if (adjustments.global.has_profile == 1u && adjustments.global.profile_zone_tint.enabled == 1u) {
+        let factor = zone_tint_smoothing_factor(coord, is_raw, adjustments.global.profile_zone_tint.smoothing.x);
+        let profile_toned = apply_zone_tint(toned, adjustments.global.profile_zone_tint, factor);
+        toned = clamp(
+            toned + adjustments.global.profile_amount * (profile_toned - toned),
+            vec3<f32>(0.0),
+            vec3<f32>(1.0)
+        );
+    }
+    if (adjustments.global.zone_tint.enabled == 1u) {
+        toned = apply_zone_tint(toned, adjustments.global.zone_tint, photo_smoothing_factor);
+    }
+    return toned;
+}
+
 // Color Calibration of the photo, then of each mask by its influence.
 fn apply_calibrations(color: vec3<f32>, coord: vec2<u32>) -> vec3<f32> {
     var calibrated = apply_color_calibration(color, adjustments.global.color_calibration);
@@ -2450,9 +2471,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         textureStore(output_texture, id.xy, vec4<f32>(l, weight_l, 0.0, 1.0));
         return;
     }
-    if (adjustments.global.zone_tint.enabled == 1u) {
-        final_rgb = apply_zone_tint(final_rgb, adjustments.global.zone_tint, zone_smoothing_factor);
-    }
+    final_rgb = apply_zone_tints(final_rgb, absolute_coord, is_raw, zone_smoothing_factor);
 
     final_rgb += grain_delta(
         final_rgb,
@@ -2489,14 +2508,12 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             let influence = get_mask_influence(i, absolute_coord);
             if (influence > 0.001) {
                 if (!backdrop_ready) {
-                    backdrop_rgb = monochrome_srgb(backdrop_rgb);
-                    if (adjustments.global.zone_tint.enabled == 1u) {
-                        backdrop_rgb = apply_zone_tint(
-                            backdrop_rgb,
-                            adjustments.global.zone_tint,
-                            zone_smoothing_factor
-                        );
-                    }
+                    backdrop_rgb = apply_zone_tints(
+                        monochrome_srgb(backdrop_rgb),
+                        absolute_coord,
+                        is_raw,
+                        zone_smoothing_factor
+                    );
                     backdrop_ready = true;
                 }
                 let blended = blend_colors(backdrop_rgb, final_rgb, mode);
@@ -2531,22 +2548,31 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
 // Bakes a custom profile (`custom_profile::bake_lattice`): each lattice point, a shaper-encoded
 // colour, goes through the bakeable stages with the photo's own (global) values, in `main`'s
-// order: Exposure, White Balance and Brightness (which run before the profile's slot), then
-// the slot's tonal and colour stages up to the tone mapper. Tonal sliders take their per-pixel
-// form (the pixel is its own surround), since a table cannot see neighbouring pixels.
+// order: Exposure, White Balance and Brightness (which run before the profile's slot), Color
+// Calibration and the photo's current profile when it is baked in (`has_profile`), then the
+// slot's tonal and colour stages up to the tone mapper. Shadows and Blacks take their
+// per-pixel form (the pixel is its own surround), since a table cannot see neighbouring pixels.
 @compute @workgroup_size(4, 4, 4)
 fn bake_profile(@builtin(global_invocation_id) id: vec3<u32>) {
     let size = u32(round(pow(f32(arrayLength(&profile_bake_output)), 1.0 / 3.0)));
     if (any(id >= vec3<u32>(size))) { return; }
     let g = adjustments.global;
+    let has_profile = g.has_profile == 1u;
 
     var color = profile_shaper_decode(vec3<f32>(id) / f32(size - 1u));
     color = apply_linear_exposure(color, g.exposure);
     color = apply_white_balance(color, g.temperature, g.tint);
     color = apply_filmic_exposure(color, g.brightness);
+    if (has_profile) {
+        color = apply_color_calibration(color, g.color_calibration);
+        color = apply_profile(color);
+    }
     // `is_raw` 1 takes the surround as linear light, the same space the pixel is in.
     color = apply_tonal_adjustments(color, color, 1u, g.contrast, g.shadows, g.whites, g.blacks);
     color = apply_highlights_adjustment(color, color, 1u, g.highlights);
+    if (!has_profile) {
+        color = apply_color_calibration(color, g.color_calibration);
+    }
     color = apply_hsl_panel(color, g.hsl, vec2<i32>(0));
     color = apply_point_colors(color, point_color_coords(color));
     color = apply_hue_shift(color, g.hue);

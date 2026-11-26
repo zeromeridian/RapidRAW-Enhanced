@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, Plus, Trash2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import type { ParseKeys } from 'i18next';
 import { toast } from 'react-toastify';
 import clsx from 'clsx';
 import AdjustmentSlider from './AdjustmentSlider';
@@ -18,6 +19,7 @@ import {
   INITIAL_ADJUSTMENTS,
   PROFILE_BAKE_GROUPS,
   ProfileAdjustment,
+  getProfileBakeGroupOfKey,
 } from '../../utils/adjustments';
 
 interface ProfilePanelProps {
@@ -30,6 +32,8 @@ interface ProfilePanelProps {
 interface CreatedProfile {
   path: string;
   profile: CustomProfile;
+  /** Ticked keys the profile could not take (`custom_profile::Bake::kept`). */
+  keptKeys: string[];
 }
 
 /** The edit with `profile` as its base: Amount kept when a profile was already set, B&W as the profile says. */
@@ -160,15 +164,32 @@ export default function ProfilePanel({
         request: { name: choice.name, group: choice.group, keys, monochrome: choice.monochrome, adjustments },
       });
       loaded.current.set(created.path, created.profile);
-      // The baked settings move into the profile, so the photo keeps its look at Amount 100.
+      // The baked settings move into the profile, so the photo keeps its look at Amount 100;
+      // what the profile could not take (its own curve or Zone Editor won) stays in the photo.
+      const kept = new Set(created.keptKeys.flatMap((key) => getProfileBakeGroupOfKey(key)?.keys ?? [key]));
+      const baked = keys.filter((key) => !kept.has(key));
       setAdjustments(
         (prev) => ({
-          ...withProfile({ ...prev, profile: null }, created.profile),
-          ...Object.fromEntries(keys.map((key) => [key, structuredClone(INITIAL_ADJUSTMENTS[key])])),
+          ...withProfile(
+            {
+              ...prev,
+              ...Object.fromEntries(baked.map((key) => [key, structuredClone(INITIAL_ADJUSTMENTS[key])])),
+              profile: null,
+            },
+            created.profile,
+          ),
           monochrome: choice.monochrome,
         }),
         t('modals.createProfile.title'),
       );
+      if (created.keptKeys.length > 0) {
+        const settings = created.keptKeys
+          .map((key) => getProfileBakeGroupOfKey(key)?.label)
+          .filter((label): label is string => label !== undefined)
+          .map((label) => t(label as ParseKeys))
+          .join(', ');
+        toast.info(t('modals.createProfile.kept', { settings }));
+      }
       setIsCreateOpen(false);
       refreshList();
     } catch (err) {
@@ -290,6 +311,7 @@ export default function ProfilePanel({
 
       <CreateProfileModal
         isOpen={isCreateOpen}
+        currentProfileName={profile?.name ?? null}
         initialGroups={initialGroups}
         initialMonochrome={adjustments.monochrome}
         isCreating={isCreating}

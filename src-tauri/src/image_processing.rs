@@ -2127,6 +2127,8 @@ pub struct GlobalAdjustments {
     pub profile_red_curve_count: u32,
     pub profile_green_curve_count: u32,
     pub profile_blue_curve_count: u32,
+    /// The custom profile's own Zone Editor, applied before the photo's.
+    pub profile_zone_tint: crate::zone_tint::ZoneTintSettings,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
@@ -3145,6 +3147,7 @@ fn get_global_adjustments_from_json(
         profile_red_curve: convert_points_to_aligned(profile_red),
         profile_green_curve: convert_points_to_aligned(profile_green),
         profile_blue_curve: convert_points_to_aligned(profile_blue),
+        profile_zone_tint: profile.zone_tint(),
     }
 }
 

@@ -5,6 +5,21 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.112.1-dev-custom-profiles — 2026-11-26
+
+### Develop
+
+- Create Profile can now bake everything a profile can hold:
+  - **Color Calibration**.
+  - **Brightness, Contrast, Highlights, Shadows, Whites and Blacks** each on
+    their own line; only Shadows and Blacks are marked approximate.
+  - The **Zone Editor**: the profile carries it and applies it before the
+    photo's own.
+  - The photo's **current profile** at its Amount, so a profile made on a
+    photo that already has one keeps the whole look.
+- When the current profile already carries a tone curve or Zone Editor,
+  the photo keeps its own, and a note says so.
+
 ## 1.112.0-dev-custom-profiles — 2026-11-26
 
 ### Develop

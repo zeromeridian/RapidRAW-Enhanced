@@ -294,9 +294,10 @@ details are in `RELEASE_NOTES.MD`.
 ## Develop
 
 - **Custom profiles, as Adobe Camera Raw creates them** (Light → Profile):
-  Create Profile bakes the chosen settings (Exposure, White Balance, Tone,
-  Curves, Presence, Hue, Color Mixer, Point Color, Color Grading; a B&W
-  flag) into a profile in the user's profile folder and resets them in the
+  Create Profile bakes the chosen settings (the current profile, Exposure,
+  White Balance, each tone slider, Curves, Presence, Hue, Color Mixer,
+  Point Color, Color Calibration, Color Grading, Zone Editor; a B&W flag)
+  into a profile in the user's profile folder and resets them in the
   photo. The profile is the base of the look: applied after White Balance
   and Brightness on linear, unclipped light, so every later slider works on
   its whole result without a cap. Grouped profile list with a live preview

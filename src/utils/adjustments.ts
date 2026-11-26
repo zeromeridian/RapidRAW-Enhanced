@@ -259,26 +259,37 @@ export interface CustomProfileEntry {
   monochrome: boolean;
 }
 
+export interface ProfileBakeGroup {
+  id: string;
+  label: string;
+  keys: string[];
+  /** Baked per pixel from a slider that reads the pixel's surround: close, not identical. */
+  isApproximate?: boolean;
+  /** Shown only while the photo has a profile (the current one, baked in at its Amount). */
+  needsProfile?: boolean;
+}
+
 /**
- * What Create Profile can bake into a profile, as in Adobe Camera Raw (`custom_profile::BAKEABLE_KEYS`).
- * Tone is baked per pixel, so it is close but not identical; White Balance is off by default.
+ * What Create Profile can bake into a profile, as in Adobe Camera Raw
+ * (`custom_profile::BAKEABLE_KEYS`): every per-pixel stage from Exposure to the tone mapper,
+ * the current profile, and the tone curve and Zone Editor, which the profile carries.
+ * White Balance is off by default.
  */
-export const PROFILE_BAKE_GROUPS: Array<{ id: string; label: string; keys: string[]; isApproximate?: boolean }> = [
+export const PROFILE_BAKE_GROUPS: Array<ProfileBakeGroup> = [
+  {
+    id: 'profile',
+    label: 'modals.createProfile.currentProfile',
+    keys: [ProfileAdjustment.Profile, ProfileAdjustment.ProfileAmount],
+    needsProfile: true,
+  },
   { id: 'exposure', label: 'adjustments.basic.exposure', keys: [BasicAdjustment.Exposure] },
   { id: 'whiteBalance', label: 'adjustments.color.whiteBalance', keys: ['temperature', 'tint'] },
-  {
-    id: 'tone',
-    label: 'modals.copyPaste.groups.tone',
-    keys: [
-      BasicAdjustment.Brightness,
-      BasicAdjustment.Contrast,
-      BasicAdjustment.Highlights,
-      BasicAdjustment.Shadows,
-      BasicAdjustment.Whites,
-      BasicAdjustment.Blacks,
-    ],
-    isApproximate: true,
-  },
+  { id: 'brightness', label: 'adjustments.basic.brightness', keys: [BasicAdjustment.Brightness] },
+  { id: 'contrast', label: 'adjustments.basic.contrast', keys: [BasicAdjustment.Contrast] },
+  { id: 'highlights', label: 'adjustments.basic.highlights', keys: [BasicAdjustment.Highlights] },
+  { id: 'shadows', label: 'adjustments.basic.shadows', keys: [BasicAdjustment.Shadows], isApproximate: true },
+  { id: 'whites', label: 'adjustments.basic.whites', keys: [BasicAdjustment.Whites] },
+  { id: 'blacks', label: 'adjustments.basic.blacks', keys: [BasicAdjustment.Blacks], isApproximate: true },
   {
     id: 'curves',
     label: 'modals.copyPaste.groups.curves',
@@ -288,8 +299,14 @@ export const PROFILE_BAKE_GROUPS: Array<{ id: string; label: string; keys: strin
   { id: 'hue', label: 'modals.copyPaste.groups.hueShift', keys: ['hue'] },
   { id: 'colorMixer', label: 'modals.copyPaste.groups.colorMixer', keys: ['hsl'] },
   { id: 'pointColor', label: 'modals.copyPaste.groups.pointColor', keys: ['pointColors'] },
+  { id: 'colorCalibration', label: 'modals.copyPaste.groups.colorCalibration', keys: ['colorCalibration'] },
   { id: 'colorGrading', label: 'modals.copyPaste.groups.colorGrading', keys: ['colorGrading'] },
+  { id: 'zoneTint', label: 'editor.adjustments.sections.zoneTint', keys: ['zoneTint'] },
 ];
+
+/** The bake groups that carry `key`, a key Create Profile left in the photo (`kept_keys`). */
+export const getProfileBakeGroupOfKey = (key: string): ProfileBakeGroup | undefined =>
+  PROFILE_BAKE_GROUPS.find((bake) => bake.keys.includes(key));
 
 export interface ColorCalibration {
   shadowsTint: number;

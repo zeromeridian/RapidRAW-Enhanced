@@ -819,7 +819,7 @@ fn high_precision_shader_source() -> String {
 
 /// A custom profile's table as a 3D texture, in full float: its shaper-encoded values are
 /// indexed exactly (`textureLoad`), so half floats would cost precision for nothing.
-fn upload_profile_table(
+pub(crate) fn upload_profile_table(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     profile: &ProfileTable,

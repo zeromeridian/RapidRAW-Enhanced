@@ -33,9 +33,17 @@ const MAX_AMOUNT: f32 = 2.0;
 /// Tables kept decoded, newest last: enough for a photo and the previews around it.
 const TABLE_CACHE_SIZE: usize = 4;
 
-/// The adjustment keys a profile can bake: the stages from Exposure to the tone mapper that act
-/// on each pixel alone (shader `bake_profile`), and the tone curve, which the profile carries.
+/// The edit's tone curve and Zone Editor block, which a profile carries as they are (they act
+/// after the tone mapper, outside the table) and applies before the photo's own.
+const CURVES_KEY: &str = "curves";
+const ZONE_TINT_KEY: &str = "zoneTint";
+
+/// The adjustment keys a profile can bake: every stage from Exposure to the tone mapper that
+/// acts on each pixel alone (shader `bake_profile`), the photo's current profile, and the
+/// tone curve and Zone Editor, which the profile carries.
 pub const BAKEABLE_KEYS: &[&str] = &[
+    PROFILE_KEY,
+    PROFILE_AMOUNT_KEY,
     "exposure",
     "temperature",
     "tint",
@@ -45,13 +53,15 @@ pub const BAKEABLE_KEYS: &[&str] = &[
     "shadows",
     "whites",
     "blacks",
+    "colorCalibration",
     "hsl",
     "pointColors",
     "hue",
     "saturation",
     "vibrance",
     "colorGrading",
-    "curves",
+    CURVES_KEY,
+    ZONE_TINT_KEY,
 ];
 
 /// How the table is indexed: linear light in even log2 steps, from `stops_below` stops under
@@ -93,6 +103,9 @@ pub struct ProfileData {
     /// The tone curve's `luma`, `red`, `green` and `blue` points, as the edit's `curves`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub curves: Option<Value>,
+    /// A Zone Editor block, as the edit's `zoneTint`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zone_tint: Option<Value>,
 }
 
 /// The shader's view of the edit's profile: what the uniforms need, read without decoding
@@ -102,6 +115,7 @@ pub struct RenderSettings {
     pub amount: f32,
     pub shaper: Shaper,
     curves: Option<Value>,
+    zone_tint: Option<Value>,
 }
 
 impl RenderSettings {
@@ -122,8 +136,14 @@ impl RenderSettings {
             shaper: profile
                 .and_then(|profile| serde_json::from_value(profile["shaper"].clone()).ok())
                 .unwrap_or_default(),
-            curves: profile.and_then(|profile| profile.get("curves").cloned()),
+            curves: profile.and_then(|profile| profile.get(CURVES_KEY).cloned()),
+            zone_tint: profile.and_then(|profile| profile.get(ZONE_TINT_KEY).cloned()),
         }
+    }
+
+    /// The profile's Zone Editor for the shader (off without a profile).
+    pub fn zone_tint(&self) -> crate::zone_tint::ZoneTintSettings {
+        crate::zone_tint::ZoneTintSettings::from_json(self.zone_tint.as_ref(), true)
     }
 
     /// The profile's points of one tone-curve channel (none without a profile).
@@ -215,14 +235,21 @@ fn decode_table(encoded: &str, size: u32) -> Result<Vec<f32>, String> {
         .collect())
 }
 
-/// Renders the profile's lattice through the bakeable stages with `adjustments` (shader
-/// `bake_profile`) and returns its shaper-encoded RGB values, red fastest.
-fn bake_lattice(
-    context: &GpuContext,
-    adjustments: &AllAdjustments,
-    size: u32,
-) -> Result<Vec<f32>, String> {
+/// Renders the profile's lattice through the bakeable stages (shader `bake_profile`) and
+/// returns its shaper-encoded RGB values, red fastest.
+fn bake_lattice(context: &GpuContext, bake: &Bake, size: u32) -> Result<Vec<f32>, String> {
     let device = &context.device;
+    let adjustments = &bake.adjustments;
+    // The photo's current profile when it is baked in; otherwise an unread placeholder.
+    let placeholder = ProfileTable {
+        size: 1,
+        data: vec![0.0; 3],
+    };
+    let base_view = crate::gpu_processing::upload_profile_table(
+        device,
+        &context.queue,
+        bake.base.as_deref().unwrap_or(&placeholder),
+    );
     let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Profile Bake Shader"),
         source: wgpu::ShaderSource::Wgsl(crate::gpu_processing::image_shader_source().into()),
@@ -266,6 +293,10 @@ fn bake_lattice(
             wgpu::BindGroupEntry {
                 binding: 2,
                 resource: adjustments_buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 12,
+                resource: wgpu::BindingResource::TextureView(&base_view),
             },
             wgpu::BindGroupEntry {
                 binding: 13,
@@ -314,26 +345,106 @@ fn bake_lattice(
         .collect())
 }
 
-/// The bake's adjustments: only `keys` of the photo's edit, its eyes kept (a hidden tool bakes
-/// nothing), and the profile's shaper; masks, the Blend Pad and any current profile left out.
-fn bake_adjustments(edit: &Value, keys: &[String], is_raw: bool, shaper: Shaper) -> AllAdjustments {
-    let mut bake = serde_json::Map::new();
-    for key in keys
-        .iter()
-        .filter(|key| BAKEABLE_KEYS.contains(&key.as_str()))
-    {
-        if let Some(value) = edit.get(key) {
-            bake.insert(key.clone(), value.clone());
+/// What a new profile takes from the photo: the ticked keys of its edit (eyes kept, so a hidden
+/// tool bakes nothing; masks and the Blend Pad left out) for the table, its current profile
+/// when that is ticked, and the tone curve and Zone Editor it carries.
+struct Bake {
+    adjustments: AllAdjustments,
+    /// The photo's current profile, baked into the new table at its Amount.
+    base: Option<Arc<ProfileTable>>,
+    shaper: Shaper,
+    curves: Option<Value>,
+    zone_tint: Option<Value>,
+    /// Ticked keys left in the photo: its own curve or Zone Editor when the current profile,
+    /// baked in, already carries one (a profile carries one of each).
+    kept: Vec<String>,
+}
+
+impl Bake {
+    fn new(edit: &Value, keys: &[String], is_raw: bool) -> Self {
+        let is_ticked = |key: &str| {
+            BAKEABLE_KEYS.contains(&key) && keys.iter().any(|ticked| ticked.as_str() == key)
+        };
+        let mut table_keys = serde_json::Map::new();
+        for key in BAKEABLE_KEYS
+            .iter()
+            .filter(|key| is_ticked(key) && ![CURVES_KEY, ZONE_TINT_KEY].contains(key))
+        {
+            if let Some(value) = edit.get(*key) {
+                table_keys.insert((*key).to_string(), value.clone());
+            }
+        }
+        if let Some(visibility) = edit.get("sectionVisibility") {
+            table_keys.insert("sectionVisibility".into(), visibility.clone());
+        }
+        let table_json = Value::Object(table_keys);
+
+        let base = table_for_adjustments(&table_json);
+        let base_profile = base.as_ref().map(|_| &edit[PROFILE_KEY]);
+        // A new table must be indexed like the one baked into it.
+        let shaper = if base.is_some() {
+            RenderSettings::from_adjustments(&table_json).shaper
+        } else {
+            Shaper::default()
+        };
+        let mut adjustments = get_all_adjustments_from_json(&table_json, is_raw, None);
+        adjustments.global.has_profile = u32::from(base.is_some());
+        adjustments.global.profile_stops_below = shaper.stops_below;
+        adjustments.global.profile_stops_above = shaper.stops_above;
+
+        let mut kept = Vec::new();
+        let mut carried = |key: &str, group: &str, is_active: fn(&Value) -> bool| {
+            let from_base = base_profile
+                .and_then(|profile| profile.get(key))
+                .filter(|value| is_active(value));
+            let from_photo = edit.get(key).filter(|value| {
+                is_ticked(key)
+                    && crate::adjustment_utils::is_group_visible(edit, group)
+                    && is_active(value)
+            });
+            if from_base.is_some() && from_photo.is_some() {
+                kept.push(key.to_string());
+            }
+            from_base.or(from_photo).cloned()
+        };
+        let curves = carried(CURVES_KEY, "curves", |curves| !is_identity_curve(curves));
+        let zone_tint = carried(ZONE_TINT_KEY, ZONE_TINT_KEY, |zone_tint| {
+            crate::zone_tint::ZoneTintSettings::from_json(Some(zone_tint), true).enabled == 1
+        });
+
+        Self {
+            adjustments,
+            base,
+            shaper,
+            curves,
+            zone_tint,
+            kept,
         }
     }
-    if let Some(visibility) = edit.get("sectionVisibility") {
-        bake.insert("sectionVisibility".into(), visibility.clone());
-    }
-    let mut adjustments = get_all_adjustments_from_json(&Value::Object(bake), is_raw, None);
-    adjustments.global.has_profile = 0;
-    adjustments.global.profile_stops_below = shaper.stops_below;
-    adjustments.global.profile_stops_above = shaper.stops_above;
-    adjustments
+}
+
+/// Whether every channel of `curves` (the edit's `curves`) leaves its tones as they are, as the
+/// shader's `is_default_curve` judges it.
+fn is_identity_curve(curves: &Value) -> bool {
+    ["luma", "red", "green", "blue"].iter().all(|channel| {
+        curves[*channel].as_array().is_none_or(|points| {
+            let xy = |point: &Value| {
+                (
+                    point["x"].as_f64().unwrap_or(0.0),
+                    point["y"].as_f64().unwrap_or(0.0),
+                )
+            };
+            let is_at = |point: Option<&Value>, value: f64| {
+                point
+                    .map(xy)
+                    .is_some_and(|(x, y)| (x - value).abs() < 0.1 && (y - value).abs() < 0.1)
+            };
+            points.len() < 2
+                || (points.iter().map(xy).all(|(x, y)| (x - y).abs() <= 0.5)
+                    && is_at(points.first(), 0.0)
+                    && is_at(points.last(), 255.0))
+        })
+    })
 }
 
 fn profiles_dir(app_handle: &AppHandle) -> Result<PathBuf, String> {
@@ -452,7 +563,8 @@ pub struct CreateProfileRequest {
     name: String,
     #[serde(default)]
     group: String,
-    /// The adjustment keys to bake (`BAKEABLE_KEYS`); the frontend resets them afterwards.
+    /// The adjustment keys to bake (`BAKEABLE_KEYS`); the frontend resets them afterwards,
+    /// apart from `CreatedProfile::kept_keys`.
     keys: Vec<String>,
     monochrome: bool,
     /// The photo's edit.
@@ -464,6 +576,8 @@ pub struct CreateProfileRequest {
 pub struct CreatedProfile {
     path: String,
     profile: ProfileData,
+    /// Ticked keys the profile could not take (`Bake::kept`); the photo keeps them.
+    kept_keys: Vec<String>,
 }
 
 /// Bakes the open photo's chosen settings into a new profile and saves it in the profile folder.
@@ -485,12 +599,9 @@ pub async fn create_custom_profile(
             .as_ref()
             .is_none_or(|image| image.is_raw);
         let context = crate::image_processing::get_or_init_gpu_context(&state, &app_handle)?;
-        let shaper = Shaper::default();
-        let adjustments = bake_adjustments(&request.adjustments, &request.keys, is_raw, shaper);
-        let values = bake_lattice(&context, &adjustments, DEFAULT_LATTICE_SIZE)?;
+        let bake = Bake::new(&request.adjustments, &request.keys, is_raw);
+        let values = bake_lattice(&context, &bake, DEFAULT_LATTICE_SIZE)?;
 
-        let bakes_curves = request.keys.iter().any(|key| key == "curves")
-            && crate::adjustment_utils::is_group_visible(&request.adjustments, "curves");
         let profile = ProfileData {
             version: FORMAT_VERSION,
             id: uuid::Uuid::new_v4().to_string(),
@@ -498,13 +609,10 @@ pub async fn create_custom_profile(
             group: request.group.trim().to_string(),
             monochrome: request.monochrome,
             size: DEFAULT_LATTICE_SIZE,
-            shaper,
+            shaper: bake.shaper,
             table: encode_table(&values)?,
-            curves: request
-                .adjustments
-                .get("curves")
-                .filter(|_| bakes_curves)
-                .cloned(),
+            curves: bake.curves,
+            zone_tint: bake.zone_tint,
         };
 
         let dir = profiles_dir(&app_handle)?;
@@ -529,6 +637,7 @@ pub async fn create_custom_profile(
         Ok(CreatedProfile {
             path: path.to_string_lossy().into_owned(),
             profile,
+            kept_keys: bake.kept,
         })
     })
     .await
@@ -598,15 +707,92 @@ mod tests {
         );
     }
 
+    fn keys(keys: &[&str]) -> Vec<String> {
+        keys.iter().map(|key| key.to_string()).collect()
+    }
+
+    const BENT_CURVE: &str =
+        r#"{ "luma": [{ "x": 0, "y": 0 }, { "x": 128, "y": 160 }, { "x": 255, "y": 255 }] }"#;
+
+    /// A current profile as the edit embeds it: a valid 2³ table and a bent tone curve.
+    fn base_profile() -> Value {
+        json!({
+            "version": 1,
+            "id": "base",
+            "name": "Base",
+            "size": 2,
+            "shaper": { "stopsBelow": 12.0, "stopsAbove": 6.0 },
+            "table": encode_table(&[0.5; 24]).unwrap(),
+            "curves": serde_json::from_str::<Value>(BENT_CURVE).unwrap(),
+        })
+    }
+
     #[test]
     fn the_bake_takes_only_the_chosen_keys() {
-        let edit = json!({ "exposure": 1.0, "contrast": 40, "clarity": 50, "masks": [] });
-        let keys = vec!["exposure".to_string(), "clarity".to_string()];
-        let adjustments = bake_adjustments(&edit, &keys, true, Shaper::default());
-        assert!(adjustments.global.exposure != 0.0);
-        assert_eq!(adjustments.global.contrast, 0.0);
-        assert_eq!(adjustments.global.clarity, 0.0, "Clarity is not bakeable");
-        assert_eq!(adjustments.global.has_profile, 0);
+        let edit = json!({
+            "exposure": 1.0,
+            "contrast": 40,
+            "clarity": 50,
+            "colorCalibration": { "redHue": 20 },
+            "masks": []
+        });
+        let bake = Bake::new(
+            &edit,
+            &keys(&["exposure", "clarity", "colorCalibration"]),
+            true,
+        );
+        let global = bake.adjustments.global;
+        assert!(global.exposure != 0.0);
+        assert!(global.color_calibration.red_hue != 0.0);
+        assert_eq!(global.contrast, 0.0);
+        assert_eq!(global.clarity, 0.0, "Clarity is not bakeable");
+        assert_eq!(global.has_profile, 0);
+        assert!(bake.base.is_none() && bake.curves.is_none() && bake.kept.is_empty());
+        assert_eq!(bake.shaper, Shaper::default());
+    }
+
+    #[test]
+    fn a_current_profile_bakes_in_with_its_shaper_and_its_carried_curve_wins() {
+        let photo_curve: Value =
+            json!({ "luma": [{ "x": 0, "y": 0 }, { "x": 128, "y": 90 }, { "x": 255, "y": 255 }] });
+        let edit = json!({ "profile": base_profile(), "profileAmount": 80, "curves": photo_curve });
+
+        let bake = Bake::new(&edit, &keys(&["profile", "profileAmount", "curves"]), true);
+        assert_eq!(bake.adjustments.global.has_profile, 1);
+        assert_eq!(bake.adjustments.global.profile_amount, 0.8);
+        assert_eq!(bake.shaper.stops_below, 12.0);
+        assert_eq!(bake.adjustments.global.profile_stops_below, 12.0);
+        assert!(bake.base.is_some());
+        assert_eq!(
+            bake.curves,
+            Some(serde_json::from_str::<Value>(BENT_CURVE).unwrap())
+        );
+        assert_eq!(
+            bake.kept,
+            vec!["curves".to_string()],
+            "the photo keeps its own curve"
+        );
+
+        let without_base = Bake::new(&edit, &keys(&["curves"]), true);
+        assert!(without_base.base.is_none());
+        assert_eq!(without_base.curves, Some(photo_curve));
+        assert!(without_base.kept.is_empty());
+    }
+
+    #[test]
+    fn a_straight_curve_is_not_carried() {
+        let straight = json!({ "luma": [{ "x": 0, "y": 0 }, { "x": 255, "y": 255 }], "red": [] });
+        assert!(is_identity_curve(&straight));
+        assert!(!is_identity_curve(
+            &serde_json::from_str(BENT_CURVE).unwrap()
+        ));
+        let shifted = json!({ "luma": [{ "x": 10, "y": 10 }, { "x": 255, "y": 255 }] });
+        assert!(
+            !is_identity_curve(&shifted),
+            "a raised first point clips the shadows"
+        );
+        let bake = Bake::new(&json!({ "curves": straight }), &keys(&["curves"]), true);
+        assert!(bake.curves.is_none());
     }
 
     /// Bakes on the GPU when one is available: an empty bake is the identity, and Exposure
@@ -621,12 +807,7 @@ mod tests {
         let size = 9;
         let node = |i: u32| decode(shaper, i as f32 / (size - 1) as f32);
 
-        let identity = bake_lattice(
-            &context,
-            &bake_adjustments(&json!({}), &[], true, shaper),
-            size,
-        )
-        .unwrap();
+        let identity = bake_lattice(&context, &Bake::new(&json!({}), &[], true), size).unwrap();
         assert_eq!(identity.len(), (size as usize).pow(3) * 3);
         for (index, value) in identity.iter().enumerate() {
             let point = index / 3;
@@ -638,13 +819,8 @@ mod tests {
             );
         }
 
-        let brighter = bake_adjustments(
-            &json!({ "exposure": 1.0 }),
-            &["exposure".to_string()],
-            true,
-            shaper,
-        );
-        let stops = brighter.global.exposure;
+        let brighter = Bake::new(&json!({ "exposure": 1.0 }), &keys(&["exposure"]), true);
+        let stops = brighter.adjustments.global.exposure;
         let baked = bake_lattice(&context, &brighter, size).unwrap();
         // A grey node above 1.0 keeps its full value: no cap at white.
         let grey = 6;
