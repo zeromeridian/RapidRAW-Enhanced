@@ -5,6 +5,13 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.110.0-dev-develop-tweaks — 2026-11-26
+
+### Library
+
+- OM System **.ORI** files (the original frame the camera keeps beside a
+  computational shot) are now listed and open like any other RAW.
+
 ## 1.109.3-fix-batch-sync-freeze — 2026-11-21
 
 ### Develop

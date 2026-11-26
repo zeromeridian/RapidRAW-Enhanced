@@ -48,6 +48,8 @@ pub const RAW_EXTENSIONS: &[(&str, &str)] = &[
     ("nrw", "Nikon Raw"),
     // Olympus
     ("orf", "Olympus Raw"),
+    // The unprocessed first frame OM System cameras keep beside a computational shot (ORF format).
+    ("ori", "OM System Original Raw"),
     // Panasonic
     ("rw2", "Panasonic Raw 2"),
     ("raw", "Panasonic Raw"),
@@ -139,7 +141,15 @@ pub fn is_supported_image_file<P: AsRef<Path>>(path: P) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_heif_file, is_supported_image_file};
+    use super::{is_heif_file, is_raw_file, is_supported_image_file};
+
+    #[test]
+    fn om_system_ori_files_are_raw() {
+        for name in ["/photos/P1250003.ORI", "P1250003.ori"] {
+            assert!(is_raw_file(name), "{name}");
+            assert!(is_supported_image_file(name), "{name}");
+        }
+    }
 
     #[test]
     fn heif_files_are_supported_in_any_case() {

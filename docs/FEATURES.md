@@ -692,6 +692,8 @@ details are in `RELEASE_NOTES.MD`.
   Display P3 convert into sRGB, 10-bit files keep their precision, and
   rotation follows the file; HDR gain maps are ignored and HDR (PQ/HLG)
   files open with a notice that their HDR curve is not decoded.
+- OM System `.ORI` files (the unprocessed original kept beside a
+  computational shot) are listed and open as RAW.
 - A versioned ThisIsRAW XMP payload carries the complete editable adjustment
   document between installations, including ordered masks and blend modes.
 
