@@ -80,8 +80,11 @@ details are in `RELEASE_NOTES.MD`.
   run the same actions as the keys, show the bound shortcut (following
   Settings → Keybinds) and grey out when they don't apply; text fields keep
   Cut, Copy, Paste and Select All.
-- Manual image stacks with collapse/expand, visible stack cues (a yellow edge
-  marker on the stack top, orange on the other members), drag ordering,
+- Manual image stacks with collapse/expand, Lightroom Classic-style stack
+  marks (an expanded stack's photos share a lighter band with grip bars at
+  its ends; the top shows a count square and a thin accent outline, the
+  other members a small stack icon; the count square and the grips collapse
+  or expand the stack), drag ordering,
   move-to-top covers, and matching Develop-filmstrip presentation. Stacking a
   selection adds it to, or merges, the stacks it touches (Lightroom's Group
   into Stack); configurable Command/Ctrl+G and Shift+S shortcuts stack the

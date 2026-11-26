@@ -5,6 +5,18 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.111.0-dev-stack-markers — 2026-11-26
+
+### Library
+
+- Stacks look like Lightroom Classic's: the photos of an expanded stack
+  share a slightly lighter band with small grip bars at its start and end,
+  the top of the stack shows a white square with the number of photos and a
+  thin accent outline, and the other photos a small stack icon. Click the
+  number square or a grip bar to collapse or expand the stack. This
+  replaces the coloured edge markers, in the grid, the list and Develop's
+  filmstrip.
+
 ## 1.109.3-fix-batch-sync-freeze — 2026-11-21
 
 ### Develop

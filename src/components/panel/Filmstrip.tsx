@@ -11,7 +11,7 @@ import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { GroupBadgeInfo } from '../../utils/imageGrouping';
-import { StackVisualCue } from './library/LibraryItems';
+import { StackBand, StackMarks } from './library/LibraryItems';
 import { getImageFlag, ImageFlag } from '../../utils/imageFlags';
 import ImageFlagBadge from '../ui/ImageFlagBadge';
 import { useCtrlClickMenuGuard } from '../../hooks/useCtrlClickMenuGuard';
@@ -98,7 +98,8 @@ const FilmstripThumbnail = memo(
     const hasEditIcon = !!showEditIcon;
     const hasColorLabel = !!colorLabel;
     const hasRating = rating > 0;
-    const hasGroupBadge = !!stackBadge?.label;
+    // A stack shows its own marks (`StackMarks`); the pill keeps the RAW+JPEG grouping badge.
+    const hasGroupBadge = !!stackBadge?.label && !stackBadge.stackVisual;
     const hasAnyOverlay = hasEditIcon || hasColorLabel || hasRating || hasGroupBadge;
 
     const cleanPath = path.split('?')[0];
@@ -189,7 +190,13 @@ const FilmstripThumbnail = memo(
         }}
         data-tooltip={truncatedTitle}
       >
-        <StackVisualCue info={stackBadge?.stackVisual} />
+        <StackMarks
+          info={stackBadge?.stackVisual}
+          count={stackBadge?.count}
+          label={stackBadge?.label}
+          path={path}
+          compact
+        />
         <ImageFlagBadge flag={imageFlag} className="absolute bottom-1 left-2 z-30 pointer-events-none" />
         {layers.length > 0 ? (
           <div className="absolute inset-0 w-full h-full">
@@ -241,10 +248,7 @@ const FilmstripThumbnail = memo(
         <div className="absolute top-1 right-1 flex items-center justify-end z-10 pointer-events-none">
           <div
             className={clsx(
-              'rounded-full h-5 px-1.5 flex items-center justify-center gap-0 pointer-events-auto transition-all duration-200 ease-out origin-top-right',
-              stackBadge?.stackVisual?.collapsed && stackBadge.count
-                ? 'bg-black/80 ring-1 ring-white/90 shadow-[0_1px_4px_rgba(0,0,0,0.9)]'
-                : 'bg-black/30 shadow-md',
+              'rounded-full h-5 px-1.5 flex items-center justify-center gap-0 pointer-events-auto transition-all duration-200 ease-out origin-top-right bg-black/30 shadow-md',
               hasAnyOverlay ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none',
             )}
           >
@@ -353,7 +357,8 @@ const FilmstripCell = ({
         justifyContent: 'flex-start',
       }}
     >
-      <div style={{ width: contentWidth, height: itemHeight }}>
+      <div style={{ width: contentWidth, height: itemHeight, position: 'relative' }}>
+        <StackBand info={groupBadgeInfo?.get(imageFile.path)?.stackVisual} gap={ITEM_GAP} path={imageFile.path} />
         <FilmstripThumbnail
           imageFile={imageFile}
           imageRatings={imageRatings}

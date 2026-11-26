@@ -37,39 +37,114 @@ const STACK_DRAG_TYPE = 'application/x-thisisraw-stack';
 // Joins a row's image paths into one effect dependency; NUL cannot occur in a file path.
 const PATH_KEY_SEPARATOR = '\u0000';
 
-const STACK_SPINE_POSITION_CLASSES: Record<StackMemberPosition, string> = {
-  only: 'top-2 bottom-2 rounded-full',
-  first: 'top-2 bottom-0 rounded-t-full',
-  middle: 'top-0 bottom-0',
-  last: 'top-0 bottom-2 rounded-b-full',
-};
-
-const STACK_MEMBER_COLOR = '#f97316';
-// The stack top (cover) gets its own spine colour, so it stands out in an expanded stack.
-const STACK_COVER_COLOR = '#facc15';
 // Corner radius of a grid thumbnail (`rounded-md`), so Lights Out lights exactly its shape.
 const THUMBNAIL_RADIUS = 6;
 
-export const StackVisualCue = ({ info }: { info?: StackVisualInfo }) => {
-  if (!info) return null;
+/** Collapses or expands the stack `path` belongs to (its count square and grip bars, as in Lightroom Classic). */
+export const toggleStackOfPath = (path: string) => {
+  const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+  const targetStack = appSettings?.imageStacks?.find((stack) => stack.paths.includes(path));
+  if (!appSettings || !targetStack) return;
+  void handleSettingsChange({
+    ...appSettings,
+    imageStacks: appSettings.imageStacks?.map((stack) =>
+      stack.id === targetStack.id ? { ...stack, collapsed: !stack.collapsed } : stack,
+    ),
+  });
+};
 
+const startsStack = (position: StackMemberPosition) => position === 'first' || position === 'only';
+const endsStack = (position: StackMemberPosition) => position === 'last' || position === 'only';
+
+/**
+ * Behind each photo of an expanded stack, Lightroom Classic style (Plan item 82): one slightly
+ * lighter band joins the stack's cells across the `gap` between them, with grip bars at its start
+ * and end that collapse the stack. Place it first in a `relative` cell wrapper.
+ */
+export const StackBand = ({ info, gap, path }: { info?: StackVisualInfo; gap: number; path: string }) => {
+  const { t } = useTranslation();
+  if (!info || info.collapsed) return null;
+  const half = gap / 2;
+  const grip = (side: 'left' | 'right') => (
+    <button
+      type="button"
+      className="absolute top-0 bottom-0 flex items-center justify-center gap-px pointer-events-auto cursor-pointer opacity-60 hover:opacity-100"
+      style={{ [side]: 0, width: half }}
+      data-tooltip={t('ui.bottomBar.tooltips.toggleStack')}
+      onClick={(event) => {
+        event.stopPropagation();
+        toggleStackOfPath(path);
+      }}
+    >
+      <span className="w-px h-6 max-h-[40%] bg-text-secondary" />
+      <span className="w-px h-6 max-h-[40%] bg-text-secondary" />
+    </button>
+  );
+  return (
+    <div
+      className={clsx(
+        'absolute pointer-events-none bg-text-primary/[0.08]',
+        startsStack(info.position) && 'rounded-l-md',
+        endsStack(info.position) && 'rounded-r-md',
+      )}
+      style={{ top: -half / 2, bottom: -half / 2, left: -half, right: -half }}
+    >
+      {startsStack(info.position) && grip('left')}
+      {endsStack(info.position) && grip('right')}
+    </div>
+  );
+};
+
+/**
+ * The stack marks on a photo itself (Plan item 82): the top of the stack shows Lightroom Classic's
+ * count square, which collapses or expands the stack, and in an expanded stack a thin accent
+ * outline; the other photos a small stack icon. Place it in the `relative` image area.
+ */
+export const StackMarks = ({
+  info,
+  count,
+  label,
+  path,
+  compact = false,
+}: {
+  info?: StackVisualInfo;
+  count?: number;
+  label?: string;
+  path: string;
+  compact?: boolean;
+}) => {
+  if (!info) return null;
+  const corner = compact ? 'top-0.5 left-0.5' : 'top-1.5 left-1.5';
+  if (!info.isCover) {
+    return (
+      <div
+        className={clsx('absolute z-20 rounded-sm bg-black/55 text-white p-0.5 pointer-events-none', corner)}
+        data-tooltip={label}
+      >
+        <Layers size={compact ? 9 : 11} />
+      </div>
+    );
+  }
   return (
     <>
       {!info.collapsed && (
-        <div
-          className={clsx('absolute left-0 z-20 w-1 pointer-events-none', STACK_SPINE_POSITION_CLASSES[info.position])}
-          style={{
-            backgroundColor: info.isCover ? STACK_COVER_COLOR : STACK_MEMBER_COLOR,
-            boxShadow: '1px 0 0 rgba(0, 0, 0, 0.65)',
-          }}
-        />
+        <div className="absolute inset-0 z-20 ring-1 ring-inset ring-accent/80 pointer-events-none" />
       )}
-      {info.isCover && (
-        <>
-          <div className="absolute top-1.5 left-1.5 z-20 w-3 h-3 rounded-tl-sm border-t border-l border-accent/40 pointer-events-none" />
-          <div className="absolute top-2.5 left-2.5 z-20 w-3 h-3 rounded-tl-sm border-t border-l border-accent/20 pointer-events-none" />
-        </>
-      )}
+      <button
+        type="button"
+        className={clsx(
+          'absolute z-20 rounded-sm bg-white text-black font-semibold leading-none tabular-nums cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.6)] hover:bg-white/80',
+          compact ? 'min-w-3.5 h-3.5 px-0.5 text-[9px]' : 'min-w-4 h-4 px-1 text-[10px]',
+          corner,
+        )}
+        data-tooltip={label}
+        onClick={(event) => {
+          event.stopPropagation();
+          toggleStackOfPath(path);
+        }}
+      >
+        {count}
+      </button>
     </>
   );
 };
@@ -100,7 +175,6 @@ const ThumbnailComponent = ({
   groupBadgeCount,
   stackVisual,
   isRaw,
-  onStackBadgeClick,
   isStackDraggable,
   onStackDragStart,
   onStackDragOver,
@@ -227,7 +301,8 @@ const ThumbnailComponent = ({
   const hasUpscaleIcon = !!isUpscaled;
   const hasColorLabel = !!colorLabel;
   const hasRating = rating > 0;
-  const hasGroupBadge = !!groupBadgeLabel;
+  // A stack shows its own marks (`StackMarks`); the pill keeps the RAW+JPEG grouping badge.
+  const hasGroupBadge = !!groupBadgeLabel && !stackVisual;
   const hasAnyOverlay = hasEditIcon || hasUpscaleIcon || hasColorLabel || hasRating || hasGroupBadge;
 
   return (
@@ -277,9 +352,9 @@ const ThumbnailComponent = ({
           )}
         />
       )}
-      <StackVisualCue info={stackVisual} />
       <ImageFlagBadge flag={imageFlag} className="absolute bottom-1.5 left-2 z-30 pointer-events-none" />
       <div className="relative w-full flex-1 min-h-0 z-0 bg-surface">
+        <StackMarks info={stackVisual} count={groupBadgeCount} label={groupBadgeLabel} path={path} />
         {layers.length > 0 && (
           <div className="absolute inset-0 w-full h-full">
             {layers.map((layer) => (
@@ -346,10 +421,7 @@ const ThumbnailComponent = ({
       <div className="absolute top-1.5 right-1.5 flex items-center justify-end z-10 pointer-events-none">
         <div
           className={clsx(
-            'rounded-full h-5 px-1.5 flex items-center justify-center gap-0 pointer-events-auto transition-all duration-200 ease-out origin-top-right',
-            stackVisual?.collapsed && groupBadgeCount
-              ? 'bg-black/80 ring-1 ring-white/90 shadow-[0_1px_4px_rgba(0,0,0,0.9)]'
-              : 'bg-black/30 shadow-md',
+            'rounded-full h-5 px-1.5 flex items-center justify-center gap-0 pointer-events-auto transition-all duration-200 ease-out origin-top-right bg-black/30 shadow-md',
             hasAnyOverlay ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none',
           )}
         >
@@ -404,30 +476,10 @@ const ThumbnailComponent = ({
               'flex items-center shrink-0 transition-all duration-200 ease-out overflow-hidden rounded-sm',
               hasGroupBadge ? 'max-w-10 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
               hasGroupBadge && (hasEditIcon || hasUpscaleIcon || hasColorLabel || hasRating) ? 'ml-1.5' : 'ml-0',
-              groupBadgeCount &&
-                'cursor-pointer hover:bg-white/20 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-white',
             )}
             data-tooltip={groupBadgeLabel}
-            role={groupBadgeCount ? 'button' : undefined}
-            tabIndex={groupBadgeCount ? 0 : undefined}
-            onClick={(event) => {
-              if (!groupBadgeCount) return;
-              event.stopPropagation();
-              onStackBadgeClick(path);
-            }}
-            onKeyDown={(event) => {
-              if (!groupBadgeCount || (event.key !== 'Enter' && event.key !== ' ')) return;
-              event.preventDefault();
-              event.stopPropagation();
-              onStackBadgeClick(path);
-            }}
           >
             <Layers size={12} className="text-white" />
-            {groupBadgeCount && (
-              <Text variant={TextVariants.small} color={TextColors.white} className="ml-0.5">
-                {groupBadgeCount}
-              </Text>
-            )}
           </div>
         </div>
       </div>
@@ -651,7 +703,6 @@ const ListItemComponent = ({
   stackBadgeCount,
   stackVisual,
   isRaw,
-  onStackBadgeClick,
   isStackDraggable,
   onStackDragStart,
   onStackDragOver,
@@ -837,7 +888,9 @@ const ListItemComponent = ({
           )}
         />
       )}
-      <StackVisualCue info={stackVisual} />
+      {stackVisual && !stackVisual.collapsed && (
+        <div className="absolute inset-0 bg-text-primary/[0.08] pointer-events-none" />
+      )}
       <div
         style={{ width: getW('thumbnail') }}
         className="flex items-center justify-center p-1.5 h-full overflow-hidden"
@@ -887,27 +940,7 @@ const ListItemComponent = ({
             <div className="absolute inset-0 z-10 bg-black/45 pointer-events-none" />
           )}
 
-          {stackBadgeCount && (
-            <button
-              type="button"
-              className={clsx(
-                'absolute top-1 right-1 z-20 rounded-full text-white px-1.5 h-5 flex items-center gap-0.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white',
-                stackVisual?.collapsed
-                  ? 'bg-black/80 hover:bg-black ring-1 ring-white/90 shadow-[0_1px_4px_rgba(0,0,0,0.9)]'
-                  : 'bg-black/50 hover:bg-black/70',
-              )}
-              data-tooltip={stackBadgeLabel}
-              onClick={(event) => {
-                event.stopPropagation();
-                onStackBadgeClick(path);
-              }}
-            >
-              <Layers size={11} />
-              <Text variant={TextVariants.small} color={TextColors.white}>
-                {stackBadgeCount}
-              </Text>
-            </button>
-          )}
+          <StackMarks info={stackVisual} count={stackBadgeCount} label={stackBadgeLabel} path={path} compact />
 
           {isCloudPlaceholder && layers.length > 0 && (
             <div
@@ -1038,20 +1071,6 @@ const RowComponent = ({
 }: any) => {
   const { t } = useTranslation();
   const row = rows[index];
-  const handleStackBadgeClick = useCallback((path: string) => {
-    const { appSettings, handleSettingsChange } = useSettingsStore.getState();
-    if (!appSettings) return;
-
-    const targetStack = appSettings.imageStacks?.find((stack) => stack.paths.includes(path));
-    if (!targetStack) return;
-
-    void handleSettingsChange({
-      ...appSettings,
-      imageStacks: appSettings.imageStacks?.map((stack) =>
-        stack.id === targetStack.id ? { ...stack, collapsed: !stack.collapsed } : stack,
-      ),
-    });
-  }, []);
   const getExpandedStackForPath = useCallback((path: string) => {
     return useSettingsStore
       .getState()
@@ -1248,8 +1267,10 @@ const RowComponent = ({
             style={{
               width: isListView ? '100%' : itemWidth,
               height: itemHeight,
+              position: 'relative',
             }}
           >
+            {!isListView && <StackBand info={stackBadge?.stackVisual} gap={gap} path={imageFile.path} />}
             {isListView ? (
               <ListItem
                 isActive={activePath === imageFile.path}
@@ -1272,7 +1293,6 @@ const RowComponent = ({
                 stackBadgeLabel={stackBadge?.label}
                 stackBadgeCount={stackBadge?.count}
                 stackVisual={stackBadge?.stackVisual}
-                onStackBadgeClick={handleStackBadgeClick}
                 isStackDraggable={isStackDraggable}
                 onStackDragStart={handleStackDragStart}
                 onStackDragOver={getStackDropEdge}
@@ -1302,7 +1322,6 @@ const RowComponent = ({
                 }
                 groupBadgeCount={stackBadge?.count}
                 stackVisual={stackBadge?.stackVisual}
-                onStackBadgeClick={handleStackBadgeClick}
                 isStackDraggable={isStackDraggable}
                 onStackDragStart={handleStackDragStart}
                 onStackDragOver={getStackDropEdge}
