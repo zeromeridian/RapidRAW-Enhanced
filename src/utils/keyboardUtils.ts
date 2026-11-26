@@ -77,6 +77,12 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     section: 'library',
   },
   {
+    action: 'toggle_stack',
+    description: 'settings.keybinds.actions.toggle_stack',
+    defaultCombo: ['alt', 'KeyS'],
+    section: 'library',
+  },
+  {
     action: 'move_to_top_of_stack',
     description: 'settings.keybinds.actions.move_to_top_of_stack',
     defaultCombo: ['shift', 'KeyS'],

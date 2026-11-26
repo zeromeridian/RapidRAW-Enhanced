@@ -49,13 +49,14 @@ import { useUIStore } from '../../store/useUIStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { COLOR_LABELS } from '../../utils/adjustments';
 import { applyBatchEditToPaths } from '../../hooks/useEditorActions';
-import { findImageStack, findToggleTargetStack, toggleImageStacks, unstackImagePaths } from '../../utils/imageStacks';
+import { findImageStack, findToggleTargetStack, unstackImagePaths } from '../../utils/imageStacks';
 import {
   getStackTargetPath,
   moveImageToStackTop,
   openCaptureTimeStackModal,
   saveImageStacks,
   stackImages,
+  toggleStacksOfPaths,
 } from '../../hooks/useLibraryActions';
 import { autoStackCreatedImages } from '../../utils/autoStacking';
 import { getEnabledCopySuffix } from '../../utils/outputNaming';
@@ -456,8 +457,7 @@ export default function BottomBar({
     stackImages(productivityPaths, stackTargetPath);
   };
 
-  const handleToggleStack = () =>
-    saveImageStacks((stacks) => toggleImageStacks(stacks, productivityPaths, stackTargetPath));
+  const handleToggleStack = () => toggleStacksOfPaths(productivityPaths);
 
   const handleMoveToTopOfStack = () => {
     if (!stackTargetPath) return;

@@ -5,6 +5,14 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.111.1-dev-stack-markers — 2026-11-26
+
+### Library
+
+- New shortcut **Alt/Option+S** expands or collapses the stack of the
+  selected photo (change it in Settings → Shortcuts); also in the menu
+  bar under Library → Stacking.
+
 ## 1.111.0-dev-stack-markers — 2026-11-26
 
 ### Library

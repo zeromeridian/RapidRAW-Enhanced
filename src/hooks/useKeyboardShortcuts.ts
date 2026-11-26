@@ -15,8 +15,10 @@ import {
   getStackTargetPath,
   moveImageToStackTop,
   stackImages,
+  toggleStacksOfPaths,
   useLibraryActions,
 } from './useLibraryActions';
+import { findToggleTargetStack } from '../utils/imageStacks';
 import { ImageFlag } from '../utils/imageFlags';
 import { KEYWORD_SET_SIZE, getActiveKeywordSet, getKeywordSets } from '../utils/keywords';
 
@@ -298,6 +300,16 @@ export const useKeyboardShortcuts = ({
           const paths = getActionPaths();
           const coverPath = getStackTargetPath(paths);
           if (coverPath) stackImages(paths, coverPath);
+        },
+      },
+      toggle_stack: {
+        shouldFire: (s: ReturnType<typeof getStoreState>) => {
+          const paths = getActionPaths();
+          return !!findToggleTargetStack(s.settings.appSettings?.imageStacks || [], paths, getStackTargetPath(paths));
+        },
+        execute: (e: KeyboardEvent) => {
+          e.preventDefault();
+          toggleStacksOfPaths(getActionPaths());
         },
       },
       move_to_top_of_stack: {

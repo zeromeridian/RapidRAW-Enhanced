@@ -7,7 +7,7 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
 import { Invokes, ImageFile, ImageStack, AlbumItem, Album, AlbumGroup } from '../components/ui/AppProperties';
-import { createImageStack, findImageStack, moveImageToTopOfStack } from '../utils/imageStacks';
+import { createImageStack, findImageStack, moveImageToTopOfStack, toggleImageStacks } from '../utils/imageStacks';
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { computeFilteredLibrary, computeSortedLibrary } from './useSortedLibrary';
@@ -48,6 +48,10 @@ export const saveImageStacks = (update: (stacks: ImageStack[]) => ImageStack[]) 
 
 export const stackImages = (paths: string[], coverPath: string) =>
   saveImageStacks((stacks) => createImageStack(stacks, paths, coverPath));
+
+/** Collapses or expands the stack of the target photo among `paths` (and the other stacks wholly in `paths`). */
+export const toggleStacksOfPaths = (paths: string[]) =>
+  saveImageStacks((stacks) => toggleImageStacks(stacks, paths, getStackTargetPath(paths)));
 
 // Auto-stacks the selection, or every photo in the current view when fewer than two are selected.
 export const openCaptureTimeStackModal = (selection: string[] = getActionPaths()) => {

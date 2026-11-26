@@ -2446,6 +2446,7 @@
         "apply_keyword_9": "Toggle keyword 9 of the keyword set",
         "next_keyword_set": "Next keyword set",
         "stack_selected": "Stack selected photos",
+        "toggle_stack": "Expand or collapse stack",
         "move_to_top_of_stack": "Move to top of stack"
       },
       "sections": {

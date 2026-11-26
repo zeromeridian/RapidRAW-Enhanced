@@ -29,6 +29,7 @@ import { lightsOutTarget } from '../../../utils/lightsOut';
 import { getImageDimensions } from '../../../utils/imageDimensions';
 import { CLOUD_THUMBNAIL_RETRY_MS } from '../../../hooks/useThumbnails';
 import { useCtrlClickMenuGuard } from '../../../hooks/useCtrlClickMenuGuard';
+import { toggleStacksOfPaths } from '../../../hooks/useLibraryActions';
 
 type StackDropEdge = 'before' | 'after';
 
@@ -41,17 +42,7 @@ const PATH_KEY_SEPARATOR = '\u0000';
 const THUMBNAIL_RADIUS = 6;
 
 /** Collapses or expands the stack `path` belongs to (its count square and grip bars, as in Lightroom Classic). */
-export const toggleStackOfPath = (path: string) => {
-  const { appSettings, handleSettingsChange } = useSettingsStore.getState();
-  const targetStack = appSettings?.imageStacks?.find((stack) => stack.paths.includes(path));
-  if (!appSettings || !targetStack) return;
-  void handleSettingsChange({
-    ...appSettings,
-    imageStacks: appSettings.imageStacks?.map((stack) =>
-      stack.id === targetStack.id ? { ...stack, collapsed: !stack.collapsed } : stack,
-    ),
-  });
-};
+const toggleStackOfPath = (path: string) => toggleStacksOfPaths([path]);
 
 const startsStack = (position: StackMemberPosition) => position === 'first' || position === 'only';
 const endsStack = (position: StackMemberPosition) => position === 'last' || position === 'only';
