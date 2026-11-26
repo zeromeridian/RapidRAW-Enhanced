@@ -11,6 +11,7 @@ import {
   DEFAULT_HALATION_HUE,
   DetailsAdjustment,
   Effect,
+  ProfileAdjustment,
   SPEED_EDIT_ADJUSTMENTS,
   withAdjustmentLayout,
 } from './adjustments';
@@ -43,6 +44,17 @@ const signed = { min: -100, max: 100, step: 1 };
 const positive = { min: 0, max: 100, step: 1, fillOrigin: 'min' as const };
 
 export const ADJUSTMENT_CONTROLS: Array<AdjustmentControl> = [
+  {
+    id: ProfileAdjustment.ProfileAmount,
+    label: 'adjustments.profile.amount',
+    parent: 'profile',
+    min: 0,
+    max: 200,
+    step: 1,
+    defaultValue: 100,
+    fillOrigin: 'min',
+    qualify: true,
+  },
   { id: BasicAdjustment.Exposure, label: 'adjustments.basic.exposure', parent: 'tone', min: -5, max: 5, step: 0.01 },
   { id: BasicAdjustment.Contrast, label: 'adjustments.basic.contrast', parent: 'tone', ...signed },
   { id: BasicAdjustment.Highlights, label: 'adjustments.basic.highlights', parent: 'tone', ...signed },

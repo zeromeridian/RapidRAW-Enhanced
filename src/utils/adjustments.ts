@@ -231,6 +231,66 @@ export enum LensAdjustment {
   LensVignetteEnabled = 'lensVignetteEnabled',
 }
 
+export enum ProfileAdjustment {
+  Profile = 'profile',
+  ProfileAmount = 'profileAmount',
+}
+
+/** A custom profile as an edit embeds it and its file stores it (`custom_profile::ProfileData`). */
+export interface CustomProfile {
+  version: number;
+  id: string;
+  name: string;
+  group: string;
+  /** Choosing the profile turns Black & White on (off for a colour profile), as in Adobe Camera Raw. */
+  monochrome: boolean;
+  size: number;
+  shaper: { stopsBelow: number; stopsAbove: number };
+  table: string;
+  curves?: Curves;
+}
+
+/** A profile in the profile folder, without its table (`custom_profile::ProfileEntry`). */
+export interface CustomProfileEntry {
+  path: string;
+  id: string;
+  name: string;
+  group: string;
+  monochrome: boolean;
+}
+
+/**
+ * What Create Profile can bake into a profile, as in Adobe Camera Raw (`custom_profile::BAKEABLE_KEYS`).
+ * Tone is baked per pixel, so it is close but not identical; White Balance is off by default.
+ */
+export const PROFILE_BAKE_GROUPS: Array<{ id: string; label: string; keys: string[]; isApproximate?: boolean }> = [
+  { id: 'exposure', label: 'adjustments.basic.exposure', keys: [BasicAdjustment.Exposure] },
+  { id: 'whiteBalance', label: 'adjustments.color.whiteBalance', keys: ['temperature', 'tint'] },
+  {
+    id: 'tone',
+    label: 'modals.copyPaste.groups.tone',
+    keys: [
+      BasicAdjustment.Brightness,
+      BasicAdjustment.Contrast,
+      BasicAdjustment.Highlights,
+      BasicAdjustment.Shadows,
+      BasicAdjustment.Whites,
+      BasicAdjustment.Blacks,
+    ],
+    isApproximate: true,
+  },
+  {
+    id: 'curves',
+    label: 'modals.copyPaste.groups.curves',
+    keys: ['curves', 'pointCurves', 'parametricCurve', 'curveMode'],
+  },
+  { id: 'presence', label: 'modals.copyPaste.groups.presence', keys: ['saturation', 'vibrance'] },
+  { id: 'hue', label: 'modals.copyPaste.groups.hueShift', keys: ['hue'] },
+  { id: 'colorMixer', label: 'modals.copyPaste.groups.colorMixer', keys: ['hsl'] },
+  { id: 'pointColor', label: 'modals.copyPaste.groups.pointColor', keys: ['pointColors'] },
+  { id: 'colorGrading', label: 'modals.copyPaste.groups.colorGrading', keys: ['colorGrading'] },
+];
+
 export interface ColorCalibration {
   shadowsTint: number;
   redHue: number;
@@ -360,6 +420,10 @@ export interface Adjustments {
   lutName?: string | null;
   lutPath?: string | null;
   lutSize?: number;
+  /** The custom profile the look starts from, its table embedded (`custom_profile.rs`). */
+  profile?: CustomProfile | null;
+  /** The custom profile's Amount, 0–200. */
+  profileAmount?: number;
   masks: Array<MaskContainer>;
   monochrome: boolean;
   motionBlurAmount: number;
@@ -1021,6 +1085,8 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   lutName: null,
   lutPath: null,
   lutSize: 0,
+  profile: null,
+  profileAmount: 100,
   masks: [],
   monochrome: false,
   motionBlurAmount: 0,
@@ -1331,6 +1397,7 @@ const groupOfSettings = (label: string, settings: Array<[keys: string | string[]
  */
 export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
   light: [
+    { label: 'modals.copyPaste.groups.profile', keys: [ProfileAdjustment.Profile, ProfileAdjustment.ProfileAmount] },
     { label: 'adjustments.color.blackAndWhite', keys: [ColorAdjustment.Monochrome] },
     groupOfSettings('modals.copyPaste.groups.exposureToneMapper', [
       [BasicAdjustment.Exposure, 'adjustments.basic.exposure'],
@@ -1681,6 +1748,8 @@ export const getAdjustmentChanges = (
 /** The adjustment keys of each Adjustments section (section copy, paste and reset). */
 export const ADJUSTMENT_SECTIONS: Sections = {
   light: [
+    ProfileAdjustment.Profile,
+    ProfileAdjustment.ProfileAmount,
     ColorAdjustment.Monochrome,
     'toneMapper',
     ColorAdjustment.Temperature,
@@ -1801,6 +1870,7 @@ export const TONE_MAPPER_TOOL = 'toneMapper';
 /** The blocks inside each section, in their default order; Curves is a single block. */
 export const ADJUSTMENT_SECTION_TOOLS: Record<string, Array<AdjustmentSectionTool>> = {
   light: [
+    { id: 'profile', label: 'adjustments.profile.title' },
     { id: 'blackAndWhite', label: 'adjustments.color.blackAndWhite' },
     { id: TONE_MAPPER_TOOL, label: 'adjustments.basic.toneMapper' },
     { id: 'whiteBalance', label: 'adjustments.color.whiteBalance' },

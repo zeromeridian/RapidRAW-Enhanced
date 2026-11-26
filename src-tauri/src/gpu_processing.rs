@@ -11,6 +11,7 @@ use tauri::Manager;
 use wgpu::util::{DeviceExt, TextureDataOrder};
 
 use crate::app_state::GpuLane;
+use crate::custom_profile::ProfileTable;
 use crate::image_processing::{AllAdjustments, GpuContext, MAX_MASKS};
 use crate::lut_processing::Lut;
 use crate::render_source::RenderSource;
@@ -66,6 +67,8 @@ pub struct RenderRequest<'a> {
     pub adjustments: AllAdjustments,
     pub mask_bitmaps: &'a [ImageBuffer<Luma<u8>, Vec<u8>>],
     pub lut: Option<Arc<Lut>>,
+    /// The edit's custom profile table (`custom_profile::table_for_adjustments`).
+    pub profile: Option<Arc<ProfileTable>>,
     pub roi: Option<Roi>,
     pub motion_blur: crate::motion_blur::MotionBlurs,
     pub probe: Option<SampleProbe>,
@@ -814,7 +817,44 @@ fn high_precision_shader_source() -> String {
     image_shader_source().replace("rgba8unorm, write>", "rgba16float, write>")
 }
 
+/// A custom profile's table as a 3D texture, in full float: its shaper-encoded values are
+/// indexed exactly (`textureLoad`), so half floats would cost precision for nothing.
+fn upload_profile_table(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    profile: &ProfileTable,
+) -> wgpu::TextureView {
+    let rgba: Vec<f32> = profile
+        .data
+        .chunks_exact(3)
+        .flat_map(|rgb| [rgb[0], rgb[1], rgb[2], 1.0])
+        .collect();
+    device
+        .create_texture_with_data(
+            queue,
+            &wgpu::TextureDescriptor {
+                label: Some("Custom Profile 3D Texture"),
+                size: wgpu::Extent3d {
+                    width: profile.size,
+                    height: profile.size,
+                    depth_or_array_layers: profile.size,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D3,
+                format: wgpu::TextureFormat::Rgba32Float,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[],
+            },
+            TextureDataOrder::MipMajor,
+            bytemuck::cast_slice(&rgba),
+        )
+        .create_view(&Default::default())
+}
+
 const FLARE_MAP_SIZE: u32 = 512;
+/// The custom profile's table (`profile_texture` in `shader.wgsl`).
+const PROFILE_BINDING: u32 = 12;
 
 impl GpuPipelines {
     pub(crate) fn new(device: &wgpu::Device) -> Self {
@@ -1121,6 +1161,16 @@ impl GpuPipelines {
             binding: 10 + MAX_MASK_BINDINGS,
             visibility: wgpu::ShaderStages::COMPUTE,
             ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+            count: None,
+        });
+        bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
+            binding: PROFILE_BINDING,
+            visibility: wgpu::ShaderStages::COMPUTE,
+            ty: wgpu::BindingType::Texture {
+                sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                view_dimension: wgpu::TextureViewDimension::D3,
+                multisampled: false,
+            },
             count: None,
         });
 
@@ -1696,7 +1746,16 @@ impl GpuProcessor {
             )
         };
 
-        let adjustments = request.adjustments;
+        let profile_texture_view = request
+            .profile
+            .as_ref()
+            .map(|profile| upload_profile_table(device, queue, profile));
+
+        let mut adjustments = request.adjustments;
+        if profile_texture_view.is_none() {
+            // Without its table the profile cannot render, so the photo renders without it.
+            adjustments.global.has_profile = 0;
+        }
         let flare_amount = flare_generation_amount(&adjustments);
         if flare_amount > 0.0 {
             let mut encoder = device.create_command_encoder(&Default::default());
@@ -2010,6 +2069,14 @@ impl GpuProcessor {
                 bind_group_entries.push(wgpu::BindGroupEntry {
                     binding: 10 + MAX_MASK_BINDINGS,
                     resource: wgpu::BindingResource::Sampler(&self.pipelines.flare_sampler),
+                });
+                bind_group_entries.push(wgpu::BindGroupEntry {
+                    binding: PROFILE_BINDING,
+                    resource: wgpu::BindingResource::TextureView(
+                        profile_texture_view
+                            .as_ref()
+                            .unwrap_or(&self.pipelines.dummy_lut_view),
+                    ),
                 });
 
                 let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -2789,6 +2856,7 @@ mod tests {
                 adjustments,
                 mask_bitmaps: &[],
                 lut: None,
+                profile: None,
                 roi: None,
                 probe: Some(probe),
                 motion_blur: Default::default(),
@@ -2928,6 +2996,7 @@ mod tests {
                 adjustments,
                 mask_bitmaps: &[],
                 lut: None,
+                profile: None,
                 roi,
                 probe: None,
                 motion_blur: Default::default(),
@@ -2997,6 +3066,7 @@ mod tests {
                 adjustments,
                 mask_bitmaps: &[],
                 lut: None,
+                profile: None,
                 roi: None,
                 probe: None,
                 motion_blur: Default::default(),

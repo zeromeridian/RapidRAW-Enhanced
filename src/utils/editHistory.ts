@@ -13,6 +13,8 @@ const KEY_NAMES: Record<string, string> = {
   lutData: 'LUT Data',
   lutName: 'LUT Name',
   lutSize: 'LUT Size',
+  profile: 'Profile',
+  profileAmount: 'Profile Amount',
   chromaticAberrationBlueYellow: 'Chromatic Aberration Blue/Yellow',
   chromaticAberrationRedCyan: 'Chromatic Aberration Red/Cyan',
   centré: 'Centré',

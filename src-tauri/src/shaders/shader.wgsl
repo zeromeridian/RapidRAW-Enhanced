@@ -103,11 +103,12 @@ struct GlobalAdjustments {
     natural_exposure_ev: f32,
     vignette_center_x: f32,
     vignette_center_y: f32,
-    _pad_lut5: f32,
+    // A custom profile (`custom_profile.rs`): on, its Amount (0–2) and its shaper's range.
+    has_profile: u32,
 
-    _pad_agx1: f32,
-    _pad_agx2: f32,
-    _pad_agx3: f32,
+    profile_amount: f32,
+    profile_stops_below: f32,
+    profile_stops_above: f32,
     agx_pipe_to_rendering_matrix: mat3x3<f32>,
     agx_rendering_to_pipe_matrix: mat3x3<f32>,
 
@@ -157,6 +158,16 @@ struct GlobalAdjustments {
     _pad_point_color2: f32,
 
     zone_tint: ZoneTint,
+
+    // The custom profile's own tone curve, applied before the photo's (`CURVE_OWNER_PROFILE`).
+    profile_luma_curve: array<Point, 16>,
+    profile_red_curve: array<Point, 16>,
+    profile_green_curve: array<Point, 16>,
+    profile_blue_curve: array<Point, 16>,
+    profile_luma_curve_count: u32,
+    profile_red_curve_count: u32,
+    profile_green_curve_count: u32,
+    profile_blue_curve_count: u32,
 }
 
 struct MaskAdjustments {
@@ -266,6 +277,11 @@ const HSL_RANGES: array<HslRange, 8> = array<HslRange, 8>(
 
 @group(0) @binding(10) var flare_texture: texture_2d<f32>;
 @group(0) @binding(11) var linear_sampler: sampler;
+
+// The custom profile's 3D table, shaper-encoded in and out (`custom_profile.rs`).
+@group(0) @binding(12) var profile_texture: texture_3d<f32>;
+// Only `bake_profile` writes it: one shaper-encoded colour per lattice point.
+@group(0) @binding(13) var<storage, read_write> profile_bake_output: array<vec4<f32>>;
 
 override HIGH_PRECISION_OUTPUT: u32 = 0u;
 // A sample probe writes the colour a targeted adjustment reads at its stage
@@ -649,14 +665,24 @@ fn interpolate_cubic_hermite(x: f32, p1: Point, p2: Point, m1: f32, m2: f32) -> 
 
 // Curves are read where they are, in the uniform buffer: passed by value, each 16-point curve
 // was copied into slow per-thread memory for every pixel. A curve is named by its owner (the
-// photo, `CURVE_OWNER_PHOTO`, or a mask's index) and its channel.
+// photo, `CURVE_OWNER_PHOTO`, its custom profile, `CURVE_OWNER_PROFILE`, or a mask's index) and
+// its channel.
 const CURVE_OWNER_PHOTO: u32 = 0xffffffffu;
+const CURVE_OWNER_PROFILE: u32 = 0xfffffffeu;
 const CURVE_LUMA: u32 = 0u;
 const CURVE_RED: u32 = 1u;
 const CURVE_GREEN: u32 = 2u;
 const CURVE_BLUE: u32 = 3u;
 
 fn curve_point(owner: u32, channel: u32, index: u32) -> Point {
+    if (owner == CURVE_OWNER_PROFILE) {
+        switch channel {
+            case 0u: { return adjustments.global.profile_luma_curve[index]; }
+            case 1u: { return adjustments.global.profile_red_curve[index]; }
+            case 2u: { return adjustments.global.profile_green_curve[index]; }
+            default: { return adjustments.global.profile_blue_curve[index]; }
+        }
+    }
     if (owner == CURVE_OWNER_PHOTO) {
         switch channel {
             case 0u: { return adjustments.global.luma_curve[index]; }
@@ -675,6 +701,14 @@ fn curve_point(owner: u32, channel: u32, index: u32) -> Point {
 }
 
 fn curve_count(owner: u32, channel: u32) -> u32 {
+    if (owner == CURVE_OWNER_PROFILE) {
+        switch channel {
+            case 0u: { return adjustments.global.profile_luma_curve_count; }
+            case 1u: { return adjustments.global.profile_red_curve_count; }
+            case 2u: { return adjustments.global.profile_green_curve_count; }
+            default: { return adjustments.global.profile_blue_curve_count; }
+        }
+    }
     if (owner == CURVE_OWNER_PHOTO) {
         switch channel {
             case 0u: { return adjustments.global.luma_curve_count; }
@@ -1716,7 +1750,17 @@ fn is_default_curve(owner: u32, channel: u32) -> bool {
     return is_identity && p0_is_origin && p_last_is_end;
 }
 
-/// The photo's curves (`owner` = `CURVE_OWNER_PHOTO`) or a mask's (its index).
+// Whether the custom profile carries no tone curve, or only straight ones.
+fn is_profile_curve_identity() -> bool {
+    for (var channel = 0u; channel < 4u; channel = channel + 1u) {
+        if (curve_count(CURVE_OWNER_PROFILE, channel) >= 2u && !is_default_curve(CURVE_OWNER_PROFILE, channel)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/// The photo's curves (`owner` = `CURVE_OWNER_PHOTO`), its profile's or a mask's (its index).
 fn apply_all_curves(color: vec3<f32>, owner: u32) -> vec3<f32> {
     let red_is_default = is_default_curve(owner, CURVE_RED);
     let green_is_default = is_default_curve(owner, CURVE_GREEN);
@@ -1742,39 +1786,40 @@ fn get_mask_influence(mask_index: u32, coords: vec2<u32>) -> f32 {
     return textureLoad(mask_textures, vec2<i32>(coords), i32(mask_index), 0).r;
 }
 
-fn sample_lut_tetrahedral(uv: vec3<f32>) -> vec3<f32> {
-    let dims = vec3<f32>(textureDimensions(lut_texture));
+// A 3D table (the finishing LUT or the custom profile) at `uv` (0–1), tetrahedrally interpolated.
+fn sample_tetrahedral(table: texture_3d<f32>, uv: vec3<f32>) -> vec3<f32> {
+    let dims = vec3<f32>(textureDimensions(table));
     let size = dims - vec3<f32>(1.0);
     let scaled = clamp(uv, vec3<f32>(0.0), vec3<f32>(1.0)) * size;
     let i_base = floor(scaled);
     let f = scaled - i_base;
     let coord0 = vec3<i32>(i_base);
     let coord1 = min(coord0 + vec3<i32>(1), vec3<i32>(dims) - vec3<i32>(1));
-    let c000 = textureLoad(lut_texture, coord0, 0).rgb;
-    let c111 = textureLoad(lut_texture, coord1, 0).rgb;
+    let c000 = textureLoad(table, coord0, 0).rgb;
+    let c111 = textureLoad(table, coord1, 0).rgb;
 
     var res = vec3<f32>(0.0);
 
     if (f.r > f.g) {
         if (f.g > f.b) {
-            let c100 = textureLoad(lut_texture, vec3<i32>(coord1.x, coord0.y, coord0.z), 0).rgb;
-            let c110 = textureLoad(lut_texture, vec3<i32>(coord1.x, coord1.y, coord0.z), 0).rgb;
+            let c100 = textureLoad(table, vec3<i32>(coord1.x, coord0.y, coord0.z), 0).rgb;
+            let c110 = textureLoad(table, vec3<i32>(coord1.x, coord1.y, coord0.z), 0).rgb;
 
             res = c000 * (1.0 - f.r) +
                   c100 * (f.r - f.g) +
                   c110 * (f.g - f.b) +
                   c111 * (f.b);
         } else if (f.r > f.b) {
-            let c100 = textureLoad(lut_texture, vec3<i32>(coord1.x, coord0.y, coord0.z), 0).rgb;
-            let c101 = textureLoad(lut_texture, vec3<i32>(coord1.x, coord0.y, coord1.z), 0).rgb;
+            let c100 = textureLoad(table, vec3<i32>(coord1.x, coord0.y, coord0.z), 0).rgb;
+            let c101 = textureLoad(table, vec3<i32>(coord1.x, coord0.y, coord1.z), 0).rgb;
 
             res = c000 * (1.0 - f.r) +
                   c100 * (f.r - f.b) +
                   c101 * (f.b - f.g) +
                   c111 * (f.g);
         } else {
-            let c001 = textureLoad(lut_texture, vec3<i32>(coord0.x, coord0.y, coord1.z), 0).rgb;
-            let c101 = textureLoad(lut_texture, vec3<i32>(coord1.x, coord0.y, coord1.z), 0).rgb;
+            let c001 = textureLoad(table, vec3<i32>(coord0.x, coord0.y, coord1.z), 0).rgb;
+            let c101 = textureLoad(table, vec3<i32>(coord1.x, coord0.y, coord1.z), 0).rgb;
 
             res = c000 * (1.0 - f.b) +
                   c001 * (f.b - f.r) +
@@ -1783,24 +1828,24 @@ fn sample_lut_tetrahedral(uv: vec3<f32>) -> vec3<f32> {
         }
     } else {
         if (f.b > f.g) {
-            let c001 = textureLoad(lut_texture, vec3<i32>(coord0.x, coord0.y, coord1.z), 0).rgb;
-            let c011 = textureLoad(lut_texture, vec3<i32>(coord0.x, coord1.y, coord1.z), 0).rgb;
+            let c001 = textureLoad(table, vec3<i32>(coord0.x, coord0.y, coord1.z), 0).rgb;
+            let c011 = textureLoad(table, vec3<i32>(coord0.x, coord1.y, coord1.z), 0).rgb;
 
             res = c000 * (1.0 - f.b) +
                   c001 * (f.b - f.g) +
                   c011 * (f.g - f.r) +
                   c111 * (f.r);
         } else if (f.b > f.r) {
-            let c010 = textureLoad(lut_texture, vec3<i32>(coord0.x, coord1.y, coord0.z), 0).rgb;
-            let c011 = textureLoad(lut_texture, vec3<i32>(coord0.x, coord1.y, coord1.z), 0).rgb;
+            let c010 = textureLoad(table, vec3<i32>(coord0.x, coord1.y, coord0.z), 0).rgb;
+            let c011 = textureLoad(table, vec3<i32>(coord0.x, coord1.y, coord1.z), 0).rgb;
 
             res = c000 * (1.0 - f.g) +
                   c010 * (f.g - f.b) +
                   c011 * (f.b - f.r) +
                   c111 * (f.r);
         } else {
-            let c010 = textureLoad(lut_texture, vec3<i32>(coord0.x, coord1.y, coord0.z), 0).rgb;
-            let c110 = textureLoad(lut_texture, vec3<i32>(coord1.x, coord1.y, coord0.z), 0).rgb;
+            let c010 = textureLoad(table, vec3<i32>(coord0.x, coord1.y, coord0.z), 0).rgb;
+            let c110 = textureLoad(table, vec3<i32>(coord1.x, coord1.y, coord0.z), 0).rgb;
 
             res = c000 * (1.0 - f.g) +
                   c010 * (f.g - f.r) +
@@ -1810,6 +1855,54 @@ fn sample_lut_tetrahedral(uv: vec3<f32>) -> vec3<f32> {
     }
 
     return res;
+}
+
+// The custom profile's shaper (`custom_profile::Shaper`): linear light to 0–1 in even log2
+// steps, from `profile_stops_below` stops under 1.0 to `profile_stops_above` stops over it.
+fn profile_shaper_encode(linear: vec3<f32>) -> vec3<f32> {
+    let below = adjustments.global.profile_stops_below;
+    let span = below + adjustments.global.profile_stops_above;
+    let stops = log2(max(linear, vec3<f32>(exp2(-below))));
+    return clamp((stops + below) / span, vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
+fn profile_shaper_decode(encoded: vec3<f32>) -> vec3<f32> {
+    let below = adjustments.global.profile_stops_below;
+    let span = below + adjustments.global.profile_stops_above;
+    return exp2(encoded * span - vec3<f32>(below));
+}
+
+// The custom profile on linear, unclipped light, blended by its Amount (0–2). A colour brighter
+// or darker than the shaper reaches is scaled into its range and back, as exposure would, so
+// the look never caps a value and every later adjustment works on the whole result.
+fn apply_profile(color: vec3<f32>) -> vec3<f32> {
+    let safe = max(color, vec3<f32>(0.0));
+    let peak = max(safe.r, max(safe.g, safe.b));
+    var looked = vec3<f32>(0.0);
+    if (peak > 0.0) {
+        let reference = clamp(
+            peak,
+            exp2(-adjustments.global.profile_stops_below),
+            exp2(adjustments.global.profile_stops_above)
+        );
+        let scale = peak / reference;
+        let encoded = profile_shaper_encode(safe / scale);
+        looked = profile_shaper_decode(sample_tetrahedral(profile_texture, encoded)) * scale;
+    }
+    return max(color + adjustments.global.profile_amount * (looked - color), vec3<f32>(0.0));
+}
+
+// Color Calibration of the photo, then of each mask by its influence.
+fn apply_calibrations(color: vec3<f32>, coord: vec2<u32>) -> vec3<f32> {
+    var calibrated = apply_color_calibration(color, adjustments.global.color_calibration);
+    for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
+        let influence = get_mask_influence(i, coord);
+        if (influence > 0.001) {
+            let masked = apply_color_calibration(calibrated, adjustments.mask_adjustments[i].color_calibration);
+            calibrated = mix(calibrated, masked, influence);
+        }
+    }
+    return calibrated;
 }
 
 // A hue (degrees) with a strength as a 2D vector, so colours can be averaged around the hue circle.
@@ -2200,18 +2293,17 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     composite_rgb_linear = apply_centre_tonal_and_color(composite_rgb_linear, adjustments.global.centre, centre_pos, absolute_coord_i);
     composite_rgb_linear = apply_white_balance(composite_rgb_linear, t_temperature, t_tint);
     composite_rgb_linear = apply_filmic_exposure(composite_rgb_linear, t_brightness);
+    // A custom profile is the base of the look, as in Adobe Camera Raw: Color Calibration adjusts
+    // the colour under it, and every adjustment from here on works on its result.
+    let has_profile = adjustments.global.has_profile == 1u;
+    if (has_profile) {
+        composite_rgb_linear = apply_calibrations(composite_rgb_linear, absolute_coord);
+        composite_rgb_linear = apply_profile(composite_rgb_linear);
+    }
     composite_rgb_linear = apply_tonal_adjustments(composite_rgb_linear, tonal_blurred, is_raw, t_contrast, t_shadows, t_whites, t_blacks);
     composite_rgb_linear = apply_highlights_adjustment(composite_rgb_linear, tonal_blurred, is_raw, t_highlights);
-    composite_rgb_linear = apply_color_calibration(composite_rgb_linear, adjustments.global.color_calibration);
-    for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
-        let influence = get_mask_influence(i, absolute_coord);
-        if (influence > 0.001) {
-            let calibrated = apply_color_calibration(
-                composite_rgb_linear,
-                adjustments.mask_adjustments[i].color_calibration
-            );
-            composite_rgb_linear = mix(composite_rgb_linear, calibrated, influence);
-        }
+    if (!has_profile) {
+        composite_rgb_linear = apply_calibrations(composite_rgb_linear, absolute_coord);
     }
     if (SAMPLE_PROBE == SAMPLE_PROBE_HSL) {
         textureStore(output_texture, id.xy, hsl_probe(composite_rgb_linear));
@@ -2305,6 +2397,12 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         base_srgb = linear_to_srgb(composite_rgb_linear);
     }
 
+    // The profile's own tone curve comes before the photo's, blended by the same Amount.
+    if (has_profile && !is_profile_curve_identity()) {
+        let profile_curved = apply_all_curves(base_srgb, CURVE_OWNER_PROFILE);
+        base_srgb = max(base_srgb + adjustments.global.profile_amount * (profile_curved - base_srgb), vec3<f32>(0.0));
+    }
+
     if (SAMPLE_PROBE == SAMPLE_PROBE_CURVE) {
         textureStore(output_texture, id.xy, curve_probe(base_srgb));
         return;
@@ -2324,7 +2422,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
 
     if (adjustments.global.has_lut == 1u) {
-        let lut_color = sample_lut_tetrahedral(final_rgb);
+        let lut_color = sample_tetrahedral(lut_texture, final_rgb);
         final_rgb = mix(final_rgb, lut_color, adjustments.global.lut_intensity);
     }
 
@@ -2429,4 +2527,40 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
 
     textureStore(output_texture, id.xy, vec4<f32>(clamp(final_rgb, vec3<f32>(0.0), vec3<f32>(1.0)), original_alpha));
+}
+
+// Bakes a custom profile (`custom_profile::bake_lattice`): each lattice point, a shaper-encoded
+// colour, goes through the bakeable stages with the photo's own (global) values, in `main`'s
+// order: Exposure, White Balance and Brightness (which run before the profile's slot), then
+// the slot's tonal and colour stages up to the tone mapper. Tonal sliders take their per-pixel
+// form (the pixel is its own surround), since a table cannot see neighbouring pixels.
+@compute @workgroup_size(4, 4, 4)
+fn bake_profile(@builtin(global_invocation_id) id: vec3<u32>) {
+    let size = u32(round(pow(f32(arrayLength(&profile_bake_output)), 1.0 / 3.0)));
+    if (any(id >= vec3<u32>(size))) { return; }
+    let g = adjustments.global;
+
+    var color = profile_shaper_decode(vec3<f32>(id) / f32(size - 1u));
+    color = apply_linear_exposure(color, g.exposure);
+    color = apply_white_balance(color, g.temperature, g.tint);
+    color = apply_filmic_exposure(color, g.brightness);
+    // `is_raw` 1 takes the surround as linear light, the same space the pixel is in.
+    color = apply_tonal_adjustments(color, color, 1u, g.contrast, g.shadows, g.whites, g.blacks);
+    color = apply_highlights_adjustment(color, color, 1u, g.highlights);
+    color = apply_hsl_panel(color, g.hsl, vec2<i32>(0));
+    color = apply_point_colors(color, point_color_coords(color));
+    color = apply_hue_shift(color, g.hue);
+    color = apply_creative_color(color, g.saturation, g.vibrance);
+    color = apply_color_grading(
+        color,
+        g.color_grading_shadows,
+        g.color_grading_midtones,
+        g.color_grading_highlights,
+        g.color_grading_global,
+        g.color_grading_blending,
+        g.color_grading_balance
+    );
+
+    let index = id.x + size * (id.y + size * id.z);
+    profile_bake_output[index] = vec4<f32>(profile_shaper_encode(color), 1.0);
 }

@@ -1,15 +1,48 @@
 # Color Profiles Plan
 
-Status (2026-11-21): **draft, not started; direction decided** (see
-"Owner decisions"). No `UPSTREAM_FEATURE_GAP.md`
-Plan item yet; number and position are the owner's to set (suggested:
-after item 54, Spektrafilm LUTs, since both decide how a LUT travels).
-One MINOR for Phases 1–2. Camera profiles (Phase 5) are a separate item.
+Status (2026-11-26): **Phases 1 and 2 built as `1.112.0`** on
+`dev/custom-profiles` (owner said go 2026-11-26; the owner commits);
+decisions 1–7 taken by the owner (below). Plan item 83 in
+`UPSTREAM_FEATURE_GAP.md`. Phase 3 and decision 6 (`lutData`) open.
 
-**Goal:** Lightroom Classic style profiles, with the owner mainly
-interested in **creating his own**: bake a look from the current develop
-settings into a profile, pick it from a browser, and dial it with an
-Amount slider, the way LrC's creative profiles work. The profile is the
+## Progress
+
+- **`1.112.0` (Phases 1–2 core):** new `custom_profile.rs` (data, u16
+  table zstd+base64, decoded-table cache, `profiles/*.tirprofile` files,
+  commands list/load/delete/create, GPU bake `bake_lattice`); shader
+  `apply_profile` after Brightness, `apply_calibrations` before it when a
+  profile is on, profile tone curve (`CURVE_OWNER_PROFILE`) before the
+  photo's curves, entry point `bake_profile`; uniforms reuse the four
+  spare pads plus four curves at the end of `GlobalAdjustments`;
+  `RenderRequest::profile` at every render site; frontend Light →
+  Profile block (`Profile.tsx`: grouped list, hover preview, Amount,
+  clear, delete) and `CreateProfileModal.tsx`; Copy & Paste group,
+  History labels; LUT Intensity 0 fix (`Effects.tsx`).
+- **Deviations from the design below (agent, 2026-11-26):** table stored
+  as 16-bit integers and uploaded as `Rgba32Float` (not f16: the
+  shaper-encoded values needed the precision); shaper 16 stops below and
+  8 above 1.0, and a colour outside that range is scaled into it and back
+  (exposure-like), so nothing is clamped (owner's critical point); the
+  bake is its own entry point, not a `SAMPLE_PROBE` stage (probes write
+  8-bit); Amount 0 switches the profile off entirely, which removes
+  decision 1b's side effect; Brightness is bakeable with Tone.
+- **"Not yet covered" points resolved:** (1) Glow/Halation light is added
+  before the slot, so it passes through the profile (only their internal
+  source estimate does not); (2) Dehaze, Centré and Flare are not baked
+  and stay per photo, before the profile; (3) the bake reads only the
+  global values.
+- **Open:** run the GPU bake test on a machine with a GPU (it skips in
+  the agent sandbox); measure the XMP size of a 33³ profile (decision 4;
+  logged at creation); app checks; Phase 2 extras (Favorites, thumbnail
+  grid, "Save to my profiles" for an embedded profile, rename); Phase 3;
+  decision 6. A saved Light tool order gets Profile appended last
+  (`reconcileOrder`); Customize Panels moves it.
+
+**Goal:** custom profiles as Photoshop's Adobe Camera Raw (ACR) creates
+them (owner 2026-11-26): bake a look from the current develop settings
+into a profile (a 3D LUT), pick it from a browser, and dial it with an
+Amount slider. **Camera profiles are out of scope** (owner 2026-11-26:
+not wanted). The profile is the
 **base** of the image: choosing it moves no slider, and every slider then
 works on top of it, so the look can still be corrected with Shadows, Tone
 Curve and the rest.
@@ -24,17 +57,41 @@ Curve and the rest.
   in a new slot before the tone sliders, which behaves like LrC. The owner
   chose (2). A finishing LUT is kept as a by-product of the same Create
   dialog (Phase 3).
+- **Critical: adjustments stack on top of the look, uncapped** (owner
+  2026-11-26). Whatever the profile's LUT does, the regular sliders
+  must still apply on top of its full result; the values need not add
+  numerically (the owner considered and declined settings-based
+  profiles that sum values, keeping Adobe-style LUT profiles), but
+  nothing may be capped. Example: Exposure +50 in the profile and +70
+  on the slider must look brighter than either, not stop at a ceiling.
+  Requirements: (1) the LUT works on linear, unclipped values through
+  the log shaper and stores its output unclipped (f16), with a shaper
+  range wide enough for the look plus extreme slider moves; (2) no clamp
+  at 1.0 between the profile and the later sliders, so Highlights,
+  Whites, the tone mapper and curves act on the whole result; (3)
+  Exposure is bakeable as a relative multiplier (it commutes with the
+  photo's own Exposure, so +50 inside and +70 outside look exactly like
+  +120); (4) tests for extreme combinations at the shaper's range ends
+  (no hard edge, no banding).
+- **White Balance bakeable too** (owner 2026-11-26; beyond ACR, which,
+  as recalled, does not offer it): an optional Create Profile checkbox,
+  off by default. Exposure (`apply_linear_exposure`, × 2^ev) and White
+  Balance (`apply_white_balance`, per-channel multipliers) are pure
+  multiplications, so baking them as relative multipliers inside the
+  LUT is exact and stacks with the photo's own values. Brightness
+  (`apply_filmic_exposure`) is a curve: bakeable, stacks visually, not
+  an exact sum. After baking, the baked values are reset in the source
+  edit as usual.
+- **ACR-style custom profiles only, no camera profiles** (owner
+  2026-11-26). DCP camera profiles (the old Phase 5) are dropped; the
+  removed text is in `HANDOFF-ARCHIVE.md` ("Superseded 2026-11-26").
+  Restart: owner request.
 
-## How Lightroom Classic does it
+## How Adobe does it (ACR and LrC)
 
-- **Camera profiles** (Adobe Color, Adobe Monochrome, Camera Matching,
-  ColorChecker profiles) are DCP files: two colour/forward matrices
-  interpolated by white balance, a HueSatMap, a LookTable and a tone
-  curve. LrC cannot make them; DNG Profile Editor, Calibrite or
-  dcamprof/Lumariver do.
-- **Creative profiles** are XMP files holding an RGB 3D LUT (plus an
-  optional base camera profile) and allow the **Amount** slider (0–200,
-  default 100). Camera profiles show no Amount slider.
+- **Custom (creative) profiles** are XMP files holding an RGB 3D LUT
+  (plus an optional base camera profile) and allow the **Amount** slider
+  (0–200, default 100). LrC uses them but cannot make them.
 - **Creating one:** only in Camera Raw (Option-click Create Preset →
   Create Profile). The chosen settings are baked into the LUT; local and
   spatial settings cannot be baked.
@@ -92,12 +149,14 @@ Curve and the rest.
   the value out. A `PROFILE_BAKE` stage can reuse it for the bake.
 - **Black & White** is the `monochrome` flag, applied at the end; a B&W
   profile can set it like LrC's Treatment switch.
-- **Camera colour** comes from rawler (CyberTimon's DngLab fork, git
-  dependency): `develop_internal` keeps rawler's `Calibrate` step, then
-  clamps channels at 0. **Assumption, not verified** (rawler's source is
-  not in this repo): Calibrate converts to sRGB primaries, so colours
-  outside sRGB are clipped before the shader. This matters for Phase 4
-  and ties into item 19b's wide-gamut path.
+- **Not yet covered (found 2026-11-26):** (1) Glow and Halation run their
+  own Brightness and tonal steps on a blurred copy (`apply_glow_bloom`,
+  `apply_halation`), so they would not see a profile applied at the
+  slot; (2) Dehaze, Centré tone/colour and Light Flare run before the
+  slot, so the profile acts on their result and the bake must reproduce
+  or exclude them; (3) White balance and Brightness reach the slot as
+  `t_*` values, apparently with mask contributions already summed in;
+  the bake should use the global values only.
 
 ## Engine (Phase 1)
 
@@ -130,8 +189,9 @@ Curve and the rest.
   looks the same with the profile applied at Amount 100.
 - **Not bakeable:** anything spatial (Clarity, Structure, Dehaze,
   Sharpening, noise reduction, Glow/Halation/Flare, Vignette, Grain,
-  Fog, Relight, Lens Blur, masks), and everything at or after the tone
-  mapper (tone mapper choice, curves, LUT). See decision 2 for the tonal
+  Fog, Relight, Lens Blur, masks), and the tone mapper choice and the
+  finishing LUT; curves travel as the profile's own tone curve
+  (decision 3). See decision 2 for the tonal
   sliders and decision 3 for curves.
 - **Profile Browser:** Profile row at the top of the first Develop tool,
   dropdown of Favorites and recent, Browse opens a browser with groups,
@@ -177,8 +237,6 @@ Curve and the rest.
 2. Create Profile (bake), Profile Browser, presets / Copy & Paste.
 3. Save as LUT from the same dialog (finishing LUT, see above), with the
    AgX bake fix.
-4. Optional: import `.cube` as a profile (decision 5).
-5. Camera profiles (DCP): separate Plan item, after item 19b.
 
 ## Tests
 
@@ -192,27 +250,47 @@ Curve and the rest.
 
 ## Open decisions (owner)
 
-1. **Exact slot** (the end-of-pipeline slot is ruled out by the owner's
-   2026-11-21 decision). (a) after WB + Brightness, before the tonal
-   sliders (candidate above) / (b) before Exposure. **Default: (a)**;
-   the current LUT stays as the finishing Effects → LUT.
+1. **Exact slot. Decided (owner 2026-11-26): (a)**, after WB +
+   Brightness, before Contrast/Highlights/Shadows/Whites/Blacks. Owner's
+   criteria: closest to real colour profiles, most flexibility, no
+   quality loss; (a) matches the DNG order (white balance and exposure,
+   then the look table, then the tone curve) and keeps Exposure/WB per
+   photo. Lens, noise reduction, sharpening, Clarity, Structure,
+   Exposure, Glow, Halation, Flare, Dehaze and Centré also run before
+   it. The current LUT stays as the finishing Effects → LUT.
+1b. **Color Calibration. Decided (owner 2026-11-26): as close to Adobe
+   as possible.** On a photo with a profile, Color Calibration (global
+   and per mask) runs before the profile, as in ACR/LrC, where
+   Calibration adjusts the camera colour under the look; without a
+   profile it stays where it is, so existing edits render identically.
+   Side effect: profile set at Amount 0 can differ slightly from no
+   profile (Calibration's position); removing the profile restores the
+   old render exactly.
 2. **Tonal sliders in the bake** (Contrast, Highlights, Shadows, Whites,
    Blacks): they use the edge-aware tonal base, so a lattice can only
-   bake their per-pixel form. (a) exclude / (b) bake the per-pixel form
-   with a warning. **Default: (a).**
-3. **Curves in the bake.** Curves run after the tone mapper, outside the
-   slot. (a) not bakeable / (b) add a 1D tone curve to the profile,
-   applied at the slot. **Default: (a)** for Phase 2; (b) later if looks
-   without tone feel too thin.
-4. **Lattice and embedding.** (a) 33³ embedded / (b) 17³ embedded,
-   33³ in the file. **Default: measure first**, then (a) if sidecars stay
-   reasonable.
+   bake their per-pixel form. **Decided (owner 2026-11-26): bake the
+   per-pixel form**, closest to ACR; the Create dialog marks these five
+   as approximate (close, not identical, mostly Highlights/Shadows on
+   detailed areas), and they are reset after baking like the rest.
+3. **Curves in the bake. Decided (owner 2026-11-26): the profile
+   carries a curve.** Curves run after the tone mapper, outside the
+   slot, so the profile stores the photo's tone curve (all channels,
+   point and parametric as rendered) next to its 3D LUT and applies it
+   at the curve stage, just before the user's own curves, blended by the
+   same Amount (like a DNG profile's own tone curve). Exact, closest to
+   ACR; the user's Tone Curve stays free and is reset after baking.
+4. **Lattice and embedding. Decided (owner 2026-11-26): measure first,
+   then 33³ embedded** if the compressed XMP size stays reasonable;
+   fall back to 17³ embedded with 33³ in the file only if it does not.
 5. **`.cube` import.** `.cube` LUTs assume display sRGB input, which the
-   scene slot does not get. (a) not supported (use Effects → LUT) /
-   (b) import through an assumed display transform. **Default: (a).**
+   scene slot does not get. **Decided (owner 2026-11-26): not
+   supported**; `.cube` files stay finishing LUTs in Effects → LUT, and
+   profiles are only those created in ThisIsRAW. Phase 4 is dropped.
 6. **`lutData`.** Phase 3 makes this more pressing, since saved
-   finishing LUTs would otherwise travel as a path only. (a) fill it so
-   the existing LUT tool embeds too
-   (separate PATCH/MINOR) / (b) leave it. **Default: (a)**, decided
-   with item 54.
-7. **Plan item number and position.** Owner.
+   finishing LUTs would otherwise travel as a path only. **Decided
+   (owner 2026-11-26): embed it**: fill `lutData` so the existing LUT
+   tool's table travels in the edit (separate PATCH/MINOR); edits
+   without it keep loading from `lutPath`.
+7. **Plan item number and position. Decided (owner 2026-11-26):** new
+   Plan item 83, the next new item, ahead of 57 → 53 → 54; item 54
+   (Spektrafilm) later reuses the embedded `lutData` work.

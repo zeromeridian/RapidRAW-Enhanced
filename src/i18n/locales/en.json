@@ -232,6 +232,21 @@
       "size": "Size",
       "vignette": "Vignette"
     },
+    "profile": {
+      "amount": "Amount",
+      "blackAndWhite": "B&W",
+      "browse": "Choose a profile",
+      "clear": "Remove profile",
+      "create": "Create Profile…",
+      "delete": "Delete Profile",
+      "deleteFailed": "Could not delete the profile: {{error}}",
+      "empty": "No profiles yet. Set up a look, then choose Create Profile.",
+      "loadFailed": "Could not load the profile: {{error}}",
+      "none": "None",
+      "notSaved": "Embedded in this photo; not in your profiles.",
+      "title": "Profile",
+      "ungrouped": "Profiles"
+    },
     "zoneTint": {
       "fill": "Fill between",
       "fillHint": "Fills the zones between the first and last selected zone along the curve, from one end's colour, strength and luminance to the other's, as one gradient grade that replaces other grades there.",
@@ -1748,6 +1763,7 @@
         "noiseReduction": "Noise Reduction",
         "pointColor": "Point Color",
         "presence": "Presence",
+        "profile": "Profile",
         "sharpness": "Sharpness",
         "tone": "Tone",
         "transformRotation": "Transform & Rotation",
@@ -1774,6 +1790,21 @@
     },
     "createGroup": {
       "placeholder": "Enter group name..."
+    },
+    "createProfile": {
+      "approximate": "approximate",
+      "approximateHint": "Tone is baked pixel by pixel, so it comes out close to, but not exactly like, the photo's edge-aware sliders.",
+      "blackAndWhite": "Black & White profile",
+      "cancel": "Cancel",
+      "create": "Create",
+      "failed": "Could not create the profile: {{error}}",
+      "groupPlaceholder": "Group (optional)",
+      "hint": "Ticked settings are baked into the profile and reset in this photo, which keeps its look with the profile applied.",
+      "namePlaceholder": "Enter profile name...",
+      "selectAll": "Select All",
+      "selectNone": "Select None",
+      "settings": "Settings to bake",
+      "title": "Create Profile"
     },
     "culling": {
       "actionDelete": "Move to Trash",

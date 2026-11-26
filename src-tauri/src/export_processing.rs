@@ -1146,6 +1146,7 @@ fn process_image_for_export_pipeline(
             adjustments: all_adjustments,
             mask_bitmaps: &mask_bitmaps,
             lut,
+            profile: crate::custom_profile::table_for_adjustments(js_adjustments),
             roi: None,
             probe: None,
             motion_blur: crate::motion_blur::MotionBlurs::new(
@@ -1520,6 +1521,7 @@ fn export_masks_for_image(
                     adjustments: single_adjustments,
                     mask_bitmaps: &single_bitmaps,
                     lut: lut.clone(),
+                    profile: crate::custom_profile::table_for_adjustments(js_adjustments),
                     roi: None,
                     probe: None,
                     motion_blur: Default::default(),
@@ -1638,6 +1640,7 @@ fn export_adjustments_as_lut(
             adjustments: all_adjustments,
             mask_bitmaps: &[],
             lut,
+            profile: crate::custom_profile::table_for_adjustments(js_adjustments),
             roi: None,
             probe: None,
             motion_blur: Default::default(),
@@ -2532,6 +2535,7 @@ pub async fn estimate_export_sizes(
                 adjustments: all_adjustments,
                 mask_bitmaps: &mask_bitmaps,
                 lut,
+                profile: crate::custom_profile::table_for_adjustments(&adjustments_clone),
                 roi: None,
                 probe: None,
                 motion_blur: crate::motion_blur::MotionBlurs::new(
@@ -2673,6 +2677,7 @@ pub async fn estimate_export_sizes(
                 adjustments: all_adjustments,
                 mask_bitmaps: &mask_bitmaps,
                 lut,
+                profile: crate::custom_profile::table_for_adjustments(&js_adjustments),
                 roi: None,
                 probe: None,
                 motion_blur: crate::motion_blur::MotionBlurs::new(

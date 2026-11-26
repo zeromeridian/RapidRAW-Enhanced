@@ -3824,6 +3824,7 @@ pub fn generate_thumbnail_data(
                 adjustments: gpu_adjustments,
                 mask_bitmaps: &mask_bitmaps,
                 lut,
+                profile: crate::custom_profile::table_for_adjustments(&meta.adjustments),
                 roi: None,
                 probe: None,
                 motion_blur: crate::motion_blur::MotionBlurs::new(

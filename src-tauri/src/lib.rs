@@ -21,6 +21,7 @@ mod blocking_command;
 mod cache_codec;
 mod cache_utils;
 mod culling;
+mod custom_profile;
 mod denoising;
 mod editor_round_trip;
 mod effect_maps;
@@ -465,6 +466,7 @@ struct EditorRender {
     adjustments: crate::image_processing::AllAdjustments,
     mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>>,
     lut: Option<Arc<lut_processing::Lut>>,
+    profile: Option<Arc<custom_profile::ProfileTable>>,
     motion_blur: crate::motion_blur::MotionBlurs,
 }
 
@@ -512,6 +514,7 @@ impl EditorRender {
             lut: adjustments["lutPath"]
                 .as_str()
                 .and_then(|p| lut_processing::get_or_load_lut(state, p).ok()),
+            profile: custom_profile::table_for_adjustments(adjustments),
             motion_blur: crate::motion_blur::MotionBlurs::new(
                 adjustments,
                 (width, height),
@@ -530,6 +533,7 @@ impl EditorRender {
             adjustments: self.adjustments,
             mask_bitmaps: &self.mask_bitmaps,
             lut: self.lut.clone(),
+            profile: self.profile.clone(),
             roi,
             motion_blur: self.motion_blur.clone(),
             probe,
@@ -1153,6 +1157,7 @@ fn render_uncropped_preview(app_handle: &tauri::AppHandle, job: UncroppedPreview
             adjustments: uncropped_adjustments,
             mask_bitmaps: &mask_bitmaps,
             lut,
+            profile: custom_profile::table_for_adjustments(&adjustments_clone),
             roi: None,
             probe: None,
             motion_blur: crate::motion_blur::MotionBlurs::new(
@@ -1353,6 +1358,7 @@ async fn preview_geometry_transform(
                     adjustments: all_adjustments,
                     mask_bitmaps: &mask_bitmaps,
                     lut,
+                    profile: custom_profile::table_for_adjustments(&temp_adjustments),
                     roi: None,
                     probe: None,
                     motion_blur: Default::default(),
@@ -1560,6 +1566,7 @@ fn generate_preset_preview_blocking(
             adjustments: all_adjustments,
             mask_bitmaps: &mask_bitmaps,
             lut,
+            profile: custom_profile::table_for_adjustments(&js_adjustments),
             roi: None,
             probe: None,
             motion_blur: crate::motion_blur::MotionBlurs::new(
@@ -1703,6 +1710,7 @@ async fn generate_all_community_previews(
                     adjustments: all_adjustments,
                     mask_bitmaps: &mask_bitmaps,
                     lut,
+                    profile: custom_profile::table_for_adjustments(js_adjustments),
                     roi: None,
                     probe: None,
                     motion_blur: crate::motion_blur::MotionBlurs::new(
@@ -1998,6 +2006,7 @@ async fn generate_preview_for_path(
                 adjustments: all_adjustments,
                 mask_bitmaps: &mask_bitmaps,
                 lut,
+                profile: custom_profile::table_for_adjustments(&js_adjustments),
                 roi: None,
                 probe: None,
                 motion_blur: crate::motion_blur::MotionBlurs::new(
@@ -2758,6 +2767,10 @@ pub fn run() {
             lut_processing::import_luts,
             lut_processing::remove_lut,
             lut_processing::generate_lut_previews,
+            custom_profile::list_custom_profiles,
+            custom_profile::load_custom_profile,
+            custom_profile::delete_custom_profile,
+            custom_profile::create_custom_profile,
             fetch_community_presets,
             generate_all_community_previews,
             save_temp_file,

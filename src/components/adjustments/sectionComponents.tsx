@@ -4,6 +4,7 @@ import CurveGraph from './Curves';
 import ColorPanel from './Color';
 import DetailsPanel from './Details';
 import EffectsPanel from './Effects';
+import ProfilePanel from './Profile';
 import { AdjustmentPanelContext } from './AdjustmentTool';
 import {
   ADJUSTMENT_SECTION_TOOLS,
@@ -26,7 +27,7 @@ interface AdjustmentSectionProps {
  * them, in one column, so Customize Panels can order blocks that come from different components.
  */
 const SECTION_SOURCES: Record<string, Array<SectionComponent>> = {
-  light: [ColorPanel, BasicAdjustments, DetailsPanel],
+  light: [ProfilePanel, ColorPanel, BasicAdjustments, DetailsPanel],
   curves: [CurveGraph],
   color: [ColorPanel],
   look: [ColorPanel, EffectsPanel],

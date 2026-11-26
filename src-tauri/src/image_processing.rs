@@ -2056,11 +2056,14 @@ pub struct GlobalAdjustments {
     /// The post-crop vignette's centre in the cropped frame (0–1, middle 0.5), as upstream.
     pub vignette_center_x: f32,
     pub vignette_center_y: f32,
-    _pad_lut5: f32,
+    /// A custom profile (`custom_profile.rs`) is on; `gpu_processing` clears it when the render
+    /// has no profile table.
+    pub has_profile: u32,
 
-    _pad_agx1: f32,
-    _pad_agx2: f32,
-    _pad_agx3: f32,
+    /// The profile's Amount, 0–2.
+    pub profile_amount: f32,
+    pub profile_stops_below: f32,
+    pub profile_stops_above: f32,
     pub agx_pipe_to_rendering_matrix: GpuMat3,
     pub agx_rendering_to_pipe_matrix: GpuMat3,
 
@@ -2114,6 +2117,16 @@ pub struct GlobalAdjustments {
     _pad_point_color2: f32,
 
     pub zone_tint: crate::zone_tint::ZoneTintSettings,
+
+    /// The custom profile's own tone curve (shader `CURVE_OWNER_PROFILE`), before the photo's.
+    pub profile_luma_curve: [Point; 16],
+    pub profile_red_curve: [Point; 16],
+    pub profile_green_curve: [Point; 16],
+    pub profile_blue_curve: [Point; 16],
+    pub profile_luma_curve_count: u32,
+    pub profile_red_curve_count: u32,
+    pub profile_green_curve_count: u32,
+    pub profile_blue_curve_count: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
@@ -2904,6 +2917,10 @@ fn get_global_adjustments_from_json(
         (0, 1.0)
     };
 
+    let profile = crate::custom_profile::RenderSettings::from_adjustments(js_adjustments);
+    let [profile_luma, profile_red, profile_green, profile_blue] =
+        ["luma", "red", "green", "blue"].map(|channel| profile.curve(channel));
+
     let (point_colors, point_color_count) = if is_visible("colorMixer") {
         parse_point_colors(js_adjustments.get("pointColors"))
     } else {
@@ -3026,11 +3043,11 @@ fn get_global_adjustments_from_json(
         natural_exposure_ev: 0.0,
         vignette_center_x,
         vignette_center_y,
-        _pad_lut5: 0.0,
+        has_profile: u32::from(profile.amount > 0.0),
 
-        _pad_agx1: 0.0,
-        _pad_agx2: 0.0,
-        _pad_agx3: 0.0,
+        profile_amount: profile.amount,
+        profile_stops_below: profile.shaper.stops_below,
+        profile_stops_above: profile.shaper.stops_above,
         agx_pipe_to_rendering_matrix: pipe_to_rendering,
         agx_rendering_to_pipe_matrix: rendering_to_pipe,
 
@@ -3119,6 +3136,15 @@ fn get_global_adjustments_from_json(
             js_adjustments.get("zoneTint"),
             is_visible("zoneTint"),
         ),
+
+        profile_luma_curve_count: profile_luma.len() as u32,
+        profile_red_curve_count: profile_red.len() as u32,
+        profile_green_curve_count: profile_green.len() as u32,
+        profile_blue_curve_count: profile_blue.len() as u32,
+        profile_luma_curve: convert_points_to_aligned(profile_luma),
+        profile_red_curve: convert_points_to_aligned(profile_red),
+        profile_green_curve: convert_points_to_aligned(profile_green),
+        profile_blue_curve: convert_points_to_aligned(profile_blue),
     }
 }
 

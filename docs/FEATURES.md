@@ -293,8 +293,18 @@ details are in `RELEASE_NOTES.MD`.
 
 ## Develop
 
-- **Adjustments sections in workflow order**: Light (Black & White, tone
-  mapper, White Balance, tone sliders, Presence), Curves, Color (Color
+- **Custom profiles, as Adobe Camera Raw creates them** (Light → Profile):
+  Create Profile bakes the chosen settings (Exposure, White Balance, Tone,
+  Curves, Presence, Hue, Color Mixer, Point Color, Color Grading; a B&W
+  flag) into a profile in the user's profile folder and resets them in the
+  photo. The profile is the base of the look: applied after White Balance
+  and Brightness on linear, unclipped light, so every later slider works on
+  its whole result without a cap. Grouped profile list with a live preview
+  on hover, Amount 0–200, delete from the list. The profile is embedded in
+  the edit and XMP, so it renders without the file; Copy & Paste, presets
+  and Auto Sync carry it. With a profile, Color Calibration acts before it.
+- **Adjustments sections in workflow order**: Light (Profile, Black &
+  White, tone mapper, White Balance, tone sliders, Presence), Curves, Color (Color
   Presence, Hue, Color Mixer and Point Color, Calibration), Look (Color
   Grading, LUT), Light & Atmosphere (Relight, Fog, Glow, Halation, Light
   Flares), Blur (Lens, Motion, Gaussian), Detail (Sharpening, Noise

@@ -5,6 +5,32 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.112.0-dev-custom-profiles — 2026-11-26
+
+### Develop
+
+- New **Profile** at the top of Light: custom profiles like Adobe Camera
+  Raw's. Set up a look, click **+** (Create Profile), name it, optionally
+  give it a group, and tick what to bake in: Exposure, White Balance,
+  Tone, Curves, Presence, Hue, Color Mixer, Point Color and Color Grading,
+  and whether it is a Black & White profile. The ticked settings move into
+  the profile and are reset in the photo, which keeps its look.
+- A profile is the base of the look: every slider works on top of it, and
+  nothing is capped. Exposure baked into a profile and Exposure on the
+  slider add up exactly; brighter or darker looks keep their full range,
+  so Highlights, Whites and the other tools still recover them.
+- Choose a profile from the list (grouped, with a live preview on the
+  photo while you hover), set its **Amount** from 0 to 200, remove it with
+  the cross, or right-click a profile to delete it. Choosing a profile
+  switches Black & White on or off as the profile says.
+- A profile travels with the photo: its look is saved in the edit and in
+  the XMP sidecar, so the photo looks the same on another computer
+  without the profile file. Profiles can be copied, pasted and synced like
+  other settings.
+- On a photo with a profile, Color Calibration acts before the profile,
+  as in Adobe Camera Raw. Photos without a profile look exactly as before.
+- LUT: Intensity set to 0 no longer jumps back to 100 in the panel.
+
 ## 1.111.1-dev-stack-markers — 2026-11-26
 
 ### Library

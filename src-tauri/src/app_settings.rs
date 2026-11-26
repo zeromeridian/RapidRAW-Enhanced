@@ -161,6 +161,8 @@ pub fn all_available_adjustments() -> HashSet<String> {
         "lutPath",
         "lutSize",
         "lutData",
+        "profile",
+        "profileAmount",
         "glowAmount",
         "glowHue",
         "glowSaturation",
