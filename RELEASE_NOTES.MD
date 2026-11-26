@@ -5,6 +5,17 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.115.0-dev-custom-profiles — 2026-11-26
+
+### Develop
+
+- The profile list can now show **previews**: each profile on the open
+  photo, in a grid, as in Adobe's Profile Browser. Switch between the
+  grid and a plain list with the buttons above it; your choice is
+  remembered.
+- Star a profile to add it to **Favorites**, listed first. Hover a
+  profile to see the star; click it again to remove the favorite.
+
 ## 1.114.0-dev-custom-profiles — 2026-11-26
 
 ### Develop

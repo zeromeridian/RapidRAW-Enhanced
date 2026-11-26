@@ -591,14 +591,17 @@ pub fn remove_lut(app_handle: AppHandle, path: String) -> Result<Vec<LutEntry>, 
     }
 }
 
-fn render_lut_swatch(
+/// A small preview of the open photo for a browser swatch (a LUT, a custom profile), as a JPEG
+/// data URL; `None` when it cannot be rendered.
+pub(crate) fn render_swatch(
     context: &crate::image_processing::GpuContext,
     state: &State<AppState>,
     source: &crate::render_source::RenderSource,
     adjustments: crate::image_processing::AllAdjustments,
-    lut_path: &str,
+    lut: Option<Arc<Lut>>,
+    profile: Option<Arc<crate::custom_profile::ProfileTable>>,
+    caller_id: &str,
 ) -> Option<String> {
-    let lut = get_or_load_lut(state, lut_path).ok()?;
     let processed = process_and_get_dynamic_image(
         context,
         state,
@@ -606,13 +609,13 @@ fn render_lut_swatch(
         RenderRequest {
             adjustments,
             mask_bitmaps: &[],
-            lut: Some(lut),
-            profile: None,
+            lut,
+            profile,
             roi: None,
             probe: None,
             motion_blur: Default::default(),
         },
-        "generate_lut_previews",
+        caller_id,
     )
     .ok()?;
 
@@ -659,7 +662,17 @@ pub fn generate_lut_previews(
     let previews = lut_paths
         .into_iter()
         .map(|path| {
-            let thumb = render_lut_swatch(&context, &state, &source, adjustments, &path);
+            let thumb = get_or_load_lut(&state, &path).ok().and_then(|lut| {
+                render_swatch(
+                    &context,
+                    &state,
+                    &source,
+                    adjustments,
+                    Some(lut),
+                    None,
+                    "generate_lut_previews",
+                )
+            });
             LutPreview { path, thumb }
         })
         .collect();

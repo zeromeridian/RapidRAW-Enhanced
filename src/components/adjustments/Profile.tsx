@@ -2,7 +2,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { AnimatePresence, motion } from 'framer-motion';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { ChevronDown, Pencil, Plus, Save, Share2, TextCursorInput, Trash2, Upload, X } from 'lucide-react';
+import {
+  ChevronDown,
+  ImageOff,
+  LayoutGrid,
+  List,
+  Pencil,
+  Plus,
+  Save,
+  Share2,
+  Star,
+  TextCursorInput,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ParseKeys } from 'i18next';
 import { toast } from 'react-toastify';
@@ -12,6 +26,7 @@ import AdjustmentTool from './AdjustmentTool';
 import CreateProfileModal, { CreateProfileChoice } from '../modals/CreateProfileModal';
 import { useContextMenu } from '../../context/ContextMenuContext';
 import { useEditorStore } from '../../store/useEditorStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
 import { Invokes } from '../ui/AppProperties';
 import {
   Adjustments,
@@ -30,6 +45,11 @@ interface ProfilePanelProps {
   isForMask?: boolean;
   onDragStateChange?: (isDragging: boolean) => void;
 }
+
+/** The grid's previews: pixels on the long side, and how many photo/edit states are kept. */
+const PREVIEW_SIZE = 112;
+const PREVIEW_CACHE_SIZE = 8;
+const NO_FAVORITES: string[] = [];
 
 interface CreatedProfile {
   path: string;
@@ -99,6 +119,18 @@ export default function ProfilePanel({
   const loaded = useRef<Map<string, CustomProfile>>(new Map());
   const hoveredPath = useRef<string | null>(null);
   const profile = adjustments.profile ?? null;
+
+  const isImageReady = useEditorStore((state) => state.selectedImage?.isReady ?? false);
+  const favorites = useSettingsStore((state) => state.appSettings?.favoriteProfiles ?? NO_FAVORITES);
+  const isGridView = useSettingsStore((state) => state.appSettings?.profileBrowserGrid ?? true);
+  const [previews, setPreviews] = useState<Record<string, string | null>>({});
+  const [isLoadingPreviews, setIsLoadingPreviews] = useState(false);
+  const previewCache = useRef<Map<string, Record<string, string | null>>>(new Map());
+  // The grid renders the edit as it is when it opens, not on every slider move.
+  const adjustmentsRef = useRef(adjustments);
+  useEffect(() => {
+    adjustmentsRef.current = adjustments;
+  });
 
   // Editing belongs to the photo it started on.
   useEffect(() => setEditing(null), [selectedImagePath]);
@@ -309,7 +341,10 @@ export default function ProfilePanel({
       const created = entry
         ? await invoke<CreatedProfile>(Invokes.UpdateCustomProfile, { path: entry.path, request })
         : await invoke<CreatedProfile>(Invokes.CreateCustomProfile, { request });
-      if (entry) loaded.current.delete(entry.path);
+      if (entry) {
+        loaded.current.delete(entry.path);
+        previewCache.current.clear();
+      }
       loaded.current.set(created.path, created.profile);
       // The baked settings move into the profile, so the photo keeps its look at Amount 100;
       // what the profile could not take (its own curve or Zone Editor won) stays in the photo.
@@ -352,6 +387,55 @@ export default function ProfilePanel({
     else handleBake(choice, dialog?.mode === 'update' ? dialog.entry : undefined);
   };
 
+  const toggleFavorite = (id: string) => {
+    const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+    if (!appSettings) return;
+    const current = appSettings.favoriteProfiles ?? NO_FAVORITES;
+    handleSettingsChange({
+      ...appSettings,
+      favoriteProfiles: current.includes(id) ? current.filter((favorite) => favorite !== id) : [...current, id],
+    });
+  };
+
+  const setGridView = (isGridView: boolean) => {
+    const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+    if (appSettings) handleSettingsChange({ ...appSettings, profileBrowserGrid: isGridView });
+  };
+
+  // The grid's previews: the open photo with each profile, rendered when the grid opens.
+  useEffect(() => {
+    if (!isExpanded || !isGridView || !selectedImagePath || !isImageReady || entries.length === 0) return;
+    const edit = adjustmentsRef.current;
+    const paths = entries.map((entry) => entry.path);
+    const key = `${selectedImagePath}|${paths.join(',')}|${JSON.stringify({ ...edit, profile: edit.profile?.id ?? null })}`;
+    const cached = previewCache.current.get(key);
+    if (cached) {
+      setPreviews(cached);
+      return;
+    }
+    let isActive = true;
+    setIsLoadingPreviews(true);
+    invoke<Array<{ path: string; thumb: string | null }>>(Invokes.GenerateProfilePreviews, {
+      paths,
+      adjustments: edit,
+      size: PREVIEW_SIZE,
+    })
+      .then((results) => {
+        if (!isActive) return;
+        const map = Object.fromEntries(results.map((result) => [result.path, result.thumb]));
+        if (previewCache.current.size >= PREVIEW_CACHE_SIZE) previewCache.current.clear();
+        previewCache.current.set(key, map);
+        setPreviews(map);
+      })
+      .catch((err) => console.error('Failed to generate profile previews:', err))
+      .finally(() => {
+        if (isActive) setIsLoadingPreviews(false);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [isExpanded, isGridView, selectedImagePath, isImageReady, entries]);
+
   const groupedEntries = useMemo(() => {
     const groups = new Map<string, CustomProfileEntry[]>();
     for (const entry of entries) {
@@ -359,6 +443,20 @@ export default function ProfilePanel({
     }
     return [...groups.entries()];
   }, [entries]);
+  // Favorites first, as in Adobe's Profile Browser, then each group; a favorite shows in both.
+  const sections = useMemo(() => {
+    const favoriteEntries = entries.filter((entry) => favorites.includes(entry.id));
+    return [
+      ...(favoriteEntries.length > 0
+        ? [{ key: 'favorites', title: t('adjustments.profile.favorites'), entries: favoriteEntries }]
+        : []),
+      ...groupedEntries.map(([group, groupEntries]) => ({
+        key: `group:${group}`,
+        title: group || t('adjustments.profile.ungrouped'),
+        entries: groupEntries,
+      })),
+    ];
+  }, [entries, favorites, groupedEntries, t]);
   // Update Profile ticks what the recipe held as well as what the photo has changed since.
   const initialGroups = useMemo(
     () => new Set([...changedBakeGroups(adjustments), ...(editing?.recipeGroups ?? [])]),
@@ -466,34 +564,121 @@ export default function ProfilePanel({
               {entries.length === 0 ? (
                 <p className="text-xs text-text-secondary">{t('adjustments.profile.empty')}</p>
               ) : (
-                groupedEntries.map(([group, groupEntries]) => (
-                  <div key={group}>
-                    <p className="text-xs text-text-secondary mb-1">{group || t('adjustments.profile.ungrouped')}</p>
-                    <div className="flex flex-col">
-                      {groupEntries.map((entry) => (
-                        <button
-                          key={entry.path}
-                          onMouseEnter={() => startPreview(entry.path)}
-                          onClick={() => handleSelect(entry)}
-                          onContextMenu={(e) => handleContextMenu(e, entry)}
-                          className={clsx(
-                            'flex items-center justify-between gap-2 px-2 py-1 rounded-sm text-sm text-left transition-colors',
-                            entry.id === profile?.id
-                              ? 'bg-accent text-button-text'
-                              : 'text-text-primary hover:bg-surface',
-                          )}
-                        >
-                          <span className="truncate">{entry.name}</span>
-                          {entry.monochrome && (
-                            <span className="text-[10px] shrink-0 opacity-70">
-                              {t('adjustments.profile.blackAndWhite')}
-                            </span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
+                <>
+                  <div className="flex justify-end gap-1">
+                    {[
+                      { isGrid: true, icon: LayoutGrid, label: t('adjustments.profile.viewGrid') },
+                      { isGrid: false, icon: List, label: t('adjustments.profile.viewList') },
+                    ].map(({ isGrid, icon: Icon, label }) => (
+                      <button
+                        key={label}
+                        aria-pressed={isGridView === isGrid}
+                        className={clsx(
+                          'p-0.5 rounded-sm transition-colors',
+                          isGridView === isGrid ? 'text-accent' : 'text-text-secondary hover:text-text-primary',
+                        )}
+                        data-tooltip={label}
+                        onClick={() => setGridView(isGrid)}
+                      >
+                        <Icon size={14} />
+                      </button>
+                    ))}
                   </div>
-                ))
+                  {sections.map((section) => (
+                    <div key={section.key}>
+                      <p className="text-xs text-text-secondary mb-1">{section.title}</p>
+                      <div className={isGridView ? 'grid grid-cols-3 gap-2' : 'flex flex-col'}>
+                        {section.entries.map((entry) => {
+                          const isSelected = entry.id === profile?.id;
+                          const isFavorite = favorites.includes(entry.id);
+                          const entryProps = {
+                            onMouseEnter: () => startPreview(entry.path),
+                            onClick: () => handleSelect(entry),
+                            onContextMenu: (e: React.MouseEvent) => handleContextMenu(e, entry),
+                          };
+                          const star = (
+                            <button
+                              aria-pressed={isFavorite}
+                              className={clsx(
+                                'p-0.5 rounded-sm transition-opacity',
+                                isGridView && 'absolute top-1 right-1 bg-black/40',
+                                isFavorite
+                                  ? 'text-accent'
+                                  : 'opacity-0 group-hover/profile:opacity-100 text-text-secondary hover:text-text-primary',
+                                isGridView && !isFavorite && 'text-white',
+                              )}
+                              data-tooltip={isFavorite ? t('editor.favorites.remove') : t('editor.favorites.add')}
+                              onClick={() => toggleFavorite(entry.id)}
+                            >
+                              <Star size={12} fill={isFavorite ? 'currentColor' : 'none'} />
+                            </button>
+                          );
+                          if (isGridView) {
+                            const thumb = previews[entry.path];
+                            return (
+                              <div key={entry.path} className="relative group/profile">
+                                <button
+                                  {...entryProps}
+                                  className={clsx(
+                                    'relative w-full aspect-square rounded-md overflow-hidden bg-bg-primary border-2 transition-colors',
+                                    isSelected ? 'border-accent' : 'border-transparent hover:border-surface',
+                                  )}
+                                  data-tooltip={entry.name}
+                                >
+                                  {isLoadingPreviews && thumb === undefined ? (
+                                    <div className="w-full h-full animate-pulse bg-surface" />
+                                  ) : thumb ? (
+                                    <img
+                                      src={thumb}
+                                      alt={entry.name}
+                                      className="w-full h-full object-cover"
+                                      draggable={false}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-text-secondary">
+                                      <ImageOff size={18} />
+                                    </div>
+                                  )}
+                                  {entry.monochrome && (
+                                    <span className="absolute top-1 left-1 px-1 rounded-sm text-[9px] text-white bg-black/50">
+                                      {t('adjustments.profile.blackAndWhite')}
+                                    </span>
+                                  )}
+                                  <span className="absolute inset-x-0 bottom-0 px-1 py-0.5 text-[10px] text-white bg-black/50 truncate text-left">
+                                    {entry.name}
+                                  </span>
+                                </button>
+                                {star}
+                              </div>
+                            );
+                          }
+                          return (
+                            <div
+                              key={entry.path}
+                              className={clsx(
+                                'group/profile flex items-center gap-1 pr-1 rounded-sm transition-colors',
+                                isSelected ? 'bg-accent text-button-text' : 'text-text-primary hover:bg-surface',
+                              )}
+                            >
+                              <button
+                                {...entryProps}
+                                className="flex-1 min-w-0 flex items-center justify-between gap-2 px-2 py-1 text-sm text-left"
+                              >
+                                <span className="truncate">{entry.name}</span>
+                                {entry.monochrome && (
+                                  <span className="text-[10px] shrink-0 opacity-70">
+                                    {t('adjustments.profile.blackAndWhite')}
+                                  </span>
+                                )}
+                              </button>
+                              {star}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </>
               )}
             </div>
           </motion.div>

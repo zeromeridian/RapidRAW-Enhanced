@@ -246,6 +246,7 @@
       "empty": "No profiles yet. Set up a look, then choose Create Profile.",
       "export": "Export…",
       "exportFailed": "Could not export the profile: {{error}}",
+      "favorites": "Favorites",
       "fileType": "ThisIsRAW Profile",
       "import": "Import Profiles…",
       "importFailed": "Could not import the profiles: {{error}}",
@@ -261,7 +262,9 @@
       "saveToProfiles": "Save to my profiles",
       "title": "Profile",
       "ungrouped": "Profiles",
-      "update": "Update Profile"
+      "update": "Update Profile",
+      "viewGrid": "Show previews",
+      "viewList": "Show as list"
     },
     "zoneTint": {
       "fill": "Fill between",

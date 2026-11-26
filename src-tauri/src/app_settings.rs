@@ -869,6 +869,13 @@ pub struct AppSettings {
     /// Whether the Recursive view shows a header per subfolder; absent means on.
     #[serde(default)]
     pub group_recursive_by_folder: Option<bool>,
+    /// Starred custom profiles (`custom_profile::ProfileData::id`), listed first in the Profile
+    /// browser.
+    #[serde(default)]
+    pub favorite_profiles: Option<Vec<String>>,
+    /// Whether the Profile browser shows a grid of previews (absent: yes) or a list.
+    #[serde(default)]
+    pub profile_browser_grid: Option<bool>,
     #[serde(default = "default_export_presets")]
     pub export_presets: Vec<ExportPreset>,
     #[serde(default)]
@@ -1103,6 +1110,8 @@ impl Default for AppSettings {
             linux_gpu_optimization_migrated_v1: Some(true),
             library_view_mode: Some("flat".to_string()),
             group_recursive_by_folder: Some(true),
+            favorite_profiles: None,
+            profile_browser_grid: None,
             export_presets: default_export_presets(),
             my_lenses: Some(Vec::new()),
             auto_apply_lens_profile: true,

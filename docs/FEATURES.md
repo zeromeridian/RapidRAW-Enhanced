@@ -300,8 +300,9 @@ details are in `RELEASE_NOTES.MD`.
   into a profile in the user's profile folder and resets them in the
   photo. The profile is the base of the look: applied after White Balance
   and Brightness on linear, unclipped light, so every later slider works on
-  its whole result without a cap. Grouped profile list with a live preview
-  on hover, Amount 0–200, in a Lightroom-style Profile row; right-click to
+  its whole result without a cap. Grouped profile browser (a grid of
+  previews on the open photo or a list, Favorites first) with a live
+  preview on hover, Amount 0–200, in a Lightroom-style Profile row; right-click to
   Edit Profile (its settings back on the sliders, then Update Profile;
   photos using it keep their version), Rename (name, group, B&W), Export
   or Delete; Import Profiles adds `.tirprofile` files; Save to my profiles

@@ -49,8 +49,17 @@ decisions 1–7 taken by the owner (below). Plan item 83 in
   (`save_embedded_custom_profile`), **Import Profiles…** and right-click
   **Export…** (`import_custom_profiles`, `export_custom_profile`); a
   profile added with an id already in the folder gets a new id
-  (`add_to_folder`); table format version 3. Next (owner-approved
-  order): 4 Favorites and thumbnails, 5 `lutData` and Phase 3.
+  (`add_to_folder`); table format version 3. Owner's check: all OK.
+- **`1.115.0` (step 4):** the list can show a grid of previews (the open
+  photo with each profile, its edit as the grid opens, masks left out;
+  `generate_profile_previews` with `with_profile` mirroring the
+  frontend's `withProfile`; LUT and profile swatches share
+  `lut_processing::render_swatch`) or a plain list, remembered
+  (`profileBrowserGrid`, default grid); starred profiles listed first
+  under Favorites (`favoriteProfiles`, by id, in the app settings).
+  Previews do not follow slider moves while the grid is open; they are
+  rendered again when it reopens with another edit. Next: 5 `lutData`
+  and Phase 3.
 - **Deviations from the design below (agent, 2026-11-26):** table stored
   as 16-bit integers and uploaded as `Rgba32Float` (not f16: the
   shaper-encoded values needed the precision); shaper 16 stops below and

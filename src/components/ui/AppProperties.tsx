@@ -66,6 +66,7 @@ export enum Invokes {
   SaveEmbeddedCustomProfile = 'save_embedded_custom_profile',
   ImportCustomProfiles = 'import_custom_profiles',
   ExportCustomProfile = 'export_custom_profile',
+  GenerateProfilePreviews = 'generate_profile_previews',
   CreateFolder = 'create_folder',
   CreateVirtualCopy = 'create_virtual_copy',
   CullImages = 'cull_images',
@@ -355,6 +356,10 @@ export interface AppSettings {
   libraryViewMode?: LibraryViewMode;
   /** Whether the Recursive view shows a header per subfolder; absent means on. */
   groupRecursiveByFolder?: boolean;
+  /** Starred custom profiles by id, listed first in the Profile browser. */
+  favoriteProfiles?: string[];
+  /** Whether the Profile browser shows a grid of previews (absent: yes) or a list. */
+  profileBrowserGrid?: boolean;
   sortCriteria?: SortCriteria;
   theme: Theme;
   thumbnailSize?: string;

@@ -898,6 +898,98 @@ pub async fn export_custom_profile(
     .await
 }
 
+/// One profile's preview in the Profile browser's grid.
+#[derive(Serialize)]
+pub struct ProfilePreview {
+    path: String,
+    /// A JPEG data URL; `None` when the profile or the photo could not be rendered.
+    thumb: Option<String>,
+}
+
+/// `edit` with `profile` as its base, as choosing it would make it (the frontend's
+/// `withProfile`): the edit's Amount when it already has a profile, else 100, and the
+/// profile's Black & White.
+fn with_profile(edit: &Value, profile: &ProfileData) -> Value {
+    let mut edit = edit.clone();
+    let amount = if edit.get(PROFILE_KEY).is_some_and(Value::is_object) {
+        edit[PROFILE_AMOUNT_KEY].as_f64().unwrap_or(100.0)
+    } else {
+        100.0
+    };
+    let mut embedded = serde_json::to_value(profile).unwrap_or_default();
+    if let Some(embedded) = embedded.as_object_mut() {
+        embedded.remove("recipe");
+    }
+    edit[PROFILE_KEY] = embedded;
+    edit[PROFILE_AMOUNT_KEY] = amount.into();
+    edit["monochrome"] = profile.monochrome.into();
+    if let Some(visibility) = edit["sectionVisibility"].as_object_mut() {
+        visibility.insert(PROFILE_GROUP.to_string(), true.into());
+    }
+    edit
+}
+
+/// Previews of the open photo with each profile at `paths` in place of its own, `size` pixels
+/// on the long side, for the Profile browser's grid. Masks are left out to keep them quick.
+#[tauri::command]
+pub async fn generate_profile_previews(
+    paths: Vec<String>,
+    adjustments: Value,
+    size: u32,
+    app_handle: AppHandle,
+) -> Result<Vec<ProfilePreview>, String> {
+    crate::blocking_command::run_blocking(move || {
+        let state = app_handle.state::<AppState>();
+        let context = crate::image_processing::get_or_init_gpu_context(&state, &app_handle)?;
+        let loaded_image = state
+            .original_image
+            .lock()
+            .unwrap()
+            .clone()
+            .ok_or("No photo is open for profile previews")?;
+        let mut edit = adjustments;
+        edit["masks"] = Value::Array(Vec::new());
+        let preview = crate::prepare_preview_source(&state, &context, &loaded_image, &edit, size)?;
+        let source = preview.render_source();
+        let tm_override = crate::image_processing::resolve_tonemapper_override_from_handle(
+            &app_handle,
+            loaded_image.is_raw,
+        );
+        let dir = profiles_dir(&app_handle)?;
+
+        Ok(paths
+            .into_iter()
+            .map(|path| {
+                let thumb = profile_path_in(&dir, &path)
+                    .and_then(|file| read_profile_file(&file))
+                    .ok()
+                    .and_then(|profile| {
+                        let edit = with_profile(&edit, &profile);
+                        let mut all_adjustments =
+                            get_all_adjustments_from_json(&edit, loaded_image.is_raw, tm_override);
+                        crate::baseline_exposure::apply_natural_exposure(
+                            &mut all_adjustments,
+                            &loaded_image.path,
+                        );
+                        crate::lut_processing::render_swatch(
+                            &context,
+                            &state,
+                            &source,
+                            all_adjustments,
+                            edit["lutPath"].as_str().and_then(|lut_path| {
+                                crate::lut_processing::get_or_load_lut(&state, lut_path).ok()
+                            }),
+                            table_for_adjustments(&edit),
+                            "generate_profile_previews",
+                        )
+                    });
+                ProfilePreview { path, thumb }
+            })
+            .collect())
+    })
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1188,6 +1280,26 @@ mod tests {
         assert!(add_to_folder(&dir, newer).is_err());
         assert_eq!(list_profiles_in(&dir).unwrap().len(), 2);
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_preview_swaps_the_profile_in_as_choosing_it_would() {
+        let mut profile: ProfileData = serde_json::from_value(base_profile()).unwrap();
+        profile.monochrome = true;
+        profile.recipe = Some(json!({ "exposure": 1.0 }));
+
+        let bare = json!({ "exposure": 0.3, "sectionVisibility": { "profile": false } });
+        let previewed = with_profile(&bare, &profile);
+        assert_eq!(previewed["profile"]["id"], "base");
+        assert!(previewed["profile"].get("recipe").is_none());
+        assert_eq!(previewed["profileAmount"], 100.0);
+        assert_eq!(previewed["monochrome"], true);
+        assert_eq!(previewed["sectionVisibility"]["profile"], true);
+        assert_eq!(previewed["exposure"], 0.3);
+        assert_eq!(RenderSettings::from_adjustments(&previewed).amount, 1.0);
+
+        let with_amount = json!({ "profile": base_profile(), "profileAmount": 60 });
+        assert_eq!(with_profile(&with_amount, &profile)["profileAmount"], 60.0);
     }
 
     #[test]
