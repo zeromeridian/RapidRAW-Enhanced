@@ -5,6 +5,27 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.121.0-dev-looks-browser — 2026-11-27
+
+### Looks
+
+- **The Presets tab is now Looks.** A Presets · Profiles · LUTs switch at
+  the top shows one kind at a time; the key is still P. For now,
+  Profiles and LUTs show their usual tools there; they get the same
+  browser as presets in coming versions.
+- **Presets as a grid or a list:** switch between a grid of previews and
+  the familiar list; the choice is remembered.
+- **Favorite presets:** a star on each preset adds it to a Favorites
+  group at the top; it also stays in its own group.
+- **Search** presets by name.
+- **Groups:** preset folders are now called groups. Every group opens and
+  closes, and stays as you left it. New Preset, Update and Configure
+  Preset have a Group field (an existing group, No Group, or New
+  Group…), and each preset's right-click menu has Move to Group. A
+  group's right-click menu offers New Preset in that group.
+- **Delete Group asks first and keeps the presets:** they move to No
+  Group instead of being deleted with the group.
+
 ## 1.120.0-dev-menu-bar-entries — 2026-11-27
 
 ### Menu bar

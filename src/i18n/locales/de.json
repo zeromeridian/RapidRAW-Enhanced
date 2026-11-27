@@ -946,14 +946,10 @@
       },
       "menu": {
         "configurePreset": "Vorgabe konfigurieren",
-        "deleteFolder": "Ordner löschen",
         "deletePreset": "Vorgabe löschen",
         "duplicatePreset": "Vorgabe duplizieren",
-        "exportFolder": "Ordner exportieren",
         "exportPreset": "Vorgabe exportieren",
-        "newFolder": "Neuer Ordner",
         "newPreset": "Neue Vorgabe",
-        "renameFolder": "Ordner umbenennen",
         "sortAll": "Alle alphabetisch sortieren"
       },
       "status": {
@@ -974,7 +970,6 @@
         "saveNew": "Als neue Vorgabe speichern"
       },
       "types": {
-        "folder": "Ordner",
         "preset": "Vorgabe"
       }
     },
@@ -986,8 +981,7 @@
         "export": "Exportieren",
         "info": "Info",
         "inpaint": "Reparieren",
-        "masks": "Masken",
-        "presets": "Vorgaben"
+        "masks": "Masken"
       }
     },
     "toasts": {
@@ -2116,7 +2110,6 @@
         "toggle_library_exif": "EXIF-Überlagerung ein-/ausblenden",
         "toggle_masks": "Maskieren-Panel ein-/ausblenden",
         "toggle_metadata": "Metadaten-Panel ein-/ausblenden",
-        "toggle_presets": "Vorgaben-Panel ein-/ausblenden",
         "undo": "Bearbeitung rückgängig machen",
         "zoom_100": "Auf 100% zoomen",
         "zoom_fit": "Auf Fenstergröße einpassen",

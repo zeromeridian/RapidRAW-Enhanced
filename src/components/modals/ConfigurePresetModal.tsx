@@ -8,6 +8,7 @@ import TickBox, { getTickState } from '../ui/TickBox';
 import { TextColors, TextVariants } from '../../types/typography';
 import { ADJUSTMENT_GROUPS, AdjustmentGroup, COPYABLE_ADJUSTMENT_KEYS } from '../../utils/adjustments';
 import { presetSettingUnits } from '../../utils/presetSettings';
+import GroupPicker, { BrowserGroup, GroupChoice, NO_GROUP, isGroupChoiceValid } from '../ui/LooksBrowser/GroupPicker';
 
 /** Save a new preset, Update one with the photo's settings, or Configure one without the photo. */
 export type PresetDialogMode = 'new' | 'update' | 'configure';
@@ -18,8 +19,11 @@ interface ConfigurePresetModalProps {
   initialName: string;
   /** The settings ticked when the dialog opens. */
   initialKeys: ReadonlySet<string>;
+  /** The preset groups (folders) to choose from, and the one chosen when the dialog opens. */
+  groups: ReadonlyArray<BrowserGroup>;
+  initialGroup: GroupChoice;
   onClose(): void;
-  onSave(name: string, keys: Set<string>): void;
+  onSave(name: string, keys: Set<string>, group: GroupChoice): void;
 }
 
 const TITLES: Record<PresetDialogMode, ParseKeys> = {
@@ -57,12 +61,14 @@ function SettingRow({ label, state, onToggle, isPart = false }: SettingRowProps)
   );
 }
 
-/** The preset dialog (Lightroom Classic's New Develop Preset): a name and a tree of the settings it saves. */
+/** The preset dialog (Lightroom Classic's New Develop Preset): a name, a group and a tree of the settings it saves. */
 export default function ConfigurePresetModal({
   isOpen,
   mode,
   initialName,
   initialKeys,
+  groups,
+  initialGroup,
   onClose,
   onSave,
 }: ConfigurePresetModalProps) {
@@ -70,6 +76,7 @@ export default function ConfigurePresetModal({
   const { sectionLabel } = useControlLabel();
   const [name, setName] = useState('');
   const [keys, setKeys] = useState<Set<string>>(new Set());
+  const [group, setGroup] = useState<GroupChoice>(NO_GROUP);
   const [isMounted, setIsMounted] = useState(false);
   const [show, setShow] = useState(false);
 
@@ -77,6 +84,7 @@ export default function ConfigurePresetModal({
     if (isOpen) {
       setName(initialName);
       setKeys(new Set(initialKeys));
+      setGroup(initialGroup);
       setIsMounted(true);
       const timer = setTimeout(() => setShow(true), 10);
       return () => clearTimeout(timer);
@@ -84,16 +92,16 @@ export default function ConfigurePresetModal({
     setShow(false);
     const timer = setTimeout(() => setIsMounted(false), 300);
     return () => clearTimeout(timer);
-  }, [isOpen, initialName, initialKeys]);
+  }, [isOpen, initialName, initialKeys, initialGroup]);
 
-  const canSave = name.trim() !== '' && keys.size > 0;
+  const canSave = name.trim() !== '' && keys.size > 0 && isGroupChoiceValid(group);
 
   const handleSave = useCallback(() => {
     if (canSave) {
-      onSave(name.trim(), keys);
+      onSave(name.trim(), keys, group);
       onClose();
     }
-  }, [canSave, name, keys, onSave, onClose]);
+  }, [canSave, name, keys, group, onSave, onClose]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -153,6 +161,9 @@ export default function ConfigurePresetModal({
           type="text"
           value={name}
         />
+        <div className="mt-3">
+          <GroupPicker groups={groups} value={group} onChange={setGroup} />
+        </div>
 
         <div className="flex justify-between items-center mt-5 mb-2 gap-4">
           <div>

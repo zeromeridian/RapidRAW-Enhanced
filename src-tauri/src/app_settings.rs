@@ -876,6 +876,18 @@ pub struct AppSettings {
     /// Whether the Profile browser shows a grid of previews (absent: yes) or a list.
     #[serde(default)]
     pub profile_browser_grid: Option<bool>,
+    /// Starred presets by id, listed first in Looks → Presets.
+    #[serde(default)]
+    pub favorite_presets: Option<Vec<String>>,
+    /// Whether Looks → Presets shows a grid of previews or a list (absent: list).
+    #[serde(default)]
+    pub preset_browser_grid: Option<bool>,
+    /// The kind Looks shows: `presets`, `profiles` or `luts` (absent: presets).
+    #[serde(default)]
+    pub looks_kind: Option<String>,
+    /// Open state of the Looks browser sections the user has toggled, keyed `kind:section`.
+    #[serde(default)]
+    pub looks_sections: Option<HashMap<String, bool>>,
     #[serde(default = "default_export_presets")]
     pub export_presets: Vec<ExportPreset>,
     #[serde(default)]
@@ -1118,6 +1130,10 @@ impl Default for AppSettings {
             group_recursive_by_folder: Some(true),
             favorite_profiles: None,
             profile_browser_grid: None,
+            favorite_presets: None,
+            preset_browser_grid: None,
+            looks_kind: None,
+            looks_sections: None,
             export_presets: default_export_presets(),
             my_lenses: Some(Vec::new()),
             auto_apply_lens_profile: true,

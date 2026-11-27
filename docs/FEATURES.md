@@ -513,6 +513,12 @@ details are in `RELEASE_NOTES.MD`.
   values, Configure keeps the preset's). Each preset shows how many
   settings it holds; replaces the Tool/Style choice, and older presets
   apply as before.
+- **Looks tab** (formerly Presets, key P): a Presets · Profiles · LUTs
+  switch shows one kind at a time. Presets as a grid of previews or a
+  list, Favorites (star) listed first, name search, groups that open
+  and close and stay so; a Group field when saving, Move to Group, and
+  Delete Group keeps the presets (they move to No Group). Profiles and
+  LUTs show their tools there until they get the same browser.
 - Named tone-curve presets with unique names, built-in Linear and contrast
   presets, modification indicators, update, save-as-new, and delete actions.
 - Tone Curve channel buttons show a dot under each adjusted channel, and the

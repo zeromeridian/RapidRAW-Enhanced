@@ -308,7 +308,7 @@ export const MENU_BAR: MenuDefinition[] = [
       action('toggle_masks', 'menuBar.items.masks'),
       action('toggle_mask_overlay', 'menuBar.items.maskOverlay'),
       action('toggle_ai', 'menuBar.items.ai'),
-      action('toggle_presets', 'menuBar.items.presets'),
+      action('toggle_presets', 'menuBar.items.looks'),
       SEPARATOR,
       action('brush_size_up', 'menuBar.items.brushSizeUp'),
       action('brush_size_down', 'menuBar.items.brushSizeDown'),

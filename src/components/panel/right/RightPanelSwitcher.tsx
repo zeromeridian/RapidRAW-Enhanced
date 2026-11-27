@@ -47,7 +47,7 @@ const editingPanelGroups: Array<Array<PanelOptions>> = [
     { id: Panel.Masks, icon: Layers, title: 'editor.switcher.tooltips.masks' },
     { id: Panel.Ai, icon: Paintbrush, title: 'editor.switcher.tooltips.inpaint' },
   ],
-  [{ id: Panel.Presets, icon: SwatchBook, title: 'editor.switcher.tooltips.presets' }],
+  [{ id: Panel.Presets, icon: SwatchBook, title: 'editor.switcher.tooltips.looks' }],
 ];
 
 // Info, Tagging, and Export are top-bar switches; only without the top bar (Android) are they here.

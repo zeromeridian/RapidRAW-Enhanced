@@ -971,14 +971,10 @@
       },
       "menu": {
         "configurePreset": "Configura Predefinito",
-        "deleteFolder": "Elimina Cartella",
         "deletePreset": "Elimina Predefinito",
         "duplicatePreset": "Duplica Predefinito",
-        "exportFolder": "Esporta Cartella",
         "exportPreset": "Esporta Predefinito",
-        "newFolder": "Nuova Cartella",
         "newPreset": "Nuovo Predefinito",
-        "renameFolder": "Rinomina Cartella",
         "sortAll": "Ordina Tutti in Ordine Alfabetico"
       },
       "status": {
@@ -999,7 +995,6 @@
         "saveNew": "Salva come nuovo predefinito"
       },
       "types": {
-        "folder": "Cartella",
         "preset": "Predefinito"
       }
     },
@@ -1011,8 +1006,7 @@
         "export": "Esporta",
         "info": "Info",
         "inpaint": "Inpainting",
-        "masks": "Maschere",
-        "presets": "Predefiniti"
+        "masks": "Maschere"
       }
     },
     "toasts": {
@@ -2163,7 +2157,6 @@
         "toggle_library_exif": "Attiva/Disattiva overlay EXIF",
         "toggle_masks": "Attiva/Disattiva pannello Maschere",
         "toggle_metadata": "Attiva/Disattiva pannello Metadati",
-        "toggle_presets": "Attiva/Disattiva pannello Predefiniti",
         "undo": "Annulla modifica",
         "zoom_100": "Zoom al 100%",
         "zoom_fit": "Zoom per adattare",

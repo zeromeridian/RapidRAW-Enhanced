@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import {
@@ -12,34 +12,48 @@ import {
 } from '@dnd-kit/core';
 import { useTranslation } from 'react-i18next';
 import type { ParseKeys } from 'i18next';
-import { PresetImportFailure, PresetListType, usePresets, UserPreset } from '../../../hooks/usePresets';
+import {
+  findPresetFolderId,
+  PresetFolder,
+  PresetImportFailure,
+  PresetListType,
+  usePresets,
+  UserPreset,
+} from '../../../hooks/usePresets';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import {
   CopyPlus,
+  Crop,
   Edit,
   FileDown,
   FileUp,
   Folder as FolderIcon,
+  FolderInput,
   FolderOpen,
   FolderPlus,
+  Layers,
   Loader2,
   Plus,
-  SortAsc,
-  Trash2,
-  Users,
-  Layers,
-  Crop,
   Save,
   Settings2,
+  SortAsc,
+  Star,
+  Trash2,
+  Users,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import ConfigurePresetModal, { PresetDialogMode } from '../../modals/ConfigurePresetModal';
 import CreateFolderModal from '../../modals/CreateFolderModal';
 import RenameFolderModal from '../../modals/RenameFolderModal';
 import Button from '../../ui/Button';
+import Input from '../../ui/Input';
 import Text from '../../ui/Text';
-import PanelHeader from '../../ui/PanelHeader';
 import Slider from '../../ui/Slider';
+import LooksHeader from './LooksHeader';
+import BrowserSection from '../../ui/LooksBrowser/BrowserSection';
+import BrowserViewSwitch from '../../ui/LooksBrowser/BrowserViewSwitch';
+import { BrowserItemProps, BrowserItems, BrowserRow, BrowserTile } from '../../ui/LooksBrowser/BrowserItem';
+import { BrowserGroup, GroupChoice, NO_GROUP, groupChoiceOf } from '../../ui/LooksBrowser/GroupPicker';
+import { useLooksBrowser } from '../../ui/LooksBrowser/useLooksBrowser';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { Adjustments, INITIAL_ADJUSTMENTS, getInitialAdjustments } from '../../../utils/adjustments';
 import {
@@ -48,39 +62,10 @@ import {
   getPresetKeys,
   presetHoldsSection,
 } from '../../../utils/presetSettings';
-import { Invokes, OPTION_SEPARATOR, Panel, Preset, SelectedImage } from '../../ui/AppProperties';
+import { Invokes, OPTION_SEPARATOR, Panel, Preset } from '../../ui/AppProperties';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
-
-interface DroppableFolderItemProps {
-  children: any;
-  folder: any;
-  isExpanded: boolean;
-  onContextMenu(event: any, folder: any): void;
-  onToggle(id: string): void;
-}
-
-interface DraggablePresetItemProps {
-  isGeneratingPreviews: boolean;
-  onApply(preset: any): void;
-  onContextMenu(event: any, preset: any): void;
-  preset: any;
-  previewUrl: string;
-  isActive?: boolean;
-  intensity?: number;
-  onIntensityChange?: (val: number) => void;
-  onDragStateChange?: (isDragging: boolean) => void;
-}
-
-interface FolderProps {
-  folder: any;
-}
-
-interface FolderState {
-  isOpen: boolean;
-  folder: any;
-}
 
 interface ModalState {
   isOpen: boolean;
@@ -89,36 +74,34 @@ interface ModalState {
   preset: Preset | null;
   /** The settings ticked when the dialog opens. */
   initialKeys: ReadonlySet<string>;
+  /** The group chosen when the dialog opens. */
+  group: GroupChoice;
 }
 
-const CLOSED_MODAL: ModalState = { isOpen: false, mode: 'new', preset: null, initialKeys: new Set() };
+const CLOSED_MODAL: ModalState = { isOpen: false, mode: 'new', preset: null, initialKeys: new Set(), group: NO_GROUP };
 
-interface PresetItemDisplayProps {
-  isGeneratingPreviews: boolean;
-  preset: Preset;
-  previewUrl: string;
-  isActive?: boolean;
-  intensity?: number;
-  onIntensityChange?: (val: number) => void;
-  onDragStateChange?: (isDragging: boolean) => void;
+/** New Group: on its own, or for Move to Group of `presetId`. */
+interface NewGroupState {
+  isOpen: boolean;
+  presetId: string | null;
 }
 
 interface PresetsPanelProps {
   onNavigateToCommunity(): void;
 }
 
-const itemVariants = {
-  hidden: { opacity: 0, x: -15 },
-  visible: (i: number) => ({
-    opacity: 1,
-    x: 0,
-    transition: {
-      duration: 0.25,
-      delay: i * 0.05,
-    },
-  }),
-  exit: { opacity: 0, x: -15, transition: { duration: 0.2 } },
-};
+/** A section of the browser: Favorites, a folder (preset group), or the presets in no folder. */
+interface PresetSection {
+  key: string;
+  title: string;
+  presets: Array<Preset>;
+  folder?: PresetFolder;
+  /** Folders start closed, as before Looks, so their previews render only once opened. */
+  defaultOpen: boolean;
+}
+
+const FAVORITES_SECTION = 'favorites';
+const UNGROUPED_SECTION = 'ungrouped';
 
 const evaluateCurveY = (curve: Array<{ x: number; y: number }>, targetX: number): number => {
   const len = curve.length;
@@ -210,274 +193,119 @@ const mixAdjustments = (presetObj: any, intensity: number, initialObj: any = INI
   return result;
 };
 
-function PresetItemDisplay({
-  preset,
-  previewUrl,
-  isGeneratingPreviews,
-  isActive,
-  intensity,
-  onIntensityChange,
-  onDragStateChange,
-}: PresetItemDisplayProps) {
-  const { t } = useTranslation();
+const revokeBlobUrl = (url: string | null | undefined) => {
+  if (url && url.startsWith('blob:')) URL.revokeObjectURL(url);
+};
+
+/** The masks and crop marks of a preset that holds those settings. */
+function presetBadges(preset: Preset): ReactNode | undefined {
   const supportsMasks = presetHoldsSection(preset, 'masks');
   const supportsGeometry = presetHoldsSection(preset, 'geometry');
+  if (!supportsMasks && !supportsGeometry) return undefined;
+  return (
+    <span className="bg-primary rounded-full px-1.5 py-0.5 flex items-center gap-1 shadow-xs shrink-0">
+      {supportsMasks && <Layers size={11} className="text-white" />}
+      {supportsGeometry && <Crop size={11} className="text-white" />}
+    </span>
+  );
+}
+
+/** The list's second line: how many settings the preset holds, named in its tooltip. */
+function PresetDetails({ preset }: { preset: Preset }) {
+  const { t } = useTranslation();
   const settings = useMemo(() => describePresetSettings(preset), [preset]);
-  const tooltipContent = useMemo(() => {
-    const features = [];
-    if (supportsMasks) features.push(t('editor.presets.supports.masks'));
-    if (supportsGeometry) features.push(t('editor.presets.supports.cropTransform'));
-
-    if (features.length === 0) return undefined;
-    return t('editor.presets.supports.label', { features: features.join(' + ') });
-  }, [supportsMasks, supportsGeometry, t]);
-
   return (
-    <div className="flex flex-col p-2 rounded-lg bg-surface cursor-grabbing">
-      <div className="flex items-center gap-3 compact:gap-2">
-        <div
-          className="w-20 h-14 bg-bg-tertiary rounded-md flex items-center justify-center shrink-0 relative overflow-hidden"
-          data-tooltip={tooltipContent}
-        >
-          {isGeneratingPreviews && !previewUrl ? (
-            <Loader2 size={20} className="animate-spin text-text-secondary" />
-          ) : previewUrl ? (
-            <img
-              src={previewUrl}
-              alt={`${preset.name} preview`}
-              className="w-full h-full object-cover rounded-md pointer-events-none"
-            />
-          ) : (
-            <Loader2 size={20} className="animate-spin text-text-secondary" />
-          )}
-
-          {(supportsMasks || supportsGeometry) && (
-            <>
-              <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-linear-to-bl from-black/30 via-black/0 to-transparent pointer-events-none z-0" />
-
-              <div className="absolute top-1 right-1 bg-primary rounded-full px-1.5 py-0.5 flex items-center gap-1.5 backdrop-blur-xs shadow-xs z-10 pointer-events-none">
-                {supportsMasks && <Layers size={11} className="text-white" />}
-                {supportsGeometry && <Crop size={11} className="text-white" />}
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="grow min-w-0 flex flex-col justify-center">
-          <Text color={TextColors.primary} weight={TextWeights.medium} className="truncate">
-            {preset.name}
-          </Text>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <Text
-              variant={TextVariants.small}
-              color={TextColors.secondary}
-              className="text-[10px] uppercase tracking-wider"
-              data-tooltip={settings.groupLabels.map((label) => t(label as ParseKeys)).join(', ')}
-            >
-              {t('editor.presets.settingsCount', { count: settings.count })}
-            </Text>
-          </div>
-        </div>
-      </div>
-
-      <AnimatePresence initial={false}>
-        {isActive && onIntensityChange && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: 'easeInOut' }}
-            className="w-full cursor-auto overflow-hidden"
-            onClick={(e: any) => e.stopPropagation()}
-            onPointerDown={(e: any) => e.stopPropagation()}
-          >
-            <div className="mt-3 compact:mt-2 px-1 pb-1">
-              <Slider
-                min={0}
-                max={200}
-                defaultValue={100}
-                value={intensity ?? 100}
-                onChange={(e: any) => onIntensityChange(Number(e.target.value))}
-                onDragStateChange={onDragStateChange}
-                label={t('editor.presets.amount')}
-                step={1}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    <Text
+      variant={TextVariants.small}
+      color={TextColors.secondary}
+      className="text-[10px] uppercase tracking-wider mt-0.5"
+      data-tooltip={settings.groupLabels.map((label) => t(label as ParseKeys)).join(', ')}
+    >
+      {t('editor.presets.settingsCount', { count: settings.count })}
+    </Text>
   );
 }
 
-function FolderItemDisplay({ folder }: FolderProps) {
-  return (
-    <div className="flex items-center gap-2 p-2 rounded-lg bg-surface cursor-grabbing w-full">
-      <div className="p-1">
-        <FolderIcon size={18} />
-      </div>
-      <Text color={TextColors.primary} weight={TextWeights.medium} className="grow truncate select-none">
-        {folder.name}
-      </Text>
-      <Text as="span" weight={TextWeights.medium} className="ml-auto pr-1">
-        {folder.children?.length || 0}
-      </Text>
-    </div>
-  );
-}
-
-function DraggablePresetItem({
-  preset,
-  onApply,
-  onContextMenu,
-  previewUrl,
-  isGeneratingPreviews,
-  isActive,
-  intensity,
-  onIntensityChange,
-  onDragStateChange,
-}: DraggablePresetItemProps) {
+/** A preset that can be dragged onto a folder or another preset. */
+function DraggablePreset({ preset, children }: { preset: Preset; children: ReactNode }) {
   const {
     attributes,
     listeners,
     setNodeRef: setDraggableNodeRef,
     isDragging,
-  } = useDraggable({
-    id: preset.id,
-    data: { type: PresetListType.Preset, preset },
-  });
-
+  } = useDraggable({ id: preset.id, data: { type: PresetListType.Preset, preset } });
   const { setNodeRef: setDroppableNodeRef, isOver } = useDroppable({
-    data: { type: PresetListType.Preset, preset },
     id: preset.id,
+    data: { type: PresetListType.Preset, preset },
   });
-
   const setCombinedRef = useCallback(
-    (node: any) => {
+    (node: HTMLElement | null) => {
       setDraggableNodeRef(node);
       setDroppableNodeRef(node);
     },
     [setDraggableNodeRef, setDroppableNodeRef],
   );
 
-  const style = {
-    borderRadius: 'var(--radius-lg)',
-    opacity: isDragging ? 0.4 : 1,
-    outline: isOver ? '2px solid var(--color-primary)' : '2px solid transparent',
-    outlineOffset: '-2px',
-    touchAction: 'none',
-  };
-
   return (
     <div
-      onClick={() => onApply(preset)}
-      onContextMenu={(e: any) => onContextMenu(e, { preset })}
+      {...listeners}
+      {...attributes}
       ref={setCombinedRef}
-      style={style}
+      style={{
+        borderRadius: 'var(--radius-lg)',
+        opacity: isDragging ? 0.4 : 1,
+        outline: isOver ? '2px solid var(--color-primary)' : '2px solid transparent',
+        outlineOffset: '-2px',
+        touchAction: 'none',
+      }}
     >
-      <motion.div
-        {...listeners}
-        {...attributes}
-        className="cursor-grab"
-        whileTap={{ scale: isActive ? 1 : 0.98 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-      >
-        <PresetItemDisplay
-          preset={preset}
-          previewUrl={previewUrl}
-          isGeneratingPreviews={isGeneratingPreviews}
-          isActive={isActive}
-          intensity={intensity}
-          onIntensityChange={onIntensityChange}
-          onDragStateChange={onDragStateChange}
-        />
-      </motion.div>
+      {children}
     </div>
   );
 }
 
-function DroppableFolderItem({ folder, onContextMenu, children, onToggle, isExpanded }: DroppableFolderItemProps) {
+interface FolderSectionProps {
+  folder: PresetFolder;
+  isOpen: boolean;
+  onToggle(): void;
+  onContextMenu(event: React.MouseEvent): void;
+  children: ReactNode;
+}
+
+/** A folder's section: a drop target for presets, dragged by its folder icon. */
+function FolderSection({ folder, isOpen, onToggle, onContextMenu, children }: FolderSectionProps) {
   const {
     attributes,
     listeners,
     setNodeRef: setDraggableNodeRef,
-    isDragging,
-  } = useDraggable({
-    data: { type: PresetListType.Folder, folder },
-    id: folder.id,
-  });
-
+  } = useDraggable({ id: folder.id, data: { type: PresetListType.Folder, folder } });
   const { setNodeRef: setDroppableNodeRef, isOver } = useDroppable({
-    data: { type: PresetListType.Folder, folder },
     id: folder.id,
+    data: { type: PresetListType.Folder, folder },
   });
-
-  const style = {
-    opacity: isDragging ? 0.4 : 1,
-    touchAction: 'none',
-  };
-
-  const hasChildren = folder.children && folder.children.length > 0;
+  const Icon = isOpen ? FolderOpen : FolderIcon;
 
   return (
-    <div
-      className={`rounded-lg transition-colors ${isOver ? 'bg-surface-hover' : ''}`}
-      ref={setDroppableNodeRef}
-      style={style}
+    <BrowserSection
+      containerRef={setDroppableNodeRef}
+      count={folder.children.length}
+      icon={
+        <span className="cursor-grab" ref={setDraggableNodeRef} {...listeners} {...attributes}>
+          <Icon size={14} className={isOpen ? 'text-primary' : undefined} />
+        </span>
+      }
+      isDropTarget={isOver}
+      isOpen={isOpen}
+      onContextMenu={onContextMenu}
+      onToggle={onToggle}
+      title={folder.name}
     >
-      <div
-        className="flex items-center gap-2 p-2 rounded-lg bg-surface cursor-pointer"
-        onContextMenu={(e: any) => onContextMenu(e, { folder })}
-      >
-        <div className="p-1 cursor-grab" ref={setDraggableNodeRef} {...listeners} {...attributes}>
-          {isExpanded ? (
-            <FolderOpen
-              className="text-primary"
-              onClick={(e: any) => {
-                e.stopPropagation();
-                onToggle(folder.id);
-              }}
-              size={18}
-            />
-          ) : (
-            <FolderIcon
-              className="text-text-secondary"
-              onClick={(e: any) => {
-                e.stopPropagation();
-                onToggle(folder.id);
-              }}
-              size={18}
-            />
-          )}
-        </div>
-        <Text
-          color={TextColors.primary}
-          weight={TextWeights.medium}
-          className="grow truncate select-none"
-          onClick={() => onToggle(folder.id)}
-        >
-          {folder.name}
-        </Text>
-        <Text as="span" variant={TextVariants.small} color={TextColors.secondary} className="ml-auto pr-1">
-          {folder.children?.length || 0}
-        </Text>
-      </div>
-      <AnimatePresence>
-        {isExpanded && hasChildren && (
-          <motion.div
-            animate={{ height: 'auto', opacity: 1 }}
-            className="ml-5 pl-4 border-l-[1.5px] border-border-color/50 space-y-2 overflow-hidden pt-2"
-            exit={{ height: 0, opacity: 0 }}
-            initial={{ height: 0, opacity: 0 }}
-          >
-            {children}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+      {children}
+    </BrowserSection>
   );
 }
 
+/** Looks → Presets: the presets in their folders (groups), as a grid of previews or a list. */
 export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
   const { t } = useTranslation();
   const selectedImage = useEditorStore((s) => s.selectedImage);
@@ -485,16 +313,19 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
   const activePanel = useUIStore((s) => s.activeRightPanel);
   const setEditor = useEditorStore((s) => s.setEditor);
   const { setAdjustments } = useEditorActions();
+  const { favorites, toggleFavorite, isGrid, setGrid, isSectionOpen, toggleSection } = useLooksBrowser('presets');
 
   const {
     addFolder,
     addPreset,
+    deleteFolder,
     deleteItem,
     duplicatePreset,
     exportPresetsToFile,
     importPresetsFromFiles,
     isLoading,
     movePreset,
+    movePresetToGroup,
     presets,
     renameItem,
     reorderItems,
@@ -503,14 +334,11 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
   } = usePresets(adjustments);
   const { showContextMenu } = useContextMenu();
   const [previews, setPreviews] = useState<Record<string, string | null>>({});
-  const [isGeneratingPreviews, setIsGeneratingPreviews] = useState(false);
+  const [query, setQuery] = useState('');
   const [configureModalState, setConfigureModalState] = useState<ModalState>(CLOSED_MODAL);
-  const [isAddFolderModalOpen, setIsAddFolderModalOpen] = useState(false);
-  const [renameFolderState, setRenameFolderState] = useState<FolderState>({ isOpen: false, folder: null });
-  const [expandedFolders, setExpandedFolders] = useState(new Set<string>());
+  const [newGroupState, setNewGroupState] = useState<NewGroupState>({ isOpen: false, presetId: null });
+  const [renameFolder, setRenameFolder] = useState<PresetFolder | null>(null);
   const [activeItem, setActiveItem] = useState<any>(null);
-  const [folderPreviewsGenerated, setFolderPreviewsGenerated] = useState<Set<string>>(new Set());
-  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
 
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
   const [presetIntensity, setPresetIntensity] = useState<number>(100);
@@ -518,10 +346,10 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
 
   const previewsRef = useRef(previews);
   previewsRef.current = previews;
-  const expandedFoldersRef = useRef(expandedFolders);
-  expandedFoldersRef.current = expandedFolders;
-  const previewQueue = useRef<Array<any>>([]);
+  const previewQueue = useRef<Array<Preset>>([]);
   const isProcessingQueue = useRef(false);
+  /** The presets shown in an open section, the only ones whose previews are rendered. */
+  const wantedIdsRef = useRef<Set<string>>(new Set());
   const currentImagePathRef = useRef<string | null>(selectedImage?.path || null);
 
   const handleDragStateChange = useCallback(
@@ -531,43 +359,112 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
     [setEditor],
   );
 
-  useEffect(() => {
-    const allPresetIds = new Set();
+  const folders = useMemo(() => presets.flatMap((item: UserPreset) => (item.folder ? [item.folder] : [])), [presets]);
+  const rootPresets = useMemo(
+    () => presets.flatMap((item: UserPreset) => (item.preset ? [item.preset] : [])),
+    [presets],
+  );
+  const allPresets = useMemo(
+    () => [...folders.flatMap((folder) => folder.children), ...rootPresets],
+    [folders, rootPresets],
+  );
+  const groups = useMemo<Array<BrowserGroup>>(
+    () => folders.map((folder) => ({ id: folder.id, name: folder.name })),
+    [folders],
+  );
+
+  const allItemsMap = useMemo(() => {
+    const map = new Map();
     presets.forEach((item: UserPreset) => {
       if (item.preset) {
-        allPresetIds.add(item.preset.id);
+        map.set(item.preset.id, { type: PresetListType.Preset, data: item.preset });
       } else if (item.folder) {
-        item.folder.children.forEach((p: Preset) => allPresetIds.add(p.id));
+        map.set(item.folder.id, { type: PresetListType.Folder, data: item.folder });
+        item.folder.children.forEach((p: Preset) => map.set(p.id, { type: PresetListType.Preset, data: p }));
       }
     });
+    return map;
+  }, [presets]);
 
-    const currentPreviews = previewsRef.current;
-    const previewsToDelete = Object.keys(currentPreviews).filter((id) => !allPresetIds.has(id));
+  const itemParentMap = useMemo(() => {
+    const map = new Map<string, string | null>();
+    presets.forEach((item: UserPreset) => {
+      if (item.preset) {
+        map.set(item.preset.id, null);
+      } else if (item.folder) {
+        const folderId = item.folder.id;
+        map.set(folderId, null);
+        item.folder.children.forEach((p: Preset) => map.set(p.id, folderId));
+      }
+    });
+    return map;
+  }, [presets]);
 
+  // Favorites first (a favorite also stays in its folder), then the folders, then the presets in
+  // no folder. A search shows only the matches, in open sections.
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const isSearching = normalizedQuery !== '';
+  const sections = useMemo<Array<PresetSection>>(() => {
+    const matches = (preset: Preset) => !isSearching || preset.name.toLocaleLowerCase().includes(normalizedQuery);
+    const favoritePresets = allPresets.filter((preset) => favorites.has(preset.id) && matches(preset));
+    const folderSections = folders
+      .map((folder) => ({
+        key: folder.id,
+        title: folder.name,
+        presets: folder.children.filter(matches),
+        folder,
+        defaultOpen: false,
+      }))
+      .filter((section) => !isSearching || section.presets.length > 0);
+    const ungrouped = rootPresets.filter(matches);
+    return [
+      ...(favoritePresets.length > 0
+        ? [
+            {
+              key: FAVORITES_SECTION,
+              title: t('editor.looks.favorites'),
+              presets: favoritePresets,
+              defaultOpen: true,
+            },
+          ]
+        : []),
+      ...folderSections,
+      ...(ungrouped.length > 0
+        ? [{ key: UNGROUPED_SECTION, title: t('editor.looks.noGroup'), presets: ungrouped, defaultOpen: true }]
+        : []),
+    ];
+  }, [allPresets, favorites, folders, isSearching, normalizedQuery, rootPresets, t]);
+
+  const isOpen = useCallback(
+    (section: PresetSection) => isSearching || isSectionOpen(section.key, section.defaultOpen),
+    [isSearching, isSectionOpen],
+  );
+
+  const wantedPresets = useMemo(() => {
+    const seen = new Map<string, Preset>();
+    sections.filter(isOpen).forEach((section) => section.presets.forEach((preset) => seen.set(preset.id, preset)));
+    return [...seen.values()];
+  }, [isOpen, sections]);
+
+  useEffect(() => {
+    const allPresetIds = new Set(allPresets.map((preset) => preset.id));
+    const previewsToDelete = Object.keys(previewsRef.current).filter((id) => !allPresetIds.has(id));
     if (previewsToDelete.length > 0) {
       setPreviews((prev) => {
         const newPreviews = { ...prev };
         previewsToDelete.forEach((id) => {
-          const url = newPreviews[id];
-          if (url && url.startsWith('blob:')) {
-            URL.revokeObjectURL(url);
-          }
+          revokeBlobUrl(newPreviews[id]);
           delete newPreviews[id];
         });
         return newPreviews;
       });
     }
-  }, [presets]);
+  }, [allPresets]);
 
   useEffect(() => {
     return () => {
-      Object.values(previewsRef.current).forEach((url) => {
-        if (url && url.startsWith('blob:')) {
-          URL.revokeObjectURL(url);
-        }
-      });
+      Object.values(previewsRef.current).forEach(revokeBlobUrl);
       previewQueue.current = [];
-      isProcessingQueue.current = false;
     };
   }, []);
 
@@ -581,102 +478,51 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
 
   const { setNodeRef: setRootNodeRef, isOver: isRootOver } = useDroppable({ id: 'root' });
 
-  const allItemsMap = useMemo(() => {
-    const map = new Map();
-    presets.forEach((item: any) => {
-      if (item.preset) {
-        map.set(item.preset.id, { type: PresetListType.Preset, data: item.preset });
-      } else if (item.folder) {
-        map.set(item.folder.id, { type: PresetListType.Folder, data: item.folder });
-        item.folder.children.forEach((p: any) => map.set(p.id, { type: PresetListType.Preset, data: p }));
-      }
-    });
-    return map;
-  }, [presets]);
-
-  const itemParentMap = useMemo(() => {
-    const map = new Map();
-    presets.forEach((item: UserPreset) => {
-      if (item.preset) {
-        map.set(item.preset.id, null);
-      } else if (item.folder) {
-        map.set(item.folder.id, null);
-        item.folder.children.forEach((p: UserPreset) => {
-          if (!item?.folder) {
-            return;
-          }
-          map.set(p.id, item.folder.id);
-        });
-      }
-    });
-    return map;
-  }, [presets]);
-
+  /** Renders the queued previews one by one; one rendered for a photo no longer open is dropped. */
   const processPreviewQueue = useCallback(async () => {
-    if (isProcessingQueue.current || previewQueue.current.length === 0) {
+    if (isProcessingQueue.current) {
       return;
     }
-
     isProcessingQueue.current = true;
-    setIsGeneratingPreviews(true);
-
-    const pathAtStart = currentImagePathRef.current;
 
     while (previewQueue.current.length > 0) {
-      if (pathAtStart !== currentImagePathRef.current) {
-        previewQueue.current = [];
-        break;
-      }
-
-      const item = previewQueue.current.shift();
-      if (!item) break;
-      const { preset, folderId } = item;
-
-      if (folderId && !expandedFoldersRef.current.has(folderId)) {
+      const preset = previewQueue.current.shift();
+      if (!preset) break;
+      if (previewsRef.current[preset.id] !== undefined || !wantedIdsRef.current.has(preset.id)) {
         continue;
       }
-
-      if (previewsRef.current[preset.id]) {
-        continue;
-      }
+      const pathAtStart = currentImagePathRef.current;
 
       try {
-        const fullPresetAdjustments = { ...INITIAL_ADJUSTMENTS, ...preset.adjustments };
         const imageData: Uint8Array = await invoke(Invokes.GeneratePresetPreview, {
-          jsAdjustments: fullPresetAdjustments,
+          jsAdjustments: { ...INITIAL_ADJUSTMENTS, ...preset.adjustments },
         });
+        if (pathAtStart !== currentImagePathRef.current) continue;
 
-        if (pathAtStart !== currentImagePathRef.current) {
-          previewQueue.current = [];
-          break;
-        }
-
-        const blob = new Blob([new Uint8Array(imageData)], { type: 'image/jpeg' });
-        const url = URL.createObjectURL(blob);
+        const url = URL.createObjectURL(new Blob([new Uint8Array(imageData)], { type: 'image/jpeg' }));
+        previewsRef.current = { ...previewsRef.current, [preset.id]: url };
         setPreviews((prev: Record<string, string | null>) => {
-          const oldUrl = prev[preset.id];
-          if (oldUrl && oldUrl.startsWith('blob:')) {
-            URL.revokeObjectURL(oldUrl);
-          }
+          revokeBlobUrl(prev[preset.id]);
           return { ...prev, [preset.id]: url };
         });
       } catch (error) {
         console.error(`Failed to generate preview for preset ${preset.name}:`, error);
         if (pathAtStart === currentImagePathRef.current) {
+          previewsRef.current = { ...previewsRef.current, [preset.id]: null };
           setPreviews((prev: Record<string, string | null>) => ({ ...prev, [preset.id]: null }));
         }
       }
     }
 
     isProcessingQueue.current = false;
-    setIsGeneratingPreviews(false);
   }, []);
 
   const enqueuePreviews = useCallback(
-    (presetsToGenerate: Array<UserPreset>, folderId: string | null = null) => {
-      const newItems = presetsToGenerate
-        .filter((p: any) => !previewsRef.current[p?.id])
-        .map((p: UserPreset) => ({ preset: p, folderId }));
+    (presetsToGenerate: Array<Preset>) => {
+      const queued = new Set(previewQueue.current.map((preset) => preset.id));
+      const newItems = presetsToGenerate.filter(
+        (preset) => previewsRef.current[preset.id] === undefined && !queued.has(preset.id),
+      );
       if (newItems.length > 0) {
         previewQueue.current.push(...newItems);
         processPreviewQueue();
@@ -685,134 +531,42 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
     [processPreviewQueue],
   );
 
-  const toggleFolder = (folderId: string) => {
-    setExpandedFolders((prev: Set<string>) => {
-      const newSet = new Set(prev);
-      if (newSet.has(folderId)) {
-        newSet.delete(folderId);
-      } else {
-        newSet.add(folderId);
-        if (!folderPreviewsGenerated.has(folderId)) {
-          generateFolderPreviews(folderId);
-        }
-      }
-      return newSet;
-    });
-  };
-
-  const generateSinglePreview = useCallback(
-    async (preset: Preset) => {
-      if (!selectedImage?.isReady || !preset) {
-        return;
-      }
-
-      setIsGeneratingPreviews(true);
-      const pathAtStart = currentImagePathRef.current;
-
-      try {
-        const fullPresetAdjustments: any = { ...INITIAL_ADJUSTMENTS, ...preset.adjustments };
-        const imageData: Uint8Array = await invoke(Invokes.GeneratePresetPreview, {
-          jsAdjustments: fullPresetAdjustments,
-        });
-
-        if (pathAtStart !== currentImagePathRef.current) return;
-
-        const blob = new Blob([new Uint8Array(imageData)], { type: 'image/jpeg' });
-        const url = URL.createObjectURL(blob);
-
-        setPreviews((prev: Record<string, string | null>) => {
-          const oldUrl = prev[preset.id];
-          if (oldUrl && oldUrl.startsWith('blob:')) {
-            URL.revokeObjectURL(oldUrl);
-          }
-          return { ...prev, [preset.id]: url };
-        });
-      } catch (error) {
-        console.error(`Failed to generate preview for preset ${preset.name}:`, error);
-        if (pathAtStart === currentImagePathRef.current) {
-          setPreviews((prev: Record<string, string | null>) => ({ ...prev, [preset.id]: null }));
-        }
-      } finally {
-        if (pathAtStart === currentImagePathRef.current) {
-          setIsGeneratingPreviews(false);
-        }
-      }
+  /** Renders `preset`'s preview again (after it was saved or changed). */
+  const refreshPreview = useCallback(
+    (preset: Preset) => {
+      revokeBlobUrl(previewsRef.current[preset.id]);
+      const remaining = { ...previewsRef.current };
+      delete remaining[preset.id];
+      previewsRef.current = remaining;
+      setPreviews(remaining);
+      wantedIdsRef.current.add(preset.id);
+      enqueuePreviews([preset]);
     },
-    [selectedImage?.isReady],
+    [enqueuePreviews],
   );
 
-  const generateFolderPreviews = useCallback(
-    async (folderId: string) => {
-      if (!selectedImage?.isReady) {
-        return;
-      }
-
-      const folder = presets.find((item: any) => item.folder && item.folder.id === folderId);
-      if (!folder?.folder?.children?.length) {
-        return;
-      }
-
-      const presetsToGenerate = folder.folder.children.filter((p: any) => !previewsRef.current[p.id]);
-      if (presetsToGenerate.length > 0) {
-        enqueuePreviews(presetsToGenerate, folderId);
-      }
-      setFolderPreviewsGenerated((prev: Set<string>) => new Set(prev).add(folderId));
-    },
-    [selectedImage?.isReady, presets, enqueuePreviews],
-  );
-
-  const generateRootPreviews = useCallback(async () => {
-    if (!selectedImage?.isReady) {
-      return;
-    }
-
-    const rootPresets = presets.filter((item: UserPreset) => item.preset).map((item) => item.preset);
-    const presetsToGenerate: any = rootPresets.filter((p: any) => !previewsRef.current[p.id]);
-
-    if (presetsToGenerate.length > 0) {
-      enqueuePreviews(presetsToGenerate);
-    }
-  }, [selectedImage?.isReady, presets, enqueuePreviews]);
-
+  // Another photo (or one not ready yet) drops the previews and the applied preset.
   useEffect(() => {
     const isPathChanged = selectedImage?.path !== currentImagePathRef.current;
-
     if (isPathChanged || !selectedImage?.isReady) {
-      Object.values(previewsRef.current).forEach((url) => {
-        if (url && url.startsWith('blob:')) {
-          URL.revokeObjectURL(url);
-        }
-      });
-
+      Object.values(previewsRef.current).forEach(revokeBlobUrl);
       previewsRef.current = {};
       previewQueue.current = [];
-
       setPreviews({});
-      setFolderPreviewsGenerated(new Set<string>());
-
       setActivePresetId(null);
       setBaseAdjustments(null);
-
       if (isPathChanged && selectedImage?.path) {
         currentImagePathRef.current = selectedImage.path;
       }
     }
+  }, [selectedImage?.isReady, selectedImage?.path]);
 
-    if (activePanel === Panel.Presets && selectedImage?.isReady && presets.length > 0) {
-      generateRootPreviews();
-      expandedFolders.forEach((folderId: string) => {
-        generateFolderPreviews(folderId);
-      });
+  useEffect(() => {
+    wantedIdsRef.current = new Set(wantedPresets.map((preset) => preset.id));
+    if (activePanel === Panel.Presets && selectedImage?.isReady) {
+      enqueuePreviews(wantedPresets);
     }
-  }, [
-    activePanel,
-    selectedImage?.isReady,
-    selectedImage?.path,
-    presets.length,
-    generateRootPreviews,
-    generateFolderPreviews,
-    expandedFolders,
-  ]);
+  }, [activePanel, enqueuePreviews, selectedImage?.isReady, selectedImage?.path, wantedPresets]);
 
   const handleApplyPreset = (preset: Preset) => {
     if (activePresetId === preset.id) {
@@ -849,59 +603,63 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
     [setAdjustments],
   );
 
-  /** Opens the preset dialog: a new preset starts with the photo's edited settings ticked, others with their own. */
-  const openPresetDialog = (mode: PresetDialogMode, preset: Preset | null = null) => {
+  /**
+   * Opens the preset dialog: a new preset starts with the photo's edited settings ticked and in
+   * `group`, others with their own settings and folder.
+   */
+  const openPresetDialog = (mode: PresetDialogMode, preset: Preset | null = null, group: GroupChoice = NO_GROUP) => {
     const initialKeys = preset
       ? getPresetKeys(preset)
       : getEditedPresetKeys(adjustments, getInitialAdjustments(selectedImage?.isRaw ?? false));
-    setConfigureModalState({ isOpen: true, mode, preset, initialKeys });
+    const initialGroup = preset ? groupChoiceOf(findPresetFolderId(presets, preset.id)) : group;
+    setConfigureModalState({ isOpen: true, mode, preset, initialKeys, group: initialGroup });
   };
 
   /** Keeps the mode and preset while the dialog fades out, so its title does not change. */
   const closePresetDialog = () => setConfigureModalState((state) => ({ ...state, isOpen: false }));
 
-  const handleSaveConfiguredPreset = async (name: string, keys: Set<string>) => {
+  const handleSaveConfiguredPreset = (name: string, keys: Set<string>, group: GroupChoice) => {
     const { mode, preset } = configureModalState;
-    const saved = preset ? updatePreset(preset.id, name, keys, mode === 'update') : addPreset(name, keys);
+    const saved = preset ? updatePreset(preset.id, name, keys, mode === 'update', group) : addPreset(name, keys, group);
     closePresetDialog();
     if (saved) {
-      await generateSinglePreview(saved);
+      refreshPreview(saved);
     }
   };
 
-  const handleAddFolder = (name: string) => {
-    addFolder(name);
-    setIsAddFolderModalOpen(false);
+  const handleNewGroupSave = (name: string) => {
+    if (newGroupState.presetId) {
+      movePresetToGroup(newGroupState.presetId, { type: 'new', name });
+    } else {
+      addFolder(name);
+    }
+    setNewGroupState({ isOpen: false, presetId: null });
   };
 
   const handleRenameFolderSave = (newName: string) => {
-    if (renameFolderState.folder) {
-      renameItem(renameFolderState.folder.id, newName);
+    if (renameFolder) {
+      renameItem(renameFolder.id, newName);
     }
-    setRenameFolderState({ isOpen: false, folder: null });
+    setRenameFolder(null);
   };
 
-  const handleDeleteItem = (id: string | null, isFolder = false) => {
-    setDeletingItemId(id);
-    if (!id) {
-      return;
-    }
+  /** Delete Group asks first; its presets stay, in no group. */
+  const confirmDeleteFolder = (folder: PresetFolder) => {
+    useUIStore.getState().setUI({
+      confirmModalState: {
+        confirmText: t('editor.looks.deleteGroup'),
+        confirmVariant: 'destructive',
+        isOpen: true,
+        message: t('editor.looks.deleteGroupMessage', { name: folder.name, count: folder.children.length }),
+        onConfirm: () => deleteFolder(folder.id),
+        title: t('editor.looks.deleteGroup'),
+      },
+    });
+  };
 
-    setTimeout(() => {
-      deleteItem(id);
-      if (isFolder) {
-        setExpandedFolders((prev: Set<string>) => {
-          const newSet = new Set(prev);
-          newSet.delete(id);
-          return newSet;
-        });
-        setFolderPreviewsGenerated((prev: Set<string>) => {
-          const newSet = new Set(prev);
-          newSet.delete(id);
-          return newSet;
-        });
-      }
-    }, 300);
+  /** Opens the folder a preset was dropped into, so it stays in view. */
+  const openFolder = (folderId: string) => {
+    if (!isSectionOpen(folderId, false)) toggleSection(folderId, false);
   };
 
   const handleDragStart = (event: any) => {
@@ -936,10 +694,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
     if (activeType === PresetListType.Preset && targetFolderId) {
       if (activeParentId !== targetFolderId) {
         movePreset(activeId, targetFolderId);
-        setExpandedFolders((prev: Set<string>) => new Set(prev).add(targetFolderId));
-        if (!folderPreviewsGenerated.has(targetFolderId)) {
-          generateFolderPreviews(targetFolderId);
-        }
+        openFolder(targetFolderId);
       } else {
         reorderItems(activeId, overId);
       }
@@ -980,9 +735,6 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
 
       const { failures } = await importPresetsFromFiles(paths);
 
-      setFolderPreviewsGenerated(new Set<string>());
-      setPreviews({});
-
       failures.forEach((failure: PresetImportFailure) =>
         console.error(`Failed to import ${failure.fileName}: ${failure.error}`),
       );
@@ -1001,7 +753,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
         defaultPath: `${name}.rrpreset`.replace(/[<>:"/\\|?*]/g, '_'),
         filters: [{ name: t('editor.presets.dialog.presetFile'), extensions: ['rrpreset'] }],
         title: t('editor.presets.dialog.exportTitle', {
-          type: isFolder ? t('editor.presets.types.folder') : t('editor.presets.types.preset'),
+          type: isFolder ? t('editor.presets.types.group') : t('editor.presets.types.preset'),
         }),
       });
 
@@ -1032,81 +784,102 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
     }
   };
 
-  const handleContextMenu = (event: any, item: UserPreset) => {
+  const handleFolderContextMenu = (event: React.MouseEvent, folder: PresetFolder) => {
     event.preventDefault();
     event.stopPropagation();
-
-    const isFolder = !!item.folder;
-    const data = isFolder ? item.folder : item.preset;
-
-    let options = [];
-    if (isFolder) {
-      options = [
-        {
-          icon: Edit,
-          label: t('editor.presets.menu.renameFolder'),
-          onClick: () => setRenameFolderState({ isOpen: true, folder: data }),
-        },
-        {
-          icon: FileDown,
-          label: t('editor.presets.menu.exportFolder'),
-          onClick: () => handleExport(item),
-        },
-        { type: OPTION_SEPARATOR },
-        {
-          icon: Trash2,
-          isDestructive: true,
-          label: t('editor.presets.menu.deleteFolder'),
-          onClick: () => handleDeleteItem(data?.id ?? null, true),
-        },
-      ];
-    } else {
-      options = [
-        {
-          icon: Save,
-          label: t('editor.presets.menu.updateWithCurrent'),
-          onClick: () => openPresetDialog('update', data as Preset),
-        },
-        {
-          icon: Settings2,
-          label: t('editor.presets.menu.configurePreset'),
-          onClick: () => openPresetDialog('configure', data as Preset),
-        },
-        { type: OPTION_SEPARATOR },
-        {
-          icon: CopyPlus,
-          label: t('editor.presets.menu.duplicatePreset'),
-          onClick: async () => {
-            const duplicated = duplicatePreset(data?.id ?? null);
-            if (duplicated) {
-              await generateSinglePreview(duplicated);
-            }
-          },
-        },
-        {
-          icon: FileDown,
-          label: t('editor.presets.menu.exportPreset'),
-          onClick: () => handleExport(item),
-        },
-        { type: OPTION_SEPARATOR },
-        {
-          icon: Trash2,
-          isDestructive: true,
-          label: t('editor.presets.menu.deletePreset'),
-          onClick: () => handleDeleteItem(data?.id ?? null, false),
-        },
-      ];
-    }
-
-    showContextMenu(event.clientX, event.clientY, options);
+    showContextMenu(event.clientX, event.clientY, [
+      {
+        icon: Plus,
+        label: t('editor.presets.menu.newPreset'),
+        onClick: () => openPresetDialog('new', null, { type: 'existing', id: folder.id }),
+      },
+      {
+        icon: Edit,
+        label: t('editor.looks.renameGroup'),
+        onClick: () => setRenameFolder(folder),
+      },
+      {
+        icon: FileDown,
+        label: t('editor.presets.menu.exportGroup'),
+        onClick: () => handleExport({ folder }),
+      },
+      { type: OPTION_SEPARATOR },
+      {
+        icon: Trash2,
+        isDestructive: true,
+        label: t('editor.looks.deleteGroup'),
+        onClick: () => confirmDeleteFolder(folder),
+      },
+    ]);
   };
 
-  const handleBackgroundContextMenu = (event: any) => {
-    if (!event.currentTarget.contains(event.target)) {
+  const handlePresetContextMenu = (event: React.MouseEvent, preset: Preset) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const folderId = findPresetFolderId(presets, preset.id) ?? null;
+    showContextMenu(event.clientX, event.clientY, [
+      {
+        icon: Save,
+        label: t('editor.presets.menu.updateWithCurrent'),
+        onClick: () => openPresetDialog('update', preset),
+      },
+      {
+        icon: Settings2,
+        label: t('editor.presets.menu.configurePreset'),
+        onClick: () => openPresetDialog('configure', preset),
+      },
+      {
+        icon: FolderInput,
+        label: t('editor.looks.moveToGroup'),
+        submenu: [
+          {
+            label: t('editor.looks.noGroup'),
+            checked: folderId === null,
+            onClick: () => movePresetToGroup(preset.id, NO_GROUP),
+          },
+          ...folders.map((folder) => ({
+            label: folder.name,
+            checked: folderId === folder.id,
+            onClick: () => movePresetToGroup(preset.id, { type: 'existing', id: folder.id }),
+          })),
+          { type: OPTION_SEPARATOR },
+          {
+            icon: FolderPlus,
+            label: t('editor.looks.newGroup'),
+            onClick: () => setNewGroupState({ isOpen: true, presetId: preset.id }),
+          },
+        ],
+      },
+      { type: OPTION_SEPARATOR },
+      {
+        icon: CopyPlus,
+        label: t('editor.presets.menu.duplicatePreset'),
+        onClick: () => {
+          const duplicated = duplicatePreset(preset.id);
+          if (duplicated) refreshPreview(duplicated);
+        },
+      },
+      {
+        icon: FileDown,
+        label: t('editor.presets.menu.exportPreset'),
+        onClick: () => handleExport({ preset }),
+      },
+      { type: OPTION_SEPARATOR },
+      {
+        icon: Trash2,
+        isDestructive: true,
+        label: t('editor.presets.menu.deletePreset'),
+        onClick: () => deleteItem(preset.id),
+      },
+    ]);
+  };
+
+  const handleBackgroundContextMenu = (event: React.MouseEvent) => {
+    if (!event.currentTarget.contains(event.target as Node)) {
       return;
     }
     event.preventDefault();
-    const options = [
+    showContextMenu(event.clientX, event.clientY, [
       {
         icon: Plus,
         label: t('editor.presets.menu.newPreset'),
@@ -1114,8 +887,8 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
       },
       {
         icon: FolderPlus,
-        label: t('editor.presets.menu.newFolder'),
-        onClick: () => setIsAddFolderModalOpen(true),
+        label: t('editor.looks.newGroup'),
+        onClick: () => setNewGroupState({ isOpen: true, presetId: null }),
       },
       { type: OPTION_SEPARATOR },
       {
@@ -1124,18 +897,71 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
         label: t('editor.presets.menu.sortAll'),
         onClick: sortAllPresetsAlphabetically,
       },
-    ];
-    showContextMenu(event.clientX, event.clientY, options);
+    ]);
   };
 
-  const folders = useMemo(() => presets.filter((item: UserPreset) => item.folder), [presets]);
-  const rootPresets = useMemo(() => presets.filter((item: UserPreset) => item.preset), [presets]);
+  const supportsTooltip = (preset: Preset) => {
+    const features = [];
+    if (presetHoldsSection(preset, 'masks')) features.push(t('editor.presets.supports.masks'));
+    if (presetHoldsSection(preset, 'geometry')) features.push(t('editor.presets.supports.cropTransform'));
+    return features.length > 0 ? t('editor.presets.supports.label', { features: features.join(' + ') }) : undefined;
+  };
+
+  const renderPreset = (preset: Preset, isDraggable: boolean) => {
+    const itemProps: BrowserItemProps = {
+      name: preset.name,
+      preview: previews[preset.id],
+      isSelected: preset.id === activePresetId,
+      isFavorite: favorites.has(preset.id),
+      onToggleFavorite: () => toggleFavorite(preset.id),
+      onClick: () => handleApplyPreset(preset),
+      onContextMenu: (event) => handlePresetContextMenu(event, preset),
+      badges: presetBadges(preset),
+      details: <PresetDetails preset={preset} />,
+      tooltip: isGrid ? undefined : supportsTooltip(preset),
+    };
+    const item = isGrid ? <BrowserTile {...itemProps} /> : <BrowserRow {...itemProps} />;
+    return isDraggable ? <DraggablePreset preset={preset}>{item}</DraggablePreset> : item;
+  };
+
+  const activePreset = activePresetId ? (allItemsMap.get(activePresetId)?.data as Preset | undefined) : undefined;
+  // The Amount slider shows once: in the first open section that lists the applied preset.
+  const activeSectionKey = activePresetId
+    ? sections.find((section) => isOpen(section) && section.presets.some((preset) => preset.id === activePresetId))?.key
+    : undefined;
+  const activeContent = activePreset && (
+    <div className="px-1 pt-1 pb-2 cursor-auto" onClick={(event) => event.stopPropagation()}>
+      <Slider
+        min={0}
+        max={200}
+        defaultValue={100}
+        value={presetIntensity}
+        onChange={(event: any) => handleIntensityChange(activePreset, Number(event.target.value))}
+        onDragStateChange={handleDragStateChange}
+        label={t('editor.presets.amount')}
+        step={1}
+      />
+    </div>
+  );
+
+  const renderSectionItems = (section: PresetSection) => (
+    <BrowserItems
+      isGrid={isGrid}
+      items={section.presets}
+      getKey={(preset) => preset.id}
+      renderItem={(preset) => renderPreset(preset, section.key !== FAVORITES_SECTION)}
+      activeKey={section.key === activeSectionKey ? activePresetId : null}
+      activeContent={activeContent}
+    />
+  );
+
+  // The presets outside folders need no header when nothing else is listed.
+  const hasOnlyUngrouped = sections.length === 1 && sections[0].key === UNGROUPED_SECTION;
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex flex-col h-full">
-        <PanelHeader
-          title={t('editor.presets.title')}
+        <LooksHeader
           actions={
             <>
               <button
@@ -1173,6 +999,18 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
           }
         />
 
+        {presets.length > 0 && (
+          <div className="flex items-center gap-2 px-4 compact:px-3 pt-3 compact:pt-2 shrink-0">
+            <Input
+              className="h-8 compact:h-7"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('editor.looks.searchPresets')}
+              value={query}
+            />
+            <BrowserViewSwitch isGrid={isGrid} onChange={setGrid} />
+          </div>
+        )}
+
         <div
           className={`grow overflow-y-auto p-4 compact:p-2 space-y-2 compact:space-y-1 rounded-lg transition-colors ${
             isRootOver ? 'bg-surface-hover' : ''
@@ -1199,81 +1037,52 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
                 {t('editor.presets.status.getCommunity')}
               </Button>
             </div>
+          ) : isSearching && sections.length === 0 ? (
+            <Text color={TextColors.secondary} className="text-center pt-4">
+              {t('editor.looks.noMatches')}
+            </Text>
+          ) : hasOnlyUngrouped ? (
+            renderSectionItems(sections[0])
           ) : (
-            <>
-              <AnimatePresence>
-                {folders
-                  .filter((item: UserPreset) => item.folder?.id !== deletingItemId)
-                  .map((item: UserPreset, index: number) => (
-                    <motion.div
-                      animate="visible"
-                      custom={index}
-                      exit="exit"
-                      initial="hidden"
-                      key={item.folder?.id}
-                      layout="position"
-                      variants={itemVariants}
-                    >
-                      <DroppableFolderItem
-                        folder={item.folder}
-                        isExpanded={item.folder?.id ? expandedFolders.has(item.folder?.id) : false}
-                        onContextMenu={(e: any) => handleContextMenu(e, item)}
-                        onToggle={toggleFolder}
-                      >
-                        <AnimatePresence>
-                          {item.folder?.children
-                            .filter((preset: Preset) => preset.id !== deletingItemId)
-                            .map((preset: Preset) => (
-                              <motion.div
-                                exit={{ opacity: 0, x: -15, transition: { duration: 0.2 } }}
-                                key={preset.id}
-                                layout="position"
-                              >
-                                <DraggablePresetItem
-                                  isGeneratingPreviews={isGeneratingPreviews}
-                                  onApply={handleApplyPreset}
-                                  onContextMenu={(e: any) => handleContextMenu(e, { preset })}
-                                  preset={preset}
-                                  previewUrl={previews[preset.id] || ''}
-                                  isActive={preset.id === activePresetId}
-                                  intensity={preset.id === activePresetId ? presetIntensity : 100}
-                                  onIntensityChange={(val) => handleIntensityChange(preset, val)}
-                                  onDragStateChange={handleDragStateChange}
-                                />
-                              </motion.div>
-                            ))}
-                        </AnimatePresence>
-                      </DroppableFolderItem>
-                    </motion.div>
-                  ))}
-              </AnimatePresence>
-              <AnimatePresence>
-                {rootPresets
-                  .filter((item: UserPreset) => item.preset?.id !== deletingItemId)
-                  .map((item: UserPreset, index: number) => (
-                    <motion.div
-                      animate="visible"
-                      custom={folders.length + index}
-                      exit="exit"
-                      initial="hidden"
-                      key={item.preset?.id}
-                      layout="position"
-                      variants={itemVariants}
-                    >
-                      <DraggablePresetItem
-                        isGeneratingPreviews={isGeneratingPreviews}
-                        onApply={handleApplyPreset}
-                        onContextMenu={(e: any) => handleContextMenu(e, item)}
-                        preset={item.preset}
-                        previewUrl={(item.preset?.id ? previews[item.preset.id] : '') || ''}
-                        isActive={item.preset?.id === activePresetId}
-                        intensity={item.preset?.id === activePresetId ? presetIntensity : 100}
-                        onIntensityChange={(val) => handleIntensityChange(item.preset as Preset, val)}
-                      />
-                    </motion.div>
-                  ))}
-              </AnimatePresence>
-            </>
+            sections.map((section) => {
+              const sectionIsOpen = isOpen(section);
+              const onToggle = () => toggleSection(section.key, section.defaultOpen);
+              if (section.folder) {
+                return (
+                  <FolderSection
+                    key={section.key}
+                    folder={section.folder}
+                    isOpen={sectionIsOpen}
+                    onToggle={onToggle}
+                    onContextMenu={(event) => handleFolderContextMenu(event, section.folder!)}
+                  >
+                    {section.presets.length > 0 ? (
+                      renderSectionItems(section)
+                    ) : (
+                      <Text variant={TextVariants.small} color={TextColors.secondary} className="px-2">
+                        {t('editor.looks.emptyGroup')}
+                      </Text>
+                    )}
+                  </FolderSection>
+                );
+              }
+              return (
+                <BrowserSection
+                  key={section.key}
+                  count={section.presets.length}
+                  icon={
+                    section.key === FAVORITES_SECTION ? (
+                      <Star size={14} className="text-accent" fill="currentColor" />
+                    ) : undefined
+                  }
+                  isOpen={sectionIsOpen}
+                  onToggle={onToggle}
+                  title={section.title}
+                >
+                  {renderSectionItems(section)}
+                </BrowserSection>
+              );
+            })
           )}
         </div>
 
@@ -1282,31 +1091,46 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
           mode={configureModalState.mode}
           initialName={configureModalState.preset?.name ?? ''}
           initialKeys={configureModalState.initialKeys}
+          groups={groups}
+          initialGroup={configureModalState.group}
           onClose={closePresetDialog}
           onSave={handleSaveConfiguredPreset}
         />
         <CreateFolderModal
-          isOpen={isAddFolderModalOpen}
-          onClose={() => setIsAddFolderModalOpen(false)}
-          onSave={handleAddFolder}
+          isOpen={newGroupState.isOpen}
+          onClose={() => setNewGroupState({ isOpen: false, presetId: null })}
+          onSave={handleNewGroupSave}
+          placeholder={t('editor.looks.newGroupPlaceholder')}
+          title={t('editor.looks.newGroupTitle')}
         />
         <RenameFolderModal
-          currentName={renameFolderState.folder?.name}
-          isOpen={renameFolderState.isOpen}
-          onClose={() => setRenameFolderState({ isOpen: false, folder: null })}
+          currentName={renameFolder?.name ?? ''}
+          isOpen={renameFolder !== null}
+          onClose={() => setRenameFolder(null)}
           onSave={handleRenameFolderSave}
+          title={t('editor.looks.renameGroupTitle')}
         />
       </div>
       <DragOverlay>
         {activeItem ? (
-          activeItem.type === 'preset' ? (
-            <PresetItemDisplay
-              isGeneratingPreviews={false}
-              preset={activeItem.data}
-              previewUrl={previews[activeItem.data.id] || ''}
-            />
+          activeItem.type === PresetListType.Preset ? (
+            <div className="w-64">
+              <BrowserRow
+                name={activeItem.data.name}
+                preview={previews[activeItem.data.id]}
+                isSelected={false}
+                isFavorite={favorites.has(activeItem.data.id)}
+                onToggleFavorite={() => undefined}
+                onClick={() => undefined}
+              />
+            </div>
           ) : (
-            <FolderItemDisplay folder={activeItem.data} />
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-surface w-64">
+              <FolderIcon size={16} />
+              <Text color={TextColors.primary} weight={TextWeights.medium} className="grow truncate select-none">
+                {activeItem.data.name}
+              </Text>
+            </div>
           )
         ) : null}
       </DragOverlay>

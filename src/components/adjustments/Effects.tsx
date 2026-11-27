@@ -30,7 +30,7 @@ import {
 import Dropdown from '../ui/Dropdown';
 import AdjustmentSlider from './AdjustmentSlider';
 import AdjustmentTool from './AdjustmentTool';
-import LUTControl from '../ui/LUTControl';
+import LutTool from './LutTool';
 import ColorField, { normalizeHexColor, useParsedTextField } from '../ui/ColorField';
 import { ColorSwatch } from '../ui/ColorSwatch';
 import { AppSettings } from '../ui/AppProperties';
@@ -268,21 +268,6 @@ export default function EffectsPanel({
     maxDepth: adjustments.lensBlurMaxDepth ?? LENS_BLUR_RANGE_DEFAULTS.maxDepth,
     minFade: adjustments.lensBlurMinFade ?? LENS_BLUR_RANGE_DEFAULTS.minFade,
     maxFade: adjustments.lensBlurMaxFade ?? LENS_BLUR_RANGE_DEFAULTS.maxFade,
-  };
-
-  const handleLutIntensityChange = (intensity: number) => {
-    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, lutIntensity: intensity }));
-  };
-
-  const handleLutClear = () => {
-    setAdjustments((prev: Partial<Adjustments>) => ({
-      ...prev,
-      lutPath: null,
-      lutName: null,
-      lutData: null,
-      lutSize: 0,
-      lutIntensity: 100,
-    }));
   };
 
   const handleSpatialEffectToggle = (mapKey: SectionMapKey) => (enabled: boolean) => {
@@ -892,18 +877,13 @@ export default function EffectsPanel({
             />
           </AiEffectSection>
 
-          <AdjustmentTool id="lut">
-            <LUTControl
-              lutPath={adjustments.lutPath || null}
-              lutName={adjustments.lutName || null}
-              lutIntensity={adjustments.lutIntensity ?? 100}
-              onLutSelect={handleLutSelect}
-              onLutHover={onLutHover}
-              onIntensityChange={handleLutIntensityChange}
-              onClear={handleLutClear}
-              onDragStateChange={onDragStateChange}
-            />
-          </AdjustmentTool>
+          <LutTool
+            adjustments={adjustments}
+            setAdjustments={setAdjustments}
+            handleLutSelect={handleLutSelect}
+            onLutHover={onLutHover}
+            onDragStateChange={onDragStateChange}
+          />
         </>
       )}
 

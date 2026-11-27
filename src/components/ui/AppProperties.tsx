@@ -238,6 +238,9 @@ export enum Panel {
   ZoneTint = 'zoneTint',
 }
 
+/** What the Looks tab (`Panel.Presets`) shows: presets, custom profiles or LUTs. */
+export type LooksKind = 'presets' | 'profiles' | 'luts';
+
 /**
  * The file types the Library's Quick Filter and Select By tell apart. Other
  * formats (PNG, WebP, …) have none and show only while no type is chosen.
@@ -369,6 +372,14 @@ export interface AppSettings {
   favoriteProfiles?: string[];
   /** Whether the Profile browser shows a grid of previews (absent: yes) or a list. */
   profileBrowserGrid?: boolean;
+  /** Starred presets by id, listed first in Looks → Presets. */
+  favoritePresets?: string[];
+  /** Whether Looks → Presets shows a grid of previews or a list (absent: list). */
+  presetBrowserGrid?: boolean;
+  /** The kind the Looks tab shows (absent: presets). */
+  looksKind?: LooksKind;
+  /** Open state of the Looks browser sections the user has toggled, keyed `kind:section`. */
+  looksSections?: Record<string, boolean>;
   sortCriteria?: SortCriteria;
   theme: Theme;
   thumbnailSize?: string;

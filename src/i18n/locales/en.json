@@ -246,7 +246,6 @@
       "empty": "No profiles yet. Set up a look, then choose Create Profile.",
       "export": "Export…",
       "exportFailed": "Could not export the profile: {{error}}",
-      "favorites": "Favorites",
       "fileType": "ThisIsRAW Profile",
       "import": "Import Profiles…",
       "importFailed": "Could not import the profiles: {{error}}",
@@ -262,9 +261,7 @@
       "saveToProfiles": "Save to my profiles",
       "title": "Profile",
       "ungrouped": "Profiles",
-      "update": "Update Profile",
-      "viewGrid": "Show previews",
-      "viewList": "Show as list"
+      "update": "Update Profile"
     },
     "zoneTint": {
       "fill": "Fill between",
@@ -888,6 +885,31 @@
       "exporting": "Exporting…",
       "savesTo": "External edit — saves to"
     },
+    "looks": {
+      "deleteGroup": "Delete Group",
+      "deleteGroupMessage_one": "Delete the group “{{name}}”? Its {{count}} item moves to No Group; nothing is deleted.",
+      "deleteGroupMessage_other": "Delete the group “{{name}}”? Its {{count}} items move to No Group; nothing is deleted.",
+      "emptyGroup": "Empty group. Drag items here or use Move to Group.",
+      "favorites": "Favorites",
+      "group": "Group",
+      "kinds": {
+        "luts": "LUTs",
+        "presets": "Presets",
+        "profiles": "Profiles"
+      },
+      "moveToGroup": "Move to Group",
+      "newGroup": "New Group…",
+      "newGroupPlaceholder": "Group name",
+      "newGroupTitle": "New Group",
+      "noGroup": "No Group",
+      "noMatches": "Nothing matches the search.",
+      "renameGroup": "Rename Group…",
+      "renameGroupTitle": "Rename Group",
+      "searchPresets": "Search presets",
+      "title": "Looks",
+      "viewGrid": "Show previews",
+      "viewList": "Show as list"
+    },
     "masks": {
       "actions": {
         "addNewComponent": "Add New Component",
@@ -1052,14 +1074,11 @@
       },
       "menu": {
         "configurePreset": "Configure Preset",
-        "deleteFolder": "Delete Folder",
         "deletePreset": "Delete Preset",
         "duplicatePreset": "Duplicate Preset",
-        "exportFolder": "Export Folder",
+        "exportGroup": "Export Group",
         "exportPreset": "Export Preset",
-        "newFolder": "New Folder",
         "newPreset": "New Preset",
-        "renameFolder": "Rename Folder",
         "sortAll": "Sort All Alphabetically",
         "updateWithCurrent": "Update with Current Settings…"
       },
@@ -1083,7 +1102,7 @@
         "saveNew": "Save as new preset"
       },
       "types": {
-        "folder": "Folder",
+        "group": "Group",
         "preset": "Preset"
       }
     },
@@ -1096,8 +1115,8 @@
         "geometry": "Geometry",
         "info": "Info",
         "inpaint": "Inpaint",
+        "looks": "Looks",
         "masks": "Masks",
-        "presets": "Presets",
         "tagging": "Tagging"
       }
     },
@@ -1678,6 +1697,7 @@
       "lightsOut": "Lights Out",
       "lightsOutBack": "Lights Out, Previous Step",
       "list": "List",
+      "looks": "Looks",
       "maskOverlay": "Mask Overlay",
       "masks": "Masks",
       "maximize": "Maximize",
@@ -1691,7 +1711,6 @@
       "panorama": "Panorama…",
       "pasteFiles": "Paste Files",
       "photoMerge": "Photo Merge",
-      "presets": "Presets",
       "previousPhoto": "Previous Photo",
       "readXmp": "Read Metadata from XMP Files",
       "refinePhotos": "Refine Photos…",
@@ -2545,7 +2564,7 @@
         "toggle_mask_overlay": "Toggle mask overlay",
         "toggle_metadata": "Toggle Metadata panel",
         "toggle_metadata_filter": "Toggle metadata filter bar",
-        "toggle_presets": "Toggle Presets panel",
+        "toggle_presets": "Toggle Looks panel",
         "undo": "Undo adjustment",
         "zoom_100": "Zoom to 100%",
         "zoom_fit": "Zoom to fit",

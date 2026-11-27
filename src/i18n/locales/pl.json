@@ -996,14 +996,10 @@
       },
       "menu": {
         "configurePreset": "Konfiguruj preset",
-        "deleteFolder": "Usuń folder",
         "deletePreset": "Usuń preset",
         "duplicatePreset": "Duplikuj preset",
-        "exportFolder": "Eksportuj folder",
         "exportPreset": "Eksportuj preset",
-        "newFolder": "Nowy folder",
         "newPreset": "Nowy preset",
-        "renameFolder": "Zmień nazwę folderu",
         "sortAll": "Sortuj wszystko alfabetycznie"
       },
       "status": {
@@ -1024,7 +1020,6 @@
         "saveNew": "Zapisz jako nowy preset"
       },
       "types": {
-        "folder": "Folder",
         "preset": "Preset"
       }
     },
@@ -1036,8 +1031,7 @@
         "export": "Eksportuj",
         "info": "Informacje",
         "inpaint": "Inpaint",
-        "masks": "Maski",
-        "presets": "Presety"
+        "masks": "Maski"
       }
     },
     "toasts": {
@@ -2210,7 +2204,6 @@
         "toggle_library_exif": "Przełącz nakładkę EXIF",
         "toggle_masks": "Przełącz panel Maski",
         "toggle_metadata": "Przełącz panel Metadane",
-        "toggle_presets": "Przełącz panel Presety",
         "undo": "Cofnij korektę",
         "zoom_100": "Powiększ do 100%",
         "zoom_fit": "Dopasuj do ekranu",

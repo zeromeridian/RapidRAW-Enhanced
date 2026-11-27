@@ -16,7 +16,7 @@ import LensGeometryPanel from '../panel/right/LensGeometryPanel';
 import TaggingPanel from '../panel/right/TaggingPanel';
 import MasksPanel from '../panel/right/MasksPanel';
 import AIPanel from '../panel/right/AIPanel';
-import PresetsPanel from '../panel/right/PresetsPanel';
+import LooksPanel from '../panel/right/LooksPanel';
 import ExportPanel from '../panel/right/ExportPanel';
 import AutoSyncFooter from '../panel/right/AutoSyncFooter';
 
@@ -256,7 +256,7 @@ export default function EditorView({
             {renderedRightPanel === Panel.LensGeometry && <LensGeometryPanel />}
             {renderedRightPanel === Panel.Masks && <MasksPanel />}
             {renderedRightPanel === Panel.Presets && (
-              <PresetsPanel
+              <LooksPanel
                 onNavigateToCommunity={() => {
                   handleBackToLibrary();
                   setUI({ activeView: 'community' });

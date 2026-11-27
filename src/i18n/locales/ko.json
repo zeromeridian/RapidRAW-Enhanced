@@ -944,14 +944,10 @@
       },
       "menu": {
         "configurePreset": "프리셋 구성",
-        "deleteFolder": "폴더 삭제",
         "deletePreset": "프리셋 삭제",
         "duplicatePreset": "프리셋 복제",
-        "exportFolder": "폴더 내보내기",
         "exportPreset": "프리셋 내보내기",
-        "newFolder": "새 폴더",
         "newPreset": "새 프리셋",
-        "renameFolder": "폴더 이름 변경",
         "sortAll": "모두 알파벳순 정렬"
       },
       "status": {
@@ -972,7 +968,6 @@
         "saveNew": "새 프리셋으로 저장"
       },
       "types": {
-        "folder": "폴더",
         "preset": "프리셋"
       }
     },
@@ -984,8 +979,7 @@
         "export": "내보내기",
         "info": "정보",
         "inpaint": "인페인팅",
-        "masks": "마스크",
-        "presets": "프리셋"
+        "masks": "마스크"
       }
     },
     "toasts": {
@@ -2114,7 +2108,6 @@
         "toggle_library_exif": "EXIF 오버레이 전환",
         "toggle_masks": "마스크 패널 전환",
         "toggle_metadata": "메타데이터 패널 전환",
-        "toggle_presets": "프리셋 패널 전환",
         "undo": "조정 실행 취소",
         "zoom_100": "100%로 확대/축소",
         "zoom_fit": "맞춤으로 확대/축소",

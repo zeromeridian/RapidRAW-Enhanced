@@ -971,14 +971,10 @@
       },
       "menu": {
         "configurePreset": "Configurar ajuste preestablecido",
-        "deleteFolder": "Eliminar carpeta",
         "deletePreset": "Eliminar ajuste preestablecido",
         "duplicatePreset": "Duplicar ajuste preestablecido",
-        "exportFolder": "Exportar carpeta",
         "exportPreset": "Exportar ajuste preestablecido",
-        "newFolder": "Nueva carpeta",
         "newPreset": "Nuevo ajuste preestablecido",
-        "renameFolder": "Renombrar carpeta",
         "sortAll": "Ordenar todo alfabéticamente"
       },
       "status": {
@@ -999,7 +995,6 @@
         "saveNew": "Guardar como nuevo ajuste preestablecido"
       },
       "types": {
-        "folder": "Carpeta",
         "preset": "Ajuste preestablecido"
       }
     },
@@ -1011,8 +1006,7 @@
         "export": "Exportar",
         "info": "Info",
         "inpaint": "Inpainting",
-        "masks": "Máscaras",
-        "presets": "Ajustes preestablecidos"
+        "masks": "Máscaras"
       }
     },
     "toasts": {
@@ -2163,7 +2157,6 @@
         "toggle_library_exif": "Alternar superposición EXIF",
         "toggle_masks": "Alternar panel de Máscaras",
         "toggle_metadata": "Alternar panel de Metadatos",
-        "toggle_presets": "Alternar panel de Ajustes preestablecidos",
         "undo": "Deshacer ajuste",
         "zoom_100": "Hacer zoom al 100%",
         "zoom_fit": "Ajustar al área de visualización",

@@ -944,14 +944,10 @@
       },
       "menu": {
         "configurePreset": "配置预设",
-        "deleteFolder": "删除文件夹",
         "deletePreset": "删除预设",
         "duplicatePreset": "复制预设",
-        "exportFolder": "导出文件夹",
         "exportPreset": "导出预设",
-        "newFolder": "新建文件夹",
         "newPreset": "新建预设",
-        "renameFolder": "重命名文件夹",
         "sortAll": "全部按字母排序"
       },
       "status": {
@@ -972,7 +968,6 @@
         "saveNew": "保存为新预设"
       },
       "types": {
-        "folder": "文件夹",
         "preset": "预设"
       }
     },
@@ -984,8 +979,7 @@
         "export": "导出",
         "info": "信息",
         "inpaint": "修复",
-        "masks": "蒙版",
-        "presets": "预设"
+        "masks": "蒙版"
       }
     },
     "toasts": {
@@ -2114,7 +2108,6 @@
         "toggle_library_exif": "切换 EXIF 叠加",
         "toggle_masks": "切换蒙版面板",
         "toggle_metadata": "切换元数据面板",
-        "toggle_presets": "切换预设面板",
         "undo": "撤销调整",
         "zoom_100": "缩放到 100%",
         "zoom_fit": "缩放以适应",

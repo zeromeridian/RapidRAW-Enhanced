@@ -944,14 +944,10 @@
       },
       "menu": {
         "configurePreset": "配置預設",
-        "deleteFolder": "刪除資料夾",
         "deletePreset": "刪除預設",
         "duplicatePreset": "複製預設",
-        "exportFolder": "匯出資料夾",
         "exportPreset": "匯出預設",
-        "newFolder": "新建資料夾",
         "newPreset": "新建預設",
-        "renameFolder": "重新命名資料夾",
         "sortAll": "全部按字母排序"
       },
       "status": {
@@ -972,7 +968,6 @@
         "saveNew": "儲存為新預設"
       },
       "types": {
-        "folder": "資料夾",
         "preset": "預設"
       }
     },
@@ -984,8 +979,7 @@
         "export": "匯出",
         "info": "資訊",
         "inpaint": "修復",
-        "masks": "遮色片",
-        "presets": "預設"
+        "masks": "遮色片"
       }
     },
     "toasts": {
@@ -2114,7 +2108,6 @@
         "toggle_library_exif": "切換 EXIF 疊加",
         "toggle_masks": "切換遮色片面板",
         "toggle_metadata": "切換後設資料面板",
-        "toggle_presets": "切換預設面板",
         "undo": "復原調整",
         "zoom_100": "縮放到 100%",
         "zoom_fit": "縮放以適應",

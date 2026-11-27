@@ -971,14 +971,10 @@
       },
       "menu": {
         "configurePreset": "Configurar Predefinição",
-        "deleteFolder": "Excluir Pasta",
         "deletePreset": "Excluir Predefinição",
         "duplicatePreset": "Duplicar Predefinição",
-        "exportFolder": "Exportar Pasta",
         "exportPreset": "Exportar Predefinição",
-        "newFolder": "Nova Pasta",
         "newPreset": "Nova Predefinição",
-        "renameFolder": "Renomear Pasta",
         "sortAll": "Classificar Todos em Ordem Alfabética"
       },
       "status": {
@@ -999,7 +995,6 @@
         "saveNew": "Salvar como nova predefinição"
       },
       "types": {
-        "folder": "Pasta",
         "preset": "Predefinição"
       }
     },
@@ -1011,8 +1006,7 @@
         "export": "Exportar",
         "info": "Informações",
         "inpaint": "Preencher",
-        "masks": "Máscaras",
-        "presets": "Predefinições"
+        "masks": "Máscaras"
       }
     },
     "toasts": {
@@ -2163,7 +2157,6 @@
         "toggle_library_exif": "Alternar sobreposição EXIF",
         "toggle_masks": "Alternar painel de Máscaras",
         "toggle_metadata": "Alternar painel de Metadados",
-        "toggle_presets": "Alternar painel de Predefinições",
         "undo": "Desfazer ajuste",
         "zoom_100": "Zoom para 100%",
         "zoom_fit": "Zoom para caber",

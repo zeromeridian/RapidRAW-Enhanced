@@ -3,7 +3,8 @@ import { invoke } from '@tauri-apps/api/core';
 import debounce from 'lodash.debounce';
 import { Adjustments } from '../utils/adjustments';
 import { getUnlistedAdjustments, pickPresetAdjustments } from '../utils/presetSettings';
-import { Folder, Invokes, Preset } from '../components/ui/AppProperties';
+import { Invokes, Preset } from '../components/ui/AppProperties';
+import type { GroupChoice } from '../components/ui/LooksBrowser/GroupPicker';
 
 /**
  * Clears upstream RapidRAW's Tool/Style flags when ThisIsRAW saves a preset: its settings are
@@ -20,8 +21,15 @@ export enum PresetListType {
   Preset = 'preset',
 }
 
+/** A preset folder (a group in Looks → Presets), as `presets.json` stores it. */
+export interface PresetFolder {
+  id: string;
+  name: string;
+  children: Array<Preset>;
+}
+
 export interface UserPreset {
-  folder?: Folder;
+  folder?: PresetFolder;
   id?: string | undefined;
   name?: string | undefined;
   preset?: Preset;
@@ -43,6 +51,61 @@ function arrayMove(array: any, from: any, to: any) {
   newArray.splice(to, 0, item);
   return newArray;
 }
+
+/** A new, empty folder (preset group). */
+const createFolder = (name: string): { folder: PresetFolder } => ({
+  folder: { id: crypto.randomUUID(), name, children: [] },
+});
+
+/** The tree with `folder` after the other folders, before the first preset outside a folder. */
+const insertFolder = (tree: Array<UserPreset>, folder: UserPreset): Array<UserPreset> => {
+  const firstPresetIndex = tree.findIndex((item) => item.preset);
+  return firstPresetIndex === -1
+    ? [...tree, folder]
+    : [...tree.slice(0, firstPresetIndex), folder, ...tree.slice(firstPresetIndex)];
+};
+
+/** The folder holding preset `id`: its id, `null` outside a folder, `undefined` when the tree lacks it. */
+export const findPresetFolderId = (tree: Array<UserPreset>, id: string): string | null | undefined => {
+  for (const item of tree) {
+    if (item.preset?.id === id) return null;
+    if (item.folder?.children.some((child) => child.id === id)) return item.folder.id;
+  }
+  return undefined;
+};
+
+/**
+ * The tree with `preset` in the chosen group (a new group is created first): replaced where it
+ * is when it stays in its group, otherwise moved to the end of the target.
+ */
+const placePreset = (tree: Array<UserPreset>, preset: Preset, group: GroupChoice): Array<UserPreset> => {
+  let next = tree;
+  let targetId: string | null = group.type === 'existing' ? group.id : null;
+  if (group.type === 'new') {
+    const folder = createFolder(group.name.trim());
+    next = insertFolder(next, folder);
+    targetId = folder.folder.id;
+  }
+  const replaceIn = (children: Array<Preset>) => children.map((child) => (child.id === preset.id ? preset : child));
+  if (findPresetFolderId(next, preset.id) === targetId) {
+    return next.map((item) => {
+      if (item.preset?.id === preset.id) return { preset };
+      if (item.folder) return { folder: { ...item.folder, children: replaceIn(item.folder.children) } };
+      return item;
+    });
+  }
+  const without = next
+    .filter((item) => item.preset?.id !== preset.id)
+    .map((item) =>
+      item.folder
+        ? { folder: { ...item.folder, children: item.folder.children.filter((child) => child.id !== preset.id) } }
+        : item,
+    );
+  if (!targetId) return [...without, { preset }];
+  return without.map((item) =>
+    item.folder?.id === targetId ? { folder: { ...item.folder, children: [...item.folder.children, preset] } } : item,
+  );
+};
 
 export function usePresets(currentAdjustments: Adjustments) {
   const [presets, setPresets] = useState<Array<UserPreset>>([]);
@@ -74,58 +137,48 @@ export function usePresets(currentAdjustments: Adjustments) {
     loadPresets();
   }, [loadPresets]);
 
-  /** Saves the photo's values of the ticked `keys` as a new preset. */
-  const addPreset = (name: string, keys: ReadonlySet<string>, folderId: string | null = null) => {
+  /** Saves the photo's values of the ticked `keys` as a new preset in the chosen group. */
+  const addPreset = (name: string, keys: ReadonlySet<string>, group: GroupChoice) => {
     const newPresetData: Preset = {
       adjustments: pickPresetAdjustments(keys, currentAdjustments),
       id: crypto.randomUUID(),
       name,
     };
 
-    let updatedPresets: Array<UserPreset>;
-    if (folderId) {
-      updatedPresets = presets.map((item: UserPreset) => {
-        if (item.folder && item.folder.id === folderId) {
-          return {
-            folder: {
-              ...item.folder,
-              children: [...item.folder.children, newPresetData],
-            },
-          };
-        }
-        return item;
-      });
-    } else {
-      updatedPresets = [...presets, { preset: newPresetData }];
-    }
-
+    const updatedPresets = placePreset(presets, newPresetData, group);
     setPresets(updatedPresets);
     savePresetsToBackend(updatedPresets);
     return newPresetData;
   };
 
   const addFolder = (name: string) => {
-    const newFolder = {
-      folder: {
-        id: crypto.randomUUID(),
-        name,
-        children: [],
-      },
-    };
-
-    setPresets((currentPresets: Array<any>) => {
-      const updatedPresets = [...currentPresets];
-      const firstPresetIndex = updatedPresets.findIndex((p: UserPreset) => p.preset);
-
-      if (firstPresetIndex === -1) {
-        updatedPresets.push(newFolder);
-      } else {
-        updatedPresets.splice(firstPresetIndex, 0, newFolder);
-      }
-
+    setPresets((currentPresets: Array<UserPreset>) => {
+      const updatedPresets = insertFolder(currentPresets, createFolder(name));
       savePresetsToBackend(updatedPresets);
       return updatedPresets;
     });
+  };
+
+  /** Deletes the folder `id`; its presets stay, outside any folder. */
+  const deleteFolder = (id: string) => {
+    const children = presets.find((item: UserPreset) => item.folder?.id === id)?.folder?.children ?? [];
+    const updatedPresets = [
+      ...presets.filter((item: UserPreset) => item.folder?.id !== id),
+      ...children.map((preset: Preset) => ({ preset })),
+    ];
+    setPresets(updatedPresets);
+    savePresetsToBackend(updatedPresets);
+  };
+
+  /** Moves preset `id` into the chosen group, at its end. */
+  const movePresetToGroup = (id: string, group: GroupChoice) => {
+    const preset = presets
+      .flatMap((item: UserPreset) => (item.preset ? [item.preset] : (item.folder?.children ?? [])))
+      .find((candidate: Preset) => candidate.id === id);
+    if (!preset) return;
+    const updatedPresets = placePreset(presets, preset, group);
+    setPresets(updatedPresets);
+    savePresetsToBackend(updatedPresets);
   };
 
   const deleteItem = (id: string) => {
@@ -170,9 +223,16 @@ export function usePresets(currentAdjustments: Adjustments) {
   /**
    * Renames the preset `id` and keeps only the ticked `keys`. Their values come from the photo
    * (`fromPhoto`, Update with Current Settings) or stay the preset's own (Configure, where a newly
-   * ticked setting is saved at its default and settings the dialog does not list are kept).
+   * ticked setting is saved at its default and settings the dialog does not list are kept), and
+   * places it in the chosen group.
    */
-  const updatePreset = (id: string, name: string, keys: ReadonlySet<string>, fromPhoto: boolean) => {
+  const updatePreset = (
+    id: string,
+    name: string,
+    keys: ReadonlySet<string>,
+    fromPhoto: boolean,
+    group: GroupChoice,
+  ) => {
     const existingPreset = presets
       .flatMap((item: UserPreset) => (item.preset ? [item.preset] : (item.folder?.children ?? [])))
       .find((preset: Preset) => preset.id === id);
@@ -190,17 +250,7 @@ export function usePresets(currentAdjustments: Adjustments) {
           },
     };
 
-    const updatedPresets = presets.map((item: UserPreset) => {
-      if (item.preset?.id === id) {
-        return { preset: updatedPreset };
-      }
-      if (item.folder?.children.some((child: Preset) => child.id === id)) {
-        const children = item.folder.children.map((child: Preset) => (child.id === id ? updatedPreset : child));
-        return { folder: { ...item.folder, children } };
-      }
-      return item;
-    });
-
+    const updatedPresets = placePreset(presets, updatedPreset, group);
     setPresets(updatedPresets);
     savePresetsToBackend(updatedPresets);
     return updatedPreset;
@@ -354,22 +404,17 @@ export function usePresets(currentAdjustments: Adjustments) {
         }
 
         for (const item of currentPresets) {
-          if (item.folder) {
-            const activeChildIndex = getIndex(item.folder.children, activeId);
-            const overChildIndex = getIndex(item.folder.children, overId);
+          const folder = item.folder;
+          if (folder) {
+            const activeChildIndex = folder.children.findIndex((child) => child.id === activeId);
+            const overChildIndex = folder.children.findIndex((child) => child.id === overId);
 
             if (activeChildIndex !== -1 && overChildIndex !== -1) {
-              const newPresets = currentPresets.map((p: UserPreset) => {
-                if (p.folder?.id === item.folder?.id) {
-                  return {
-                    folder: {
-                      ...p?.folder,
-                      children: arrayMove(p.folder?.children, activeChildIndex, overChildIndex),
-                    },
-                  };
-                }
-                return p;
-              });
+              const newPresets = currentPresets.map((p: UserPreset) =>
+                p.folder?.id === folder.id
+                  ? { folder: { ...folder, children: arrayMove(folder.children, activeChildIndex, overChildIndex) } }
+                  : p,
+              );
               savePresetsToBackend(newPresets);
               return newPresets;
             }
@@ -469,6 +514,7 @@ export function usePresets(currentAdjustments: Adjustments) {
   return {
     addFolder,
     addPreset,
+    deleteFolder,
     deleteItem,
     duplicatePreset,
     exportPresetsToFile,
@@ -477,6 +523,7 @@ export function usePresets(currentAdjustments: Adjustments) {
     importLegacyPresetsFromFile,
     isLoading,
     movePreset,
+    movePresetToGroup,
     presets,
     refreshPresets: loadPresets,
     renameItem,

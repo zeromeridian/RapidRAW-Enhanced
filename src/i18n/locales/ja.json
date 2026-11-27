@@ -944,14 +944,10 @@
       },
       "menu": {
         "configurePreset": "プリセットを構成",
-        "deleteFolder": "フォルダを削除",
         "deletePreset": "プリセットを削除",
         "duplicatePreset": "プリセットを複製",
-        "exportFolder": "フォルダを書き出し",
         "exportPreset": "プリセットを書き出し",
-        "newFolder": "新規フォルダ",
         "newPreset": "新規プリセット",
-        "renameFolder": "フォルダ名を変更",
         "sortAll": "すべて名前順に並べ替え"
       },
       "status": {
@@ -972,7 +968,6 @@
         "saveNew": "新規プリセットとして保存"
       },
       "types": {
-        "folder": "フォルダ",
         "preset": "プリセット"
       }
     },
@@ -984,8 +979,7 @@
         "export": "書き出し",
         "info": "情報",
         "inpaint": "インペイント",
-        "masks": "マスク",
-        "presets": "プリセット"
+        "masks": "マスク"
       }
     },
     "toasts": {
@@ -2114,7 +2108,6 @@
         "toggle_library_exif": "EXIF重ね合わせ表示の表示/非表示",
         "toggle_masks": "マスクパネルの表示/非表示",
         "toggle_metadata": "メタデータパネルの表示/非表示",
-        "toggle_presets": "プリセットパネルの表示/非表示",
         "undo": "操作を元に戻す",
         "zoom_100": "100%ズーム",
         "zoom_fit": "画面に合わせる",

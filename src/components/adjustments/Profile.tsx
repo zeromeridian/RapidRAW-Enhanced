@@ -5,8 +5,6 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import {
   ChevronDown,
   ImageOff,
-  LayoutGrid,
-  List,
   Pencil,
   Plus,
   Save,
@@ -26,7 +24,8 @@ import AdjustmentTool from './AdjustmentTool';
 import CreateProfileModal, { CreateProfileChoice } from '../modals/CreateProfileModal';
 import { useContextMenu } from '../../context/ContextMenuContext';
 import { useEditorStore } from '../../store/useEditorStore';
-import { useSettingsStore } from '../../store/useSettingsStore';
+import BrowserViewSwitch from '../ui/LooksBrowser/BrowserViewSwitch';
+import { useLooksBrowser } from '../ui/LooksBrowser/useLooksBrowser';
 import { Invokes } from '../ui/AppProperties';
 import {
   Adjustments,
@@ -49,7 +48,6 @@ interface ProfilePanelProps {
 /** The grid's previews: pixels on the long side, and how many photo/edit states are kept. */
 const PREVIEW_SIZE = 112;
 const PREVIEW_CACHE_SIZE = 8;
-const NO_FAVORITES: string[] = [];
 
 interface CreatedProfile {
   path: string;
@@ -121,8 +119,7 @@ export default function ProfilePanel({
   const profile = adjustments.profile ?? null;
 
   const isImageReady = useEditorStore((state) => state.selectedImage?.isReady ?? false);
-  const favorites = useSettingsStore((state) => state.appSettings?.favoriteProfiles ?? NO_FAVORITES);
-  const isGridView = useSettingsStore((state) => state.appSettings?.profileBrowserGrid ?? true);
+  const { favorites, toggleFavorite, isGrid: isGridView, setGrid: setGridView } = useLooksBrowser('profiles');
   const [previews, setPreviews] = useState<Record<string, string | null>>({});
   const [isLoadingPreviews, setIsLoadingPreviews] = useState(false);
   const previewCache = useRef<Map<string, Record<string, string | null>>>(new Map());
@@ -405,21 +402,6 @@ export default function ProfilePanel({
     else handleBake(choice, dialog?.mode === 'update' ? dialog.entry : undefined);
   };
 
-  const toggleFavorite = (id: string) => {
-    const { appSettings, handleSettingsChange } = useSettingsStore.getState();
-    if (!appSettings) return;
-    const current = appSettings.favoriteProfiles ?? NO_FAVORITES;
-    handleSettingsChange({
-      ...appSettings,
-      favoriteProfiles: current.includes(id) ? current.filter((favorite) => favorite !== id) : [...current, id],
-    });
-  };
-
-  const setGridView = (isGridView: boolean) => {
-    const { appSettings, handleSettingsChange } = useSettingsStore.getState();
-    if (appSettings) handleSettingsChange({ ...appSettings, profileBrowserGrid: isGridView });
-  };
-
   // The grid's previews: the open photo with each profile, rendered when the grid opens.
   useEffect(() => {
     if (!isExpanded || !isGridView || !selectedImagePath || !isImageReady || entries.length === 0) return;
@@ -463,10 +445,10 @@ export default function ProfilePanel({
   }, [entries]);
   // Favorites first, as in Adobe's Profile Browser, then each group; a favorite shows in both.
   const sections = useMemo(() => {
-    const favoriteEntries = entries.filter((entry) => favorites.includes(entry.id));
+    const favoriteEntries = entries.filter((entry) => favorites.has(entry.id));
     return [
       ...(favoriteEntries.length > 0
-        ? [{ key: 'favorites', title: t('adjustments.profile.favorites'), entries: favoriteEntries }]
+        ? [{ key: 'favorites', title: t('editor.looks.favorites'), entries: favoriteEntries }]
         : []),
       ...groupedEntries.map(([group, groupEntries]) => ({
         key: `group:${group}`,
@@ -583,24 +565,8 @@ export default function ProfilePanel({
                 <p className="text-xs text-text-secondary">{t('adjustments.profile.empty')}</p>
               ) : (
                 <>
-                  <div className="flex justify-end gap-1">
-                    {[
-                      { isGrid: true, icon: LayoutGrid, label: t('adjustments.profile.viewGrid') },
-                      { isGrid: false, icon: List, label: t('adjustments.profile.viewList') },
-                    ].map(({ isGrid, icon: Icon, label }) => (
-                      <button
-                        key={label}
-                        aria-pressed={isGridView === isGrid}
-                        className={clsx(
-                          'p-0.5 rounded-sm transition-colors',
-                          isGridView === isGrid ? 'text-accent' : 'text-text-secondary hover:text-text-primary',
-                        )}
-                        data-tooltip={label}
-                        onClick={() => setGridView(isGrid)}
-                      >
-                        <Icon size={14} />
-                      </button>
-                    ))}
+                  <div className="flex justify-end">
+                    <BrowserViewSwitch isGrid={isGridView} onChange={setGridView} />
                   </div>
                   {sections.map((section) => (
                     <div key={section.key}>
@@ -608,7 +574,7 @@ export default function ProfilePanel({
                       <div className={isGridView ? 'grid grid-cols-3 gap-2' : 'flex flex-col'}>
                         {section.entries.map((entry) => {
                           const isSelected = entry.id === profile?.id;
-                          const isFavorite = favorites.includes(entry.id);
+                          const isFavorite = favorites.has(entry.id);
                           const entryProps = {
                             onMouseEnter: () => startPreview(entry.path),
                             onClick: () => handleSelect(entry),

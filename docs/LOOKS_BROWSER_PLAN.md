@@ -154,4 +154,25 @@ English strings only (`en.json`, listed under "Pending translations").
 
 - 2026-11-27: owner request; code check and this plan; decisions L1–L5,
   then the Looks tab (L6–L9, owner's follow-up: "Profiles, LUTs and
-  presets are in 3 different places"). No code yet.
+  presets are in 3 different places").
+- 2026-11-27: **phase 1 built as `1.121.0`** on `dev/looks-browser`
+  (L5's batch branch `dev/menu-bar-entries` was merged meanwhile, so a
+  new one from `develop` `9c8a414b`), not committed. Shared parts in
+  `src/components/ui/LooksBrowser/`: `useLooksBrowser(kind)` (one hook
+  for favourites, grid/list and section open state, keyed in
+  `BROWSER_SETTINGS`; Basic → Profile already uses it), `BrowserSection`,
+  `BrowserViewSwitch`, `BrowserItem.tsx` (`BrowserTile`, `BrowserRow`,
+  `BrowserItems`, which puts the active item's slider under it or under
+  its grid row), `GroupPicker` (`GroupChoice`: none / existing / new).
+  `LooksPanel` + `LooksHeader` (kind in settings as `looksKind`, not the
+  UI store, so it survives restarts); Profiles and LUTs show
+  `ProfilePanel` and the new `LutTool` until phases 2–3. Settings:
+  `favoritePresets`, `presetBrowserGrid` (default list, as before),
+  `looksKind`, `looksSections` (`kind:section` → open). Choices made
+  while building (owner may revise): presets' groups keep their stored
+  order (drag to reorder, Sort All) rather than name order; folders start
+  closed as before, Favorites and No Group open; No Group's header shows
+  only beside other sections; a search opens every section with
+  matches; grid previews are the existing preset previews cropped
+  square; the list's details line is the settings count; a group's
+  right-click also offers New Preset in that group.
