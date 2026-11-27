@@ -9,6 +9,7 @@ import { Invokes } from '../components/ui/AppProperties';
 import type { CreateProfileChoice } from '../components/modals/CreateProfileModal';
 import { useEditorStore } from '../store/useEditorStore';
 import { useEditorActions } from './useEditorActions';
+import { useLuts } from './useLuts';
 import {
   Adjustments,
   CustomProfile,
@@ -109,6 +110,7 @@ const keysOfGroups = (groups: ReadonlySet<string>) =>
 export function useCustomProfiles() {
   const { t } = useTranslation();
   const { setAdjustments } = useEditorActions();
+  const { refreshList: refreshLuts } = useLuts();
   const setEditor = useEditorStore((state) => state.setEditor);
 
   const refreshList = useCallback(async () => {
@@ -350,7 +352,7 @@ export function useCustomProfiles() {
       await invoke<string>(Invokes.SaveSettingsAsLut, {
         request: {
           name: choice.name,
-          group: '',
+          group: choice.group,
           keys: keysOfGroups(choice.groups),
           monochrome: choice.monochrome,
           adjustments: useEditorStore.getState().adjustments,
@@ -358,6 +360,7 @@ export function useCustomProfiles() {
       });
       toast.success(t('modals.createProfile.lutSaved', { name: choice.name }));
       setProfileState({ dialog: null });
+      refreshLuts();
     } catch (err) {
       toast.error(t('modals.createProfile.lutFailed', { error: String(err) }));
     } finally {

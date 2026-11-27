@@ -5,6 +5,25 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.123.0-dev-looks-browser — 2026-11-27
+
+### Looks
+
+- **LUTs have the same browser as profiles in Looks:** a grid of previews
+  or a list, Favorites first, groups, search; pointing at a LUT
+  previews it, a click applies it, and its Intensity slider appears
+  under it.
+- **LUT groups are folders** inside the LUT folder, so they can be seen
+  and arranged in Finder or Explorer, and a folder of LUTs copied there
+  shows up as a group. Right-click a LUT for Move to Group; right-click
+  a group to import LUTs straight into it, rename it or delete it (its
+  LUTs move out of the group, nothing is deleted).
+- **Save as LUT** (in the Create Profile dialog) can save into a group.
+- **Look → LUT is now a short row** like Basic → Profile: the LUT's
+  name opens Looks → LUTs, with a button to remove it and Intensity.
+- Older edits that point at a LUT by its file still find it after it
+  has been moved to another group.
+
 ## 1.122.0-dev-looks-browser — 2026-11-27
 
 ### Looks

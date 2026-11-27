@@ -6,7 +6,7 @@ import { useEditorActions } from './useEditorActions';
 
 /** The props every adjustment section component takes for the photo's own adjustments. */
 export function useAdjustmentSectionProps() {
-  const { setAdjustments, handleLutSelect, setLutPreviewOverride } = useEditorActions();
+  const { setAdjustments } = useEditorActions();
   const { appSettings, theme } = useSettingsStore(
     useShallow((state) => ({ appSettings: state.appSettings, theme: state.theme })),
   );
@@ -34,8 +34,6 @@ export function useAdjustmentSectionProps() {
     setAdjustments,
     histogram,
     theme,
-    handleLutSelect,
-    onLutHover: setLutPreviewOverride,
     appSettings,
     isWbPickerActive,
     toggleWbPicker,

@@ -3,8 +3,8 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { AppSettings, LooksKind } from '../AppProperties';
 
 interface BrowserSettingKeys {
-  favorites: 'favoritePresets' | 'favoriteProfiles';
-  grid: 'presetBrowserGrid' | 'profileBrowserGrid';
+  favorites: 'favoritePresets' | 'favoriteProfiles' | 'favoriteLuts';
+  grid: 'presetBrowserGrid' | 'profileBrowserGrid' | 'lutBrowserGrid';
   /** The layout before the user picks one: presets keep their list, profiles their grid. */
   isGridDefault: boolean;
 }
@@ -13,9 +13,10 @@ interface BrowserSettingKeys {
 const BROWSER_SETTINGS = {
   presets: { favorites: 'favoritePresets', grid: 'presetBrowserGrid', isGridDefault: false },
   profiles: { favorites: 'favoriteProfiles', grid: 'profileBrowserGrid', isGridDefault: true },
-} as const satisfies Partial<Record<LooksKind, BrowserSettingKeys>>;
+  luts: { favorites: 'favoriteLuts', grid: 'lutBrowserGrid', isGridDefault: true },
+} as const satisfies Record<LooksKind, BrowserSettingKeys>;
 
-export type LooksBrowserKind = keyof typeof BROWSER_SETTINGS;
+export type LooksBrowserKind = LooksKind;
 
 const NO_FAVORITES: string[] = [];
 const NO_SECTIONS: Record<string, boolean> = {};

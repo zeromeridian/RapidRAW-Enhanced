@@ -968,7 +968,8 @@ pub async fn save_settings_as_lut(
             .path()
             .app_data_dir()
             .map_err(|e| e.to_string())?;
-        let dir = crate::lut_processing::get_luts_dir(&data_dir).map_err(|e| e.to_string())?;
+        let luts_dir = crate::lut_processing::get_luts_dir(&data_dir).map_err(|e| e.to_string())?;
+        let dir = crate::lut_processing::lut_group_dir(&luts_dir, &request.group)?;
         let stem = crate::naming::clean_file_stem(name);
         let path = crate::lut_processing::unique_destination(
             &dir,

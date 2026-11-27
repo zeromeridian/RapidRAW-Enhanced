@@ -38,6 +38,8 @@ interface CreateProfileModalProps {
   initialName: string;
   /** The profile groups to choose from (a group's id is its name), and the one chosen at first ('' for none). */
   profileGroups: ReadonlyArray<BrowserGroup>;
+  /** The LUT groups (subfolders of `luts/`) Save as LUT can save into. */
+  lutGroups: ReadonlyArray<BrowserGroup>;
   initialGroup: string;
   /** The bake groups ticked when the dialog opens. */
   initialGroups: ReadonlySet<string>;
@@ -72,6 +74,7 @@ export default function CreateProfileModal({
   currentProfileName,
   initialName,
   profileGroups,
+  lutGroups,
   initialGroup,
   initialGroups,
   initialMonochrome,
@@ -112,13 +115,13 @@ export default function CreateProfileModal({
 
   // Only a new bake can be a LUT; Update and Rename are for profiles.
   const isLut = mode === 'create' && target === 'lut';
-  const canSubmit = name.trim() !== '' && !isBusy && (isLut || isGroupChoiceValid(group));
+  const canSubmit = name.trim() !== '' && !isBusy && isGroupChoiceValid(group);
 
   const handleSubmit = useCallback(() => {
     if (canSubmit) {
       onSubmit({
         name: name.trim(),
-        // A profile group's id is its name.
+        // A profile or LUT group's id is its name.
         group: group.type === 'none' ? '' : group.type === 'new' ? group.name.trim() : group.id,
         groups: mode === 'rename' ? new Set() : groups,
         monochrome,
@@ -194,7 +197,11 @@ export default function CreateProfileModal({
                   target === option ? 'bg-accent text-button-text' : 'text-text-secondary hover:text-text-primary'
                 }`}
                 key={option}
-                onClick={() => setTarget(option)}
+                onClick={() => {
+                  // Profiles and LUTs have groups of their own.
+                  if (option !== target) setGroup(NO_GROUP);
+                  setTarget(option);
+                }}
                 role="radio"
                 type="button"
               >
@@ -213,7 +220,7 @@ export default function CreateProfileModal({
             type="text"
             value={name}
           />
-          {!isLut && <GroupPicker groups={profileGroups} value={group} onChange={setGroup} />}
+          <GroupPicker groups={isLut ? lutGroups : profileGroups} value={group} onChange={setGroup} />
         </div>
 
         {mode === 'rename' ? (

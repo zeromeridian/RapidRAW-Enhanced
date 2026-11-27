@@ -69,6 +69,11 @@ export enum Invokes {
   ExportCustomProfile = 'export_custom_profile',
   GenerateProfilePreviews = 'generate_profile_previews',
   SaveSettingsAsLut = 'save_settings_as_lut',
+  ListLuts = 'list_luts',
+  ImportLuts = 'import_luts',
+  RemoveLut = 'remove_lut',
+  MoveLutsToGroup = 'move_luts_to_group',
+  GenerateLutPreviews = 'generate_lut_previews',
   CreateFolder = 'create_folder',
   CreateVirtualCopy = 'create_virtual_copy',
   CullImages = 'cull_images',
@@ -377,6 +382,10 @@ export interface AppSettings {
   favoritePresets?: string[];
   /** Whether Looks → Presets shows a grid of previews or a list (absent: list). */
   presetBrowserGrid?: boolean;
+  /** Starred LUTs by their path inside `luts/` (`LutEntry.id`), listed first in Looks → LUTs. */
+  favoriteLuts?: string[];
+  /** Whether Looks → LUTs shows a grid of previews (absent: yes) or a list. */
+  lutBrowserGrid?: boolean;
   /** The kind the Looks tab shows (absent: presets). */
   looksKind?: LooksKind;
   /** Open state of the Looks browser sections the user has toggled, keyed `kind:section`. */

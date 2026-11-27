@@ -196,4 +196,21 @@ English strings only (`en.json`, listed under "Pending translations").
   shows in Looks too; Create Profile and Import moved from the row to
   Looks (plan: the row keeps only name, ✕, Amount, Save / Update);
   imports keep the group stored in the file (a file dialog has no room
-  for a group picker).
+  for a group picker). Committed by the owner as `6ac3909f`.
+- 2026-11-27: **phase 3 built as `1.123.0`**, not committed. Rust
+  (`lut_processing.rs`): entries carry `group` (subfolder) and `id`
+  (path inside `luts/`, the favourite key); listing reads `luts/` and
+  its subfolders (one level, hidden folders skipped); `import_luts`
+  takes an optional group; `move_luts_to_group` serves Move to Group,
+  Rename Group and Delete Group (to `luts/` itself), names clashes
+  `name (n)`, removes emptied group folders, and returns the moves so
+  the photo's `lutPath` and the favourites follow; `remove_lut` drops
+  an emptied group folder; `get_or_load_lut` finds a moved file by
+  name for path-only edits (L1); Save as LUT saves into the chosen
+  group. Frontend: `GroupedBrowser` now carries Profiles and LUTs (one
+  implementation of sections, group menus and dialogs); `useLuts`
+  store; `LutTool` became the slim row (`LUTControl` removed). Choices
+  made while building: LUT import into a group from the group's
+  right-click menu (Import LUTs into Group…) instead of a picker in the
+  file dialog; LUTs default to the grid as before; masks have no LUT
+  tool, so nothing changes there.

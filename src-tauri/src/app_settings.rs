@@ -882,6 +882,12 @@ pub struct AppSettings {
     /// Whether Looks → Presets shows a grid of previews or a list (absent: list).
     #[serde(default)]
     pub preset_browser_grid: Option<bool>,
+    /// Starred LUTs by their path inside `luts/` (`LutEntry::id`), listed first in Looks → LUTs.
+    #[serde(default)]
+    pub favorite_luts: Option<Vec<String>>,
+    /// Whether Looks → LUTs shows a grid of previews (absent: yes) or a list.
+    #[serde(default)]
+    pub lut_browser_grid: Option<bool>,
     /// The kind Looks shows: `presets`, `profiles` or `luts` (absent: presets).
     #[serde(default)]
     pub looks_kind: Option<String>,
@@ -1132,6 +1138,8 @@ impl Default for AppSettings {
             profile_browser_grid: None,
             favorite_presets: None,
             preset_browser_grid: None,
+            favorite_luts: None,
+            lut_browser_grid: None,
             looks_kind: None,
             looks_sections: None,
             export_presets: default_export_presets(),

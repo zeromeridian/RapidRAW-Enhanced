@@ -48,8 +48,6 @@ interface EffectsPanelProps {
   adjustments: Adjustments;
   isForMask?: boolean;
   setAdjustments(adjustments: Partial<Adjustments> | ((prev: Adjustments) => Adjustments)): any;
-  handleLutSelect(path: string): void;
-  onLutHover?: (path: string | null) => void;
   appSettings: AppSettings | null;
   onDragStateChange?: (isDragging: boolean) => void;
 }
@@ -185,8 +183,6 @@ export default function EffectsPanel({
   adjustments,
   setAdjustments,
   isForMask = false,
-  handleLutSelect,
-  onLutHover,
   appSettings,
   onDragStateChange,
 }: EffectsPanelProps) {
@@ -877,13 +873,7 @@ export default function EffectsPanel({
             />
           </AiEffectSection>
 
-          <LutTool
-            adjustments={adjustments}
-            setAdjustments={setAdjustments}
-            handleLutSelect={handleLutSelect}
-            onLutHover={onLutHover}
-            onDragStateChange={onDragStateChange}
-          />
+          <LutTool adjustments={adjustments} setAdjustments={setAdjustments} onDragStateChange={onDragStateChange} />
         </>
       )}
 

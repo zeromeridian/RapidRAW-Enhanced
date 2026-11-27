@@ -16,6 +16,16 @@ export const NO_GROUP: GroupChoice = { type: 'none' };
 /** A new group needs a name. */
 export const isGroupChoiceValid = (choice: GroupChoice) => choice.type !== 'new' || choice.name.trim() !== '';
 
+/** The groups of items grouped by name (profiles, LUTs), sorted; '' (no group) left out. */
+export const groupNamesOf = (items: ReadonlyArray<{ group: string }>) =>
+  [...new Set(items.map((item) => item.group).filter((group) => group !== ''))].sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: 'base' }),
+  );
+
+/** Name-keyed groups for the picker: a profile or LUT group's id is its name. */
+export const namedGroupsOf = (items: ReadonlyArray<{ group: string }>): Array<BrowserGroup> =>
+  groupNamesOf(items).map((group) => ({ id: group, name: group }));
+
 /** The choice that keeps an item in `groupId`, or in no group. */
 export const groupChoiceOf = (groupId: string | null | undefined): GroupChoice =>
   groupId ? { type: 'existing', id: groupId } : NO_GROUP;

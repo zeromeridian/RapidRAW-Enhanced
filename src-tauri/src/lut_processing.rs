@@ -31,6 +31,18 @@ pub struct Lut {
 pub struct LutEntry {
     pub name: String,
     pub path: String,
+    /// The subfolder of `luts/` it is in (Looks → LUTs' group); empty for `luts/` itself.
+    pub group: String,
+    /// Its path inside `luts/` with `/` separators, which keeps favourites apart across groups.
+    pub id: String,
+}
+
+/// LUTs moved by `move_luts_to_group`, and the folder listed afterwards.
+#[derive(Serialize)]
+pub struct MovedLuts {
+    pub entries: Vec<LutEntry>,
+    /// `(from, to)` paths, so an edit or favourite naming a moved LUT can follow it.
+    pub moved: Vec<(String, String)>,
 }
 
 #[derive(Serialize)]
@@ -58,32 +70,152 @@ pub fn get_luts_dir(app_data_dir: &Path) -> anyhow::Result<PathBuf> {
 /// HALD images.
 const SUPPORTED_LUT_EXTENSIONS: &[&str] = &["cube", "3dl", "png", "jpg", "jpeg", "tif", "tiff"];
 
-pub fn list_luts_in_dir(dir: &Path) -> anyhow::Result<Vec<LutEntry>> {
-    let mut entries: Vec<LutEntry> = Vec::new();
-    if !dir.exists() {
-        return Ok(entries);
-    }
+fn is_lut_file(path: &Path) -> bool {
+    let extension = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    path.is_file() && SUPPORTED_LUT_EXTENSIONS.contains(&extension.as_str())
+}
+
+/// The LUT files directly in `dir`, listed as members of `group`.
+fn luts_in_folder(dir: &Path, group: &str) -> anyhow::Result<Vec<LutEntry>> {
+    let mut entries = Vec::new();
     for entry in read_dir(dir)? {
         let path = entry?.path();
-        let extension = path
-            .extension()
+        if !is_lut_file(&path) {
+            continue;
+        }
+        let file_name = path
+            .file_name()
             .and_then(|s| s.to_str())
-            .unwrap_or("")
-            .to_lowercase();
-        if SUPPORTED_LUT_EXTENSIONS.contains(&extension.as_str()) {
-            let name = path
+            .unwrap_or_default()
+            .to_string();
+        entries.push(LutEntry {
+            name: path
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("LUT")
-                .to_string();
-            entries.push(LutEntry {
-                name,
-                path: path.to_string_lossy().into_owned(),
-            });
+                .to_string(),
+            path: path.to_string_lossy().into_owned(),
+            group: group.to_string(),
+            id: if group.is_empty() {
+                file_name
+            } else {
+                format!("{group}/{file_name}")
+            },
+        });
+    }
+    Ok(entries)
+}
+
+/// The group folders of `luts/`: its subfolders, one level (Plan item 86, decisions L1–L2).
+fn group_folders(dir: &Path) -> anyhow::Result<Vec<PathBuf>> {
+    Ok(read_dir(dir)?
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| {
+            path.is_dir()
+                && path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| !name.starts_with('.'))
+        })
+        .collect())
+}
+
+/// The LUTs in `dir` (`luts/`) and in its group subfolders, by group, then name.
+pub fn list_luts_in_dir(dir: &Path) -> anyhow::Result<Vec<LutEntry>> {
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut entries = luts_in_folder(dir, "")?;
+    for folder in group_folders(dir)? {
+        let group = folder
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default()
+            .to_string();
+        entries.extend(luts_in_folder(&folder, &group)?);
+    }
+    entries.sort_by_key(|entry| (entry.group.to_lowercase(), entry.name.to_lowercase()));
+    Ok(entries)
+}
+
+/// The folder of `group` in `luts_dir`, created when needed; `luts_dir` itself for no group.
+pub fn lut_group_dir(luts_dir: &Path, group: &str) -> Result<PathBuf, String> {
+    let group = group.trim();
+    if group.is_empty() {
+        return Ok(luts_dir.to_path_buf());
+    }
+    let name = crate::naming::clean_file_stem(group);
+    if name.is_empty() || name.starts_with('.') {
+        return Err(format!("'{group}' cannot be a group name"));
+    }
+    let dir = luts_dir.join(name);
+    create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+/// Whether `path` is a file in `luts_dir` or in one of its group folders.
+fn is_in_luts_dir(luts_dir: &Path, path: &Path) -> bool {
+    let Ok(luts_dir) = luts_dir.canonicalize() else {
+        return false;
+    };
+    path.parent()
+        .and_then(|parent| parent.canonicalize().ok())
+        .is_some_and(|parent| {
+            parent == luts_dir || parent.parent().is_some_and(|above| above == luts_dir)
+        })
+}
+
+/// Moves the LUT files at `paths` into `group`'s folder (renamed `name (n)` on a clash) and
+/// removes group folders the move left empty. Returns `(from, to)` for each moved file.
+pub fn move_luts_in(
+    luts_dir: &Path,
+    paths: &[String],
+    group: &str,
+) -> Result<Vec<(String, String)>, String> {
+    let target = lut_group_dir(luts_dir, group)?;
+    let mut moved = Vec::new();
+    for path in paths {
+        let source = Path::new(path);
+        if !is_lut_file(source) || !is_in_luts_dir(luts_dir, source) {
+            return Err(format!("'{path}' is not a LUT in the LUT folder"));
+        }
+        let parent = source.parent().map(Path::to_path_buf);
+        if parent.as_deref() == Some(target.as_path()) {
+            continue;
+        }
+        let stem = source.file_stem().and_then(|s| s.to_str()).unwrap_or("LUT");
+        let extension = source
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("cube");
+        let destination = unique_destination(&target, stem, extension);
+        std::fs::rename(source, &destination).map_err(|e| e.to_string())?;
+        moved.push((path.clone(), destination.to_string_lossy().into_owned()));
+        if let Some(parent) = parent.filter(|parent| parent != luts_dir) {
+            // Only an empty folder is removed; one still holding files stays.
+            let _ = std::fs::remove_dir(parent);
         }
     }
-    entries.sort_by_key(|a| a.name.to_lowercase());
-    Ok(entries)
+    Ok(moved)
+}
+
+/// A LUT moved since an edit stored its path (Looks → LUTs' groups are subfolders of `luts/`):
+/// the file of the same name in `luts/` or one of its groups.
+fn find_moved_lut(path: &Path) -> Option<PathBuf> {
+    let file_name = path.file_name()?;
+    let luts_dir = path
+        .ancestors()
+        .skip(1)
+        .take(2)
+        .find(|dir| dir.file_name().is_some_and(|name| name == "luts"))?;
+    std::iter::once(luts_dir.to_path_buf())
+        .chain(group_folders(luts_dir).ok()?)
+        .map(|dir| dir.join(file_name))
+        .find(|candidate| candidate.is_file())
 }
 
 /// `stem.extension` in `dir`, or the first free `stem (n).extension`; also names custom profiles.
@@ -97,7 +229,8 @@ pub(crate) fn unique_destination(dir: &Path, stem: &str, extension: &str) -> Pat
     candidate
 }
 
-pub fn import_luts_to_dir(dir: &Path, source_paths: &[String]) -> anyhow::Result<Vec<LutEntry>> {
+/// Copies the LUT files at `source_paths` into `dir` (`luts/` or a group folder).
+pub fn import_luts_to_dir(dir: &Path, source_paths: &[String]) -> anyhow::Result<()> {
     for source in source_paths {
         if let Err(error) = parse_lut_file(source) {
             log::warn!("Skipping invalid LUT '{}': {}", source, error);
@@ -127,7 +260,7 @@ pub fn import_luts_to_dir(dir: &Path, source_paths: &[String]) -> anyhow::Result
             log::error!("Failed to copy LUT '{}': {}", source, error);
         }
     }
-    list_luts_in_dir(dir)
+    Ok(())
 }
 
 #[cfg(target_os = "android")]
@@ -456,7 +589,14 @@ pub fn get_or_load_lut(state: &AppState, path: &str) -> Result<Arc<Lut>, String>
         return Ok(lut.clone());
     }
 
-    let lut = parse_lut_file(path).map_err(|e| e.to_string())?;
+    // An edit from before `1.115.1` holds only the path; its LUT may have moved to a group since.
+    let lut = match parse_lut_file(path) {
+        Err(error) if !Path::new(path).exists() => find_moved_lut(Path::new(path))
+            .ok_or(error)
+            .and_then(|moved| parse_lut_file(&moved.to_string_lossy())),
+        result => result,
+    }
+    .map_err(|e| e.to_string())?;
     let arc_lut = Arc::new(lut);
     cache.insert(path.to_string(), arc_lut.clone());
     Ok(arc_lut)
@@ -559,8 +699,14 @@ fn list_luts_in_cache() -> anyhow::Result<Vec<LutEntry>> {
                 .unwrap_or("LUT")
                 .to_string();
             entries.push(LutEntry {
+                id: path
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or_default()
+                    .to_string(),
                 name,
                 path: path.to_string_lossy().into_owned(),
+                group: String::new(),
             });
         }
     }
@@ -577,17 +723,20 @@ fn combined_lut_list(luts_dir: &Path) -> anyhow::Result<Vec<LutEntry>> {
     Ok(entries)
 }
 
+/// Copies LUT files into `luts/`, or into `group`'s folder when one is given.
 #[tauri::command]
 pub fn import_luts(
     app_handle: AppHandle,
     source_paths: Vec<String>,
+    group: Option<String>,
 ) -> Result<Vec<LutEntry>, String> {
     let data_dir = app_handle
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?;
     let luts_dir = get_luts_dir(&data_dir).map_err(|e| e.to_string())?;
-    import_luts_to_dir(&luts_dir, &source_paths).map_err(|e| e.to_string())?;
+    let target = lut_group_dir(&luts_dir, group.as_deref().unwrap_or_default())?;
+    import_luts_to_dir(&target, &source_paths).map_err(|e| e.to_string())?;
 
     #[cfg(target_os = "android")]
     {
@@ -626,6 +775,10 @@ pub fn remove_lut(app_handle: AppHandle, path: String) -> Result<Vec<LutEntry>, 
 
     if target_path.exists() {
         std::fs::remove_file(&target_path).map_err(|e| e.to_string())?;
+        // A group folder left empty goes with its last LUT.
+        if let Some(parent) = target_path.parent().filter(|parent| *parent != luts_dir) {
+            let _ = std::fs::remove_dir(parent);
+        }
     } else {
         return Err("LUT file not found".to_string());
     }
@@ -638,6 +791,29 @@ pub fn remove_lut(app_handle: AppHandle, path: String) -> Result<Vec<LutEntry>, 
     {
         list_luts_in_dir(&luts_dir).map_err(|e| e.to_string())
     }
+}
+
+/// Looks → LUTs' Move to Group, Rename Group (every LUT of a group into the new name) and Delete
+/// Group (into `luts/` itself: nothing is deleted).
+#[tauri::command]
+pub async fn move_luts_to_group(
+    app_handle: AppHandle,
+    paths: Vec<String>,
+    group: String,
+) -> Result<MovedLuts, String> {
+    crate::blocking_command::run_blocking(move || {
+        let data_dir = app_handle
+            .path()
+            .app_data_dir()
+            .map_err(|e| e.to_string())?;
+        let luts_dir = get_luts_dir(&data_dir).map_err(|e| e.to_string())?;
+        let moved = move_luts_in(&luts_dir, &paths, &group)?;
+        Ok(MovedLuts {
+            entries: list_luts_in_dir(&luts_dir).map_err(|e| e.to_string())?,
+            moved,
+        })
+    })
+    .await
 }
 
 /// A small preview of the open photo for a browser swatch (a LUT, a custom profile), as a JPEG
@@ -772,6 +948,94 @@ mod tests {
         }
         assert!(unembed_lut("not a table", lut.size).is_err());
         assert!(unembed_lut(&embedded, lut.size + 1).is_err());
+    }
+
+    /// A temporary `luts/` folder with `warm.cube` in it and `cool.cube` in group `Film`.
+    fn luts_folder() -> (PathBuf, PathBuf) {
+        let root = std::env::temp_dir().join(format!("tir-luts-{}", uuid::Uuid::new_v4()));
+        let luts = root.join("luts");
+        std::fs::create_dir_all(luts.join("Film")).unwrap();
+        std::fs::write(luts.join("warm.cube"), b"LUT").unwrap();
+        std::fs::write(luts.join("Film").join("cool.cube"), b"LUT").unwrap();
+        std::fs::write(luts.join("notes.txt"), b"not a LUT").unwrap();
+        (root, luts)
+    }
+
+    #[test]
+    fn luts_are_listed_with_their_group_folder() {
+        let (root, luts) = luts_folder();
+        let entries = list_luts_in_dir(&luts).unwrap();
+        let listed: Vec<(&str, &str, &str)> = entries
+            .iter()
+            .map(|entry| (entry.group.as_str(), entry.name.as_str(), entry.id.as_str()))
+            .collect();
+        assert_eq!(
+            listed,
+            [
+                ("", "warm", "warm.cube"),
+                ("Film", "cool", "Film/cool.cube")
+            ]
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn moving_luts_between_groups_renames_clashes_and_drops_empty_groups() {
+        let (root, luts) = luts_folder();
+        let warm = luts.join("warm.cube").to_string_lossy().into_owned();
+        let cool = luts
+            .join("Film")
+            .join("cool.cube")
+            .to_string_lossy()
+            .into_owned();
+
+        let moved = move_luts_in(&luts, std::slice::from_ref(&warm), "Film").unwrap();
+        assert_eq!(moved.len(), 1);
+        assert!(luts.join("Film").join("warm.cube").is_file());
+
+        std::fs::write(luts.join("cool.cube"), b"LUT").unwrap();
+        move_luts_in(&luts, &[cool], "").unwrap();
+        assert!(
+            luts.join("cool (1).cube").is_file(),
+            "a clash gets a number"
+        );
+        let warm_in_film = luts.join("Film").join("warm.cube");
+        move_luts_in(&luts, &[warm_in_film.to_string_lossy().into_owned()], "").unwrap();
+        assert!(
+            !luts.join("Film").exists(),
+            "the emptied group folder is gone"
+        );
+
+        assert!(
+            move_luts_in(
+                &luts,
+                &[root.join("elsewhere.cube").to_string_lossy().into_owned()],
+                "X"
+            )
+            .is_err()
+        );
+        assert!(lut_group_dir(&luts, "..").is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_moved_lut_is_found_by_its_file_name() {
+        let (root, luts) = luts_folder();
+        assert_eq!(
+            find_moved_lut(&luts.join("cool.cube")),
+            Some(luts.join("Film").join("cool.cube"))
+        );
+        assert_eq!(
+            find_moved_lut(&luts.join("Other").join("warm.cube")),
+            Some(luts.join("warm.cube"))
+        );
+        assert_eq!(find_moved_lut(&luts.join("missing.cube")), None);
+        assert_eq!(
+            find_moved_lut(&root.join("warm.cube")),
+            None,
+            "only inside luts/"
+        );
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

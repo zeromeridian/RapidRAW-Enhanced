@@ -2805,6 +2805,7 @@ pub fn run() {
             lut_processing::list_luts,
             lut_processing::import_luts,
             lut_processing::remove_lut,
+            lut_processing::move_luts_to_group,
             lut_processing::generate_lut_previews,
             custom_profile::list_custom_profiles,
             custom_profile::load_custom_profile,

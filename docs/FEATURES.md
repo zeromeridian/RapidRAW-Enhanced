@@ -515,15 +515,17 @@ details are in `RELEASE_NOTES.MD`.
   settings it holds; replaces the Tool/Style choice, and older presets
   apply as before.
 - **Looks tab** (formerly Presets, key P): a Presets · Profiles · LUTs
-  switch shows one kind at a time. Presets and profiles share one
+  switch shows one kind at a time. Presets, profiles and LUTs share one
   browser: a grid of previews or a list, Favorites (star) listed first,
   name search, groups that open and close and stay so, a group picker
   when saving, Move to Group, Rename Group, and Delete Group that keeps
   the items (they move to No Group); the applied item's strength slider
-  sits under it, and Looks opens at it. Profiles preview on hover; a
-  tool row's name (Basic → Profile) opens Looks with a Back to
-  Adjustments button. LUTs show their tool there until they get the
-  same browser.
+  sits under it, and Looks opens at it. Profiles and LUTs preview on
+  hover; a tool row's name (Basic → Profile, Look → LUT) opens Looks
+  with a Back to Adjustments button. LUT groups are subfolders of the
+  LUT folder (a group's menu can import straight into it; Save as LUT
+  can save into one); edits that only name a LUT's file still find it
+  after a move.
 - Named tone-curve presets with unique names, built-in Linear and contrast
   presets, modification indicators, update, save-as-new, and delete actions.
 - Tone Curve channel buttons show a dot under each adjusted channel, and the
