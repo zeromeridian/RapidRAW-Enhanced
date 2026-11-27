@@ -18,7 +18,9 @@ use crate::image_processing::GpuContext;
 use crate::launch_request::ExternalEditSession;
 use crate::lut_processing::Lut;
 
-#[derive(Serialize, Deserialize)]
+/// The main window's frame as `window_state.json` keeps it: the normal (windowed) size and
+/// position, also while the window is maximized or full screen, plus those two states.
+#[derive(Clone, Serialize, Deserialize)]
 pub struct WindowState {
     pub width: u32,
     pub height: u32,

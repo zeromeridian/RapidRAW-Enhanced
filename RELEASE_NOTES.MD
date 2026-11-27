@@ -5,6 +5,18 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.121.1-dev-looks-browser — 2026-11-27
+
+### Window (macOS)
+
+- **Quitting in full screen no longer breaks the next start:** the app
+  opens in full screen again, and leaving full screen returns to your
+  normal window size. Before, it opened as a normal window covering the
+  whole screen, behind the Dock and under the menu bar.
+- A saved window position that no longer fits (for example after
+  rearranging displays) is moved inside the screen, below the menu bar
+  and beside the Dock.
+
 ## 1.121.0-dev-looks-browser — 2026-11-27
 
 ### Looks

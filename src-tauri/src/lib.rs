@@ -2173,6 +2173,51 @@ fn saved_window_state_is_usable(state: &WindowState, monitors: &[MonitorBounds])
     })
 }
 
+/// The saved frame moved and, if needed, shrunk into the monitor area it overlaps most, so a
+/// frame saved at full-screen size (or for a screen since rearranged) cannot open under the
+/// macOS menu bar or Dock.
+#[cfg(target_os = "macos")]
+fn fit_window_state(state: WindowState, monitors: &[MonitorBounds]) -> WindowState {
+    let overlap = |monitor: &&MonitorBounds| {
+        let width = (state.x as i64 + state.width as i64)
+            .min(monitor.x as i64 + monitor.width as i64)
+            - (state.x as i64).max(monitor.x as i64);
+        let height = (state.y as i64 + state.height as i64)
+            .min(monitor.y as i64 + monitor.height as i64)
+            - (state.y as i64).max(monitor.y as i64);
+        width.max(0) * height.max(0)
+    };
+    let Some(monitor) = monitors.iter().max_by_key(overlap) else {
+        return state;
+    };
+    let width = state.width.min(monitor.width);
+    let height = state.height.min(monitor.height);
+    WindowState {
+        width,
+        height,
+        x: state
+            .x
+            .clamp(monitor.x, monitor.x + (monitor.width - width) as i32),
+        y: state
+            .y
+            .clamp(monitor.y, monitor.y + (monitor.height - height) as i32),
+        ..state
+    }
+}
+
+/// The window frame saved at the last quit, if there is a readable one.
+#[cfg(not(target_os = "android"))]
+fn read_window_state(app_handle: &tauri::AppHandle) -> Option<WindowState> {
+    let path = app_handle
+        .path()
+        .app_config_dir()
+        .ok()?
+        .join("window_state.json");
+    serde_json::from_str(&std::fs::read_to_string(path).ok()?).ok()
+}
+
+/// The monitors a saved frame may be restored to. On macOS only their work area counts (below
+/// the menu bar, beside the Dock), so a restored window always lies inside it.
 #[cfg(not(target_os = "android"))]
 fn available_monitor_bounds(window: &tauri::WebviewWindow) -> Vec<MonitorBounds> {
     window
@@ -2181,8 +2226,13 @@ fn available_monitor_bounds(window: &tauri::WebviewWindow) -> Vec<MonitorBounds>
             monitors
                 .into_iter()
                 .map(|monitor| {
-                    let position = monitor.position();
-                    let size = monitor.size();
+                    #[cfg(target_os = "macos")]
+                    let (position, size) = {
+                        let area = monitor.work_area();
+                        (area.position, area.size)
+                    };
+                    #[cfg(not(target_os = "macos"))]
+                    let (position, size) = (*monitor.position(), *monitor.size());
                     MonitorBounds {
                         x: position.x,
                         y: position.y,
@@ -2214,54 +2264,39 @@ fn frontend_ready(
 
     #[cfg(not(target_os = "android"))]
     {
+        let saved_state = is_first_run
+            .then(|| read_window_state(&app_handle))
+            .flatten();
         #[cfg(any(windows, target_os = "linux"))]
-        let mut should_maximize = false;
-        #[cfg(any(windows, target_os = "linux"))]
-        let mut should_fullscreen = false;
-        #[cfg(not(any(windows, target_os = "linux")))]
-        let _ = (&app_handle, is_first_run);
+        let should_maximize = saved_state.as_ref().is_some_and(|state| state.maximized);
+        let should_fullscreen = saved_state.as_ref().is_some_and(|state| state.fullscreen);
 
         #[cfg(any(windows, target_os = "linux"))]
-        if is_first_run && let Ok(config_dir) = app_handle.path().app_config_dir() {
-            let path = config_dir.join("window_state.json");
-
-            if let Ok(contents) = std::fs::read_to_string(&path)
-                && let Ok(saved_state) = serde_json::from_str::<WindowState>(&contents)
-            {
-                #[cfg(any(windows, target_os = "linux"))]
-                {
-                    should_maximize = saved_state.maximized;
-                    should_fullscreen = saved_state.fullscreen;
-                }
-
-                if (should_maximize || should_fullscreen)
-                    && let Some(monitor) = window
-                        .current_monitor()
+        if (should_maximize || should_fullscreen)
+            && let Some(monitor) = window
+                .current_monitor()
+                .ok()
+                .flatten()
+                .or_else(|| window.primary_monitor().ok().flatten())
+                .or_else(|| {
+                    window
+                        .available_monitors()
                         .ok()
-                        .flatten()
-                        .or_else(|| window.primary_monitor().ok().flatten())
-                        .or_else(|| {
-                            window
-                                .available_monitors()
-                                .ok()
-                                .and_then(|m| m.into_iter().next())
-                        })
-                {
-                    let monitor_size = monitor.size();
-                    let monitor_pos = monitor.position();
-                    let default_width = 1280i32;
-                    let default_height = 720i32;
-                    let center_x = monitor_pos.x + (monitor_size.width as i32 - default_width) / 2;
-                    let center_y =
-                        monitor_pos.y + (monitor_size.height as i32 - default_height) / 2;
+                        .and_then(|m| m.into_iter().next())
+                })
+        {
+            let monitor_size = monitor.size();
+            let monitor_pos = monitor.position();
+            let default_width = 1280i32;
+            let default_height = 720i32;
+            let center_x = monitor_pos.x + (monitor_size.width as i32 - default_width) / 2;
+            let center_y = monitor_pos.y + (monitor_size.height as i32 - default_height) / 2;
 
-                    let _ = window.set_size(tauri::PhysicalSize::new(
-                        default_width as u32,
-                        default_height as u32,
-                    ));
-                    let _ = window.set_position(tauri::PhysicalPosition::new(center_x, center_y));
-                }
-            }
+            let _ = window.set_size(tauri::PhysicalSize::new(
+                default_width as u32,
+                default_height as u32,
+            ));
+            let _ = window.set_position(tauri::PhysicalPosition::new(center_x, center_y));
         }
 
         if let Err(e) = window.show() {
@@ -2271,13 +2306,12 @@ fn frontend_ready(
             log::error!("Failed to focus window: {}", e);
         }
         #[cfg(any(windows, target_os = "linux"))]
-        if is_first_run {
-            if should_maximize {
-                let _ = window.maximize();
-            }
-            if should_fullscreen {
-                let _ = window.set_fullscreen(true);
-            }
+        if should_maximize {
+            let _ = window.maximize();
+        }
+        // Quit in full screen, back in full screen; leaving it returns to the saved normal frame.
+        if should_fullscreen {
+            let _ = window.set_fullscreen(true);
         }
     }
 
@@ -2576,36 +2610,33 @@ pub fn run() {
                     );
                 }
 
-                if let Ok(config_dir) = app.path().app_config_dir() {
-                    let path = config_dir.join("window_state.json");
-                    if let Ok(contents) = std::fs::read_to_string(&path) {
-                        if let Ok(state) = serde_json::from_str::<WindowState>(&contents) {
-                            let monitor_bounds = available_monitor_bounds(&window);
-                            if saved_window_state_is_usable(&state, &monitor_bounds) {
-                                let _ = window.set_size(tauri::Size::Physical(
-                                    tauri::PhysicalSize::new(state.width, state.height),
-                                ));
-                                let _ = window.set_position(tauri::Position::Physical(
-                                    tauri::PhysicalPosition::new(state.x, state.y),
-                                ));
-                            } else {
-                                log::warn!(
-                                    "Saved window state was unusable ({}x{} at {},{}), centering instead.",
-                                    state.width,
-                                    state.height,
-                                    state.x,
-                                    state.y
-                                );
-                                let _ = window.center();
-                            }
+                let saved_state = read_window_state(app.handle());
+                match saved_state {
+                    Some(state) => {
+                        let monitor_bounds = available_monitor_bounds(&window);
+                        if saved_window_state_is_usable(&state, &monitor_bounds) {
+                            #[cfg(target_os = "macos")]
+                            let state = fit_window_state(state, &monitor_bounds);
+                            let _ = window.set_size(tauri::Size::Physical(
+                                tauri::PhysicalSize::new(state.width, state.height),
+                            ));
+                            let _ = window.set_position(tauri::Position::Physical(
+                                tauri::PhysicalPosition::new(state.x, state.y),
+                            ));
                         } else {
+                            log::warn!(
+                                "Saved window state was unusable ({}x{} at {},{}), centering instead.",
+                                state.width,
+                                state.height,
+                                state.x,
+                                state.y
+                            );
                             let _ = window.center();
                         }
-                    } else {
+                    }
+                    None => {
                         let _ = window.center();
                     }
-                } else {
-                    let _ = window.center();
                 }
 
                 let window_failsafe = window.clone();
@@ -2650,48 +2681,60 @@ pub fn run() {
 
                 let window_for_handler = window.clone();
                 let pending_state_for_handler = pending_window_state.clone();
+                // The normal frame, kept while the window is maximized or full screen so a
+                // relaunch (or leaving full screen) has it; seeded with the frame just restored.
+                let mut normal_frame = WindowState {
+                    width: 1280,
+                    height: 720,
+                    x: 0,
+                    y: 0,
+                    maximized: false,
+                    fullscreen: false,
+                };
+                if let Ok(position) = window.outer_position() {
+                    normal_frame.x = position.x;
+                    normal_frame.y = position.y;
+                }
+                if let Ok(size) = window.outer_size()
+                    && size.width >= 800
+                    && size.height >= 600
+                {
+                    normal_frame.width = size.width;
+                    normal_frame.height = size.height;
+                }
+                let normal_frame = Mutex::new(normal_frame);
 
                 window.on_window_event(move |event| match event {
                     tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
+                        // macOS's green-button zoom is not tracked as maximized.
                         #[cfg(any(windows, target_os = "linux"))]
                         let maximized = window_for_handler.is_maximized().unwrap_or(false);
                         #[cfg(not(any(windows, target_os = "linux")))]
                         let maximized = false;
-
-                        #[cfg(any(windows, target_os = "linux"))]
                         let fullscreen = window_for_handler.is_fullscreen().unwrap_or(false);
-                        #[cfg(not(any(windows, target_os = "linux")))]
-                        let fullscreen = false;
 
                         if window_for_handler.is_minimized().unwrap_or(false) {
                             return;
                         }
 
-                        let mut state = WindowState {
-                            width: 1280,
-                            height: 720,
-                            x: 0,
-                            y: 0,
-                            maximized,
-                            fullscreen,
-                        };
-
-                        if let Ok(position) = window_for_handler.outer_position() {
-                            state.x = position.x;
-                            state.y = position.y;
+                        let mut frame = normal_frame.lock().unwrap();
+                        frame.maximized = maximized;
+                        frame.fullscreen = fullscreen;
+                        if !maximized && !fullscreen {
+                            if let Ok(position) = window_for_handler.outer_position() {
+                                frame.x = position.x;
+                                frame.y = position.y;
+                            }
+                            if let Ok(size) = window_for_handler.outer_size()
+                                && size.width >= 800
+                                && size.height >= 600
+                            {
+                                frame.width = size.width;
+                                frame.height = size.height;
+                            }
                         }
 
-                        if !maximized
-                            && !fullscreen
-                            && let Ok(size) = window_for_handler.outer_size()
-                            && size.width >= 800
-                            && size.height >= 600
-                        {
-                            state.width = size.width;
-                            state.height = size.height;
-                        }
-
-                        *pending_state_for_handler.lock().unwrap() = Some(state);
+                        *pending_state_for_handler.lock().unwrap() = Some(frame.clone());
                     }
                     _ => {}
                 });
@@ -2961,4 +3004,61 @@ pub fn run() {
                 _ => {}
             }
         });
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod window_state_tests {
+    use super::{MonitorBounds, WindowState, fit_window_state};
+
+    /// A 1728×1117 work area below a 38 px menu bar (a 14" MacBook Pro at 1×).
+    const WORK_AREA: MonitorBounds = MonitorBounds {
+        x: 0,
+        y: 38,
+        width: 1728,
+        height: 1079,
+    };
+
+    fn frame(x: i32, y: i32, width: u32, height: u32) -> WindowState {
+        WindowState {
+            width,
+            height,
+            x,
+            y,
+            maximized: false,
+            fullscreen: false,
+        }
+    }
+
+    #[test]
+    fn full_screen_frame_fits_below_the_menu_bar() {
+        let fitted = fit_window_state(frame(0, 0, 1728, 1117), &[WORK_AREA]);
+        assert_eq!(
+            (fitted.x, fitted.y, fitted.width, fitted.height),
+            (0, 38, 1728, 1079)
+        );
+    }
+
+    #[test]
+    fn frame_inside_the_work_area_is_kept() {
+        let fitted = fit_window_state(frame(100, 200, 1280, 720), &[WORK_AREA]);
+        assert_eq!(
+            (fitted.x, fitted.y, fitted.width, fitted.height),
+            (100, 200, 1280, 720)
+        );
+    }
+
+    #[test]
+    fn frame_fits_the_monitor_it_overlaps_most() {
+        let second = MonitorBounds {
+            x: 1728,
+            y: 0,
+            width: 2560,
+            height: 1415,
+        };
+        let fitted = fit_window_state(frame(3500, 900, 1280, 720), &[WORK_AREA, second]);
+        assert_eq!(
+            (fitted.x, fitted.y, fitted.width, fitted.height),
+            (3008, 695, 1280, 720)
+        );
+    }
 }
