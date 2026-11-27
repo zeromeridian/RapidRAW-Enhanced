@@ -5,6 +5,25 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.124.0-dev-looks-browser — 2026-11-27
+
+### Looks
+
+- **One New Look dialog** for presets, profiles and LUTs: ＋ in Looks
+  opens it on the kind shown, and a Preset · Profile · LUT switch
+  changes what it saves. It has the name, the group and one list of
+  settings. For a profile or LUT, the settings it cannot hold are
+  greyed out; ticks are kept when you switch. Update and Configure
+  Preset, Update Profile and Rename Profile use the same dialog.
+- **Looks → LUTs** has a ＋ to save the photo's settings as a LUT.
+- **Presets preview on the photo when you point at them**, as profiles
+  and LUTs do.
+
+### Fixes
+
+- Pointing at a LUT in Looks now keeps its preview on the photo; it
+  used to switch back to the photo after a moment.
+
 ## 1.123.0-dev-looks-browser — 2026-11-27
 
 ### Looks

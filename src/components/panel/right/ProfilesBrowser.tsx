@@ -7,6 +7,7 @@ import { ProfileEditingBar } from '../../adjustments/Profile';
 import GroupedBrowser from '../../ui/LooksBrowser/GroupedBrowser';
 import { Invokes, OPTION_SEPARATOR } from '../../ui/AppProperties';
 import { useCustomProfiles, useCustomProfileStore } from '../../../hooks/useCustomProfiles';
+import { openLookDialog } from '../../../hooks/useLookDialog';
 import { useAdjustmentSectionProps } from '../../../hooks/useAdjustmentSectionProps';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { CustomProfileEntry, ProfileAdjustment } from '../../../utils/adjustments';
@@ -27,7 +28,6 @@ export default function ProfilesBrowser() {
     endPreview,
     selectProfile,
     startEdit,
-    openDialog,
     moveToGroup,
     importProfiles,
     exportProfile,
@@ -117,7 +117,7 @@ export default function ProfilesBrowser() {
         {
           label: t('adjustments.profile.rename'),
           icon: TextCursorInput,
-          onClick: () => openDialog({ mode: 'rename', entry }),
+          onClick: () => openLookDialog({ mode: 'renameProfile', entry }),
         },
         moveToGroupOption,
         { label: t('adjustments.profile.export'), icon: Share2, onClick: () => exportProfile(entry) },
@@ -141,7 +141,7 @@ export default function ProfilesBrowser() {
           </button>
           <button
             className="p-2 rounded-full hover:bg-surface transition-colors"
-            onClick={() => openDialog({ mode: 'create' })}
+            onClick={() => openLookDialog({ mode: 'new', type: 'profile' })}
             data-tooltip={t('adjustments.profile.create')}
           >
             <Plus size={18} />

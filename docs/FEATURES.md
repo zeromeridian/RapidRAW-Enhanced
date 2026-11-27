@@ -520,7 +520,11 @@ details are in `RELEASE_NOTES.MD`.
   name search, groups that open and close and stay so, a group picker
   when saving, Move to Group, Rename Group, and Delete Group that keeps
   the items (they move to No Group); the applied item's strength slider
-  sits under it, and Looks opens at it. Profiles and LUTs preview on
+  sits under it, and Looks opens at it. One New Look dialog (＋ in
+  Looks) saves a preset, profile or LUT from the photo: Type, name,
+  group and one settings tree, where a profile or LUT greys out what it
+  cannot hold; Update / Configure Preset and Update / Rename Profile use
+  it too. Presets, profiles and LUTs preview on
   hover; a tool row's name (Basic → Profile, Look → LUT) opens Looks
   with a Back to Adjustments button. LUT groups are subfolders of the
   LUT folder (a group's menu can import straight into it; Save as LUT

@@ -6,7 +6,6 @@ import type { ParseKeys } from 'i18next';
 import { toast } from 'react-toastify';
 import { create } from 'zustand';
 import { Invokes } from '../components/ui/AppProperties';
-import type { CreateProfileChoice } from '../components/modals/CreateProfileModal';
 import { useEditorStore } from '../store/useEditorStore';
 import { useEditorActions } from './useEditorActions';
 import { useLuts } from './useLuts';
@@ -15,7 +14,6 @@ import {
   CustomProfile,
   CustomProfileEntry,
   INITIAL_ADJUSTMENTS,
-  PROFILE_BAKE_GROUPS,
   PROFILE_FILE_EXTENSION,
   getProfileBakeGroupOfKey,
 } from '../utils/adjustments';
@@ -27,16 +25,22 @@ interface CreatedProfile {
   keptKeys: string[];
 }
 
-/** The profile dialog that is open: a new profile, a new revision of the one being edited, or a rename. */
-export type ProfileDialog =
-  { mode: 'create' } | { mode: 'update'; entry: CustomProfileEntry } | { mode: 'rename'; entry: CustomProfileEntry };
+/** What a new profile or LUT is made of (New Look dialog). */
+export interface ProfileRequest {
+  name: string;
+  /** The group's name; '' for none. */
+  group: string;
+  /** The adjustment keys to bake (`PROFILE_BAKEABLE_KEYS`). */
+  keys: ReadonlyArray<string>;
+  monochrome: boolean;
+}
 
 /** A profile's recipe on the sliders (Edit Profile), and the edit to go back to on Cancel. */
 export interface ProfileEditing {
   entry: CustomProfileEntry;
   before: Adjustments;
-  /** The bake groups the recipe holds, ticked again by Update Profile. */
-  recipeGroups: Set<string>;
+  /** The keys the recipe holds, ticked again by Update Profile. */
+  recipeKeys: Set<string>;
   /** The photo it started on; another photo ends it. */
   imagePath: string | null;
 }
@@ -47,19 +51,17 @@ interface CustomProfileState {
   /** Counts listings, so previews of a profile updated in place render again. */
   revision: number;
   editing: ProfileEditing | null;
-  dialog: ProfileDialog | null;
   isBaking: boolean;
 }
 
 /**
- * The custom profiles shared by Basic → Profile and Looks → Profiles, so both show the same
- * list, the same Edit Profile and one profile dialog (`ProfileDialogHost`).
+ * The custom profiles shared by Basic → Profile, Looks → Profiles and the New Look dialog, so
+ * all show the same list and the same Edit Profile.
  */
 export const useCustomProfileStore = create<CustomProfileState>(() => ({
   entries: [],
   revision: 0,
   editing: null,
-  dialog: null,
   isBaking: false,
 }));
 
@@ -91,20 +93,6 @@ export const withProfile = <T extends Partial<Adjustments>>(adjustments: T, prof
   monochrome: profile.monochrome,
   sectionVisibility: { ...adjustments.sectionVisibility, profile: true },
 });
-
-const isChanged = (adjustments: Partial<Adjustments>, key: string) =>
-  JSON.stringify(adjustments[key]) !== JSON.stringify(INITIAL_ADJUSTMENTS[key]);
-
-/** The bake groups the photo has changed from their defaults; White Balance starts unticked. */
-export const changedBakeGroups = (adjustments: Adjustments): Set<string> =>
-  new Set(
-    PROFILE_BAKE_GROUPS.filter(
-      (bake) => bake.id !== 'whiteBalance' && bake.keys.some((key) => isChanged(adjustments, key)),
-    ).map((bake) => bake.id),
-  );
-
-const keysOfGroups = (groups: ReadonlySet<string>) =>
-  PROFILE_BAKE_GROUPS.filter((bake) => groups.has(bake.id)).flatMap((bake) => bake.keys);
 
 /** The photo's custom profile and every action on the profile folder (Plan item 83, Looks item 86). */
 export function useCustomProfiles() {
@@ -186,9 +174,7 @@ export function useCustomProfiles() {
         editing: {
           entry,
           before: adjustments,
-          recipeGroups: new Set(
-            PROFILE_BAKE_GROUPS.filter((bake) => bake.keys.some((key) => key in recipe)).map((bake) => bake.id),
-          ),
+          recipeKeys: new Set(Object.keys(recipe)),
           imagePath: selectedImage?.path ?? null,
         },
       });
@@ -214,22 +200,22 @@ export function useCustomProfiles() {
     setAdjustments(() => editing.before, t('adjustments.profile.cancelEdit'));
   };
 
-  const openDialog = (dialog: ProfileDialog) => setProfileState({ dialog });
-  const closeDialog = () => setProfileState({ dialog: null });
-
-  const rename = async (entry: CustomProfileEntry, choice: CreateProfileChoice) => {
+  /** Renames `entry`, moves it to `request.group` and sets its B&W flag; true when it worked. */
+  const rename = async (entry: CustomProfileEntry, request: Omit<ProfileRequest, 'keys'>) => {
     try {
       setEntries(
         await invoke<CustomProfileEntry[]>(Invokes.RenameCustomProfile, {
           path: entry.path,
-          name: choice.name,
-          group: choice.group,
-          monochrome: choice.monochrome,
+          name: request.name,
+          group: request.group,
+          monochrome: request.monochrome,
         }),
       );
-      setProfileState({ editing: null, dialog: null });
+      setProfileState({ editing: null });
+      return true;
     } catch (err) {
       toast.error(t('adjustments.profile.renameFailed', { error: String(err) }));
+      return false;
     }
   };
 
@@ -300,13 +286,16 @@ export function useCustomProfiles() {
     }
   };
 
-  /** Create Profile, or Update Profile for the profile being edited: bake the ticked settings. */
-  const bake = async (choice: CreateProfileChoice, entry?: CustomProfileEntry) => {
-    const keys = keysOfGroups(choice.groups);
+  /**
+   * Create Profile, or Update Profile for the profile being edited: bake the ticked settings;
+   * true when it worked.
+   */
+  const bake = async (choice: ProfileRequest, entry?: CustomProfileEntry) => {
+    const { keys } = choice;
     const adjustments = useEditorStore.getState().adjustments;
     setProfileState({ isBaking: true });
     try {
-      const request = { name: choice.name, group: choice.group, keys, monochrome: choice.monochrome, adjustments };
+      const request = { ...choice, adjustments };
       const created = entry
         ? await invoke<CreatedProfile>(Invokes.UpdateCustomProfile, { path: entry.path, request })
         : await invoke<CreatedProfile>(Invokes.CreateCustomProfile, { request });
@@ -336,43 +325,36 @@ export function useCustomProfiles() {
           .join(', ');
         toast.info(t('modals.createProfile.kept', { settings }));
       }
-      setProfileState({ dialog: null, editing: null });
+      setProfileState({ editing: null });
       refreshList();
+      return true;
     } catch (err) {
       toast.error(t('modals.createProfile.failed', { error: String(err) }));
+      return false;
     } finally {
       setProfileState({ isBaking: false });
     }
   };
 
-  /** Save as LUT: the ticked settings into a finishing LUT in Look → LUT; the photo stays as it is. */
-  const saveLut = async (choice: CreateProfileChoice) => {
+  /**
+   * Save as LUT: the ticked settings into a finishing LUT in Look → LUT; the photo stays as it
+   * is. True when it worked.
+   */
+  const saveLut = async (choice: ProfileRequest) => {
     setProfileState({ isBaking: true });
     try {
       await invoke<string>(Invokes.SaveSettingsAsLut, {
-        request: {
-          name: choice.name,
-          group: choice.group,
-          keys: keysOfGroups(choice.groups),
-          monochrome: choice.monochrome,
-          adjustments: useEditorStore.getState().adjustments,
-        },
+        request: { ...choice, adjustments: useEditorStore.getState().adjustments },
       });
       toast.success(t('modals.createProfile.lutSaved', { name: choice.name }));
-      setProfileState({ dialog: null });
       refreshLuts();
+      return true;
     } catch (err) {
       toast.error(t('modals.createProfile.lutFailed', { error: String(err) }));
+      return false;
     } finally {
       setProfileState({ isBaking: false });
     }
-  };
-
-  const submitDialog = (choice: CreateProfileChoice) => {
-    const { dialog } = useCustomProfileStore.getState();
-    if (dialog?.mode === 'rename') rename(dialog.entry, choice);
-    else if (choice.target === 'lut') saveLut(choice);
-    else bake(choice, dialog?.mode === 'update' ? dialog.entry : undefined);
   };
 
   return {
@@ -383,9 +365,9 @@ export function useCustomProfiles() {
     clearProfile,
     startEdit,
     cancelEdit,
-    openDialog,
-    closeDialog,
-    submitDialog,
+    rename,
+    bake,
+    saveLut,
     moveToGroup,
     importProfiles,
     exportProfile,

@@ -5,6 +5,7 @@ import AdjustmentSlider from './AdjustmentSlider';
 import AdjustmentTool from './AdjustmentTool';
 import { openLooks } from '../panel/right/LooksHeader';
 import { useCustomProfiles, useCustomProfileStore } from '../../hooks/useCustomProfiles';
+import { openLookDialog } from '../../hooks/useLookDialog';
 import { Adjustments, ProfileAdjustment } from '../../utils/adjustments';
 
 interface ProfilePanelProps {
@@ -17,7 +18,7 @@ interface ProfilePanelProps {
 /** Edit Profile in progress: the profile's name, Cancel and Update Profile (here and in Looks → Profiles). */
 export function ProfileEditingBar() {
   const { t } = useTranslation();
-  const { cancelEdit, openDialog } = useCustomProfiles();
+  const { cancelEdit } = useCustomProfiles();
   const editing = useCustomProfileStore((state) => state.editing);
   if (!editing) return null;
   return (
@@ -34,7 +35,7 @@ export function ProfileEditingBar() {
         </button>
         <button
           className="px-2 py-1 rounded-sm bg-accent text-button-text font-semibold hover:bg-accent-hover transition-colors"
-          onClick={() => openDialog({ mode: 'update', entry: editing.entry })}
+          onClick={() => openLookDialog({ mode: 'updateProfile', entry: editing.entry })}
         >
           {t('adjustments.profile.update')}
         </button>

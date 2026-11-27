@@ -41,7 +41,6 @@ import {
   Trash2,
   Users,
 } from 'lucide-react';
-import ConfigurePresetModal, { PresetDialogMode } from '../../modals/ConfigurePresetModal';
 import CreateFolderModal from '../../modals/CreateFolderModal';
 import RenameFolderModal from '../../modals/RenameFolderModal';
 import Button from '../../ui/Button';
@@ -51,33 +50,16 @@ import LooksHeader from './LooksHeader';
 import BrowserSection from '../../ui/LooksBrowser/BrowserSection';
 import BrowserToolbar, { matchesQuery } from '../../ui/LooksBrowser/BrowserToolbar';
 import { BrowserItemProps, BrowserItems, BrowserRow, BrowserTile } from '../../ui/LooksBrowser/BrowserItem';
-import { BrowserGroup, GroupChoice, NO_GROUP, groupChoiceOf } from '../../ui/LooksBrowser/GroupPicker';
+import { NO_GROUP } from '../../ui/LooksBrowser/GroupPicker';
 import { useLooksBrowser } from '../../ui/LooksBrowser/useLooksBrowser';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { Adjustments, INITIAL_ADJUSTMENTS, getInitialAdjustments } from '../../../utils/adjustments';
-import {
-  describePresetSettings,
-  getEditedPresetKeys,
-  getPresetKeys,
-  presetHoldsSection,
-} from '../../../utils/presetSettings';
+import { Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
+import { describePresetSettings, presetHoldsSection } from '../../../utils/presetSettings';
 import { Invokes, OPTION_SEPARATOR, Panel, Preset } from '../../ui/AppProperties';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
-
-interface ModalState {
-  isOpen: boolean;
-  mode: PresetDialogMode;
-  /** The preset updated or configured; none for a new one. */
-  preset: Preset | null;
-  /** The settings ticked when the dialog opens. */
-  initialKeys: ReadonlySet<string>;
-  /** The group chosen when the dialog opens. */
-  group: GroupChoice;
-}
-
-const CLOSED_MODAL: ModalState = { isOpen: false, mode: 'new', preset: null, initialKeys: new Set(), group: NO_GROUP };
+import { openLookDialog } from '../../../hooks/useLookDialog';
 
 /** New Group: on its own, or for Move to Group of `presetId`. */
 interface NewGroupState {
@@ -316,7 +298,6 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
 
   const {
     addFolder,
-    addPreset,
     deleteFolder,
     deleteItem,
     duplicatePreset,
@@ -329,12 +310,10 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
     renameItem,
     reorderItems,
     sortAllPresetsAlphabetically,
-    updatePreset,
   } = usePresets(adjustments);
   const { showContextMenu } = useContextMenu();
   const [previews, setPreviews] = useState<Record<string, string | null>>({});
   const [query, setQuery] = useState('');
-  const [configureModalState, setConfigureModalState] = useState<ModalState>(CLOSED_MODAL);
   const [newGroupState, setNewGroupState] = useState<NewGroupState>({ isOpen: false, presetId: null });
   const [renameFolder, setRenameFolder] = useState<PresetFolder | null>(null);
   const [activeItem, setActiveItem] = useState<any>(null);
@@ -366,10 +345,6 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
   const allPresets = useMemo(
     () => [...folders.flatMap((folder) => folder.children), ...rootPresets],
     [folders, rootPresets],
-  );
-  const groups = useMemo<Array<BrowserGroup>>(
-    () => folders.map((folder) => ({ id: folder.id, name: folder.name })),
-    [folders],
   );
 
   const allItemsMap = useMemo(() => {
@@ -444,18 +419,24 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
     return [...seen.values()];
   }, [isOpen, sections]);
 
+  // A preset deleted or saved again (New Look's Update or Configure) loses its preview; the
+  // preview queue below renders a changed one again.
+  const renderedPresetsRef = useRef(new Map<string, Preset>());
   useEffect(() => {
-    const allPresetIds = new Set(allPresets.map((preset) => preset.id));
-    const previewsToDelete = Object.keys(previewsRef.current).filter((id) => !allPresetIds.has(id));
-    if (previewsToDelete.length > 0) {
-      setPreviews((prev) => {
-        const newPreviews = { ...prev };
-        previewsToDelete.forEach((id) => {
-          revokeBlobUrl(newPreviews[id]);
-          delete newPreviews[id];
-        });
-        return newPreviews;
+    const current = new Map(allPresets.map((preset) => [preset.id, preset]));
+    const stale = Object.keys(previewsRef.current).filter((id) => {
+      const rendered = renderedPresetsRef.current.get(id);
+      return !current.has(id) || (rendered !== undefined && rendered !== current.get(id));
+    });
+    renderedPresetsRef.current = current;
+    if (stale.length > 0) {
+      const remaining = { ...previewsRef.current };
+      stale.forEach((id) => {
+        revokeBlobUrl(remaining[id]);
+        delete remaining[id];
       });
+      previewsRef.current = remaining;
+      setPreviews(remaining);
     }
   }, [allPresets]);
 
@@ -529,20 +510,6 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
     [processPreviewQueue],
   );
 
-  /** Renders `preset`'s preview again (after it was saved or changed). */
-  const refreshPreview = useCallback(
-    (preset: Preset) => {
-      revokeBlobUrl(previewsRef.current[preset.id]);
-      const remaining = { ...previewsRef.current };
-      delete remaining[preset.id];
-      previewsRef.current = remaining;
-      setPreviews(remaining);
-      wantedIdsRef.current.add(preset.id);
-      enqueuePreviews([preset]);
-    },
-    [enqueuePreviews],
-  );
-
   // Another photo (or one not ready yet) drops the previews and the applied preset.
   useEffect(() => {
     const isPathChanged = selectedImage?.path !== currentImagePathRef.current;
@@ -601,29 +568,11 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
     [setAdjustments],
   );
 
-  /**
-   * Opens the preset dialog: a new preset starts with the photo's edited settings ticked and in
-   * `group`, others with their own settings and folder.
-   */
-  const openPresetDialog = (mode: PresetDialogMode, preset: Preset | null = null, group: GroupChoice = NO_GROUP) => {
-    const initialKeys = preset
-      ? getPresetKeys(preset)
-      : getEditedPresetKeys(adjustments, getInitialAdjustments(selectedImage?.isRaw ?? false));
-    const initialGroup = preset ? groupChoiceOf(findPresetFolderId(presets, preset.id)) : group;
-    setConfigureModalState({ isOpen: true, mode, preset, initialKeys, group: initialGroup });
-  };
-
-  /** Keeps the mode and preset while the dialog fades out, so its title does not change. */
-  const closePresetDialog = () => setConfigureModalState((state) => ({ ...state, isOpen: false }));
-
-  const handleSaveConfiguredPreset = (name: string, keys: Set<string>, group: GroupChoice) => {
-    const { mode, preset } = configureModalState;
-    const saved = preset ? updatePreset(preset.id, name, keys, mode === 'update', group) : addPreset(name, keys, group);
-    closePresetDialog();
-    if (saved) {
-      refreshPreview(saved);
-    }
-  };
+  /** Hovering a preset shows it on the photo, as profiles and LUTs do. */
+  const startPreview = (preset: Preset) =>
+    setEditor((state) => ({ previewOverride: { ...state.adjustments, ...preset.adjustments } }));
+  const endPreview = useCallback(() => setEditor({ previewOverride: null }), [setEditor]);
+  useEffect(() => endPreview, [endPreview]);
 
   const handleNewGroupSave = (name: string) => {
     if (newGroupState.presetId) {
@@ -789,7 +738,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
       {
         icon: Plus,
         label: t('editor.presets.menu.newPreset'),
-        onClick: () => openPresetDialog('new', null, { type: 'existing', id: folder.id }),
+        onClick: () => openLookDialog({ mode: 'new', type: 'preset', group: { type: 'existing', id: folder.id } }),
       },
       {
         icon: Edit,
@@ -819,12 +768,12 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
       {
         icon: Save,
         label: t('editor.presets.menu.updateWithCurrent'),
-        onClick: () => openPresetDialog('update', preset),
+        onClick: () => openLookDialog({ mode: 'updatePreset', preset }),
       },
       {
         icon: Settings2,
         label: t('editor.presets.menu.configurePreset'),
-        onClick: () => openPresetDialog('configure', preset),
+        onClick: () => openLookDialog({ mode: 'configurePreset', preset }),
       },
       {
         icon: FolderInput,
@@ -852,10 +801,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
       {
         icon: CopyPlus,
         label: t('editor.presets.menu.duplicatePreset'),
-        onClick: () => {
-          const duplicated = duplicatePreset(preset.id);
-          if (duplicated) refreshPreview(duplicated);
-        },
+        onClick: () => duplicatePreset(preset.id),
       },
       {
         icon: FileDown,
@@ -881,7 +827,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
       {
         icon: Plus,
         label: t('editor.presets.menu.newPreset'),
-        onClick: () => openPresetDialog('new'),
+        onClick: () => openLookDialog({ mode: 'new', type: 'preset' }),
       },
       {
         icon: FolderPlus,
@@ -912,7 +858,11 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
       isSelected: preset.id === activePresetId,
       isFavorite: favorites.has(preset.id),
       onToggleFavorite: () => toggleFavorite(preset.id),
-      onClick: () => handleApplyPreset(preset),
+      onClick: () => {
+        endPreview();
+        handleApplyPreset(preset);
+      },
+      onMouseEnter: () => startPreview(preset),
       onContextMenu: (event) => handlePresetContextMenu(event, preset),
       badges: presetBadges(preset),
       details: <PresetDetails preset={preset} />,
@@ -988,7 +938,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
               <button
                 className="p-2 rounded-full hover:bg-surface transition-colors"
                 disabled={isLoading}
-                onClick={() => openPresetDialog('new')}
+                onClick={() => openLookDialog({ mode: 'new', type: 'preset' })}
                 data-tooltip={t('editor.presets.tooltips.saveNew')}
               >
                 <Plus size={18} />
@@ -1012,6 +962,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
             isRootOver ? 'bg-surface-hover' : ''
           }`}
           onContextMenu={handleBackgroundContextMenu}
+          onMouseLeave={endPreview}
           ref={setRootNodeRef}
         >
           {isLoading && presets.length === 0 && (
@@ -1082,16 +1033,6 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
           )}
         </div>
 
-        <ConfigurePresetModal
-          isOpen={configureModalState.isOpen}
-          mode={configureModalState.mode}
-          initialName={configureModalState.preset?.name ?? ''}
-          initialKeys={configureModalState.initialKeys}
-          groups={groups}
-          initialGroup={configureModalState.group}
-          onClose={closePresetDialog}
-          onSave={handleSaveConfiguredPreset}
-        />
         <CreateFolderModal
           isOpen={newGroupState.isOpen}
           onClose={() => setNewGroupState({ isOpen: false, presetId: null })}

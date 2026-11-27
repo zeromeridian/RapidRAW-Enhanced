@@ -314,6 +314,9 @@ export const PROFILE_BAKE_GROUPS: Array<ProfileBakeGroup> = [
   { id: 'zoneTint', label: 'editor.adjustments.sections.zoneTint', keys: ['zoneTint'] },
 ];
 
+/** Every key a profile or a saved LUT can bake (`custom_profile::BAKEABLE_KEYS`). */
+export const PROFILE_BAKEABLE_KEYS: ReadonlySet<string> = new Set(PROFILE_BAKE_GROUPS.flatMap((bake) => bake.keys));
+
 /** The bake groups that carry `key`, a key Create Profile left in the photo (`kept_keys`). */
 export const getProfileBakeGroupOfKey = (key: string): ProfileBakeGroup | undefined =>
   PROFILE_BAKE_GROUPS.find((bake) => bake.keys.includes(key));

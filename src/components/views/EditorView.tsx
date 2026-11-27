@@ -17,7 +17,7 @@ import TaggingPanel from '../panel/right/TaggingPanel';
 import MasksPanel from '../panel/right/MasksPanel';
 import AIPanel from '../panel/right/AIPanel';
 import LooksPanel from '../panel/right/LooksPanel';
-import ProfileDialogHost from '../adjustments/ProfileDialogHost';
+import LookDialogHost from '../modals/LookDialogHost';
 import ExportPanel from '../panel/right/ExportPanel';
 import AutoSyncFooter from '../panel/right/AutoSyncFooter';
 
@@ -285,7 +285,7 @@ export default function EditorView({
 
   return (
     <div className={clsx('flex grow h-full min-h-0', isCompactPortrait ? 'flex-col gap-2' : 'flex-row')}>
-      <ProfileDialogHost />
+      <LookDialogHost />
       <div className={clsx('flex-1 flex flex-col min-w-0', isCompactPortrait && 'min-h-0')}>
         {editorNode}
         {!isCompactPortrait && editorBottomBarNode}

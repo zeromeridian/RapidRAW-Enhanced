@@ -150,6 +150,10 @@ export function useLuts() {
     }
   };
 
+  // Stable, so a browser ending the preview when it closes does not end it on every render.
+  const startPreview = useCallback((entry: LutEntry) => setLutPreviewOverride(entry.path), [setLutPreviewOverride]);
+  const endPreview = useCallback(() => setLutPreviewOverride(null), [setLutPreviewOverride]);
+
   return {
     refreshList,
     selectLut,
@@ -157,7 +161,7 @@ export function useLuts() {
     importLuts,
     removeLut,
     moveToGroup,
-    startPreview: (entry: LutEntry) => setLutPreviewOverride(entry.path),
-    endPreview: () => setLutPreviewOverride(null),
+    startPreview,
+    endPreview,
   };
 }

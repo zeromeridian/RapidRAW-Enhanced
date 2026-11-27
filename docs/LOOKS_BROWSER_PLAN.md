@@ -149,6 +149,11 @@ English strings only (`en.json`, listed under "Pending translations").
   Looks.
 - **L8 The tab is called Looks;** the key stays P.
 - **L9 One New Look dialog, as the last phase.**
+- **L10 (owner 2026-11-27) One settings tree for every Type:** always
+  the full preset tree; for Profile or LUT the settings a profile
+  cannot bake are greyed out and unticked, Profile (the current one)
+  only with a profile on the photo, Shadows/Blacks keep "(approximate)";
+  ticks carry over when the Type changes.
 
 ## Progress
 
@@ -213,4 +218,18 @@ English strings only (`en.json`, listed under "Pending translations").
   made while building: LUT import into a group from the group's
   right-click menu (Import LUTs into Group…) instead of a picker in the
   file dialog; LUTs default to the grid as before; masks have no LUT
-  tool, so nothing changes there.
+  tool, so nothing changes there. Owner 2026-11-27: phases 1–3 "all
+  look ok"; committed as `84292c47`.
+- 2026-11-27: **phase 4 built as `1.124.0`**, not committed: one New
+  Look dialog (`NewLookModal` + `LookDialogHost`, `useLookDialog`
+  store) for new presets, profiles and LUTs (Type switch) and for
+  Update / Configure Preset, Update / Rename Profile; decision L10 (one
+  tree, unbakeable greyed). `ConfigurePresetModal`, `CreateProfileModal`
+  and `ProfileDialogHost` are gone. The preset tree moved into a shared
+  store (`usePresets`), so the dialog host and Looks → Presets see one
+  list. Also the owner's two hover reports: presets now preview on
+  hover; the LUT hover preview no longer falls back (unstable
+  `endPreview` in `useLuts`). Choices made while building: a new
+  profile or LUT starts with the photo's edited settings ticked (as a
+  new preset; Create Profile used to leave White Balance unticked);
+  LUTs got a ＋ too. Item 86 is complete once `1.124.0` passes.

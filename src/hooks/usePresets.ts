@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import debounce from 'lodash.debounce';
+import { create } from 'zustand';
 import { Adjustments } from '../utils/adjustments';
 import { getUnlistedAdjustments, pickPresetAdjustments } from '../utils/presetSettings';
 import { Invokes, Preset } from '../components/ui/AppProperties';
@@ -107,35 +108,47 @@ const placePreset = (tree: Array<UserPreset>, preset: Preset, group: GroupChoice
   );
 };
 
+interface PresetState {
+  presets: Array<UserPreset>;
+  isLoading: boolean;
+}
+
+/**
+ * The preset tree (`presets.json`), shared by every `usePresets` (Looks → Presets, Masks, the
+ * New Look dialog), so a preset saved in one shows in all and saves never race.
+ */
+const usePresetStore = create<PresetState>(() => ({ presets: [], isLoading: true }));
+
+const setIsLoading = (isLoading: boolean) => usePresetStore.setState({ isLoading });
+
+const setPresets = (update: Array<UserPreset> | ((current: Array<UserPreset>) => Array<UserPreset>)) =>
+  usePresetStore.setState((state) => ({
+    presets: typeof update === 'function' ? update(state.presets) : update,
+  }));
+
+const savePresetsToBackend = debounce((presetsToSave: Array<UserPreset>) => {
+  invoke(Invokes.SavePresets, { presets: presetsToSave }).catch((err) => console.error('Failed to save presets:', err));
+}, 500);
+
+const loadPresets = async () => {
+  setIsLoading(true);
+  try {
+    setPresets(await invoke<Array<UserPreset>>(Invokes.LoadPresets));
+  } catch (error) {
+    console.error('Failed to load presets:', error);
+    setPresets([]);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 export function usePresets(currentAdjustments: Adjustments) {
-  const [presets, setPresets] = useState<Array<UserPreset>>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const loadPresets = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const loadedPresets: Array<UserPreset> = await invoke(Invokes.LoadPresets);
-      setPresets(loadedPresets);
-    } catch (error) {
-      console.error('Failed to load presets:', error);
-      setPresets([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const savePresetsToBackend = useCallback(
-    debounce((presetsToSave: Array<UserPreset>) => {
-      invoke(Invokes.SavePresets, { presets: presetsToSave }).catch((err) =>
-        console.error('Failed to save presets:', err),
-      );
-    }, 500),
-    [],
-  );
+  const presets = usePresetStore((state) => state.presets);
+  const isLoading = usePresetStore((state) => state.isLoading);
 
   useEffect(() => {
     loadPresets();
-  }, [loadPresets]);
+  }, []);
 
   /** Saves the photo's values of the ticked `keys` as a new preset in the chosen group. */
   const addPreset = (name: string, keys: ReadonlySet<string>, group: GroupChoice) => {
@@ -310,7 +323,7 @@ export function usePresets(currentAdjustments: Adjustments) {
       savePresetsToBackend(updatedPresets);
       return newPreset;
     },
-    [presets, savePresetsToBackend],
+    [presets],
   );
 
   const movePreset = useCallback(
@@ -385,47 +398,44 @@ export function usePresets(currentAdjustments: Adjustments) {
       setPresets(updatedPresets);
       savePresetsToBackend(updatedPresets);
     },
-    [presets, savePresetsToBackend],
+    [presets],
   );
 
-  const reorderItems = useCallback(
-    (activeId: string, overId: string) => {
-      setPresets((currentPresets: Array<UserPreset>) => {
-        const getIndex = (arr: Array<UserPreset>, id: string) =>
-          arr.findIndex((item: UserPreset) => item.preset?.id === id || item.folder?.id === id || item?.id === id);
+  const reorderItems = useCallback((activeId: string, overId: string) => {
+    setPresets((currentPresets: Array<UserPreset>) => {
+      const getIndex = (arr: Array<UserPreset>, id: string) =>
+        arr.findIndex((item: UserPreset) => item.preset?.id === id || item.folder?.id === id || item?.id === id);
 
-        const activeRootIndex = getIndex(currentPresets, activeId);
-        const overRootIndex = getIndex(currentPresets, overId);
+      const activeRootIndex = getIndex(currentPresets, activeId);
+      const overRootIndex = getIndex(currentPresets, overId);
 
-        if (activeRootIndex !== -1 && overRootIndex !== -1) {
-          const newPresets: Array<UserPreset> = arrayMove(currentPresets, activeRootIndex, overRootIndex);
-          savePresetsToBackend(newPresets);
-          return newPresets;
-        }
+      if (activeRootIndex !== -1 && overRootIndex !== -1) {
+        const newPresets: Array<UserPreset> = arrayMove(currentPresets, activeRootIndex, overRootIndex);
+        savePresetsToBackend(newPresets);
+        return newPresets;
+      }
 
-        for (const item of currentPresets) {
-          const folder = item.folder;
-          if (folder) {
-            const activeChildIndex = folder.children.findIndex((child) => child.id === activeId);
-            const overChildIndex = folder.children.findIndex((child) => child.id === overId);
+      for (const item of currentPresets) {
+        const folder = item.folder;
+        if (folder) {
+          const activeChildIndex = folder.children.findIndex((child) => child.id === activeId);
+          const overChildIndex = folder.children.findIndex((child) => child.id === overId);
 
-            if (activeChildIndex !== -1 && overChildIndex !== -1) {
-              const newPresets = currentPresets.map((p: UserPreset) =>
-                p.folder?.id === folder.id
-                  ? { folder: { ...folder, children: arrayMove(folder.children, activeChildIndex, overChildIndex) } }
-                  : p,
-              );
-              savePresetsToBackend(newPresets);
-              return newPresets;
-            }
+          if (activeChildIndex !== -1 && overChildIndex !== -1) {
+            const newPresets = currentPresets.map((p: UserPreset) =>
+              p.folder?.id === folder.id
+                ? { folder: { ...folder, children: arrayMove(folder.children, activeChildIndex, overChildIndex) } }
+                : p,
+            );
+            savePresetsToBackend(newPresets);
+            return newPresets;
           }
         }
+      }
 
-        return currentPresets;
-      });
-    },
-    [savePresetsToBackend],
-  );
+      return currentPresets;
+    });
+  }, []);
 
   const sortAllPresetsAlphabetically = useCallback(() => {
     setPresets((currentPresets) => {
@@ -449,58 +459,49 @@ export function usePresets(currentAdjustments: Adjustments) {
       savePresetsToBackend(sortedPresets);
       return sortedPresets;
     });
-  }, [savePresetsToBackend]);
+  }, []);
 
-  const importPresetsFromFile = useCallback(
-    async (filePath: string) => {
-      setIsLoading(true);
-      try {
-        const updatedPresetList: Array<any> = await invoke(Invokes.HandleImportPresetsFromFile, { filePath });
-        setPresets(updatedPresetList);
-      } catch (error) {
-        console.error('Failed to import presets from file:', error);
-        throw error;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [setPresets],
-  );
+  const importPresetsFromFile = useCallback(async (filePath: string) => {
+    setIsLoading(true);
+    try {
+      const updatedPresetList: Array<any> = await invoke(Invokes.HandleImportPresetsFromFile, { filePath });
+      setPresets(updatedPresetList);
+    } catch (error) {
+      console.error('Failed to import presets from file:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-  const importLegacyPresetsFromFile = useCallback(
-    async (filePath: string) => {
-      setIsLoading(true);
-      try {
-        const updatedPresetList: Array<UserPreset> = await invoke(Invokes.HandleImportLegacyPresetsFromFile, {
-          filePath,
-        });
-        setPresets(updatedPresetList);
-      } catch (error) {
-        console.error('Failed to import legacy presets from file:', error);
-        throw error;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [setPresets],
-  );
+  const importLegacyPresetsFromFile = useCallback(async (filePath: string) => {
+    setIsLoading(true);
+    try {
+      const updatedPresetList: Array<UserPreset> = await invoke(Invokes.HandleImportLegacyPresetsFromFile, {
+        filePath,
+      });
+      setPresets(updatedPresetList);
+    } catch (error) {
+      console.error('Failed to import legacy presets from file:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-  const importPresetsFromFiles = useCallback(
-    async (filePaths: Array<string>): Promise<PresetImportResult> => {
-      setIsLoading(true);
-      try {
-        const result: PresetImportResult = await invoke(Invokes.HandleImportPresetsFromFiles, { filePaths });
-        setPresets(result.presets);
-        return result;
-      } catch (error) {
-        console.error('Failed to import presets from files:', error);
-        throw error;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [setPresets],
-  );
+  const importPresetsFromFiles = useCallback(async (filePaths: Array<string>): Promise<PresetImportResult> => {
+    setIsLoading(true);
+    try {
+      const result: PresetImportResult = await invoke(Invokes.HandleImportPresetsFromFiles, { filePaths });
+      setPresets(result.presets);
+      return result;
+    } catch (error) {
+      console.error('Failed to import presets from files:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const exportPresetsToFile = useCallback(async (presetsToExport: Array<any>, filePath: string) => {
     try {

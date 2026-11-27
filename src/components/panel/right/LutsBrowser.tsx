@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
-import { FileUp, Trash2, Upload } from 'lucide-react';
+import { FileUp, Plus, Trash2, Upload } from 'lucide-react';
+import { openLookDialog } from '../../../hooks/useLookDialog';
 import Slider from '../../ui/Slider';
 import GroupedBrowser from '../../ui/LooksBrowser/GroupedBrowser';
 import { Invokes, OPTION_SEPARATOR } from '../../ui/AppProperties';
@@ -99,13 +100,22 @@ export default function LutsBrowser() {
       ]}
       onMoveToGroup={moveToGroup}
       headerActions={
-        <button
-          className="p-2 rounded-full hover:bg-surface transition-colors"
-          onClick={() => importLuts()}
-          data-tooltip={t('ui.lut.importLuts')}
-        >
-          <Upload size={18} />
-        </button>
+        <>
+          <button
+            className="p-2 rounded-full hover:bg-surface transition-colors"
+            onClick={() => importLuts()}
+            data-tooltip={t('ui.lut.importLuts')}
+          >
+            <Upload size={18} />
+          </button>
+          <button
+            className="p-2 rounded-full hover:bg-surface transition-colors"
+            onClick={() => openLookDialog({ mode: 'new', type: 'lut' })}
+            data-tooltip={t('modals.createProfile.titleLut')}
+          >
+            <Plus size={18} />
+          </button>
+        </>
       }
       searchPlaceholder={t('editor.looks.searchLuts')}
       emptyText={t('ui.lut.empty')}
