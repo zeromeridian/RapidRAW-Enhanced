@@ -45,12 +45,11 @@ import ConfigurePresetModal, { PresetDialogMode } from '../../modals/ConfigurePr
 import CreateFolderModal from '../../modals/CreateFolderModal';
 import RenameFolderModal from '../../modals/RenameFolderModal';
 import Button from '../../ui/Button';
-import Input from '../../ui/Input';
 import Text from '../../ui/Text';
 import Slider from '../../ui/Slider';
 import LooksHeader from './LooksHeader';
 import BrowserSection from '../../ui/LooksBrowser/BrowserSection';
-import BrowserViewSwitch from '../../ui/LooksBrowser/BrowserViewSwitch';
+import BrowserToolbar, { matchesQuery } from '../../ui/LooksBrowser/BrowserToolbar';
 import { BrowserItemProps, BrowserItems, BrowserRow, BrowserTile } from '../../ui/LooksBrowser/BrowserItem';
 import { BrowserGroup, GroupChoice, NO_GROUP, groupChoiceOf } from '../../ui/LooksBrowser/GroupPicker';
 import { useLooksBrowser } from '../../ui/LooksBrowser/useLooksBrowser';
@@ -402,10 +401,9 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
 
   // Favorites first (a favorite also stays in its folder), then the folders, then the presets in
   // no folder. A search shows only the matches, in open sections.
-  const normalizedQuery = query.trim().toLocaleLowerCase();
-  const isSearching = normalizedQuery !== '';
+  const isSearching = query.trim() !== '';
   const sections = useMemo<Array<PresetSection>>(() => {
-    const matches = (preset: Preset) => !isSearching || preset.name.toLocaleLowerCase().includes(normalizedQuery);
+    const matches = (preset: Preset) => matchesQuery(preset.name, query);
     const favoritePresets = allPresets.filter((preset) => favorites.has(preset.id) && matches(preset));
     const folderSections = folders
       .map((folder) => ({
@@ -433,7 +431,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
         ? [{ key: UNGROUPED_SECTION, title: t('editor.looks.noGroup'), presets: ungrouped, defaultOpen: true }]
         : []),
     ];
-  }, [allPresets, favorites, folders, isSearching, normalizedQuery, rootPresets, t]);
+  }, [allPresets, favorites, folders, isSearching, query, rootPresets, t]);
 
   const isOpen = useCallback(
     (section: PresetSection) => isSearching || isSectionOpen(section.key, section.defaultOpen),
@@ -1000,15 +998,13 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
         />
 
         {presets.length > 0 && (
-          <div className="flex items-center gap-2 px-4 compact:px-3 pt-3 compact:pt-2 shrink-0">
-            <Input
-              className="h-8 compact:h-7"
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={t('editor.looks.searchPresets')}
-              value={query}
-            />
-            <BrowserViewSwitch isGrid={isGrid} onChange={setGrid} />
-          </div>
+          <BrowserToolbar
+            query={query}
+            onQueryChange={setQuery}
+            placeholder={t('editor.looks.searchPresets')}
+            isGrid={isGrid}
+            onGridChange={setGrid}
+          />
         )}
 
         <div

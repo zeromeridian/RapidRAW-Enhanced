@@ -1,4 +1,4 @@
-import { Fragment, ReactNode } from 'react';
+import { Fragment, ReactNode, useEffect, useRef, useState } from 'react';
 import { ImageOff, Star } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
@@ -22,6 +22,16 @@ export interface BrowserItemProps {
   /** The list's second line, e.g. a preset's settings count. */
   details?: ReactNode;
   tooltip?: string;
+}
+
+/** Scrolls the item into view when it appears selected, e.g. the current profile as Looks opens. */
+function useRevealWhenSelected(isSelected: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [wasSelectedAtMount] = useState(isSelected);
+  useEffect(() => {
+    if (wasSelectedAtMount) ref.current?.scrollIntoView({ block: 'nearest' });
+  }, [wasSelectedAtMount]);
+  return ref;
 }
 
 function Preview({ name, preview }: Pick<BrowserItemProps, 'name' | 'preview'>) {
@@ -83,8 +93,10 @@ export function BrowserTile({
   badges,
   tooltip,
 }: BrowserItemProps) {
+  const ref = useRevealWhenSelected(isSelected);
   return (
     <div
+      ref={ref}
       className={clsx(
         'group/look relative aspect-square rounded-md overflow-hidden bg-bg-primary border-2 cursor-pointer transition-colors',
         isSelected ? 'border-accent' : 'border-transparent hover:border-surface',
@@ -121,8 +133,10 @@ export function BrowserRow({
   details,
   tooltip,
 }: BrowserItemProps) {
+  const ref = useRevealWhenSelected(isSelected);
   return (
     <div
+      ref={ref}
       className={clsx(
         'group/look flex items-center gap-3 compact:gap-2 p-1.5 rounded-lg border-2 cursor-pointer transition-colors',
         isSelected ? 'border-accent bg-surface' : 'border-transparent bg-surface hover:bg-card-active',

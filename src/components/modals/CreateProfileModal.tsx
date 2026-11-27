@@ -7,6 +7,13 @@ import Button from '../ui/Button';
 import TickBox from '../ui/TickBox';
 import { TextColors, TextVariants } from '../../types/typography';
 import { PROFILE_BAKE_GROUPS } from '../../utils/adjustments';
+import GroupPicker, {
+  BrowserGroup,
+  GroupChoice,
+  NO_GROUP,
+  groupChoiceOf,
+  isGroupChoiceValid,
+} from '../ui/LooksBrowser/GroupPicker';
 
 /** What Create makes: a profile (the base of the look) or a finishing LUT (Save as LUT). */
 export type CreateTarget = 'profile' | 'lut';
@@ -29,6 +36,8 @@ interface CreateProfileModalProps {
   /** The photo's current profile, which can be baked in; null without one. */
   currentProfileName: string | null;
   initialName: string;
+  /** The profile groups to choose from (a group's id is its name), and the one chosen at first ('' for none). */
+  profileGroups: ReadonlyArray<BrowserGroup>;
   initialGroup: string;
   /** The bake groups ticked when the dialog opens. */
   initialGroups: ReadonlySet<string>;
@@ -62,6 +71,7 @@ export default function CreateProfileModal({
   mode,
   currentProfileName,
   initialName,
+  profileGroups,
   initialGroup,
   initialGroups,
   initialMonochrome,
@@ -71,7 +81,7 @@ export default function CreateProfileModal({
 }: CreateProfileModalProps) {
   const { t } = useTranslation();
   const [name, setName] = useState('');
-  const [group, setGroup] = useState('');
+  const [group, setGroup] = useState<GroupChoice>(NO_GROUP);
   const [groups, setGroups] = useState<Set<string>>(new Set());
   const [monochrome, setMonochrome] = useState(false);
   const [target, setTarget] = useState<CreateTarget>('profile');
@@ -84,7 +94,7 @@ export default function CreateProfileModal({
       // The fields start from the initial values once, as the dialog opens.
       if (!wasOpen.current) {
         setName(initialName);
-        setGroup(initialGroup);
+        setGroup(groupChoiceOf(initialGroup));
         setGroups(new Set(initialGroups));
         setMonochrome(initialMonochrome);
         setTarget('profile');
@@ -100,15 +110,16 @@ export default function CreateProfileModal({
     return () => clearTimeout(timer);
   }, [isOpen, initialName, initialGroup, initialGroups, initialMonochrome]);
 
-  const canSubmit = name.trim() !== '' && !isBusy;
   // Only a new bake can be a LUT; Update and Rename are for profiles.
   const isLut = mode === 'create' && target === 'lut';
+  const canSubmit = name.trim() !== '' && !isBusy && (isLut || isGroupChoiceValid(group));
 
   const handleSubmit = useCallback(() => {
     if (canSubmit) {
       onSubmit({
         name: name.trim(),
-        group: group.trim(),
+        // A profile group's id is its name.
+        group: group.type === 'none' ? '' : group.type === 'new' ? group.name.trim() : group.id,
         groups: mode === 'rename' ? new Set() : groups,
         monochrome,
         target: isLut ? 'lut' : 'profile',
@@ -202,16 +213,7 @@ export default function CreateProfileModal({
             type="text"
             value={name}
           />
-          {!isLut && (
-            <input
-              className={INPUT_CLASS}
-              onChange={(e) => setGroup(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={t('modals.createProfile.groupPlaceholder')}
-              type="text"
-              value={group}
-            />
-          )}
+          {!isLut && <GroupPicker groups={profileGroups} value={group} onChange={setGroup} />}
         </div>
 
         {mode === 'rename' ? (

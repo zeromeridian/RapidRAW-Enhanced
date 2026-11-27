@@ -835,6 +835,39 @@ pub async fn rename_custom_profile(
     .await
 }
 
+/// Moves the profiles at `paths` into `group` (empty: no group); names, files and looks stay.
+fn regroup_profiles(dir: &Path, paths: &[String], group: &str) -> Result<(), String> {
+    let group = group.trim();
+    for path in paths {
+        let path = profile_path_in(dir, path)?;
+        let profile = read_profile_file(&path)?;
+        if profile.group != group {
+            let profile = ProfileData {
+                group: group.to_string(),
+                ..profile
+            };
+            save_profile(dir, &profile, Some(&path))?;
+        }
+    }
+    Ok(())
+}
+
+/// Looks → Profiles' Move to Group, Rename Group (every profile of a group into the new name)
+/// and Delete Group (into no group: nothing is deleted).
+#[tauri::command]
+pub async fn move_custom_profiles_to_group(
+    paths: Vec<String>,
+    group: String,
+    app_handle: AppHandle,
+) -> Result<Vec<ProfileEntry>, String> {
+    crate::blocking_command::run_blocking(move || {
+        let dir = profiles_dir(&app_handle)?;
+        regroup_profiles(&dir, &paths, &group)?;
+        list_profiles_in(&dir)
+    })
+    .await
+}
+
 /// Adds a profile from elsewhere (a photo's edit, an imported file) to the profile folder,
 /// after checking that its table loads; one whose id is already there becomes a profile of its
 /// own, so choosing either never picks the other.
@@ -1301,6 +1334,28 @@ mod tests {
             !entries[0].can_edit,
             "a profile without a recipe cannot be edited"
         );
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn regrouping_moves_profiles_and_keeps_their_files() {
+        let dir = std::env::temp_dir().join(format!("tir-profiles-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let profile: ProfileData = serde_json::from_value(base_profile()).unwrap();
+        let path = save_profile(&dir, &profile, None)
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+
+        regroup_profiles(&dir, std::slice::from_ref(&path), " Film ").unwrap();
+        let entries = list_profiles_in(&dir).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].group, "Film");
+        assert_eq!(entries[0].path, path, "the file keeps its name");
+
+        regroup_profiles(&dir, std::slice::from_ref(&path), "").unwrap();
+        assert_eq!(list_profiles_in(&dir).unwrap()[0].group, "");
+        assert!(regroup_profiles(&dir, &["elsewhere.tirprofile".to_string()], "X").is_err());
         fs::remove_dir_all(&dir).unwrap();
     }
 

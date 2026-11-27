@@ -62,6 +62,7 @@ export enum Invokes {
   ListCustomProfiles = 'list_custom_profiles',
   LoadCustomProfile = 'load_custom_profile',
   RenameCustomProfile = 'rename_custom_profile',
+  MoveCustomProfilesToGroup = 'move_custom_profiles_to_group',
   UpdateCustomProfile = 'update_custom_profile',
   SaveEmbeddedCustomProfile = 'save_embedded_custom_profile',
   ImportCustomProfiles = 'import_custom_profiles',

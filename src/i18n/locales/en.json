@@ -886,6 +886,7 @@
       "savesTo": "External edit — saves to"
     },
     "looks": {
+      "backToAdjustments": "Back to Adjustments",
       "deleteGroup": "Delete Group",
       "deleteGroupMessage_one": "Delete the group “{{name}}”? Its {{count}} item moves to No Group; nothing is deleted.",
       "deleteGroupMessage_other": "Delete the group “{{name}}”? Its {{count}} items move to No Group; nothing is deleted.",
@@ -906,6 +907,7 @@
       "renameGroup": "Rename Group…",
       "renameGroupTitle": "Rename Group",
       "searchPresets": "Search presets",
+      "searchProfiles": "Search profiles",
       "title": "Looks",
       "viewGrid": "Show previews",
       "viewList": "Show as list"
@@ -1867,7 +1869,6 @@
       "create": "Create",
       "currentProfile": "Current profile ({{name}})",
       "failed": "Could not create the profile: {{error}}",
-      "groupPlaceholder": "Group (optional)",
       "hint": "Ticked settings are baked into the profile and reset in this photo, which keeps its look with the profile applied.",
       "hintLut": "Ticked settings are saved as a LUT for Look → LUT; this photo stays as it is. A LUT works on the finished photo, after every slider, so it matches JPEGs closely and RAW photos only approximately.",
       "hintUpdate": "Ticked settings are baked into the profile again. Photos already using it keep the version they have.",

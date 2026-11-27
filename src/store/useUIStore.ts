@@ -184,6 +184,8 @@ interface UIState {
   renderedRightPanel: Panel | null;
   // The editing tool (Adjustments, Crop, Masks, ...) last shown in Develop, reopened by the Develop switch.
   lastEditingPanel: Panel;
+  /** The panel a tool row opened Looks from (Basic → Profile), for Looks' Back pill; cleared on leaving Looks. */
+  looksReturnPanel: Panel | null;
   slideDirection: number;
   collapsibleSectionsState: CollapsibleSectionsState;
 
@@ -279,6 +281,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   activeRightPanel: Panel.Adjustments,
   renderedRightPanel: Panel.Adjustments,
   lastEditingPanel: Panel.Adjustments,
+  looksReturnPanel: null,
   slideDirection: 1,
   collapsibleSectionsState: {
     light: true,
@@ -366,8 +369,9 @@ export const useUIStore = create<UIState>((set, get) => ({
   setRightPanel: (panelId) => {
     const current = get().activeRightPanel;
     updateCropSession(current, panelId === current ? null : panelId);
+    if (panelId !== Panel.Presets) set({ looksReturnPanel: null });
     if (panelId === current) {
-      set({ activeRightPanel: null });
+      set({ activeRightPanel: null, looksReturnPanel: null });
     } else {
       const currentIndex = current ? RIGHT_PANEL_ORDER.indexOf(current) : -1;
       const newIndex = panelId ? RIGHT_PANEL_ORDER.indexOf(panelId) : -1;

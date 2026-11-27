@@ -305,12 +305,13 @@ details are in `RELEASE_NOTES.MD`.
   into a profile in the user's profile folder and resets them in the
   photo. The profile is the base of the look: applied after White Balance
   and Brightness on linear, unclipped light, so every later slider works on
-  its whole result without a cap. Grouped profile browser (a grid of
-  previews on the open photo or a list, Favorites first) with a live
-  preview on hover, Amount 0–200, in a Lightroom-style Profile row; right-click to
+  its whole result without a cap. Profiles are browsed in Looks →
+  Profiles (see Looks tab); the Lightroom-style Profile row shows the
+  chosen profile (its name opens Looks), Amount 0–200 and Save to my
+  profiles; right-click a profile in Looks to
   Edit Profile (its settings back on the sliders, then Update Profile;
-  photos using it keep their version), Rename (name, group, B&W), Export
-  or Delete; Import Profiles adds `.tirprofile` files; Save to my profiles
+  photos using it keep their version), Rename (name, group, B&W), Move to
+  Group, Export or Delete; Import Profiles adds `.tirprofile` files; Save to my profiles
   keeps a photo's embedded profile. The same dialog can **Save as LUT**:
   the ticked settings as a finishing LUT for Look → LUT (the photo left
   as it is). The profile is embedded in
@@ -514,11 +515,15 @@ details are in `RELEASE_NOTES.MD`.
   settings it holds; replaces the Tool/Style choice, and older presets
   apply as before.
 - **Looks tab** (formerly Presets, key P): a Presets · Profiles · LUTs
-  switch shows one kind at a time. Presets as a grid of previews or a
-  list, Favorites (star) listed first, name search, groups that open
-  and close and stay so; a Group field when saving, Move to Group, and
-  Delete Group keeps the presets (they move to No Group). Profiles and
-  LUTs show their tools there until they get the same browser.
+  switch shows one kind at a time. Presets and profiles share one
+  browser: a grid of previews or a list, Favorites (star) listed first,
+  name search, groups that open and close and stay so, a group picker
+  when saving, Move to Group, Rename Group, and Delete Group that keeps
+  the items (they move to No Group); the applied item's strength slider
+  sits under it, and Looks opens at it. Profiles preview on hover; a
+  tool row's name (Basic → Profile) opens Looks with a Back to
+  Adjustments button. LUTs show their tool there until they get the
+  same browser.
 - Named tone-curve presets with unique names, built-in Linear and contrast
   presets, modification indicators, update, save-as-new, and delete actions.
 - Tone Curve channel buttons show a dot under each adjusted channel, and the

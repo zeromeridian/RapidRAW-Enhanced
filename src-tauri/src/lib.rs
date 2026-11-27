@@ -2812,6 +2812,7 @@ pub fn run() {
             custom_profile::create_custom_profile,
             custom_profile::update_custom_profile,
             custom_profile::rename_custom_profile,
+            custom_profile::move_custom_profiles_to_group,
             custom_profile::save_embedded_custom_profile,
             custom_profile::import_custom_profiles,
             custom_profile::export_custom_profile,

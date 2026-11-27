@@ -5,6 +5,26 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.122.0-dev-looks-browser — 2026-11-27
+
+### Looks
+
+- **Profiles have their own browser in Looks:** a grid of previews or a
+  list (now with previews too), Favorites first, then each group and No
+  Group; every group opens and closes and stays so; search by name.
+  Pointing at a profile previews it on the photo, a click applies it,
+  and its Amount slider appears under it.
+- **Profile groups:** Create, Update and Rename Profile choose the group
+  from a list (or New Group…) instead of typing it. Right-click a
+  profile for Move to Group; right-click a group to rename it or delete
+  it (its profiles move to No Group).
+- **Basic → Profile is now a short row:** the profile's name, a button to
+  remove it, Amount, Save to my profiles and the Edit Profile bar.
+  Clicking the name opens Looks → Profiles at the current profile, with
+  a **Back to Adjustments** button. Create Profile and Import are in
+  Looks.
+- Opening Looks scrolls to the applied preset or profile.
+
 ## 1.121.1-dev-looks-browser — 2026-11-27
 
 ### Window (macOS)

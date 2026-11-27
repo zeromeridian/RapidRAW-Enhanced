@@ -175,4 +175,25 @@ English strings only (`en.json`, listed under "Pending translations").
   only beside other sections; a search opens every section with
   matches; grid previews are the existing preset previews cropped
   square; the list's details line is the settings count; a group's
-  right-click also offers New Preset in that group.
+  right-click also offers New Preset in that group. Committed by the
+  owner as `abcd7144`.
+- 2026-11-27: **phase 2 built as `1.122.0`** (with item 87's `1.121.1`
+  fix underneath), not committed. Profile state moved out of
+  `Profile.tsx` into `useCustomProfiles` + `useCustomProfileStore`
+  (list, revision, Edit Profile, the dialog), shared by the slim Basic →
+  Profile row and the new `ProfilesBrowser`; `ProfileDialogHost`
+  (mounted in `EditorView`) renders the one `CreateProfileModal`, lists
+  the folder once and ends Edit Profile on another photo. Rust: one
+  command `move_custom_profiles_to_group(paths, group)` for Move to
+  Group, Rename Group and Delete Group (to `''`), with a test.
+  `CreateProfileModal` takes the `GroupPicker` (a profile group's id is
+  its name). Shared additions: `BrowserToolbar` (search + layout, also
+  used by presets now), `matchesQuery`, items scroll into view when
+  shown selected. Back pill: `looksReturnPanel` in the UI store, set by
+  `openLooks(kind)`, cleared when another panel opens. Choices made
+  while building: profile groups in name order with No Group last (as
+  the folder lists them), all sections start open; the Edit Profile bar
+  shows in Looks too; Create Profile and Import moved from the row to
+  Looks (plan: the row keeps only name, ✕, Amount, Save / Update);
+  imports keep the group stored in the file (a file dialog has no room
+  for a group picker).
