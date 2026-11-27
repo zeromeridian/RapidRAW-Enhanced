@@ -30,7 +30,6 @@ import {
 import Dropdown from '../ui/Dropdown';
 import AdjustmentSlider from './AdjustmentSlider';
 import AdjustmentTool from './AdjustmentTool';
-import LutTool from './LutTool';
 import ColorField, { normalizeHexColor, useParsedTextField } from '../ui/ColorField';
 import { ColorSwatch } from '../ui/ColorSwatch';
 import { AppSettings } from '../ui/AppProperties';
@@ -872,8 +871,6 @@ export default function EffectsPanel({
               onDragStateChange={onDragStateChange}
             />
           </AiEffectSection>
-
-          <LutTool adjustments={adjustments} setAdjustments={setAdjustments} onDragStateChange={onDragStateChange} />
         </>
       )}
 

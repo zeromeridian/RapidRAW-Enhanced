@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
-import { FileUp, Plus, Trash2, Upload } from 'lucide-react';
+import { Eye, EyeOff, FileUp, Plus, Trash2, Upload } from 'lucide-react';
+import clsx from 'clsx';
+import { isGroupVisible } from '../../../utils/adjustments';
 import { openLookDialog } from '../../../hooks/useLookDialog';
 import Slider from '../../ui/Slider';
 import GroupedBrowser from '../../ui/LooksBrowser/GroupedBrowser';
@@ -27,6 +29,7 @@ export default function LutsBrowser() {
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
   const isImageReady = useEditorStore((state) => state.selectedImage?.isReady ?? false);
   const [previews, setPreviews] = useState<Record<string, string | null>>({});
+  const isLutShown = isGroupVisible(adjustments.sectionVisibility, 'lut');
 
   // Listed whenever Looks → LUTs opens, so LUTs saved meanwhile (Save as LUT) appear.
   useEffect(() => {
@@ -72,18 +75,36 @@ export default function LutsBrowser() {
       previews={previews}
       isSelected={(entry) => entry.path === adjustments.lutPath}
       activeContent={
-        <div className="px-1 pt-1 pb-2" onClick={(event) => event.stopPropagation()}>
-          <Slider
-            label={t('ui.lut.intensity')}
-            min={0}
-            max={100}
-            step={1}
-            value={adjustments.lutIntensity ?? 100}
-            defaultValue={100}
-            onChange={(e) => setAdjustments((prev) => ({ ...prev, lutIntensity: Number(e.target.value) }))}
-            onDragStateChange={onDragStateChange}
-            fillOrigin="min"
-          />
+        <div className="flex items-center gap-2 px-1 pt-1 pb-2" onClick={(event) => event.stopPropagation()}>
+          <div className="grow min-w-0">
+            <Slider
+              label={t('ui.lut.intensity')}
+              min={0}
+              max={100}
+              step={1}
+              value={adjustments.lutIntensity ?? 100}
+              defaultValue={100}
+              onChange={(e) => setAdjustments((prev) => ({ ...prev, lutIntensity: Number(e.target.value) }))}
+              onDragStateChange={onDragStateChange}
+              fillOrigin="min"
+            />
+          </div>
+          {/* The LUT's own eye (it has no Adjustments section): off keeps it in the edit, unseen. */}
+          <button
+            className={clsx(
+              'p-1 rounded-full hover:bg-bg-primary shrink-0',
+              isLutShown ? 'text-text-secondary' : 'text-accent',
+            )}
+            data-tooltip={t(isLutShown ? 'ui.lut.hideLut' : 'ui.lut.showLut')}
+            onClick={() =>
+              setAdjustments((prev) => ({
+                ...prev,
+                sectionVisibility: { ...prev.sectionVisibility, lut: !isLutShown },
+              }))
+            }
+          >
+            {isLutShown ? <Eye size={16} /> : <EyeOff size={16} />}
+          </button>
         </div>
       }
       onSelect={selectLut}

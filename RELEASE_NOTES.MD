@@ -5,6 +5,20 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.124.1-dev-looks-browser — 2026-11-27
+
+### Adjustments
+
+- **The Look section is now called Color Grading** and holds only Color
+  Grading, without a second heading of the same name (the heading still
+  shows in Favorites).
+- **The LUT is no longer in Adjustments:** choose it, set its Intensity
+  and show or hide it in Looks → LUTs, where a new eye button next to
+  Intensity hides the LUT while keeping it in the edit. Copy & Paste and
+  New Look list the LUT under its own heading.
+- Copying, pasting or resetting the Color Grading section leaves the
+  LUT alone; Reset All still removes it.
+
 ## 1.124.0-dev-looks-browser — 2026-11-27
 
 ### Looks

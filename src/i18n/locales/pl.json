@@ -179,7 +179,6 @@
       "lensBlur": "Rozmycie obiektywu",
       "lensDiffusion": "Dyfuzja",
       "lightFlares": "Flary świetlne",
-      "lut": "LUT",
       "midpoint": "Punkt środkowy",
       "motionBlur": "Rozmycie ruchu",
       "motionBlurAngle": "Kąt",
@@ -502,7 +501,6 @@
         "light": "Światło",
         "lensGeometry": "Obiektyw i geometria",
         "lightAtmosphere": "Światło i atmosfera",
-        "look": "Styl",
         "zoneTint": "Edytor stref"
       },
       "title": "Ustawienia",
@@ -2502,14 +2500,11 @@
       "selectImageFile": "Wybierz plik obrazu"
     },
     "lut": {
-      "clearLut": "Wyczyść LUT",
       "empty": "Brak LUT — zaimportuj jakieś",
       "filterLabel": "Pliki LUT",
       "importFailed": "Nie udało się zaimportować LUT",
       "intensity": "Intensywność",
-      "label": "LUT",
       "removeLut": "Usuń LUT",
-      "selectLutFile": "Wybierz plik LUT",
       "unsupportedFormat": "Wykryto nieobsługiwany format pliku: .{{ext}}"
     },
     "slider": {

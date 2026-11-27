@@ -180,7 +180,6 @@
       "lensBlur": "Lens Blur",
       "lensDiffusion": "Diffusion",
       "lightFlares": "Light Flares",
-      "lut": "LUT",
       "midpoint": "Midpoint",
       "motionBlur": "Motion Blur",
       "motionBlurAngle": "Angle",
@@ -541,7 +540,8 @@
         "light": "Light",
         "lensGeometry": "Lens & Geometry",
         "lightAtmosphere": "Light & Atmosphere",
-        "look": "Look",
+        "look": "Color Grading",
+        "lut": "LUT",
         "masks": "Masks",
         "zoneTint": "Zone Editor"
       },
@@ -2875,17 +2875,16 @@
       "selectImageFile": "Select an image file"
     },
     "lut": {
-      "clearLut": "Clear LUT",
       "empty": "No LUTs yet — import some",
       "filterLabel": "LUT Files",
+      "hideLut": "Hide the LUT (it stays in the edit)",
       "importFailed": "Failed to import LUTs",
       "importIntoGroup": "Import LUTs into Group…",
       "importLuts": "Import LUTs…",
       "intensity": "Intensity",
-      "label": "LUT",
       "moveFailed": "Could not move the LUT: {{error}}",
       "removeLut": "Remove LUT",
-      "selectLutFile": "Select a LUT file",
+      "showLut": "Show the LUT",
       "unsupportedFormat": "Unsupported file format(s) detected: .{{ext}}"
     },
     "slider": {

@@ -30,7 +30,7 @@ const SECTION_SOURCES: Record<string, Array<SectionComponent>> = {
   light: [ProfilePanel, ColorPanel, BasicAdjustments, DetailsPanel],
   curves: [CurveGraph],
   color: [ColorPanel],
-  look: [ColorPanel, EffectsPanel],
+  look: [ColorPanel],
   lightAtmosphere: [EffectsPanel],
   blur: [EffectsPanel],
   detail: [DetailsPanel],
@@ -49,6 +49,7 @@ function createSectionComponent(section: string): SectionComponent {
         ...parent,
         // A Favorites tool narrows the section down to that one block.
         tools: parent.tools ? sectionTools.filter((id) => parent.tools?.includes(id)) : sectionTools,
+        isInFavorites: parent.tools !== undefined,
         // An older edit can have only some of a section's tools switched off: those show dimmed.
         hiddenTools:
           getSectionEye(visibility, section) === 'partial' ? getHiddenSectionGroups(visibility, section) : undefined,

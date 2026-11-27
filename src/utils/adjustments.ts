@@ -1422,6 +1422,18 @@ const groupOfSettings = (label: string, settings: Array<[keys: string | string[]
 };
 
 /**
+ * The finishing LUT's keys. It has no Adjustments section since Looks → LUTs sets it (Plan item
+ * 86), so a section's copy, paste and reset leave it alone; Reset All still clears it.
+ */
+export const LUT_ADJUSTMENT_KEYS: ReadonlyArray<string> = [
+  Effect.LutIntensity,
+  Effect.LutName,
+  Effect.LutPath,
+  Effect.LutSize,
+  Effect.LutData,
+];
+
+/**
  * The Copy & Paste Settings checkboxes, under the Adjustments sections they belong to; the
  * preset dialog also lists each group's parts.
  */
@@ -1471,13 +1483,9 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     { label: 'modals.copyPaste.groups.pointColor', keys: [ColorAdjustment.PointColors] },
     { label: 'modals.copyPaste.groups.colorCalibration', keys: ['colorCalibration'] },
   ],
-  look: [
-    { label: 'modals.copyPaste.groups.colorGrading', keys: [ColorAdjustment.ColorGrading] },
-    {
-      label: 'modals.copyPaste.groups.lut',
-      keys: [Effect.LutIntensity, Effect.LutName, Effect.LutPath, Effect.LutSize, Effect.LutData],
-    },
-  ],
+  look: [{ label: 'modals.copyPaste.groups.colorGrading', keys: [ColorAdjustment.ColorGrading] }],
+  // Not an Adjustments section: the LUT is chosen and set in Looks → LUTs (Plan item 86).
+  lut: [{ label: 'modals.copyPaste.groups.lut', keys: [...LUT_ADJUSTMENT_KEYS] }],
   lightAtmosphere: [
     {
       label: 'modals.copyPaste.groups.halationGlow',
@@ -1807,14 +1815,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     ColorAdjustment.PointColors,
     'colorCalibration',
   ],
-  look: [
-    ColorAdjustment.ColorGrading,
-    Effect.LutIntensity,
-    Effect.LutName,
-    Effect.LutPath,
-    Effect.LutSize,
-    Effect.LutData,
-  ],
+  look: [ColorAdjustment.ColorGrading],
   lightAtmosphere: [
     Effect.RelightEnabled,
     Effect.RelightLights,
@@ -1920,10 +1921,7 @@ export const ADJUSTMENT_SECTION_TOOLS: Record<string, Array<AdjustmentSectionToo
     { id: 'colorMixer', label: 'adjustments.color.colorMixer' },
     { id: 'colorCalibration', label: 'adjustments.color.calibration.title' },
   ],
-  look: [
-    { id: 'colorGrading', label: 'adjustments.color.colorGrading' },
-    { id: 'lut', label: 'adjustments.effects.lut' },
-  ],
+  look: [{ id: 'colorGrading', label: 'adjustments.color.colorGrading' }],
   lightAtmosphere: [
     { id: 'relight', label: 'adjustments.effects.relight' },
     { id: 'fog', label: 'adjustments.effects.fog' },

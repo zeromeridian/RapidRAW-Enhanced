@@ -179,7 +179,6 @@
       "lensBlur": "レンズぼかし",
       "lensDiffusion": "拡散",
       "lightFlares": "ライトフレア",
-      "lut": "LUT",
       "midpoint": "中間点",
       "motionBlur": "モーションブラー",
       "motionBlurAngle": "角度",
@@ -464,7 +463,6 @@
         "light": "ライト",
         "lensGeometry": "レンズとジオメトリ",
         "lightAtmosphere": "光と雰囲気",
-        "look": "ルック",
         "zoneTint": "ゾーンエディター"
       },
       "title": "補正",
@@ -2404,14 +2402,11 @@
       "selectImageFile": "画像ファイルを選択"
     },
     "lut": {
-      "clearLut": "LUTをクリア",
       "empty": "LUTはまだありません — インポートしてください",
       "filterLabel": "LUTファイル",
       "importFailed": "LUTのインポートに失敗しました",
       "intensity": "適用度",
-      "label": "LUT",
       "removeLut": "LUTを削除",
-      "selectLutFile": "LUTファイルを選択",
       "unsupportedFormat": "未対応のファイル形式が検出されました: .{{ext}}"
     },
     "slider": {

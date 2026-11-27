@@ -509,7 +509,7 @@ export default function ColorPanel({
         <AdjustmentSlider control={ColorAdjustment.Hue} {...sliderProps} />
       </AdjustmentTool>
 
-      <AdjustmentTool id="colorGrading" titleClassName="mb-3 compact:mb-1">
+      <AdjustmentTool id="colorGrading" titleClassName="mb-3 compact:mb-1" isSectionNamesake>
         <ColorGradingPanel
           adjustments={adjustments}
           setAdjustments={setAdjustments}

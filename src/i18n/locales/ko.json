@@ -179,7 +179,6 @@
       "lensBlur": "렌즈 블러",
       "lensDiffusion": "확산",
       "lightFlares": "빛 번짐",
-      "lut": "LUT",
       "midpoint": "중간점",
       "motionBlur": "모션 블러",
       "motionBlurAngle": "각도",
@@ -464,7 +463,6 @@
         "light": "빛",
         "lensGeometry": "렌즈 및 지오메트리",
         "lightAtmosphere": "빛과 분위기",
-        "look": "룩",
         "zoneTint": "존 에디터"
       },
       "title": "조정",
@@ -2404,14 +2402,11 @@
       "selectImageFile": "이미지 파일 선택"
     },
     "lut": {
-      "clearLut": "LUT 지우기",
       "empty": "아직 LUT가 없습니다 — 가져오기를 수행하세요",
       "filterLabel": "LUT 파일",
       "importFailed": "LUT 가져오기 실패",
       "intensity": "강도",
-      "label": "LUT",
       "removeLut": "LUT 제거",
-      "selectLutFile": "LUT 파일 선택",
       "unsupportedFormat": "지원되지 않는 파일 형식이 감지되었습니다: .{{ext}}"
     },
     "slider": {

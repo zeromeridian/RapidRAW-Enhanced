@@ -179,7 +179,6 @@
       "lensBlur": "镜头模糊",
       "lensDiffusion": "扩散",
       "lightFlares": "光线耀斑",
-      "lut": "LUT",
       "midpoint": "中点",
       "motionBlur": "动感模糊",
       "motionBlurAngle": "角度",
@@ -464,7 +463,6 @@
         "light": "光线",
         "lensGeometry": "镜头与几何",
         "lightAtmosphere": "光线与氛围",
-        "look": "风格",
         "zoneTint": "区域编辑器"
       },
       "title": "调整",
@@ -2404,14 +2402,11 @@
       "selectImageFile": "选择图像文件"
     },
     "lut": {
-      "clearLut": "清除 LUT",
       "empty": "暂无 LUT — 请导入一些",
       "filterLabel": "LUT 文件",
       "importFailed": "导入 LUT 失败",
       "intensity": "强度",
-      "label": "LUT",
       "removeLut": "移除 LUT",
-      "selectLutFile": "选择 LUT 文件",
       "unsupportedFormat": "检测到不支持的文件格式：.{{ext}}"
     },
     "slider": {

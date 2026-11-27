@@ -179,7 +179,6 @@
       "lensBlur": "Размытие объектива",
       "lensDiffusion": "Диффузия",
       "lightFlares": "Блики",
-      "lut": "LUT",
       "midpoint": "Средняя точка",
       "motionBlur": "Размытие в движении",
       "motionBlurAngle": "Угол",
@@ -502,7 +501,6 @@
         "light": "Свет",
         "lensGeometry": "Объектив и геометрия",
         "lightAtmosphere": "Свет и атмосфера",
-        "look": "Стиль",
         "zoneTint": "Редактор зон"
       },
       "title": "Настройки",
@@ -2502,14 +2500,11 @@
       "selectImageFile": "Выберите графический файл"
     },
     "lut": {
-      "clearLut": "Удалить LUT",
       "empty": "Пока нет LUT — импортируйте их",
       "filterLabel": "Файлы LUT",
       "importFailed": "Не удалось импортировать LUT",
       "intensity": "Интенсивность",
-      "label": "LUT",
       "removeLut": "Удалить LUT",
-      "selectLutFile": "Выберите файл таблицы цветов LUT",
       "unsupportedFormat": "Обнаружены неподдерживаемые форматы файлов: .{{ext}}"
     },
     "slider": {

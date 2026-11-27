@@ -232,4 +232,12 @@ English strings only (`en.json`, listed under "Pending translations").
   `endPreview` in `useLuts`). Choices made while building: a new
   profile or LUT starts with the photo's edited settings ticked (as a
   new preset; Create Profile used to leave White Balance unticked);
-  LUTs got a ＋ too. Item 86 is complete once `1.124.0` passes.
+  LUTs got a ＋ too. Committed by the owner as `a6382ea5`.
+- 2026-11-27: **`1.124.1`** (owner request after phase 4, revises L7
+  for the LUT): Look → LUT removed from Adjustments; the Look section
+  is labelled Color Grading (id `look` kept) with no duplicate tool
+  heading; the LUT's eye moved beside its Intensity in Looks → LUTs; LUT
+  keys out of the section's copy/paste/reset (Reset All still clears
+  them) and under their own heading in Copy & Paste and New Look. Basic
+  → Profile stays (L7). Item 86 is complete once `1.124.0`/`1.124.1`
+  pass.

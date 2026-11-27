@@ -313,14 +313,14 @@ details are in `RELEASE_NOTES.MD`.
   photos using it keep their version), Rename (name, group, B&W), Move to
   Group, Export or Delete; Import Profiles adds `.tirprofile` files; Save to my profiles
   keeps a photo's embedded profile. The same dialog can **Save as LUT**:
-  the ticked settings as a finishing LUT for Look → LUT (the photo left
+  the ticked settings as a finishing LUT for Looks → LUTs (the photo left
   as it is). The profile is embedded in
   the edit and XMP, so it renders without the file; Copy & Paste, presets
   and Auto Sync carry it. With a profile, Color Calibration acts before it.
 - **Adjustments sections in workflow order**: Light (Profile, Black &
   White, tone mapper, White Balance, tone sliders, Presence), Curves, Color (Color
-  Presence, Hue, Color Mixer and Point Color, Calibration), Look (Color
-  Grading, LUT), Light & Atmosphere (Relight, Fog, Glow, Halation, Light
+  Presence, Hue, Color Mixer and Point Color, Calibration), Color
+  Grading, Light & Atmosphere (Relight, Fog, Glow, Halation, Light
   Flares), Blur (Lens, Motion, Gaussian), Detail (Sharpening, Noise
   Reduction, AI Denoise), Finish (Vignette, Grain),
   in the photo's and the masks' panels and the Copy & Paste dialog. Each
@@ -525,8 +525,9 @@ details are in `RELEASE_NOTES.MD`.
   group and one settings tree, where a profile or LUT greys out what it
   cannot hold; Update / Configure Preset and Update / Rename Profile use
   it too. Presets, profiles and LUTs preview on
-  hover; a tool row's name (Basic → Profile, Look → LUT) opens Looks
-  with a Back to Adjustments button. LUT groups are subfolders of the
+  hover; Basic → Profile's name opens Looks with a Back to Adjustments
+  button. The LUT lives only in Looks → LUTs (Intensity and an eye to
+  hide it under the applied LUT), not in Adjustments. LUT groups are subfolders of the
   LUT folder (a group's menu can import straight into it; Save as LUT
   can save into one); edits that only name a LUT's file still find it
   after a move.

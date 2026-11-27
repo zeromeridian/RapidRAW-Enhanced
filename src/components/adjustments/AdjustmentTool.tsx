@@ -16,6 +16,8 @@ interface AdjustmentPanelContextValue {
   tools?: ReadonlyArray<string>;
   /** Tool blocks whose eye is off inside a section whose eye is partly on; they show dimmed. */
   hiddenTools?: ReadonlyArray<string>;
+  /** The tools are shown in Favorites, away from their section's heading. */
+  isInFavorites?: boolean;
 }
 
 export const AdjustmentPanelContext = createContext<AdjustmentPanelContextValue>({ canFavorite: false });
@@ -66,6 +68,8 @@ interface AdjustmentToolProps {
   titleClassName?: string;
   /** No heading: the block is one labelled control (Black & White) and the star sits after it. */
   isUntitled?: boolean;
+  /** The section has the tool's name (Color Grading), so the title shows only in Favorites. */
+  isSectionNamesake?: boolean;
 }
 
 /**
@@ -79,9 +83,10 @@ export default function AdjustmentTool({
   title,
   titleClassName = 'mb-2 compact:mb-1',
   isUntitled = false,
+  isSectionNamesake = false,
 }: AdjustmentToolProps) {
   const { t } = useTranslation();
-  const { tools, hiddenTools } = useContext(AdjustmentPanelContext);
+  const { tools, hiddenTools, isInFavorites } = useContext(AdjustmentPanelContext);
   const tool = ADJUSTMENT_TOOLS_BY_ID[id];
   const order = useSettingsStore((state) =>
     getAdjustmentToolOrder(tool.section, state.appSettings?.adjustmentLayout?.toolOrder).indexOf(id),
@@ -112,9 +117,11 @@ export default function AdjustmentTool({
     <div {...blockProps}>
       <div className={clsx('group/favorite flex justify-between items-center', titleClassName)}>
         <div className="flex items-center gap-1 min-w-0">
-          <Text variant={TextVariants.heading} className="compact:text-sm truncate">
-            {title ?? t(tool.label as ParseKeys)}
-          </Text>
+          {(!isSectionNamesake || isInFavorites) && (
+            <Text variant={TextVariants.heading} className="compact:text-sm truncate">
+              {title ?? t(tool.label as ParseKeys)}
+            </Text>
+          )}
           <FavoriteStar favorite={favorite} />
         </div>
         {actions}

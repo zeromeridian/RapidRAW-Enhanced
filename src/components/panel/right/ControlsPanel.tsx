@@ -15,6 +15,7 @@ import {
   Adjustments,
   INITIAL_ADJUSTMENTS,
   ADJUSTMENT_SECTIONS,
+  LUT_ADJUSTMENT_KEYS,
   getAdjustmentSectionOrder,
   getInitialAdjustments,
   getSectionEye,
@@ -103,12 +104,13 @@ export default function Controls() {
     setAdjustments(
       (prev: Adjustments) => ({
         ...prev,
-        ...Object.keys(ADJUSTMENT_SECTIONS)
-          .flatMap((s) => ADJUSTMENT_SECTIONS[s])
-          .reduce((acc: any, key: string) => {
+        ...[...Object.keys(ADJUSTMENT_SECTIONS).flatMap((s) => ADJUSTMENT_SECTIONS[s]), ...LUT_ADJUSTMENT_KEYS].reduce(
+          (acc: any, key: string) => {
             acc[key] = initialAdjustments[key as keyof Adjustments];
             return acc;
-          }, {}),
+          },
+          {},
+        ),
         sectionVisibility: { ...INITIAL_ADJUSTMENTS.sectionVisibility },
       }),
       t('contextMenus.editor.resetAdjustments'),
