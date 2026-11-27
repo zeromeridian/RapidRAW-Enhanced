@@ -22,7 +22,6 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tauri::Emitter;
-use tauri::Manager;
 use tokenizers::Tokenizer;
 use tokio::sync::Mutex as TokioMutex;
 
@@ -233,6 +232,26 @@ const NORMAL_ASSET: ModelAsset = ModelAsset {
     sha256: Some(NORMAL_SHA256),
     name: "Normal Model",
 };
+
+/// Every file the models folder holds, moved along when the folder changes
+/// (`models_location::move_models_folder`).
+pub const MODEL_FILENAMES: &[&str] = &[
+    ENCODER_FILENAME,
+    DECODER_FILENAME,
+    BIREFNET_FP16_FILENAME,
+    BIREFNET_FP32_FILENAME,
+    ESAM3_IMAGE_ENCODER_FILENAME,
+    ESAM3_DECODER_FILENAME,
+    ESAM3_TEXT_ENCODER_FILENAME,
+    ESAM3_SKY_PROMPT_FILENAME,
+    DEPTH_FILENAME,
+    CLIP_MODEL_FILENAME,
+    CLIP_TOKENIZER_FILENAME,
+    DENOISE_FILENAME,
+    UPSCALE_FILENAME,
+    LAMA_FILENAME,
+    NORMAL_FILENAME,
+];
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum AiMaskModel {
@@ -1007,11 +1026,7 @@ pub fn fast_color_guided_filter(
 }
 
 fn get_models_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf> {
-    let models_dir = app_handle.path().app_data_dir()?.join("models");
-    if !models_dir.exists() {
-        fs::create_dir_all(&models_dir)?;
-    }
-    Ok(models_dir)
+    crate::models_location::models_dir(app_handle).map_err(anyhow::Error::msg)
 }
 
 fn persist_downloaded_asset(dest: &Path, bytes: &[u8]) -> Result<()> {

@@ -127,6 +127,8 @@ export enum Invokes {
   LoadCatalogFolderTrees = 'load_catalog_folder_trees',
   GetCatalogLocation = 'get_catalog_location',
   MoveLibraryCatalog = 'move_library_catalog',
+  GetModelsLocation = 'get_models_location',
+  MoveModelsFolder = 'move_models_folder',
   LoadImage = 'load_image',
   PreloadImages = 'preload_images',
   LoadMetadata = 'load_metadata',
@@ -336,6 +338,8 @@ export interface AdjustmentLayout {
 
 export interface AppSettings {
   catalogDirectory?: string;
+  /** The chosen AI models folder; absent uses the default. */
+  modelsDirectory?: string;
   aiConnectorAddress?: string;
   aiGpuAcceleration?: boolean;
   aiProvider?: string;

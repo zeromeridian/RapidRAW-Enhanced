@@ -1,15 +1,11 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
-import { FolderOpen, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import Button from '../../ui/Button';
 import Input from '../../ui/Input';
-import Text from '../../ui/Text';
 import { Invokes } from '../../ui/AppProperties';
-import { TextColors, TextVariants } from '../../../types/typography';
 import SettingsPage, { SettingsPageProps } from './SettingsPage';
-import { SettingSwitch } from './SettingControls';
+import { FolderLocation, SettingSwitch } from './SettingControls';
 import { useSettingsContext } from './SettingsContext';
 
 interface CatalogMoveResult {
@@ -70,35 +66,16 @@ export default function LibrarySettings({ query }: SettingsPageProps) {
               description: t('settings.general.catalogLocationDesc'),
               stacked: true,
               control: (
-                <div className="space-y-2">
-                  <Input
-                    disabled
-                    onChange={() => {}}
-                    value={catalogLocation || t('settings.general.catalogLocationLoading')}
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    <Button disabled={isMovingCatalog} onClick={handleChooseCatalogLocation} type="button">
-                      <FolderOpen size={16} />
-                      {isMovingCatalog
-                        ? t('settings.general.catalogMoving')
-                        : t('settings.general.catalogChooseFolder')}
-                    </Button>
-                    <Button
-                      className="bg-surface text-text-primary border border-border-color"
-                      disabled={isMovingCatalog || !appSettings?.catalogDirectory}
-                      onClick={() => moveCatalog(null)}
-                      type="button"
-                    >
-                      <RotateCcw size={16} />
-                      {t('settings.general.catalogUseDefault')}
-                    </Button>
-                  </div>
-                  {catalogLocationMessage && (
-                    <Text variant={TextVariants.small} color={TextColors.secondary}>
-                      {catalogLocationMessage}
-                    </Text>
-                  )}
-                </div>
+                <FolderLocation
+                  busy={isMovingCatalog}
+                  busyText={t('settings.general.catalogMoving')}
+                  canUseDefault={!!appSettings?.catalogDirectory}
+                  chooseText={t('settings.general.catalogChooseFolder')}
+                  message={catalogLocationMessage}
+                  onChoose={handleChooseCatalogLocation}
+                  onUseDefault={() => moveCatalog(null)}
+                  path={catalogLocation || t('settings.general.catalogLocationLoading')}
+                />
               ),
             },
             {

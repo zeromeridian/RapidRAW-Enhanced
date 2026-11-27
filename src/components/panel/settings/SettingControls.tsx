@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
-import { LucideIcon } from 'lucide-react';
+import { FolderOpen, LucideIcon, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Button from '../../ui/Button';
+import Input from '../../ui/Input';
 import Switch from '../../ui/Switch';
 import Text from '../../ui/Text';
 import { Invokes } from '../../ui/AppProperties';
@@ -90,6 +91,64 @@ export const ActionButton = ({ disabled = false, icon: Icon, isProcessing, onCli
 
 /** An action's progress or result. */
 export const StatusMessage = ({ message }: { message: string }) => <Text color={TextColors.accent}>{message}</Text>;
+
+interface FolderLocationProps {
+  busy: boolean;
+  busyText: string;
+  canUseDefault: boolean;
+  chooseText: string;
+  /** An unreachable folder (for example an unplugged drive). */
+  error?: string;
+  message?: string;
+  onChoose(): void;
+  onUseDefault(): void;
+  path: string;
+}
+
+/** Where a movable store (the catalog, the AI models) lives, with Choose Folder and Use Default. */
+export const FolderLocation = ({
+  busy,
+  busyText,
+  canUseDefault,
+  chooseText,
+  error,
+  message,
+  onChoose,
+  onUseDefault,
+  path,
+}: FolderLocationProps) => {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-2">
+      <Input disabled onChange={() => {}} value={path} />
+      <div className="flex flex-wrap gap-2">
+        <Button disabled={busy} onClick={onChoose} type="button">
+          <FolderOpen size={16} />
+          {busy ? busyText : chooseText}
+        </Button>
+        <Button
+          className="bg-surface text-text-primary border border-border-color"
+          disabled={busy || !canUseDefault}
+          onClick={onUseDefault}
+          type="button"
+        >
+          <RotateCcw size={16} />
+          {t('settings.general.catalogUseDefault')}
+        </Button>
+      </div>
+      {error && (
+        <Text variant={TextVariants.small} color={TextColors.error}>
+          {error}
+        </Text>
+      )}
+      {message && (
+        <Text variant={TextVariants.small} color={TextColors.secondary}>
+          {message}
+        </Text>
+      )}
+    </div>
+  );
+};
 
 /** A folder or file path shown in full. */
 export const PathBox = ({ children }: { children: string }) => (

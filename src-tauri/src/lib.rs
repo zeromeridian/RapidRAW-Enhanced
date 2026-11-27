@@ -52,6 +52,7 @@ mod lightroom_xmp;
 mod lights_out_cover;
 mod lut_processing;
 mod mask_generation;
+mod models_location;
 mod motion_blur;
 mod multi_exposure;
 mod naming;
@@ -2391,6 +2392,7 @@ pub fn run() {
             if let Err(error) = identifier_migration::migrate_from_previous_identifier(app.handle()) {
                 eprintln!("Application identifier data migration will be retried: {error}");
             }
+            models_location::migrate_legacy_models_dir(app.handle());
             let state = app.state::<AppState>();
 
             #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
@@ -2840,6 +2842,8 @@ pub fn run() {
             library_catalog::load_catalog_folder_trees,
             library_catalog::get_catalog_location,
             library_catalog::move_library_catalog,
+            models_location::get_models_location,
+            models_location::move_models_folder,
             file_management::get_folder_tree,
             file_management::get_folder_children,
             file_management::get_pinned_folder_trees,

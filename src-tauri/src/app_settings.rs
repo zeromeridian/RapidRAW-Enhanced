@@ -1032,6 +1032,9 @@ pub struct AppSettings {
     pub right_panel_width: Option<u32>,
     #[serde(default)]
     pub catalog_directory: Option<String>,
+    /// The chosen AI models folder (`models_location.rs`); `None` uses the default.
+    #[serde(default)]
+    pub models_directory: Option<String>,
     #[serde(default)]
     pub lights_out_dim_level: Option<u8>,
     #[serde(default)]
@@ -1193,6 +1196,7 @@ impl Default for AppSettings {
             left_panel_width: None,
             right_panel_width: None,
             catalog_directory: None,
+            models_directory: None,
             lights_out_dim_level: None,
             lights_out_screen_color: None,
             lights_out_border_width: None,

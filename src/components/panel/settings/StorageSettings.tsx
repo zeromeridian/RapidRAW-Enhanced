@@ -1,12 +1,20 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import type { ParseKeys } from 'i18next';
 import { ExternalLink as ExternalLinkIcon, FolderOpen, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Invokes } from '../../ui/AppProperties';
 import { formatBytes } from '../../../utils/formatBytes';
 import SettingsPage, { SettingRowDef, SettingsPageProps } from './SettingsPage';
-import { ActionButton, PathBox, StatusMessage, useClearableCache, useTimedAction } from './SettingControls';
+import {
+  ActionButton,
+  FolderLocation,
+  PathBox,
+  StatusMessage,
+  useClearableCache,
+  useTimedAction,
+} from './SettingControls';
 import { useSettingsContext } from './SettingsContext';
 
 interface SidecarImportResult {
@@ -16,9 +24,19 @@ interface SidecarImportResult {
   failed: number;
 }
 
+/** `models_location::ModelsLocation`. */
+interface ModelsLocation {
+  available: boolean;
+  directory: string | null;
+  path: string;
+}
+
 export default function StorageSettings({ query }: SettingsPageProps) {
   const { t } = useTranslation();
-  const { onLibraryRefresh, requestConfirm, rootPaths } = useSettingsContext();
+  const { appSettings, onLibraryRefresh, onSettingsChange, requestConfirm, rootPaths } = useSettingsContext();
+  const [modelsLocation, setModelsLocation] = useState<ModelsLocation | null>(null);
+  const [modelsMessage, setModelsMessage] = useState('');
+  const [isMovingModels, setIsMovingModels] = useState(false);
   const [isImportingSidecars, setIsImportingSidecars] = useState(false);
   const [sidecarImportMessage, setSidecarImportMessage] = useState('');
   const clearSidecars = useTimedAction();
@@ -45,6 +63,36 @@ export default function StorageSettings({ query }: SettingsPageProps) {
       })
       .finally(() => setLogPathLoading(false));
   }, []);
+
+  useEffect(() => {
+    invoke<ModelsLocation>(Invokes.GetModelsLocation).then(setModelsLocation).catch(console.error);
+  }, [appSettings?.modelsDirectory]);
+
+  const moveModels = async (directory: string | null) => {
+    setIsMovingModels(true);
+    setModelsMessage('');
+    try {
+      const result = await invoke<ModelsLocation>(Invokes.MoveModelsFolder, { directory });
+      await onSettingsChange({ ...appSettings, modelsDirectory: result.directory ?? undefined });
+      setModelsLocation(result);
+      setModelsMessage(t('settings.data.modelsMoveSuccess'));
+    } catch (error) {
+      console.error('Failed to move the AI models:', error);
+      setModelsMessage(`${t('settings.data.modelsMoveFailed')}: ${error}`);
+    } finally {
+      setIsMovingModels(false);
+    }
+  };
+
+  const handleChooseModelsFolder = async () => {
+    const selected = await openDialog({
+      directory: true,
+      multiple: false,
+      defaultPath: modelsLocation?.path,
+      title: t('settings.general.catalogChooseFolder'),
+    });
+    if (typeof selected === 'string') await moveModels(selected);
+  };
 
   const handleImportRapidRawSidecars = async () => {
     setIsImportingSidecars(true);
@@ -134,6 +182,25 @@ export default function StorageSettings({ query }: SettingsPageProps) {
           id: 'data-management',
           title: t('settings.data.title'),
           rows: [
+            {
+              id: 'models-location',
+              label: t('settings.data.modelsLocation'),
+              description: t('settings.data.modelsLocationDesc'),
+              stacked: true,
+              control: (
+                <FolderLocation
+                  busy={isMovingModels}
+                  busyText={t('settings.data.modelsMoving')}
+                  canUseDefault={!!modelsLocation?.directory}
+                  chooseText={t('settings.general.catalogChooseFolder')}
+                  error={modelsLocation && !modelsLocation.available ? t('settings.data.modelsUnavailable') : undefined}
+                  message={modelsMessage}
+                  onChoose={handleChooseModelsFolder}
+                  onUseDefault={() => moveModels(null)}
+                  path={modelsLocation?.path ?? t('settings.data.loading')}
+                />
+              ),
+            },
             {
               id: 'import-sidecars',
               label: t('settings.data.importSidecars'),

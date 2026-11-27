@@ -5,6 +5,19 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.117.0-dev-user-data — 2026-11-27
+
+### Settings
+
+- **AI Models Location** (Settings → Storage): the downloaded AI models
+  now live in their own folder instead of beside your settings, presets,
+  LUTs and profiles, so that folder holds only your own files. Existing
+  models move there once at the first start. Choose another folder, for
+  example on an external drive, or go back with **Use Default**; the
+  models already downloaded move along. If the chosen folder is not
+  available (drive unplugged), the AI tools say so instead of downloading
+  the models somewhere else.
+
 ## 1.116.0-dev-custom-profiles — 2026-11-26
 
 ### Develop

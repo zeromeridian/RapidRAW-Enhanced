@@ -779,3 +779,10 @@ details are in `RELEASE_NOTES.MD`.
 - Uses `io.github.ColrBent.ThisIsRAW` consistently across supported packaging.
 - Automatically preserves settings, catalogs, and cached thumbnails from the
   previous application identifier without blocking the UI on large caches.
+- Downloaded AI models live outside the user-data folder (default: a sibling
+  `io.github.ColrBent.ThisIsRAW.models` in the local, non-roaming data
+  location; moved there once from the old `models/`), so that folder holds
+  only user files. Settings → Storage → AI Models Location chooses another
+  folder (for example an external drive) or the default, moving the
+  downloaded models; an unavailable chosen folder stops the AI tools with a
+  message instead of downloading elsewhere.

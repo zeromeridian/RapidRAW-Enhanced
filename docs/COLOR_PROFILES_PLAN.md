@@ -1,8 +1,8 @@
 # Color Profiles Plan
 
 Status (2026-11-26): **all phases built**, `1.112.0`–`1.116.0` on
-`dev/custom-profiles` (the owner commits; `1.116.0` awaits the owner's
-check); decisions 1–7 taken by the owner (below). Plan item 83 in
+`dev/custom-profiles` (all committed by the owner, last `4bf9b920`, in
+`develop`; `1.116.0`'s checks 20–22 not yet recorded); decisions 1–7 taken by the owner (below). Plan item 83 in
 `UPSTREAM_FEATURE_GAP.md`.
 
 ## Progress

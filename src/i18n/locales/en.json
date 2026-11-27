@@ -2343,6 +2343,12 @@
         "clearingAiDenoise": "Clearing AI Denoise cache..."
       },
       "title": "Data Management",
+      "modelsLocation": "AI Models Location",
+      "modelsLocationDesc": "Choose where the downloaded AI models are stored, for example on an external drive. Changing this location moves the models already downloaded; missing ones download again when needed.",
+      "modelsMoveFailed": "Could not move the AI models",
+      "modelsMoveSuccess": "AI models moved successfully.",
+      "modelsMoving": "Moving AI Models...",
+      "modelsUnavailable": "This folder is not available. Connect its drive, or choose another folder. AI tools cannot run until then.",
       "clearAiDenoise": "Clear AI Denoise Cache",
       "clearAiDenoiseButton": "Clear",
       "clearAiUpscale": "Clear AI Super Resolution Cache",
