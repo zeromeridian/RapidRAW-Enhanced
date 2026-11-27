@@ -67,6 +67,7 @@ mod raw_processing;
 mod relight;
 mod rename;
 mod render_source;
+mod settings_backup;
 mod tagging;
 mod tagging_utils;
 mod tiff_metadata;
@@ -2844,6 +2845,8 @@ pub fn run() {
             library_catalog::move_library_catalog,
             models_location::get_models_location,
             models_location::move_models_folder,
+            settings_backup::back_up_settings,
+            settings_backup::restore_settings,
             file_management::get_folder_tree,
             file_management::get_folder_children,
             file_management::get_pinned_folder_trees,

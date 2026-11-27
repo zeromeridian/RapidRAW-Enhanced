@@ -71,10 +71,12 @@ libc = "0.2.186"
 rgb = "0.8.53"
 imgref = "1.12.2"
 sysinfo = "0.39.5"
-rusqlite = { version = "0.38", features = ["bundled"] }
+rusqlite = { version = "0.38", features = ["bundled", "backup"] }
 zstd = "0.13"
 # Colour profiles of HEIF images (already a dependency of `image`).
 moxcms = "0.8.1"
+# Back Up / Restore Settings (`settings_backup.rs`); deflate through the existing flate2.
+zip = { version = "9.8.2", default-features = false, features = ["deflate-flate2"] }
 
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 trash = "5.2.6"

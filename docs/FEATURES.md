@@ -786,3 +786,9 @@ details are in `RELEASE_NOTES.MD`.
   folder (for example an external drive) or the default, moving the
   downloaded models; an unavailable chosen folder stops the AI tools with a
   message instead of downloading elsewhere.
+- Back Up / Restore Settings (Settings → Storage and the File menu): one
+  `.zip` of settings, presets, LUTs, profiles, albums and, optionally (on by
+  default), the library catalog. A restore replaces them all, after saving
+  the current state in `restore-backups/` (last three kept), keeps this
+  machine's catalog and models locations and processing/GPU choices, and
+  relaunches the app.

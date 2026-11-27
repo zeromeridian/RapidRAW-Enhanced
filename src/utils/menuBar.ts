@@ -10,7 +10,14 @@ import { KEYWORD_SET_SIZE } from './keywords';
 export type MenuView = 'library' | 'develop';
 
 /** Entries that are no keybind action: the App's handlers (`useNativeMenuBar`'s `commands`). */
-export type MenuCommand = 'deleteRejected' | 'displayCull' | 'displayList' | 'refreshView' | 'showInFinder';
+export type MenuCommand =
+  | 'backUpSettings'
+  | 'deleteRejected'
+  | 'displayCull'
+  | 'displayList'
+  | 'refreshView'
+  | 'restoreSettings'
+  | 'showInFinder';
 
 /** OS-provided items (`PredefinedMenuItem`): text editing and the macOS app and window items. */
 export type NativeMenuItem =
@@ -93,6 +100,9 @@ export const MENU_BAR: MenuDefinition[] = [
       action('copy_files', 'menuBar.items.copyFiles'),
       action('paste_files', 'menuBar.items.pasteFiles'),
       action('copy_image_path', 'menuBar.items.copyImagePath'),
+      SEPARATOR,
+      command('backUpSettings', 'menuBar.items.backUpSettings'),
+      command('restoreSettings', 'menuBar.items.restoreSettings'),
     ],
   },
   {

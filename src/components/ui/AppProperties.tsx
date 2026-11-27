@@ -129,6 +129,8 @@ export enum Invokes {
   MoveLibraryCatalog = 'move_library_catalog',
   GetModelsLocation = 'get_models_location',
   MoveModelsFolder = 'move_models_folder',
+  BackUpSettings = 'back_up_settings',
+  RestoreSettings = 'restore_settings',
   LoadImage = 'load_image',
   PreloadImages = 'preload_images',
   LoadMetadata = 'load_metadata',
@@ -340,6 +342,8 @@ export interface AppSettings {
   catalogDirectory?: string;
   /** The chosen AI models folder; absent uses the default. */
   modelsDirectory?: string;
+  /** Whether Back Up Settings includes the library catalog; absent means on. */
+  backupIncludeCatalog?: boolean;
   aiConnectorAddress?: string;
   aiGpuAcceleration?: boolean;
   aiProvider?: string;

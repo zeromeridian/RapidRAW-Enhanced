@@ -1002,6 +1002,31 @@ fn copy_catalog(source: &std::path::Path, target: &std::path::Path) -> Result<()
     result
 }
 
+/// Writes a consistent copy of the catalog to `target` with SQLite's backup API, so an
+/// open catalog is copied safely (Back Up Settings). `false` when there is no catalog yet.
+pub fn back_up_catalog(app_handle: &AppHandle, target: &std::path::Path) -> Result<bool, String> {
+    let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+    let source = database_path(app_handle)?;
+    if !source.exists() {
+        return Ok(false);
+    }
+    open_at(source)?
+        .backup("main", target, None)
+        .map_err(|error| error.to_string())?;
+    Ok(true)
+}
+
+/// Replaces the catalog's content with the catalog at `source` (Restore Settings), in this
+/// machine's catalog location.
+pub fn restore_catalog(app_handle: &AppHandle, source: &std::path::Path) -> Result<(), String> {
+    let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+    open_at(database_path(app_handle)?)?
+        .restore("main", source, None::<fn(rusqlite::backup::Progress)>)
+        .map_err(|error| error.to_string())?;
+    // A catalog from an older version gets this version's tables and markers.
+    open(app_handle).map(drop)
+}
+
 fn remove_catalog_files(path: &std::path::Path) {
     let _ = fs::remove_file(path);
     for suffix in ["-wal", "-shm"] {

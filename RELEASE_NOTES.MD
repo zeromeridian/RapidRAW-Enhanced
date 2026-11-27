@@ -5,6 +5,23 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.118.0-dev-user-data — 2026-11-27
+
+### Settings
+
+- **Back Up Settings** (Settings → Storage, or File → Back Up
+  Settings…): saves your settings, presets, LUTs, profiles and albums in
+  one `.zip` file, to keep or to move to another computer. **Include
+  library catalog** (on by default) adds the catalog, so a restore needs
+  no rescan. Edits stay in the XMP files beside your photos.
+- **Restore Settings** (Settings → Storage, or File → Restore
+  Settings…): replaces your settings, presets, LUTs, profiles and albums
+  (and the catalog, if the backup has one) with a backup, then restarts.
+  The current state is saved first in the `restore-backups` folder of
+  the app's data folder (the last three are kept). This computer's
+  catalog and AI models locations and its processing and GPU choices
+  stay as they are.
+
 ## 1.117.0-dev-user-data — 2026-11-27
 
 ### Settings

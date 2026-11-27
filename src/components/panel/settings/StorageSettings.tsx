@@ -2,15 +2,20 @@ import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import type { ParseKeys } from 'i18next';
-import { ExternalLink as ExternalLinkIcon, FolderOpen, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, ExternalLink as ExternalLinkIcon, FolderOpen, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import Button from '../../ui/Button';
+import Text from '../../ui/Text';
 import { Invokes } from '../../ui/AppProperties';
+import { TextColors, TextVariants } from '../../../types/typography';
 import { formatBytes } from '../../../utils/formatBytes';
+import { backUpSettings, restoreSettings } from '../../../utils/settingsBackup';
 import SettingsPage, { SettingRowDef, SettingsPageProps } from './SettingsPage';
 import {
   ActionButton,
   FolderLocation,
   PathBox,
+  SettingSwitch,
   StatusMessage,
   useClearableCache,
   useTimedAction,
@@ -33,7 +38,8 @@ interface ModelsLocation {
 
 export default function StorageSettings({ query }: SettingsPageProps) {
   const { t } = useTranslation();
-  const { appSettings, onLibraryRefresh, onSettingsChange, requestConfirm, rootPaths } = useSettingsContext();
+  const { appSettings, onLibraryRefresh, onSettingsChange, requestConfirm, rootPaths, updateSetting } =
+    useSettingsContext();
   const [modelsLocation, setModelsLocation] = useState<ModelsLocation | null>(null);
   const [modelsMessage, setModelsMessage] = useState('');
   const [isMovingModels, setIsMovingModels] = useState(false);
@@ -198,6 +204,43 @@ export default function StorageSettings({ query }: SettingsPageProps) {
                   onChoose={handleChooseModelsFolder}
                   onUseDefault={() => moveModels(null)}
                   path={modelsLocation?.path ?? t('settings.data.loading')}
+                />
+              ),
+            },
+            {
+              id: 'back-up-settings',
+              label: t('settings.data.backup.title'),
+              description: t('settings.data.backup.description'),
+              control: (
+                <Button onClick={() => void backUpSettings(t)} type="button">
+                  <Archive size={16} className="mr-2" />
+                  {t('settings.data.backup.button')}
+                </Button>
+              ),
+              details: (
+                <div className="flex items-center gap-3">
+                  <SettingSwitch
+                    checked={appSettings?.backupIncludeCatalog ?? true}
+                    id="backup-include-catalog-toggle"
+                    label={t('settings.data.backup.includeCatalog')}
+                    onChange={(checked) => updateSetting('backupIncludeCatalog', checked)}
+                  />
+                  <Text variant={TextVariants.small} color={TextColors.secondary}>
+                    {t('settings.data.backup.includeCatalog')}
+                  </Text>
+                </div>
+              ),
+            },
+            {
+              id: 'restore-settings',
+              label: t('settings.data.restore.title'),
+              description: t('settings.data.restore.description'),
+              control: (
+                <ActionButton
+                  icon={ArchiveRestore}
+                  isProcessing={false}
+                  onClick={() => void restoreSettings(t, requestConfirm)}
+                  text={t('settings.data.restore.button')}
                 />
               ),
             },

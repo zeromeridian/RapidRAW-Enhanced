@@ -1035,6 +1035,9 @@ pub struct AppSettings {
     /// The chosen AI models folder (`models_location.rs`); `None` uses the default.
     #[serde(default)]
     pub models_directory: Option<String>,
+    /// Whether Back Up Settings includes the library catalog; absent means on.
+    #[serde(default)]
+    pub backup_include_catalog: Option<bool>,
     #[serde(default)]
     pub lights_out_dim_level: Option<u8>,
     #[serde(default)]
@@ -1197,6 +1200,7 @@ impl Default for AppSettings {
             right_panel_width: None,
             catalog_directory: None,
             models_directory: None,
+            backup_include_catalog: None,
             lights_out_dim_level: None,
             lights_out_screen_color: None,
             lights_out_border_width: None,

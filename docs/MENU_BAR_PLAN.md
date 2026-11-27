@@ -169,3 +169,5 @@ nothing new is added here.
   owner request); Library → Rename Photos… uses it instead of a command.
 - **`1.108.0` (2026-11-21):** Library → Refine Photos… (keybind
   `refine_photos`, ⌥⌘R; Plan item 72).
+- **`1.118.0` (2026-11-27):** File → Back Up Settings… / Restore
+  Settings… (commands `backUpSettings`, `restoreSettings`; Plan item 85).

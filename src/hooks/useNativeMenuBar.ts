@@ -13,6 +13,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 import { getRejectedPathsForLoadedFolder } from '../utils/imageFlags';
 import { MenuCommand, MenuEntry, MenuView, getMenuAccelerator, menusForView } from '../utils/menuBar';
+import { backUpSettings, confirmWithAppModal, restoreSettings } from '../utils/settingsBackup';
 import { canRunShortcutAction, isTypingKeyPress, runShortcutAction } from './useKeyboardShortcuts';
 import { getActionPaths } from './useLibraryActions';
 
@@ -44,6 +45,7 @@ export function useNativeMenuBar({ handleDeleteRejected, handleLibraryRefresh }:
   const view: MenuView = useEditorStore((state) => (state.selectedImage ? 'develop' : 'library'));
 
   const commands: Record<MenuCommand, MenuCommandHandler> = {
+    backUpSettings: { canRun: () => true, run: () => void backUpSettings(t) },
     deleteRejected: {
       canRun: () => {
         const { imageList, currentFolderPath } = useLibraryStore.getState();
@@ -57,6 +59,7 @@ export function useNativeMenuBar({ handleDeleteRejected, handleLibraryRefresh }:
       canRun: () => !!useLibraryStore.getState().currentFolderPath,
       run: () => void handleLibraryRefresh(),
     },
+    restoreSettings: { canRun: () => true, run: () => void restoreSettings(t, confirmWithAppModal) },
     showInFinder: {
       canRun: () => getActionPaths().length === 1,
       run: () =>

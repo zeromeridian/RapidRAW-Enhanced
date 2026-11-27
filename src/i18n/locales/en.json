@@ -1637,6 +1637,7 @@
       "analytics": "Analytics",
       "autoSync": "Auto Sync",
       "brushSizeDown": "Decrease Brush Size",
+      "backUpSettings": "Back Up Settings…",
       "brushSizeUp": "Increase Brush Size",
       "copyFiles": "Copy Files",
       "copyImagePath": "Copy Image Path",
@@ -1671,6 +1672,7 @@
       "previousPhoto": "Previous Photo",
       "refinePhotos": "Refine Photos…",
       "renamePhotos": "Rename Photos…",
+      "restoreSettings": "Restore Settings…",
       "rotateLeft": "Rotate Left",
       "rotateRight": "Rotate Right",
       "selectAllPhotos": "Select All Photos",
@@ -2343,6 +2345,24 @@
         "clearingAiDenoise": "Clearing AI Denoise cache..."
       },
       "title": "Data Management",
+      "backup": {
+        "button": "Back Up…",
+        "description": "Saves your settings, presets, LUTs, profiles and albums in one .zip file, to keep or to move to another computer. Edits stay in the XMP files beside your photos.",
+        "failed": "Could not back up the settings",
+        "includeCatalog": "Include library catalog",
+        "saved": "Settings backed up to {{path}}.",
+        "saving": "Backing up settings...",
+        "title": "Back Up Settings"
+      },
+      "restore": {
+        "button": "Restore…",
+        "confirm": "Restore and Restart",
+        "description": "Replaces your settings, presets, LUTs, profiles and albums with a backup. This computer's catalog and AI models locations and its processing and GPU choices stay as they are.",
+        "failed": "Could not restore the settings",
+        "message": "Your current settings, presets, LUTs, profiles and albums are replaced by the backup (and the library catalog, if the backup has one). They are first saved to the restore-backups folder in the app's data folder. ThisIsRAW restarts afterwards.",
+        "restoring": "Restoring settings...",
+        "title": "Restore Settings"
+      },
       "modelsLocation": "AI Models Location",
       "modelsLocationDesc": "Choose where the downloaded AI models are stored, for example on an external drive. Changing this location moves the models already downloaded; missing ones download again when needed.",
       "modelsMoveFailed": "Could not move the AI models",
