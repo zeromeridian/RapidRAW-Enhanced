@@ -1,3 +1,4 @@
+import type { PhotoCommand } from '../hooks/usePhotoCommands';
 import { KEYBIND_DEFINITIONS, getEffectiveCombo } from './keyboardUtils';
 import { KEYWORD_SET_SIZE } from './keywords';
 
@@ -9,15 +10,32 @@ import { KEYWORD_SET_SIZE } from './keywords';
 
 export type MenuView = 'library' | 'develop';
 
-/** Entries that are no keybind action: the App's handlers (`useNativeMenuBar`'s `commands`). */
+/**
+ * Entries that are no keybind action: the right-click menus' photo commands (`usePhotoCommands`) and the
+ * App's handlers (`useNativeMenuBar`'s `commands`).
+ */
 export type MenuCommand =
+  | PhotoCommand
   | 'backUpSettings'
+  | 'blendPad'
   | 'deleteRejected'
   | 'displayCull'
   | 'displayList'
+  | 'filmstrip'
+  | 'leftPanel'
+  | 'lensGeometry'
+  | 'newAlbum'
+  | 'newFolder'
+  | 'readXmp'
   | 'refreshView'
   | 'restoreSettings'
-  | 'showInFinder';
+  | 'showInFinder'
+  | 'showSubfolders'
+  | 'taggingPanel'
+  | 'zoneEditor';
+
+/** Submenus built from the right-click menus' entries, because they list the user's editors and albums. */
+export type MenuOptionSource = 'addToAlbum' | 'openIn';
 
 /** OS-provided items (`PredefinedMenuItem`): text editing and the macOS app and window items. */
 export type NativeMenuItem =
@@ -41,6 +59,7 @@ export type MenuEntry =
   | { kind: 'action'; action: string; label: string; labelOptions?: Record<string, unknown> }
   | { kind: 'command'; command: MenuCommand; label: string }
   | { kind: 'native'; item: NativeMenuItem }
+  | { kind: 'options'; source: MenuOptionSource }
   | { kind: 'submenu'; label: string; entries: MenuEntry[] }
   | { kind: 'separator' };
 
@@ -64,6 +83,7 @@ const action = (actionId: string, label: string, labelOptions?: Record<string, u
 });
 const command = (commandId: MenuCommand, label: string): MenuEntry => ({ kind: 'command', command: commandId, label });
 const native = (item: NativeMenuItem): MenuEntry => ({ kind: 'native', item });
+const options = (source: MenuOptionSource): MenuEntry => ({ kind: 'options', source });
 const submenu = (label: string, entries: MenuEntry[]): MenuEntry => ({ kind: 'submenu', label, entries });
 
 const COLOR_LABEL_ACTIONS = ['red', 'yellow', 'green', 'blue', 'purple'] as const;
@@ -94,7 +114,11 @@ export const MENU_BAR: MenuDefinition[] = [
       action('import_photos', 'menuBar.items.importPhotos'),
       action('toggle_export', 'menuBar.items.export'),
       SEPARATOR,
+      options('openIn'),
+      command('importLightroomEdits', 'menuBar.items.importLightroomEdits'),
+      SEPARATOR,
       command('showInFinder', 'contextMenus.thumbnail.showExplorer'),
+      command('newFolder', 'menuBar.items.newFolder'),
       command('refreshView', 'contextMenus.library.refreshView'),
       SEPARATOR,
       action('copy_files', 'menuBar.items.copyFiles'),
@@ -134,6 +158,7 @@ export const MENU_BAR: MenuDefinition[] = [
       command('displayCull', 'menuBar.items.cull'),
       command('displayList', 'menuBar.items.list'),
       SEPARATOR,
+      command('showSubfolders', 'menuBar.items.showSubfolders'),
       action('toggle_metadata_filter', 'menuBar.items.filterBar'),
       action('toggle_library_exif', 'menuBar.items.exifOverlay'),
       SEPARATOR,
@@ -141,6 +166,15 @@ export const MENU_BAR: MenuDefinition[] = [
         action('stack_selected', 'menuBar.items.stackSelected'),
         action('toggle_stack', 'ui.bottomBar.tooltips.toggleStack'),
         action('move_to_top_of_stack', 'contextMenus.thumbnail.moveToTopOfStack'),
+        command('unstack', 'contextMenus.thumbnail.unstack'),
+        SEPARATOR,
+        command('autoStack', 'contextMenus.thumbnail.autoStackByCaptureTime'),
+      ]),
+      submenu('menuBar.items.albums', [
+        options('addToAlbum'),
+        command('removeFromAlbum', 'menuBar.items.removeFromAlbum'),
+        SEPARATOR,
+        command('newAlbum', 'menuBar.items.newAlbum'),
       ]),
       SEPARATOR,
       action('refine_photos', 'menuBar.items.refinePhotos'),
@@ -181,6 +215,29 @@ export const MENU_BAR: MenuDefinition[] = [
         action('next_keyword_set', 'menuBar.items.nextKeywordSet'),
       ]),
       SEPARATOR,
+      command('createVirtualCopy', 'menuBar.items.createVirtualCopy'),
+      command('duplicateFile', 'menuBar.items.duplicateFile'),
+      SEPARATOR,
+      submenu('menuBar.items.photoMerge', [
+        command('panorama', 'menuBar.items.panorama'),
+        command('hdr', 'menuBar.items.hdr'),
+      ]),
+      command('collage', 'menuBar.items.collage'),
+      command('cullSimilar', 'menuBar.items.cullSimilar'),
+      submenu('menuBar.items.enhance', [
+        command('denoise', 'menuBar.items.denoise'),
+        submenu('adjustments.details.aiDenoise', [
+          command('aiDenoiseOn', 'contextMenus.thumbnail.enable'),
+          command('aiDenoiseOff', 'contextMenus.thumbnail.remove'),
+        ]),
+        submenu('contextMenus.editor.superResolution', [
+          command('superResolutionOn', 'contextMenus.thumbnail.enable'),
+          command('superResolutionOff', 'contextMenus.thumbnail.remove'),
+        ]),
+        SEPARATOR,
+        command('convertNegative', 'menuBar.items.convertNegative'),
+      ]),
+      SEPARATOR,
       action('delete_selected', 'menuBar.items.deletePhoto'),
       command('deleteRejected', 'flags.deleteRejected'),
     ],
@@ -189,7 +246,12 @@ export const MENU_BAR: MenuDefinition[] = [
     id: 'metadata',
     label: 'menuBar.metadata',
     views: ['library'],
-    entries: [action('toggle_metadata', 'menuBar.items.metadataPanel')],
+    entries: [
+      action('toggle_metadata', 'menuBar.items.metadataPanel'),
+      command('taggingPanel', 'menuBar.items.taggingPanel'),
+      SEPARATOR,
+      command('readXmp', 'menuBar.items.readXmp'),
+    ],
   },
   {
     id: 'develop',
@@ -200,6 +262,11 @@ export const MENU_BAR: MenuDefinition[] = [
       action('paste_adjustments', 'contextMenus.editor.pasteAdjustments'),
       action('toggle_auto_sync', 'menuBar.items.autoSync'),
       action('reset_adjustments', 'contextMenus.editor.resetAdjustments'),
+      SEPARATOR,
+      command('applyPreset', 'menuBar.items.applyPreset'),
+      command('autoAdjust', 'contextMenus.editor.autoAdjust'),
+      command('autoLensCorrection', 'contextMenus.editor.autoLensCorrection'),
+      command('upgradeLensCorrection', 'menuBar.items.upgradeLensCorrection'),
       SEPARATOR,
       action('show_original', 'menuBar.items.showOriginal'),
     ],
@@ -212,6 +279,10 @@ export const MENU_BAR: MenuDefinition[] = [
       action('toggle_adjustments', 'menuBar.items.adjustments'),
       action('toggle_crop_panel', 'menuBar.items.crop'),
       action('toggle_crop', 'menuBar.items.straighten'),
+      command('lensGeometry', 'editor.adjustments.sections.lensGeometry'),
+      SEPARATOR,
+      command('blendPad', 'editor.blendPad.title'),
+      command('zoneEditor', 'editor.adjustments.sections.zoneTint'),
       SEPARATOR,
       action('toggle_masks', 'menuBar.items.masks'),
       action('toggle_mask_overlay', 'menuBar.items.maskOverlay'),
@@ -245,6 +316,9 @@ export const MENU_BAR: MenuDefinition[] = [
     entries: [
       action('show_library_grid', 'menuBar.items.libraryModule'),
       action('open_image', 'menuBar.items.developModule'),
+      SEPARATOR,
+      command('leftPanel', 'menuBar.items.leftPanel'),
+      command('filmstrip', 'menuBar.items.filmstrip'),
       SEPARATOR,
       native('Minimize'),
       native('Maximize'),

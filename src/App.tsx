@@ -459,6 +459,9 @@ function App() {
     handleFolderTreeContextMenu,
     handleAlbumTreeContextMenu,
     handleMainLibraryContextMenu,
+    menuOptions,
+    photoCommands,
+    readXmpFromFolder,
   } = useAppContextMenus({
     handleImageSelect,
     handleBackToLibrary,
@@ -513,7 +516,15 @@ function App() {
     handleZoomChange,
   });
 
-  useNativeMenuBar({ handleDeleteRejected, handleLibraryRefresh });
+  useNativeMenuBar({
+    handleDeleteRejected,
+    handleLibraryRefresh,
+    libraryViewMode,
+    menuOptions,
+    photoCommands,
+    readXmpFromFolder,
+    setLibraryViewMode,
+  });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

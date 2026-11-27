@@ -4,7 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
-import { DEVELOP_PANEL_BY_LIBRARY_PANEL, getLibraryPanel, LibraryPanel, useUIStore } from '../../store/useUIStore';
+import {
+  canToggleLibraryPanel,
+  DEVELOP_PANEL_BY_LIBRARY_PANEL,
+  getLibraryPanel,
+  LibraryPanel,
+  useUIStore,
+} from '../../store/useUIStore';
 
 type SidePanelToggle = LibraryPanel | 'develop';
 
@@ -64,10 +70,9 @@ export function SidePanelToggles({ isItemVisible }: { isItemVisible(id: string):
 
   const isDisabled = (toggle: SidePanelToggle) => {
     if (isEditing || toggle === shownToggle) return false;
-    // In the Library, Export needs photos to export and Develop needs a photo to open.
-    if (toggle === 'export') return !hasSelection;
+    // In the Library, Develop needs a photo to open; the panels follow `canToggleLibraryPanel`.
     if (toggle === 'develop') return !libraryActivePath;
-    return false;
+    return !canToggleLibraryPanel(useUIStore.getState(), toggle, hasSelection);
   };
 
   const toggles = SIDE_PANEL_TOGGLES.filter(({ id }) => isItemVisible(id));

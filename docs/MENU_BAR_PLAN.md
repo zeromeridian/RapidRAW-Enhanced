@@ -17,6 +17,12 @@ item 69.
    are unchanged; the menus are another way to reach the same actions.
 4. **Shortcuts beside each entry.** Each entry shows the combo bound in
    Settings → Keybinds, so it follows rebinding.
+5. **E and I in the Library (owner 2026-11-27).** Export (E) and Metadata
+   Panel (I) also work in the Library, keys and menu, exactly like the
+   title bar's Export and Info switches (Export needs a selection).
+6. **No Quick Filter or Select By entries (owner 2026-11-27).** The title
+   bar's rows stay the one place for them; they stay open whenever there
+   is room, so a menu toggle would do nothing visible.
 
 ## Design constraints found in the code check
 
@@ -156,7 +162,7 @@ nothing new is added here.
   - Edit keeps the native Cut, Copy, Paste and Select All before the photo
     entries that share ⌘C, ⌘V and ⌘A; Undo/Redo typed in a text field act
     on its text (`execCommand`).
-  - **Not yet:** the right-click-only entries of the draft (Open in,
+  - **Not yet** (all but phase 3 added in `1.119.0`, below): the right-click-only entries of the draft (Open in,
     Import Lightroom Edits, New Folder, Albums, Unstack, Auto-Stack, Flat /
     Recursive, Quick Filter, Select By, virtual copy, duplicate, Photo
     Merge, Frame, Cull Similar, Enhance, Read XMP, Apply Preset, Auto
@@ -171,3 +177,28 @@ nothing new is added here.
   `refine_photos`, ⌥⌘R; Plan item 72).
 - **`1.118.0` (2026-11-27):** File → Back Up Settings… / Restore
   Settings… (commands `backUpSettings`, `restoreSettings`; Plan item 85).
+- **`1.119.0` (2026-11-27, `dev/menu-bar-entries`, not committed): the
+  remaining draft entries, macOS.**
+  - `src/hooks/usePhotoCommands.ts`: the right-click photo commands as
+    `{ canRun(paths), run(paths) }` (merge/frame limits, virtual copy,
+    duplicate, Enhance, AI tools on/off, Auto Adjust, lens corrections,
+    Unstack, Auto-Stack, Remove from Album, Import Lightroom Edits) plus
+    `readXmpFromFolder`; the thumbnail, Develop and folder menus use them
+    (`photoCommandOption`), the menu bar runs them on `getActionPaths()`.
+  - `useAppContextMenus.ts` returns `photoCommands`, `readXmpFromFolder`
+    and `menuOptions` (`openIn`, `addToAlbum`: the right-click submenus,
+    shared by `buildOpenInOptionForPaths` / `buildAddToAlbumOption`).
+  - `menuBar.ts`: entry kind `options` (a submenu built from those
+    `Option` trees, rebuilt when its labels or the selection change) and
+    the new commands; `useNativeMenuBar.ts`: `CheckMenuItem` for entries
+    with `isChecked` (Show Photos in Subfolders, Left Panel, Filmstrip).
+  - Decision 5: `toggle_metadata` / `toggle_export` run in the Library
+    through `toggleLibraryPanel`, with the shared
+    `canToggleLibraryPanel` (`useUIStore.ts`, also used by
+    `SidePanelToggles`).
+  - Behaviour changes in the right-click menus: Develop's Auto Adjust,
+    Auto Lens Correction and AI tool entries and the thumbnail menu's wait
+    for the edited photo to load only when it is the only target; Frame
+    Image in Develop takes the photo from the library list.
+  - **Still to do:** phase 3 (Windows/Linux bar; About in Help there).
+    Left out by decision 6: Quick Filter, Select By.

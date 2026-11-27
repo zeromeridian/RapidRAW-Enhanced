@@ -5,6 +5,36 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.119.0-dev-menu-bar-entries — 2026-11-27
+
+### Menu bar (macOS)
+
+- The menus now offer the commands that were only in the right-click
+  menus:
+  - **File:** Open in (your external editors, Open as Layers, Original
+    File), Import Lightroom Edits…, New Folder….
+  - **Library:** Show Photos in Subfolders (with a check mark), Stacking
+    → Unstack Photos and Auto-Stack by Capture Time…, and a new
+    **Albums** menu with Add to Album, Remove from Album and New Album….
+  - **Photo:** Create Virtual Copy, Duplicate File, Photo Merge
+    (Panorama…, HDR…), Frame / Collage…, Cull Similar…, and **Enhance**
+    (Denoise…, AI Denoise and Super Resolution on or off, Convert
+    Negative…).
+  - **Metadata:** Tagging Panel and Read Metadata from XMP Files.
+  - **Develop:** Apply Preset…, Auto Adjust Image, Auto Lens Correction
+    and Use Updated Lens Correction.
+  - **Tools:** Lens & Geometry, Blend Pad and Zone Editor.
+  - **Window:** Left Panel and Filmstrip, with check marks.
+- Each command acts on the selected photos, like the keys, and is greyed
+  out when it does not apply (for example Panorama needs 2–30 photos,
+  HDR 2–9).
+
+### Library
+
+- **E** opens the Export panel and **I** the Info panel in the Library
+  too, like the switches in the top bar (Export needs a selection). So
+  File → Export… and Metadata → Metadata Panel now also work there.
+
 ## 1.118.0-dev-user-data — 2026-11-27
 
 ### Settings

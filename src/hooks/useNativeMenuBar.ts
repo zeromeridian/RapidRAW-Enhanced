@@ -1,31 +1,49 @@
 import { useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Menu, MenuItem, PredefinedMenuItem, Submenu } from '@tauri-apps/api/menu';
+import { CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu } from '@tauri-apps/api/menu';
 import type { Resource } from '@tauri-apps/api/core';
 import type { ParseKeys } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
-import { Invokes, LibraryDisplayMode } from '../components/ui/AppProperties';
+import {
+  Invokes,
+  LibraryDisplayMode,
+  LibraryViewMode,
+  Option,
+  OPTION_SEPARATOR,
+  Panel,
+} from '../components/ui/AppProperties';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 import { getRejectedPathsForLoadedFolder } from '../utils/imageFlags';
-import { MenuCommand, MenuEntry, MenuView, getMenuAccelerator, menusForView } from '../utils/menuBar';
+import { isCollectionView } from '../utils/libraryViews';
+import { MenuCommand, MenuEntry, MenuOptionSource, MenuView, getMenuAccelerator, menusForView } from '../utils/menuBar';
 import { backUpSettings, confirmWithAppModal, restoreSettings } from '../utils/settingsBackup';
 import { canRunShortcutAction, isTypingKeyPress, runShortcutAction } from './useKeyboardShortcuts';
 import { getActionPaths } from './useLibraryActions';
+import type { PathCommand, PhotoCommand } from './usePhotoCommands';
 
 interface NativeMenuBarProps {
   handleDeleteRejected(): void;
   handleLibraryRefresh(): Promise<void>;
+  libraryViewMode: LibraryViewMode;
+  menuOptions: Record<MenuOptionSource, () => Option>;
+  photoCommands: Record<PhotoCommand, PathCommand>;
+  readXmpFromFolder(folderPath: string): Promise<void>;
+  setLibraryViewMode(mode: LibraryViewMode): void;
 }
 
 interface MenuCommandHandler {
   canRun(): boolean;
+  /** Shown as a check mark (an on/off entry). */
+  isChecked?(): boolean;
   run(): void;
 }
+
+type NativeItem = MenuItem | CheckMenuItem | PredefinedMenuItem | Submenu;
 
 /** Greying out follows the app's state at most this often. */
 const ENABLED_REFRESH_MS = 150;
@@ -37,15 +55,58 @@ const setLibraryDisplayMode = (mode: LibraryDisplayMode) => {
   }
 };
 
+/** The folder shown in the Library, unless it is a collection (an album or a search). */
+const getOpenFolder = () => {
+  const { currentFolderPath } = useLibraryStore.getState();
+  return currentFolderPath && !isCollectionView(currentFolderPath) ? currentFolderPath : null;
+};
+
+const visibilityToggle = (key: 'filmstrip' | 'folderTree'): MenuCommandHandler => ({
+  canRun: () => true,
+  isChecked: () => Boolean(useUIStore.getState().uiVisibility[key]),
+  run: () =>
+    useUIStore
+      .getState()
+      .setUI((state) => ({ uiVisibility: { ...state.uiVisibility, [key]: !state.uiVisibility[key] } })),
+});
+
+/** A Develop tool panel, as the right panel's switcher opens it. */
+const toolPanel = (panel: Panel): MenuCommandHandler => ({
+  canRun: () => !!useEditorStore.getState().selectedImage,
+  run: () => useUIStore.getState().setRightPanel(panel),
+});
+
+/** What a right-click submenu shows; it is rebuilt only when this changes. */
+const optionSignature = (option: Option) =>
+  `${JSON.stringify(option, ['label', 'disabled', 'type', 'submenu'])}\n${getActionPaths().join('\n')}`;
+
 /** The macOS menu bar's menus from the shared list (`utils/menuBar.ts`), rebuilt per view. */
-export function useNativeMenuBar({ handleDeleteRejected, handleLibraryRefresh }: NativeMenuBarProps) {
+export function useNativeMenuBar({
+  handleDeleteRejected,
+  handleLibraryRefresh,
+  libraryViewMode,
+  menuOptions,
+  photoCommands,
+  readXmpFromFolder,
+  setLibraryViewMode,
+}: NativeMenuBarProps) {
   const { t, i18n } = useTranslation();
   const osPlatform = useSettingsStore((state) => state.osPlatform);
   const keybinds = useSettingsStore((state) => state.appSettings?.keybinds);
   const view: MenuView = useEditorStore((state) => (state.selectedImage ? 'develop' : 'library'));
 
+  // The right-click menus' photo commands act on the selection, as the keys do.
+  const photoMenuCommands = Object.fromEntries(
+    Object.entries(photoCommands).map(([id, command]) => [
+      id,
+      { canRun: () => command.canRun(getActionPaths()), run: () => command.run(getActionPaths()) },
+    ]),
+  ) as Record<PhotoCommand, MenuCommandHandler>;
+
   const commands: Record<MenuCommand, MenuCommandHandler> = {
+    ...photoMenuCommands,
     backUpSettings: { canRun: () => true, run: () => void backUpSettings(t) },
+    blendPad: toolPanel(Panel.BlendPad),
     deleteRejected: {
       canRun: () => {
         const { imageList, currentFolderPath } = useLibraryStore.getState();
@@ -55,6 +116,24 @@ export function useNativeMenuBar({ handleDeleteRejected, handleLibraryRefresh }:
     },
     displayCull: { canRun: () => true, run: () => setLibraryDisplayMode(LibraryDisplayMode.Cull) },
     displayList: { canRun: () => true, run: () => setLibraryDisplayMode(LibraryDisplayMode.List) },
+    filmstrip: visibilityToggle('filmstrip'),
+    leftPanel: visibilityToggle('folderTree'),
+    lensGeometry: toolPanel(Panel.LensGeometry),
+    newAlbum: {
+      canRun: () => true,
+      run: () => useUIStore.getState().setUI({ albumActionTarget: null, isCreateAlbumModalOpen: true }),
+    },
+    newFolder: {
+      canRun: () => !!getOpenFolder(),
+      run: () => useUIStore.getState().setUI({ folderActionTarget: getOpenFolder(), isCreateFolderModalOpen: true }),
+    },
+    readXmp: {
+      canRun: () => !!getOpenFolder(),
+      run: () => {
+        const folder = getOpenFolder();
+        if (folder) void readXmpFromFolder(folder);
+      },
+    },
     refreshView: {
       canRun: () => !!useLibraryStore.getState().currentFolderPath,
       run: () => void handleLibraryRefresh(),
@@ -67,15 +146,52 @@ export function useNativeMenuBar({ handleDeleteRejected, handleLibraryRefresh }:
           toast.error(t('contextMenus.toasts.couldNotShowExplorer', { err })),
         ),
     },
+    showSubfolders: {
+      canRun: () => true,
+      isChecked: () => libraryViewMode === LibraryViewMode.Recursive,
+      run: () =>
+        setLibraryViewMode(
+          libraryViewMode === LibraryViewMode.Recursive ? LibraryViewMode.Flat : LibraryViewMode.Recursive,
+        ),
+    },
+    taggingPanel: {
+      canRun: () => true,
+      run: () => {
+        const ui = useUIStore.getState();
+        if (useEditorStore.getState().selectedImage) ui.setRightPanel(Panel.Tagging);
+        else ui.toggleLibraryPanel('tagging');
+      },
+    },
+    zoneEditor: toolPanel(Panel.ZoneTint),
   };
   const commandsRef = useRef(commands);
   commandsRef.current = commands;
+  const menuOptionsRef = useRef(menuOptions);
+  menuOptionsRef.current = menuOptions;
+  const refreshRef = useRef<() => void>(() => {});
+
+  // The view mode is the App's own state, not a store the menu listens to.
+  useEffect(() => refreshRef.current(), [libraryViewMode]);
 
   useEffect(() => {
     if (osPlatform !== 'macos') return;
     let isCancelled = false;
     const created: Resource[] = [];
-    const toggles: Array<{ item: MenuItem; canRun(): boolean; enabled: boolean }> = [];
+    const toggles: Array<{
+      item: MenuItem | CheckMenuItem;
+      canRun(): boolean;
+      enabled: boolean;
+      isChecked?(): boolean;
+    }> = [];
+    // `resources` holds every handle of the submenu's current items, freed when they are replaced.
+    const optionMenus: Array<{
+      submenu: Submenu;
+      source: MenuOptionSource;
+      signature: string;
+      items: NativeItem[];
+      resources: Resource[];
+      update: Promise<void>;
+    }> = [];
 
     const runAction = (actionId: string) => {
       // A key typed into a text field stays with the field, as with the keydown handler; Undo and
@@ -87,15 +203,62 @@ export function useNativeMenuBar({ handleDeleteRejected, handleLibraryRefresh }:
       runShortcutAction(actionId);
     };
 
-    const addToggle = async (text: string, canRun: () => boolean, run: () => void, accelerator?: string) => {
+    const addToggle = async (
+      text: string,
+      canRun: () => boolean,
+      run: () => void,
+      { accelerator, isChecked }: { accelerator?: string; isChecked?(): boolean } = {},
+    ) => {
       const enabled = canRun();
-      const item = await MenuItem.new({ text, accelerator, enabled, action: run });
-      toggles.push({ item, canRun, enabled });
+      const checked = isChecked?.();
+      const item =
+        checked === undefined
+          ? await MenuItem.new({ text, accelerator, enabled, action: run })
+          : await CheckMenuItem.new({ text, accelerator, enabled, checked, action: run });
+      toggles.push({ item, canRun, enabled, isChecked });
       return item;
     };
 
-    const buildEntry = async (entry: MenuEntry): Promise<MenuItem | PredefinedMenuItem | Submenu> => {
-      let item: MenuItem | PredefinedMenuItem | Submenu;
+    // A right-click menu entry as a native item, its handles added to `resources`; its own submenus are
+    // built the same way.
+    const buildOption = async (option: Option, resources: Resource[]): Promise<NativeItem> => {
+      const item =
+        option.type === OPTION_SEPARATOR
+          ? await PredefinedMenuItem.new({ item: 'Separator' })
+          : option.submenu
+            ? await Submenu.new({
+                text: option.label ?? '',
+                enabled: !option.disabled,
+                items: await buildOptions(option.submenu, resources),
+              })
+            : await MenuItem.new({
+                text: option.label ?? '',
+                enabled: !option.disabled && !!option.onClick,
+                action: () => option.onClick?.(),
+              });
+      resources.push(item);
+      return item;
+    };
+    const buildOptions = (items: Option[] | undefined, resources: Resource[]) =>
+      Promise.all((items ?? []).map((option) => buildOption(option, resources)));
+
+    const refreshOptionMenu = (entry: (typeof optionMenus)[number]) => {
+      entry.update = entry.update.then(async () => {
+        const option = menuOptionsRef.current[entry.source]();
+        const signature = optionSignature(option);
+        if (isCancelled || signature === entry.signature) return;
+        entry.signature = signature;
+        await Promise.all(entry.items.map((item) => entry.submenu.remove(item)));
+        entry.resources.forEach((resource) => void resource.close());
+        entry.resources = [];
+        entry.items = await buildOptions(option.submenu, entry.resources);
+        await entry.submenu.append(entry.items);
+        await entry.submenu.setEnabled(!option.disabled);
+      });
+    };
+
+    const buildEntry = async (entry: MenuEntry): Promise<NativeItem> => {
+      let item: NativeItem;
       switch (entry.kind) {
         case 'separator':
           item = await PredefinedMenuItem.new({ item: 'Separator' });
@@ -103,6 +266,22 @@ export function useNativeMenuBar({ handleDeleteRejected, handleLibraryRefresh }:
         case 'native':
           item = await PredefinedMenuItem.new({ item: entry.item === 'About' ? { About: null } : entry.item });
           break;
+        case 'options': {
+          const option = menuOptionsRef.current[entry.source]();
+          const resources: Resource[] = [];
+          const items = await buildOptions(option.submenu, resources);
+          const submenu = await Submenu.new({ text: option.label ?? '', enabled: !option.disabled, items });
+          optionMenus.push({
+            submenu,
+            source: entry.source,
+            signature: optionSignature(option),
+            items,
+            resources,
+            update: Promise.resolve(),
+          });
+          item = submenu;
+          break;
+        }
         case 'submenu':
           item = await Submenu.new({
             text: t(entry.label as ParseKeys),
@@ -114,7 +293,7 @@ export function useNativeMenuBar({ handleDeleteRejected, handleLibraryRefresh }:
             String(t(entry.label as ParseKeys, entry.labelOptions as never)),
             () => canRunShortcutAction(entry.action),
             () => runAction(entry.action),
-            getMenuAccelerator(entry.action, keybinds, osPlatform),
+            { accelerator: getMenuAccelerator(entry.action, keybinds, osPlatform) },
           );
           break;
         case 'command': {
@@ -125,6 +304,7 @@ export function useNativeMenuBar({ handleDeleteRejected, handleLibraryRefresh }:
             () => {
               if (handler().canRun()) handler().run();
             },
+            { isChecked: handler().isChecked && (() => handler().isChecked?.() ?? false) },
           );
           break;
         }
@@ -142,11 +322,16 @@ export function useNativeMenuBar({ handleDeleteRejected, handleLibraryRefresh }:
           toggle.enabled = enabled;
           void toggle.item.setEnabled(enabled);
         }
+        // A click flips a native check mark itself, so it is always set to the app's state.
+        const checked = toggle.isChecked?.();
+        if (checked !== undefined && toggle.item instanceof CheckMenuItem) void toggle.item.setChecked(checked);
       }
+      optionMenus.forEach(refreshOptionMenu);
     };
     const scheduleRefresh = () => {
       if (refreshTimer === undefined) refreshTimer = setTimeout(refreshEnabled, ENABLED_REFRESH_MS);
     };
+    refreshRef.current = scheduleRefresh;
     const unsubscribes = [useEditorStore, useLibraryStore, useUIStore, useSettingsStore, useProcessStore].map((store) =>
       store.subscribe(scheduleRefresh),
     );
@@ -184,9 +369,10 @@ export function useNativeMenuBar({ handleDeleteRejected, handleLibraryRefresh }:
     return () => {
       isCancelled = true;
       clearTimeout(refreshTimer);
+      refreshRef.current = () => {};
       unsubscribes.forEach((unsubscribe) => unsubscribe());
       // The next menu bar replaces this one in the system; only the handles are freed here.
-      created.forEach((resource) => void resource.close());
+      [...created, ...optionMenus.flatMap((entry) => entry.resources)].forEach((resource) => void resource.close());
     };
   }, [osPlatform, view, keybinds, i18n.language, t]);
 }

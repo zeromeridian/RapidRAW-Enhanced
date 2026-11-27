@@ -77,9 +77,13 @@ details are in `RELEASE_NOTES.MD`.
 - **Menu bar** (Lightroom Classic style; macOS native menus, Windows/Linux
   in-app bar planned): File, Edit, Photo, View, Window and Help, plus
   Library and Metadata in Library and Develop and Tools in Develop. Entries
-  run the same actions as the keys, show the bound shortcut (following
-  Settings → Keybinds) and grey out when they don't apply; text fields keep
-  Cut, Copy, Paste and Select All.
+  run the same actions as the keys and the right-click menus (Open in,
+  albums, virtual copies, Photo Merge, Enhance, Auto Adjust, lens
+  corrections, tool panels and more), act on the selection, show the bound
+  shortcut (following Settings → Keybinds) and grey out when they don't
+  apply; on/off entries (subfolders, Left Panel, Filmstrip) show a check
+  mark; text fields keep Cut, Copy, Paste and Select All. E and I open
+  Export and Info in the Library too.
 - Manual image stacks with collapse/expand, Lightroom Classic-style stack
   marks (an expanded stack's photos share a lighter band with grip bars at
   its ends; the top shows a count square and a thin accent outline, the

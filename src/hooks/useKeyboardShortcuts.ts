@@ -6,7 +6,7 @@ import { KEYBIND_DEFINITIONS, getEffectiveCombo, isTextEntryTarget, normalizeCom
 import { EditorState, canUndoEdit, getZoomPixelSize, useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { isModalOpen, useUIStore } from '../store/useUIStore';
+import { canToggleLibraryPanel, isModalOpen, useUIStore } from '../store/useUIStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { applyCrop, cancelCrop, toggleAutoSync, useEditorActions } from './useEditorActions';
 import {
@@ -533,11 +533,13 @@ export const useKeyboardShortcuts = ({
           s.ui.setRightPanel(Panel.Presets);
         },
       },
+      // Metadata and Export also work in the Library, as the top bar's Info and Export switches (owner 2026-11-27).
       toggle_metadata: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: () => true,
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) => {
           e.preventDefault();
-          s.ui.setRightPanel(Panel.Metadata);
+          if (s.editor.selectedImage) s.ui.setRightPanel(Panel.Metadata);
+          else s.ui.toggleLibraryPanel('metadata');
         },
       },
       toggle_analytics: {
@@ -548,10 +550,12 @@ export const useKeyboardShortcuts = ({
         },
       },
       toggle_export: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s: ReturnType<typeof getStoreState>) =>
+          !!s.editor.selectedImage || canToggleLibraryPanel(s.ui, 'export', s.library.multiSelectedPaths.length > 0),
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) => {
           e.preventDefault();
-          s.ui.setRightPanel(Panel.Export);
+          if (s.editor.selectedImage) s.ui.setRightPanel(Panel.Export);
+          else s.ui.toggleLibraryPanel('export');
         },
       },
       toggle_library_exif: {

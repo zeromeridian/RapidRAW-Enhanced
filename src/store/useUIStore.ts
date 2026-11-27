@@ -68,6 +68,13 @@ export const getLibraryPanel = (
   return ui.uiVisibility.libraryTagging ? 'tagging' : null;
 };
 
+/** Whether `toggleLibraryPanel` may run: Export opens only with photos to export, and a shown panel can always close. */
+export const canToggleLibraryPanel = (
+  ui: Pick<UIState, 'isLibraryExportPanelVisible' | 'uiVisibility'>,
+  panel: LibraryPanel,
+  hasSelection: boolean,
+) => panel !== 'export' || hasSelection || getLibraryPanel(ui, true) === 'export';
+
 export interface ConfirmModalState {
   confirmText?: string;
   confirmVariant?: string;
