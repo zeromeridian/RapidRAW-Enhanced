@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu } from '@tauri-apps/api/menu';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { Resource } from '@tauri-apps/api/core';
 import type { ParseKeys } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -17,16 +18,25 @@ import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { useUIStore } from '../store/useUIStore';
+import { SettingsPageId, useUIStore } from '../store/useUIStore';
 import { getRejectedPathsForLoadedFolder } from '../utils/imageFlags';
+import { formatActionCombo } from '../utils/keyboardUtils';
 import { isCollectionView } from '../utils/libraryViews';
-import { MenuCommand, MenuEntry, MenuOptionSource, MenuView, getMenuAccelerator, menusForView } from '../utils/menuBar';
+import {
+  MenuCommand,
+  MenuEntry,
+  MenuOptionSource,
+  MenuView,
+  NativeMenuItem,
+  getMenuAccelerator,
+  menusForView,
+} from '../utils/menuBar';
 import { backUpSettings, confirmWithAppModal, restoreSettings } from '../utils/settingsBackup';
 import { canRunShortcutAction, isTypingKeyPress, runShortcutAction } from './useKeyboardShortcuts';
 import { getActionPaths } from './useLibraryActions';
 import type { PathCommand, PhotoCommand } from './usePhotoCommands';
 
-interface NativeMenuBarProps {
+interface MenuBarProps {
   handleDeleteRejected(): void;
   handleLibraryRefresh(): Promise<void>;
   libraryViewMode: LibraryViewMode;
@@ -44,6 +54,38 @@ interface MenuCommandHandler {
 }
 
 type NativeItem = MenuItem | CheckMenuItem | PredefinedMenuItem | Submenu;
+
+/** A menu of the Windows and Linux bar: its title and, built when it opens, its entries. */
+export interface InAppMenu {
+  id: string;
+  label: string;
+}
+
+export interface MenuBarModel {
+  /** Empty on macOS (native menus) and Android (no menus). */
+  menus: InAppMenu[];
+  buildMenuOptions(menuId: string): Option[];
+}
+
+/** The window items the Windows and Linux bar offers itself (`IN_APP_NATIVE_ITEMS`). */
+const IN_APP_WINDOW_ITEMS: Partial<Record<NativeMenuItem, { label: ParseKeys; run(): Promise<void> }>> = {
+  CloseWindow: { label: 'menuBar.items.closeWindow', run: () => getCurrentWindow().close() },
+  Fullscreen: {
+    label: 'menuBar.items.fullScreen',
+    run: async () => {
+      const appWindow = getCurrentWindow();
+      await appWindow.setFullscreen(!(await appWindow.isFullscreen()));
+    },
+  },
+  Maximize: { label: 'menuBar.items.maximize', run: () => getCurrentWindow().toggleMaximize() },
+  Minimize: { label: 'menuBar.items.minimize', run: () => getCurrentWindow().minimize() },
+};
+
+/** Opens Settings on one of its pages. */
+const openSettingsPage = (settingsPage: SettingsPageId): MenuCommandHandler => ({
+  canRun: () => true,
+  run: () => useUIStore.getState().setUI({ isSettingsOpen: true, settingsPage }),
+});
 
 /** Greying out follows the app's state at most this often. */
 const ENABLED_REFRESH_MS = 150;
@@ -80,8 +122,11 @@ const toolPanel = (panel: Panel): MenuCommandHandler => ({
 const optionSignature = (option: Option) =>
   `${JSON.stringify(option, ['label', 'disabled', 'type', 'submenu'])}\n${getActionPaths().join('\n')}`;
 
-/** The macOS menu bar's menus from the shared list (`utils/menuBar.ts`), rebuilt per view. */
-export function useNativeMenuBar({
+/**
+ * The menu bar from the shared list (`utils/menuBar.ts`), rebuilt per view: native menus on macOS, and
+ * on Windows and Linux the model for the title bar's own menus (`MenuBarMenus`).
+ */
+export function useMenuBar({
   handleDeleteRejected,
   handleLibraryRefresh,
   libraryViewMode,
@@ -89,7 +134,7 @@ export function useNativeMenuBar({
   photoCommands,
   readXmpFromFolder,
   setLibraryViewMode,
-}: NativeMenuBarProps) {
+}: MenuBarProps): MenuBarModel {
   const { t, i18n } = useTranslation();
   const osPlatform = useSettingsStore((state) => state.osPlatform);
   const keybinds = useSettingsStore((state) => state.appSettings?.keybinds);
@@ -105,6 +150,7 @@ export function useNativeMenuBar({
 
   const commands: Record<MenuCommand, MenuCommandHandler> = {
     ...photoMenuCommands,
+    about: openSettingsPage('about'),
     backUpSettings: { canRun: () => true, run: () => void backUpSettings(t) },
     blendPad: toolPanel(Panel.BlendPad),
     deleteRejected: {
@@ -117,6 +163,7 @@ export function useNativeMenuBar({
     displayCull: { canRun: () => true, run: () => setLibraryDisplayMode(LibraryDisplayMode.Cull) },
     displayList: { canRun: () => true, run: () => setLibraryDisplayMode(LibraryDisplayMode.List) },
     filmstrip: visibilityToggle('filmstrip'),
+    keyboardShortcuts: openSettingsPage('shortcuts'),
     leftPanel: visibilityToggle('folderTree'),
     lensGeometry: toolPanel(Panel.LensGeometry),
     newAlbum: {
@@ -127,6 +174,8 @@ export function useNativeMenuBar({
       canRun: () => !!getOpenFolder(),
       run: () => useUIStore.getState().setUI({ folderActionTarget: getOpenFolder(), isCreateFolderModalOpen: true }),
     },
+    // Closes the window as its close button does, so its usual saving on close runs.
+    quit: { canRun: () => true, run: () => void getCurrentWindow().close() },
     readXmp: {
       canRun: () => !!getOpenFolder(),
       run: () => {
@@ -337,7 +386,7 @@ export function useNativeMenuBar({
     );
 
     const build = async () => {
-      const menus = menusForView(view);
+      const menus = menusForView(view, osPlatform);
       const submenus = await Promise.all(
         menus.map(async (menu) => {
           const submenu = await Submenu.new({
@@ -375,4 +424,49 @@ export function useNativeMenuBar({
       [...created, ...optionMenus.flatMap((entry) => entry.resources)].forEach((resource) => void resource.close());
     };
   }, [osPlatform, view, keybinds, i18n.language, t]);
+
+  // Windows and Linux: the title bar's menus, their entries built from the app's state when one opens.
+  const hasInAppMenus = osPlatform === 'linux' || osPlatform === 'windows';
+  const inAppMenus = useMemo(
+    () => (hasInAppMenus ? menusForView(view, osPlatform) : []),
+    [hasInAppMenus, osPlatform, view],
+  );
+
+  const toOption = (entry: MenuEntry): Option | null => {
+    switch (entry.kind) {
+      case 'separator':
+        return { type: OPTION_SEPARATOR };
+      case 'native': {
+        const windowItem = IN_APP_WINDOW_ITEMS[entry.item];
+        return windowItem ? { label: t(windowItem.label), onClick: () => void windowItem.run() } : null;
+      }
+      case 'options':
+        return menuOptionsRef.current[entry.source]();
+      case 'submenu':
+        return { label: t(entry.label as ParseKeys), submenu: toOptions(entry.entries) };
+      case 'action':
+        return {
+          label: String(t(entry.label as ParseKeys, entry.labelOptions as never)),
+          disabled: !canRunShortcutAction(entry.action),
+          shortcut: formatActionCombo(entry.action, keybinds, osPlatform) || undefined,
+          onClick: () => runShortcutAction(entry.action),
+        };
+      case 'command': {
+        const handler = commandsRef.current[entry.command];
+        return {
+          label: t(entry.label as ParseKeys),
+          checked: handler.isChecked?.(),
+          disabled: !handler.canRun(),
+          onClick: handler.run,
+        };
+      }
+    }
+  };
+  const toOptions = (entries: MenuEntry[]) =>
+    entries.map(toOption).filter((option): option is Option => option !== null);
+
+  return {
+    menus: inAppMenus.map((menu) => ({ id: menu.id, label: t(menu.label as ParseKeys) })),
+    buildMenuOptions: (menuId) => toOptions(inAppMenus.find((menu) => menu.id === menuId)?.entries ?? []),
+  };
 }

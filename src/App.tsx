@@ -37,7 +37,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useThumbnails } from './hooks/useThumbnails';
 import { ImageDimensions } from './hooks/useImageRenderSize';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { useNativeMenuBar } from './hooks/useNativeMenuBar';
+import { useMenuBar } from './hooks/useMenuBar';
 import { useTauriListeners } from './hooks/useTauriListeners';
 import { useImportCardWatcher } from './hooks/useImportCardWatcher';
 import { useFileOperations } from './hooks/useFileOperations';
@@ -516,7 +516,7 @@ function App() {
     handleZoomChange,
   });
 
-  useNativeMenuBar({
+  const menuBar = useMenuBar({
     handleDeleteRejected,
     handleLibraryRefresh,
     libraryViewMode,
@@ -815,7 +815,7 @@ function App() {
             isFullScreen ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-[60px] opacity-100',
           )}
         >
-          {isTitleBarShown && <TitleBar />}
+          {isTitleBarShown && <TitleBar menuBar={menuBar} />}
         </div>
         <div
           className={clsx(

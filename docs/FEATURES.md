@@ -74,8 +74,9 @@ details are in `RELEASE_NOTES.MD`.
 - **Square corners** inside the window (one theme setting in `styles.css`);
   circles such as slider knobs and colour dots, and the macOS window
   corners, stay round.
-- **Menu bar** (Lightroom Classic style; macOS native menus, Windows/Linux
-  in-app bar planned): File, Edit, Photo, View, Window and Help, plus
+- **Menu bar** (Lightroom Classic style; native menus on macOS, the same
+  menus in the top bar on Windows and Linux, with Settings… in Edit, Exit
+  in File and About in Help there): File, Edit, Photo, View, Window and Help, plus
   Library and Metadata in Library and Develop and Tools in Develop. Entries
   run the same actions as the keys and the right-click menus (Open in,
   albums, virtual copies, Photo Merge, Enhance, Auto Adjust, lens

@@ -45,6 +45,21 @@ The same behaviour in all three, from shared code:
    presets keep drag and drop. **Group right-click:** Rename Group,
    Delete Group (asks; its items move to "No Group", decision L3), for
    all three.
+6. **One place to browse: the Looks tab** (L6–L8). Develop's Presets
+   tab becomes **Looks**, with a **Presets · Profiles · LUTs** switch at
+   the top (remembered), a name search for the shown kind, the
+   grid/list switch, **＋** (create the shown kind) and import. Hover
+   previews a profile or LUT on the photo (as today's tool lists do);
+   a click applies it, and the active item shows its strength slider
+   under it (preset Amount, profile Amount, LUT Intensity). Those
+   sliders are the tools' own controls on the same adjustment keys, so
+   moving one moves the other.
+7. **Tool rows choose nothing themselves** (L7). Basic → Profile keeps
+   the name field, ✕, Amount, and Save to Profiles / Update; Look → LUT
+   keeps the name field, ✕ and Intensity. The lists that unfold there
+   today are removed. Clicking the name opens Looks on that switch,
+   scrolled to the current item, with a **‹ Back to Adjustments** pill
+   that returns to the tool panel you came from (`lastEditingPanel`).
 
 ## Design
 
@@ -71,19 +86,42 @@ The same behaviour in all three, from shared code:
   never changes their look; older edits hold only `lutPath`, so a path
   that no longer exists falls back to a LUT with the same file name
   anywhere in `luts/` (`get_or_load_lut`).
+- **Looks tab:** `Panel.Presets` keeps its internal value (`'presets'`,
+  so saved panel state and the `toggle_presets` keybind stay valid);
+  only its label changes to Looks (right-panel switcher, menu bar Tools
+  entry, Settings → Keybinds). A new `LooksPanel` holds the switch and
+  shows the Presets, Profiles or LUTs browser; the kind shown is in the
+  UI store (`looksKind`) so a tool row can open the tab on its kind.
+  Profile and LUT browsing (previews, hover preview, select, right-click
+  actions, Create / Import) move from `Profile.tsx` and `LUTControl.tsx`
+  into their browsers; the tool rows keep what adjusts the photo.
+  Profiles are not offered for masks today; LUTs keep whatever masks
+  use now (checked when phase 3 starts).
 
 ## Phases (one MINOR each)
 
-1. **Shared browser + profiles:** the shared components; the profile
-   browser moves onto them (list with previews, collapsible sections,
-   group picker in Create / Update, Move to Group, Rename / Delete
-   Group).
-2. **LUTs:** subfolder groups (Rust: `list_luts`, import, Save LUT,
-   move, group rename/delete, the by-name fallback; tests), list layout,
-   favourites, group picker in Save LUT and Import.
-3. **Presets:** grid layout, Favorites section, group picker in Create /
-   Update Preset, Move to Group in the right-click menu, collapsible
-   state remembered.
+1. **Shared browser, Looks tab, presets:** the shared components; the
+   Presets tab becomes Looks with its switch (Profiles and LUTs show
+   their current lists there until their phase); presets get the grid,
+   Favorites, search, group picker in Create / Update Preset, Move to
+   Group.
+2. **Profiles in Looks:** the profile browser on the shared components
+   (list with previews, collapsible sections, group picker in Create /
+   Update, Move to Group, Rename / Delete Group); Basic → Profile
+   becomes the slim row that opens Looks, with the Back pill.
+3. **LUTs in Looks:** subfolder groups (Rust: `list_luts`, import, Save
+   LUT, move, group rename/delete, the by-name fallback; tests), list
+   layout, favourites, group picker in Save LUT and Import; Look → LUT
+   becomes the slim row.
+4. **New Look dialog** (L9): one dialog from Looks' ＋ for all three
+   (Type: Preset / Profile / LUT, Name, Group, one settings tree whose
+   sections are the profile bake groups), replacing
+   `ConfigurePresetModal` and `CreateProfileModal`. Until then each
+   dialog only gains the group picker.
+
+Order note: phase 1 starts with presets (the tab they already own), so
+the Looks tab exists before profiles and LUTs move in; phases 2 and 3
+can swap.
 
 Each phase: Clippy gate when Rust changes, `tsc`/ESLint against `HEAD`,
 English strings only (`en.json`, listed under "Pending translations").
@@ -100,12 +138,20 @@ English strings only (`en.json`, listed under "Pending translations").
   deleted with the group.
 - **L4 Scope: these three browsers only.** Tone curve and Orbit Blend
   Pad presets (`NamedPresetBar`) and export presets stay as they are.
-- **L5 Plan item 86, next:** started right after the `1.119.0` menu
-  entries, before item 69's Windows/Linux bar. Same batch branch
+- **L5 Plan item 86, after item 69** (first planned before 69's
+  Windows/Linux bar; owner 2026-11-27 later: finish the menu work
+  first). Same batch branch
   (`dev/menu-bar-entries`, owner rule: never two unmerged branches),
   one commit per phase.
+- **L6 One Looks tab** for presets, profiles and LUTs (not three
+  browsers that only share a design).
+- **L7 The tool rows' unfolding lists are dropped;** the name opens
+  Looks.
+- **L8 The tab is called Looks;** the key stays P.
+- **L9 One New Look dialog, as the last phase.**
 
 ## Progress
 
-- 2026-11-27: owner request; code check and this plan; decisions L1–L5.
-  No code yet.
+- 2026-11-27: owner request; code check and this plan; decisions L1–L5,
+  then the Looks tab (L6–L9, owner's follow-up: "Profiles, LUTs and
+  presets are in 3 different places"). No code yet.

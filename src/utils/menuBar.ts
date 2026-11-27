@@ -12,20 +12,23 @@ export type MenuView = 'library' | 'develop';
 
 /**
  * Entries that are no keybind action: the right-click menus' photo commands (`usePhotoCommands`) and the
- * App's handlers (`useNativeMenuBar`'s `commands`).
+ * App's handlers (`useMenuBar`'s `commands`).
  */
 export type MenuCommand =
   | PhotoCommand
+  | 'about'
   | 'backUpSettings'
   | 'blendPad'
   | 'deleteRejected'
   | 'displayCull'
   | 'displayList'
   | 'filmstrip'
+  | 'keyboardShortcuts'
   | 'leftPanel'
   | 'lensGeometry'
   | 'newAlbum'
   | 'newFolder'
+  | 'quit'
   | 'readXmp'
   | 'refreshView'
   | 'restoreSettings'
@@ -55,13 +58,27 @@ export type NativeMenuItem =
   | 'Services'
   | 'ShowAll';
 
-export type MenuEntry =
+/**
+ * The OS items the Windows and Linux bar offers itself (`useMenuBar`); the others (text editing, the
+ * macOS app and window list items) are left out there, as those keys work in text fields anyway.
+ */
+export const IN_APP_NATIVE_ITEMS: ReadonlySet<NativeMenuItem> = new Set([
+  'CloseWindow',
+  'Fullscreen',
+  'Maximize',
+  'Minimize',
+]);
+
+type MenuEntryKind =
   | { kind: 'action'; action: string; label: string; labelOptions?: Record<string, unknown> }
   | { kind: 'command'; command: MenuCommand; label: string }
   | { kind: 'native'; item: NativeMenuItem }
   | { kind: 'options'; source: MenuOptionSource }
   | { kind: 'submenu'; label: string; entries: MenuEntry[] }
   | { kind: 'separator' };
+
+/** `otherPlatformsOnly`: only in the Windows and Linux bar (what macOS keeps in its app menu). */
+export type MenuEntry = MenuEntryKind & { otherPlatformsOnly?: boolean };
 
 export interface MenuDefinition {
   id: string;
@@ -84,6 +101,8 @@ const action = (actionId: string, label: string, labelOptions?: Record<string, u
 const command = (commandId: MenuCommand, label: string): MenuEntry => ({ kind: 'command', command: commandId, label });
 const native = (item: NativeMenuItem): MenuEntry => ({ kind: 'native', item });
 const options = (source: MenuOptionSource): MenuEntry => ({ kind: 'options', source });
+const onOtherPlatforms = (...entries: MenuEntry[]): MenuEntry[] =>
+  entries.map((entry) => ({ ...entry, otherPlatformsOnly: true }));
 const submenu = (label: string, entries: MenuEntry[]): MenuEntry => ({ kind: 'submenu', label, entries });
 
 const COLOR_LABEL_ACTIONS = ['red', 'yellow', 'green', 'blue', 'purple'] as const;
@@ -127,6 +146,7 @@ export const MENU_BAR: MenuDefinition[] = [
       SEPARATOR,
       command('backUpSettings', 'menuBar.items.backUpSettings'),
       command('restoreSettings', 'menuBar.items.restoreSettings'),
+      ...onOtherPlatforms(SEPARATOR, command('quit', 'menuBar.items.exit')),
     ],
   },
   {
@@ -147,6 +167,7 @@ export const MENU_BAR: MenuDefinition[] = [
       action('deselect_all', 'menuBar.items.selectNone'),
       SEPARATOR,
       action('focus_search', 'menuBar.items.find'),
+      ...onOtherPlatforms(SEPARATOR, action('open_settings', 'menuBar.items.settings')),
     ],
   },
   {
@@ -332,11 +353,36 @@ export const MENU_BAR: MenuDefinition[] = [
     id: 'help',
     label: 'menuBar.help',
     role: 'help',
-    entries: [action('open_settings', 'menuBar.items.keyboardShortcuts')],
+    entries: [
+      command('keyboardShortcuts', 'menuBar.items.keyboardShortcuts'),
+      ...onOtherPlatforms(SEPARATOR, command('about', 'menuBar.items.about')),
+    ],
   },
 ];
 
-export const menusForView = (view: MenuView) => MENU_BAR.filter((menu) => !menu.views || menu.views.includes(view));
+/** Drops entries the platform does not show, then separators left at an edge or next to another. */
+const entriesForPlatform = (entries: MenuEntry[], isMac: boolean): MenuEntry[] => {
+  const shown: MenuEntry[] = [];
+  for (const entry of entries) {
+    const isShown = isMac ? !entry.otherPlatformsOnly : entry.kind !== 'native' || IN_APP_NATIVE_ITEMS.has(entry.item);
+    if (!isShown) continue;
+    if (entry.kind === 'separator') {
+      if (shown.length > 0 && shown[shown.length - 1].kind !== 'separator') shown.push(entry);
+    } else {
+      shown.push(entry.kind === 'submenu' ? { ...entry, entries: entriesForPlatform(entry.entries, isMac) } : entry);
+    }
+  }
+  if (shown[shown.length - 1]?.kind === 'separator') shown.pop();
+  return shown;
+};
+
+/** The menus of a view on a platform: macOS has its app menu; Windows and Linux move its entries. */
+export const menusForView = (view: MenuView, osPlatform: string): MenuDefinition[] => {
+  const isMac = osPlatform === 'macos';
+  return MENU_BAR.filter((menu) => (!menu.views || menu.views.includes(view)) && (isMac || !menu.isAppMenu)).map(
+    (menu) => ({ ...menu, entries: entriesForPlatform(menu.entries, isMac) }),
+  );
+};
 
 const ACCELERATOR_MODIFIERS: Record<string, string> = { ctrl: 'CmdOrCtrl', shift: 'Shift', alt: 'Alt' };
 

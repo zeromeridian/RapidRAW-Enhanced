@@ -5,6 +5,20 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.120.0-dev-menu-bar-entries — 2026-11-27
+
+### Menu bar
+
+- **Windows and Linux now have the menu bar too:** File, Edit, View,
+  Window and Help, plus Library, Photo and Metadata in the Library and
+  Photo, Develop and Tools in Develop, in the top bar where the app's
+  name was. Each entry shows its key and is greyed out when it does
+  not apply; on/off entries show a check mark. Settings… is in Edit,
+  Exit in File, and About ThisIsRAW in Help; Window has Minimize,
+  Maximize, Full Screen and Close Window.
+- **Help → Keyboard Shortcuts…** now opens the Keyboard Shortcuts page
+  of Settings directly.
+
 ## 1.119.0-dev-menu-bar-entries — 2026-11-27
 
 ### Menu bar (macOS)

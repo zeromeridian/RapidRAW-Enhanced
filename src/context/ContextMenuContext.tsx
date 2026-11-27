@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, FC } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronRight } from 'lucide-react';
+import { Check, ChevronRight } from 'lucide-react';
 import { Option as AppOption, OPTION_SEPARATOR } from '../components/ui/AppProperties';
 import clsx from 'clsx';
 
@@ -235,11 +235,15 @@ function MenuItem({ option, path, hideContextMenu }: MenuItemProps) {
         ref={itemRef}
         role="menuitem"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          {option.checked !== undefined && (
+            <Check size={16} className={option.checked ? 'shrink-0' : 'shrink-0 invisible'} />
+          )}
           {option.color && <div className="w-3 h-3 rounded-full" style={{ backgroundColor: option.color }}></div>}
           {option.icon && <option.icon size={16} />}
-          <span>{option.label}</span>
+          <span className="truncate">{option.label}</span>
         </div>
+        {option.shortcut && <span className="shrink-0 text-xs text-text-secondary">{option.shortcut}</span>}
         {option.submenu && <ChevronRight size={16} />}
       </button>
 

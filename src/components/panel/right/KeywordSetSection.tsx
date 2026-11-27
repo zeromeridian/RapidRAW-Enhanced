@@ -12,7 +12,7 @@ import TaggingSection from './TaggingSection';
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TextColors, TextVariants } from '../../../types/typography';
-import { KEYBIND_DEFINITIONS, formatKeyCode, getEffectiveCombo } from '../../../utils/keyboardUtils';
+import { formatActionCombo } from '../../../utils/keyboardUtils';
 import {
   KEYWORD_SET_SIZE,
   KeywordSet,
@@ -45,13 +45,9 @@ export default function KeywordSetSection({ targetPaths }: KeywordSetSectionProp
 
   const shortcutLabels = useMemo(
     () =>
-      Array.from({ length: KEYWORD_SET_SIZE }, (_, index) => {
-        const definition = KEYBIND_DEFINITIONS.find((item) => item.action === `apply_keyword_${index + 1}`);
-        if (!definition) return '';
-        return getEffectiveCombo(definition, appSettings?.keybinds)
-          .map((key) => formatKeyCode(key, osPlatform))
-          .join(osPlatform === 'macos' ? '' : '+');
-      }),
+      Array.from({ length: KEYWORD_SET_SIZE }, (_, index) =>
+        formatActionCombo(`apply_keyword_${index + 1}`, appSettings?.keybinds, osPlatform),
+      ),
     [appSettings?.keybinds, osPlatform],
   );
 

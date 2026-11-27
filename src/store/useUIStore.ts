@@ -68,6 +68,10 @@ export const getLibraryPanel = (
   return ui.uiVisibility.libraryTagging ? 'tagging' : null;
 };
 
+/** The Settings pages (`SettingsPanel`'s `SETTINGS_PAGES`). */
+export type SettingsPageId =
+  'interface' | 'library' | 'editor' | 'tagging' | 'processing' | 'ai' | 'export' | 'storage' | 'shortcuts' | 'about';
+
 /** Whether `toggleLibraryPanel` may run: Export opens only with photos to export, and a shown panel can always close. */
 export const canToggleLibraryPanel = (
   ui: Pick<UIState, 'isLibraryExportPanelVisible' | 'uiVisibility'>,
@@ -165,6 +169,8 @@ interface UIState {
   uiVisibility: UiVisibility;
   isLibraryExportPanelVisible: boolean;
   isSettingsOpen: boolean;
+  /** The page Settings opens on next (About, Keyboard Shortcuts from the menu bar); cleared when read. */
+  settingsPage: SettingsPageId | null;
   lightsOutMode: LightsOutMode;
 
   // Dimensions
@@ -262,6 +268,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   uiVisibility: { folderTree: true, filmstrip: true, quickFilter: false, editorExif: true },
   isLibraryExportPanelVisible: false,
   isSettingsOpen: false,
+  settingsPage: null,
   lightsOutMode: 'off',
 
   leftPanelWidth: DEFAULT_LEFT_PANEL_WIDTH,

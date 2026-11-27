@@ -4,6 +4,8 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Minus, Square, X } from 'lucide-react';
 import { LibraryFilterControls } from '../components/panel/LibraryFilterControls';
 import { SidePanelToggles } from '../components/panel/SidePanelToggles';
+import type { MenuBarModel } from '../hooks/useMenuBar';
+import { MenuBarMenus } from './MenuBarMenus';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 
@@ -44,7 +46,8 @@ const RestoreDownIcon = ({ size = 14, className = '' }) => (
   </svg>
 );
 
-export default function TitleBar() {
+/** On Windows and Linux the app's menus take the place of its name (`useMenuBar`). */
+export default function TitleBar({ menuBar }: { menuBar: MenuBarModel }) {
   const [osPlatform, setOsPlatform] = useState('');
   const [isMaximized, setIsMaximized] = useState(false);
 
@@ -63,10 +66,12 @@ export default function TitleBar() {
   const [windowControlsWidth, setWindowControlsWidth] = useState(0);
   const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
 
+  // The menus' titles change with the view and the language, so the title area is measured again.
+  const menuTitles = menuBar.menus.map((menu) => menu.label).join('|');
   useLayoutEffect(() => {
     setTitleWidth(titleRef.current?.offsetWidth ?? 0);
     setWindowControlsWidth(windowControlsRef.current?.offsetWidth ?? 0);
-  }, [osPlatform, showWindowControls]);
+  }, [osPlatform, showWindowControls, menuTitles]);
 
   // Shown with the main pane in Library and Develop. Their labels follow the language and toolbar
   // settings, so their width is measured.
@@ -190,12 +195,16 @@ export default function TitleBar() {
               />
             </div>
           )}
-          <div
-            data-tauri-drag-region
-            className={`flex items-center h-full ${isMac && showWindowControls ? '' : 'px-4'}`}
-          >
-            <p className="text-sm font-semibold text-text-secondary pointer-events-none">ThisIsRAW</p>
-          </div>
+          {menuBar.menus.length > 0 ? (
+            <MenuBarMenus menuBar={menuBar} />
+          ) : (
+            <div
+              data-tauri-drag-region
+              className={`flex items-center h-full ${isMac && showWindowControls ? '' : 'px-4'}`}
+            >
+              <p className="text-sm font-semibold text-text-secondary pointer-events-none">ThisIsRAW</p>
+            </div>
+          )}
         </div>
         {mainPaneBounds && (
           <div

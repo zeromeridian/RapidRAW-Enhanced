@@ -200,5 +200,32 @@ nothing new is added here.
     Auto Lens Correction and AI tool entries and the thumbnail menu's wait
     for the edited photo to load only when it is the only target; Frame
     Image in Develop takes the photo from the library list.
-  - **Still to do:** phase 3 (Windows/Linux bar; About in Help there).
-    Left out by decision 6: Quick Filter, Select By.
+  - Left out by decision 6: Quick Filter, Select By.
+- **`1.120.0` (2026-11-27, same branch, not committed): phase 3, the
+  Windows/Linux bar.**
+  - `useNativeMenuBar.ts` renamed `useMenuBar.ts`: same commands for
+    both; on macOS it builds the native menus as before, on Windows and
+    Linux it returns a `MenuBarModel` (`menus`, `buildMenuOptions`) whose
+    entries are built as right-click `Option`s when a menu opens (so
+    greying and check marks are always current; no refresh loop).
+  - `src/window/MenuBarMenus.tsx`: the titles in `TitleBar.tsx` in place
+    of the app name; a click opens the list through `ContextMenuContext`
+    (`Option` gained `shortcut` and `checked`), pointing at another
+    title while one is open switches to it.
+  - `menuBar.ts`: `menusForView(view, osPlatform)`; entries marked
+    `otherPlatformsOnly` (Edit → Settings…, File → Exit, Help → About
+    ThisIsRAW); on Windows/Linux only Minimize, Maximize, Full Screen and
+    Close Window of the OS items (`IN_APP_NATIVE_ITEMS`; Cut, Copy, Paste,
+    Select All are left out, their keys work in text fields), and
+    separators left at an edge or doubled are dropped. Exit closes the
+    window like its close button.
+  - Help → Keyboard Shortcuts… (all platforms) and About open their
+    Settings page (`useUIStore.settingsPage`, read once by
+    `SettingsPanel`; `SettingsPageId` moved to `useUIStore.ts`).
+  - Shared `formatActionCombo` (`keyboardUtils.ts`) for the key hints,
+    also used by `KeywordSetSection` instead of its own copy.
+  - **Deferred (owner 2026-11-27: "defer any outstanding Linux/Windows
+    menu bar work"):** testing the bar on Linux and Windows (not
+    compiled or run there yet) and keyboard navigation (Alt / F10 to
+    reach the bar, arrow keys, Enter, Alt+letter mnemonics; the shared
+    right-click menu has no arrow keys either). Restart: owner request.

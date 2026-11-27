@@ -526,6 +526,19 @@ export function formatKeyCode(key: string, osPlatform: string): string {
   return label || key;
 }
 
+/** A keybind action's bound combo as shown beside it, e.g. `Ctrl+Shift+I` (or `⌘⇧I`-style on macOS). */
+export function formatActionCombo(
+  actionId: string,
+  keybinds: Record<string, string[]> | undefined,
+  osPlatform: string,
+): string {
+  const definition = KEYBIND_DEFINITIONS.find((item) => item.action === actionId);
+  if (!definition) return '';
+  return getEffectiveCombo(definition, keybinds)
+    .map((key) => formatKeyCode(key, osPlatform))
+    .join(osPlatform === 'macos' ? '' : '+');
+}
+
 export function arraysEqual(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((v, i) => v === b[i]);
 }

@@ -1,4 +1,4 @@
-import { ComponentType, useState } from 'react';
+import { ComponentType, useEffect, useState } from 'react';
 import {
   ArrowLeft,
   Cpu,
@@ -25,6 +25,7 @@ import Text from '../ui/Text';
 import { AppSettings } from '../ui/AppProperties';
 import { TextColors, TextVariants } from '../../types/typography';
 import { useOsPlatform } from '../../hooks/useOsPlatform';
+import { SettingsPageId, useUIStore } from '../../store/useUIStore';
 import { ConfirmRequest, SettingsContext, SettingsContextValue } from './settings/SettingsContext';
 import { SettingsPageProps } from './settings/SettingsPage';
 import { useProcessingSettings } from './settings/useProcessingSettings';
@@ -46,9 +47,6 @@ interface SettingsPanelProps {
   onSettingsChange(settings: AppSettings): Promise<void>;
   rootPaths: string[];
 }
-
-type SettingsPageId =
-  'interface' | 'library' | 'editor' | 'tagging' | 'processing' | 'ai' | 'export' | 'storage' | 'shortcuts' | 'about';
 
 interface SettingsPageEntry {
   icon: LucideIcon;
@@ -79,7 +77,16 @@ export default function SettingsPanel({
 }: SettingsPanelProps) {
   const { t } = useTranslation();
   const osPlatform = useOsPlatform();
-  const [activePageId, setActivePageId] = useState<SettingsPageId>(SETTINGS_PAGES[0].id);
+  // The menu bar can ask for a page (About, Keyboard Shortcuts), also while Settings is open; each
+  // request is used once.
+  const requestedPage = useUIStore((state) => state.settingsPage);
+  const [activePageId, setActivePageId] = useState<SettingsPageId>(() => requestedPage ?? SETTINGS_PAGES[0].id);
+  useEffect(() => {
+    if (!requestedPage) return;
+    setActivePageId(requestedPage);
+    setSearch('');
+    useUIStore.getState().setUI({ settingsPage: null });
+  }, [requestedPage]);
   const [search, setSearch] = useState('');
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);

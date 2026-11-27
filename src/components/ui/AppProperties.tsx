@@ -564,6 +564,8 @@ export interface ImageFile extends ImageEditState {
 }
 
 export interface Option {
+  /** An on/off entry: a check mark shows while it is on. */
+  checked?: boolean;
   color?: string;
   disabled?: boolean;
   icon?: any;
@@ -571,6 +573,8 @@ export interface Option {
   label?: string;
   onClick?(): void;
   onRightClick?(): void;
+  /** The bound key, shown at the right edge (menu bar entries). */
+  shortcut?: string;
   submenu?: any;
   type?: string;
 }
