@@ -239,5 +239,6 @@ English strings only (`en.json`, listed under "Pending translations").
   heading; the LUT's eye moved beside its Intensity in Looks → LUTs; LUT
   keys out of the section's copy/paste/reset (Reset All still clears
   them) and under their own heading in Copy & Paste and New Look. Basic
-  → Profile stays (L7). Item 86 is complete once `1.124.0`/`1.124.1`
-  pass.
+  → Profile stays (L7). Committed as `cbbaf5ce`; `dev/looks-browser`
+  merged into `develop` by the owner 2026-11-27. Done; open: the
+  owner's checks of `1.124.0`/`1.124.1` (`HANDOFF.md`).

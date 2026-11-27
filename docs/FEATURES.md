@@ -166,6 +166,10 @@ details are in `RELEASE_NOTES.MD`.
   summary. In the Recursive view its **Group by folder** switch (on by
   default, remembered) turns the per-folder headers off for one flat grid
   in the sort order.
+- **Thumbnail numbers like Lightroom Classic's**: each photo's place in
+  the current view, large and faint in the grid tile's corner (a soft
+  blend keeps it visible on dark and bright photos) and bold in the
+  filmstrip.
 - Compact neutral file-type badges in Library grid and list metadata, using a
   shared `RAW` label for camera formats and normalized labels such as `JPG` and
   `TIF` for rendered files. Grid metadata also shows the image pixel
@@ -298,6 +302,9 @@ details are in `RELEASE_NOTES.MD`.
 
 ## Develop
 
+- **A mask's adjustments are marked as such**: in the Masks panel every
+  section header has a faint accent tint and the mask icon ("Edits the
+  selected mask only"), so they are not mistaken for the photo's.
 - **Custom profiles, as Adobe Camera Raw creates them** (Light → Profile):
   Create Profile bakes the chosen settings (the current profile, Exposure,
   White Balance, each tone slider, Curves, Presence, Hue, Color Mixer,

@@ -1628,6 +1628,7 @@
     }
   },
   "masks": {
+    "sectionEditsMask": "Edits the selected mask only, not the whole photo",
     "types": {
       "all": "Whole Image",
       "brush": "Brush",

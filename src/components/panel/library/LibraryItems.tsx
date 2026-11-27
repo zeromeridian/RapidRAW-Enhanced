@@ -160,6 +160,7 @@ const ThumbnailComponent = ({
   aspectRatio: thumbnailAspectRatio,
   isEdited,
   isUpscaled,
+  number,
   exif,
   isCloudPlaceholder,
   groupBadgeLabel,
@@ -344,7 +345,14 @@ const ThumbnailComponent = ({
         />
       )}
       <ImageFlagBadge flag={imageFlag} className="absolute bottom-1.5 left-2 z-30 pointer-events-none" />
-      <div className="relative w-full flex-1 min-h-0 z-0 bg-surface">
+      <div className="@container relative w-full flex-1 min-h-0 z-0 bg-surface">
+        {number !== undefined && (
+          // Lightroom Classic's cell number: large and faint in the corner, over the photo with
+          // a weak difference blend, so it shows on dark and bright photos and beside them alike.
+          <span className="absolute top-0 left-1.5 z-10 font-bold leading-none tabular-nums select-none pointer-events-none text-[24cqw] text-white/25 mix-blend-difference">
+            {number}
+          </span>
+        )}
         <StackMarks info={stackVisual} count={groupBadgeCount} label={groupBadgeLabel} path={path} />
         {layers.length > 0 && (
           <div className="absolute inset-0 w-full h-full">
@@ -1230,7 +1238,7 @@ const RowComponent = ({
         boxSizing: 'border-box',
       }}
     >
-      {row.images.map((imageFile: ImageFile) => {
+      {row.images.map((imageFile: ImageFile, indexInRow: number) => {
         const stackBadge = groupBadgeInfo?.get(imageFile.path);
         const isStackDraggable = Boolean(getExpandedStackForPath(imageFile.path));
         let isPrevSelected = false;
@@ -1305,6 +1313,7 @@ const RowComponent = ({
                 exif={imageFile.exif}
                 isEdited={imageFile.is_edited}
                 isUpscaled={imageFile.is_upscaled}
+                number={row.firstNumber + indexInRow}
                 aspectRatio={thumbnailAspectRatio}
                 isCloudPlaceholder={imageFile.is_cloud_placeholder}
                 isRaw={imageFile.is_raw}

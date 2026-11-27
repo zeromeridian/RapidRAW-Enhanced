@@ -238,6 +238,11 @@ const FilmstripThumbnail = memo(
 
         {imageFlag === ImageFlag.Rejected && <div className="absolute inset-0 z-10 bg-black/45 pointer-events-none" />}
 
+        {/* Lightroom Classic's filmstrip number: the photo's place in the list, bold in the corner. */}
+        <span className="absolute top-0.5 left-1.5 z-10 text-sm font-bold leading-none tabular-nums text-white/70 [text-shadow:0_1px_3px_rgb(0_0_0/0.6)] select-none pointer-events-none">
+          {index + 1}
+        </span>
+
         <div
           className={clsx(
             'absolute top-0 right-0 w-3/4 h-3/4 bg-linear-to-bl from-black/25 via-black/0 to-transparent pointer-events-none z-0 transition-opacity duration-200 ease-in-out',

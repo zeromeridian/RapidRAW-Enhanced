@@ -27,6 +27,7 @@ import {
   FileEdit,
   FolderOpen,
   Folder as FolderIcon,
+  Layers,
   Loader2,
   Minus,
   Plus,
@@ -2054,6 +2055,15 @@ function SettingsPanel({
               onToggle={() => handleToggleSection(sectionName)}
               onToggleVisibility={() => handleToggleVisibility(sectionName)}
               onContextMenu={(e: any) => handleSectionContextMenu(e, sectionName)}
+              // These sections edit the mask, not the whole photo: a tinted header and the mask icon.
+              isTinted
+              titleIcon={
+                <Layers
+                  size={16}
+                  className="text-accent shrink-0 compact:size-3.5"
+                  data-tooltip={t('masks.sectionEditsMask')}
+                />
+              }
             >
               <SectionComponent
                 adjustments={displayContainer.adjustments}

@@ -5,6 +5,30 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.125.1-dev-mask-cue-thumb-numbers — 2026-11-27
+
+### Library
+
+- The grid's thumbnail numbers now stay faintly visible on every photo:
+  they sit over the photo with a soft blend instead of behind it, where
+  wide photos hid them.
+
+## 1.125.0-dev-mask-cue-thumb-numbers — 2026-11-27
+
+### Library
+
+- **Thumbnails are numbered, as in Lightroom Classic:** each photo's
+  place in the current view. In the grid a large, faint number sits in
+  the tile's corner behind the photo (over the photo's corner when
+  thumbnails fill the tile); the filmstrip shows it bold in the corner.
+
+### Masks
+
+- **A mask's adjustments look different from the photo's:** in the
+  Masks panel every section header (Light, Color, …) has a faint accent
+  tint and the mask icon, whose tooltip says it edits the selected mask
+  only.
+
 ## 1.124.1-dev-looks-browser — 2026-11-27
 
 ### Adjustments

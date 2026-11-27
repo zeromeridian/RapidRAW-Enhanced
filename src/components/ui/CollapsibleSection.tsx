@@ -18,6 +18,10 @@ interface CollapsibleSectionProps {
   title: string;
   /** Shown after the title (e.g. a Favorites star, which shows when the header is hovered). */
   titleAddon?: ReactNode;
+  /** Shown before the title (the mask icon of a mask's sections). */
+  titleIcon?: ReactNode;
+  /** A faint accent tint on the header: the section edits a mask, not the whole photo. */
+  isTinted?: boolean;
 }
 
 export default function CollapsibleSection({
@@ -31,6 +35,8 @@ export default function CollapsibleSection({
   onToggleVisibility = () => {},
   title,
   titleAddon,
+  titleIcon,
+  isTinted = false,
 }: CollapsibleSectionProps) {
   const { t } = useTranslation();
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -87,12 +93,16 @@ export default function CollapsibleSection({
   return (
     <div className="bg-surface rounded-lg compact:rounded-none overflow-hidden shrink-0" onContextMenu={onContextMenu}>
       <div
-        className="group/favorite w-full px-4 py-3 compact:px-3 compact:py-1 flex min-h-10 compact:min-h-7 items-center justify-between text-left hover:bg-card-active transition-colors duration-200"
+        className={clsx(
+          'group/favorite w-full px-4 py-3 compact:px-3 compact:py-1 flex min-h-10 compact:min-h-7 items-center justify-between text-left hover:bg-card-active transition-colors duration-200',
+          isTinted && 'bg-accent/10',
+        )}
         onClick={onToggle}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
         <div className="flex items-center gap-2">
+          {titleIcon}
           <Text
             variant={TextVariants.title}
             weight={TextWeights.normal}

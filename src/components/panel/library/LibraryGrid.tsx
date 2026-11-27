@@ -319,6 +319,9 @@ export default function LibraryGrid(props: any) {
 
     if (isGroupedByFolder) {
       const groups = groupImagesByFolder(imageList, currentFolderPath);
+      // Thumbnails are numbered in display order across folders; a collapsed folder keeps its
+      // numbers, so the others do not change when it closes.
+      let numbered = 0;
       groups.forEach((group) => {
         if (group.images.length === 0) return;
 
@@ -331,9 +334,11 @@ export default function LibraryGrid(props: any) {
               type: 'images',
               images: group.images.slice(i, i + columnCount),
               startIndex: i,
+              firstNumber: numbered + i + 1,
             });
           }
         }
+        numbered += group.images.length;
       });
     } else {
       for (let i = 0; i < imageList.length; i += columnCount) {
@@ -341,6 +346,7 @@ export default function LibraryGrid(props: any) {
           type: 'images',
           images: imageList.slice(i, i + columnCount),
           startIndex: i,
+          firstNumber: i + 1,
         });
       }
     }
