@@ -14,6 +14,7 @@ import { PresetBatchTarget } from '../../store/useUIStore';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { normalizeLoadedAdjustments } from '../../utils/adjustments';
+import { masksForApplying, withMasks } from '../../utils/maskUtils';
 
 interface PresetBatchModalProps {
   isOpen: boolean;
@@ -156,7 +157,8 @@ export default function PresetBatchModal({ isOpen, onClose, target }: PresetBatc
     try {
       const batchResult = await invoke<BatchResult>(Invokes.ApplyPresetBatch, {
         request: {
-          adjustments: selectedPreset.adjustments,
+          // New mask ids; the backend makes the AI parts for each photo (Plan item 90).
+          adjustments: withMasks(selectedPreset.adjustments, masksForApplying),
           folders: target.folderPaths,
           includeSubfolders,
           paths: target.imagePaths,

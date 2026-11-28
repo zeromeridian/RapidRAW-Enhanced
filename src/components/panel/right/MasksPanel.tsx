@@ -81,7 +81,7 @@ import {
 } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { OPTION_SEPARATOR, Orientation } from '../../ui/AppProperties';
-import { createSubMask } from '../../../utils/maskUtils';
+import { createSubMask, masksForApplying, withImageSize } from '../../../utils/maskUtils';
 import { usePresets } from '../../../hooks/usePresets';
 import Text from '../../ui/Text';
 import PanelHeader from '../../ui/PanelHeader';
@@ -112,7 +112,7 @@ const MASK_BLEND_MODE_OPTIONS = Object.values(MaskBlendMode).map((value) => ({
 }));
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useAiMasking } from '../../../hooks/useAiMasking';
-import { useEditorActions } from '../../../hooks/useEditorActions';
+import { makeAiMasksFor, openPhotoMaskSize, useEditorActions } from '../../../hooks/useEditorActions';
 import { useUIStore } from '../../../store/useUIStore';
 import { useWaveformControls } from '../../../hooks/useWaveformControls';
 
@@ -313,7 +313,15 @@ export default function MasksPanel() {
     }));
   }, [setEditor]);
 
-  const setCopiedMask = useCallback((mask: MaskContainer) => setEditor({ copiedMask: mask }), [setEditor]);
+  const setCopiedMask = useCallback(
+    (mask: MaskContainer) => {
+      // Its shapes record this photo's size, so Paste Mask fits them to another photo (Plan item 91).
+      const size = openPhotoMaskSize();
+      const sized = size ? { ...mask, subMasks: mask.subMasks.map((subMask) => withImageSize(subMask, size)) } : mask;
+      setEditor((state) => ({ copiedMask: sized, copiedMaskPath: state.selectedImage?.path ?? null }));
+    },
+    [setEditor],
+  );
   const setIsMaskControlHovered = useCallback(
     (hovered: boolean) => setEditor({ isMaskControlHovered: hovered }),
     [setEditor],
@@ -484,7 +492,8 @@ export default function MasksPanel() {
     if (type === Mask.AiDepth) {
       Object.assign(subMask.parameters, AI_DEPTH_MASK_RANGE_DEFAULTS, { feather: 10, fullStrength: true });
     }
-    return subMask;
+    // Shapes record the size their pixels refer to, so presets and paste fit them to other photos (Plan item 91).
+    return withImageSize(subMask, { width: imgW, height: imgH });
   };
 
   const handleAddMaskContainer = (type: Mask) => {
@@ -733,12 +742,21 @@ export default function MasksPanel() {
       return;
     }
 
-    const pastedContainer = cloneMaskContainerData(copiedMask, { rename: false });
+    // On another photo the mask pastes as Copy & Paste does: without painted parts, its shapes
+    // fitted to this photo and its AI parts made for it (Plan items 90 and 91).
+    const { copiedMaskPath } = useEditorStore.getState();
+    const isOtherPhoto = copiedMaskPath !== (selectedImage?.path ?? null);
+    const pastedContainer = isOtherPhoto
+      ? masksForApplying([copiedMask], openPhotoMaskSize())[0]
+      : cloneMaskContainerData(copiedMask, { rename: false });
+    if (!pastedContainer) return;
+
     const containerIndex = insertAfterContainerId
       ? adjustments.masks.findIndex((mask) => mask.id === insertAfterContainerId)
       : -1;
 
     insertMaskContainer(pastedContainer, containerIndex >= 0 ? containerIndex + 1 : undefined);
+    if (isOtherPhoto) makeAiMasksFor([pastedContainer]);
   };
 
   const handleDuplicateSubMask = (containerId: string, subMask: SubMask, insertIndex?: number) => {

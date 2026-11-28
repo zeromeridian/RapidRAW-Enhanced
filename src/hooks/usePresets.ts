@@ -3,6 +3,8 @@ import { invoke } from '@tauri-apps/api/core';
 import debounce from 'lodash.debounce';
 import { create } from 'zustand';
 import { Adjustments } from '../utils/adjustments';
+import { toPortableMasks } from '../utils/maskUtils';
+import { openPhotoMaskSize } from './useEditorActions';
 import { getUnlistedAdjustments, pickPresetAdjustments } from '../utils/presetSettings';
 import { Invokes, Preset } from '../components/ui/AppProperties';
 import type { GroupChoice } from '../components/ui/LooksBrowser/GroupPicker';
@@ -130,10 +132,41 @@ const savePresetsToBackend = debounce((presetsToSave: Array<UserPreset>) => {
   invoke(Invokes.SavePresets, { presets: presetsToSave }).catch((err) => console.error('Failed to save presets:', err));
 }, 500);
 
+/** `preset` with portable masks (`toPortableMasks`); the same object when they already are. */
+const withPortablePresetMasks = (preset: Preset): Preset => {
+  const masks = preset.adjustments?.masks;
+  if (!Array.isArray(masks)) return preset;
+  const portable = toPortableMasks(masks);
+  return JSON.stringify(portable) === JSON.stringify(masks)
+    ? preset
+    : { ...preset, adjustments: { ...preset.adjustments, masks: portable } };
+};
+
+/**
+ * Shows the preset tree the backend loaded or imported, with every preset's masks portable, and
+ * saves it once when that changed one: presets saved before Plan item 90 hold their photo's AI
+ * bitmaps (hundreds of KB each) and painted parts.
+ */
+const receivePresets = (tree: Array<UserPreset>) => {
+  let changed = false;
+  const portable = (preset: Preset) => {
+    const next = withPortablePresetMasks(preset);
+    changed ||= next !== preset;
+    return next;
+  };
+  const presets = tree.map((item) => {
+    if (item.preset) return { ...item, preset: portable(item.preset) };
+    if (item.folder) return { ...item, folder: { ...item.folder, children: item.folder.children.map(portable) } };
+    return item;
+  });
+  setPresets(presets);
+  if (changed) savePresetsToBackend(presets);
+};
+
 const loadPresets = async () => {
   setIsLoading(true);
   try {
-    setPresets(await invoke<Array<UserPreset>>(Invokes.LoadPresets));
+    receivePresets(await invoke<Array<UserPreset>>(Invokes.LoadPresets));
   } catch (error) {
     console.error('Failed to load presets:', error);
     setPresets([]);
@@ -153,7 +186,7 @@ export function usePresets(currentAdjustments: Adjustments) {
   /** Saves the photo's values of the ticked `keys` as a new preset in the chosen group. */
   const addPreset = (name: string, keys: ReadonlySet<string>, group: GroupChoice) => {
     const newPresetData: Preset = {
-      adjustments: pickPresetAdjustments(keys, currentAdjustments),
+      adjustments: pickPresetAdjustments(keys, currentAdjustments, openPhotoMaskSize(currentAdjustments)),
       id: crypto.randomUUID(),
       name,
     };
@@ -256,7 +289,7 @@ export function usePresets(currentAdjustments: Adjustments) {
       ...WITHOUT_UPSTREAM_PRESET_FLAGS,
       name,
       adjustments: fromPhoto
-        ? pickPresetAdjustments(keys, currentAdjustments)
+        ? pickPresetAdjustments(keys, currentAdjustments, openPhotoMaskSize(currentAdjustments))
         : {
             ...getUnlistedAdjustments(existingPreset.adjustments),
             ...pickPresetAdjustments(keys, existingPreset.adjustments),
@@ -465,7 +498,7 @@ export function usePresets(currentAdjustments: Adjustments) {
     setIsLoading(true);
     try {
       const updatedPresetList: Array<any> = await invoke(Invokes.HandleImportPresetsFromFile, { filePath });
-      setPresets(updatedPresetList);
+      receivePresets(updatedPresetList);
     } catch (error) {
       console.error('Failed to import presets from file:', error);
       throw error;
@@ -480,7 +513,7 @@ export function usePresets(currentAdjustments: Adjustments) {
       const updatedPresetList: Array<UserPreset> = await invoke(Invokes.HandleImportLegacyPresetsFromFile, {
         filePath,
       });
-      setPresets(updatedPresetList);
+      receivePresets(updatedPresetList);
     } catch (error) {
       console.error('Failed to import legacy presets from file:', error);
       throw error;
@@ -493,7 +526,7 @@ export function usePresets(currentAdjustments: Adjustments) {
     setIsLoading(true);
     try {
       const result: PresetImportResult = await invoke(Invokes.HandleImportPresetsFromFiles, { filePaths });
-      setPresets(result.presets);
+      receivePresets(result.presets);
       return result;
     } catch (error) {
       console.error('Failed to import presets from files:', error);

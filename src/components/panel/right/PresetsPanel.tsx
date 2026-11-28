@@ -54,11 +54,12 @@ import { NO_GROUP } from '../../ui/LooksBrowser/GroupPicker';
 import { useLooksBrowser } from '../../ui/LooksBrowser/useLooksBrowser';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
+import { masksForApplying, withMasks } from '../../../utils/maskUtils';
 import { describePresetSettings, presetHoldsSection } from '../../../utils/presetSettings';
 import { Invokes, OPTION_SEPARATOR, Panel, Preset } from '../../ui/AppProperties';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
-import { useEditorActions } from '../../../hooks/useEditorActions';
+import { makeAiMasksFor, openPhotoMaskSize, useEditorActions } from '../../../hooks/useEditorActions';
 import { openLookDialog } from '../../../hooks/useLookDialog';
 
 /** New Group: on its own, or for Move to Group of `presetId`. */
@@ -547,19 +548,25 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
     setActivePresetId(preset.id);
     setPresetIntensity(100);
 
+    // The preset's masks get new ids and are fitted to this photo; the editor makes their AI parts.
+    const size = openPhotoMaskSize({ ...adjustments, ...preset.adjustments });
+    const applied = withMasks(preset.adjustments, (masks) => masksForApplying(masks, size));
     setAdjustments(
       (prevAdjustments: Adjustments) => ({
         ...prevAdjustments,
-        ...preset.adjustments,
+        ...applied,
       }),
       `${t('editor.presets.types.preset')}: ${preset.name}`,
     );
+    makeAiMasksFor(applied.masks);
   };
 
   const handleIntensityChange = useCallback(
     (preset: Preset, intensity: number) => {
       setPresetIntensity(intensity);
-      const mixed = mixAdjustments(preset.adjustments, intensity);
+      // Masks do not mix: they stay as applied, with the AI parts made for this photo.
+      const { masks: _masks, ...mixable } = preset.adjustments;
+      const mixed = mixAdjustments(mixable, intensity);
       setAdjustments((prev: Adjustments) => ({
         ...prev,
         ...mixed,

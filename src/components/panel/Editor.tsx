@@ -195,7 +195,15 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
 
   const { setAdjustments } = useEditorActions();
 
-  const { handleGenerateAiMask, handleQuickErase, handleManualCleanup } = useAiMasking();
+  const { handleGenerateAiMask, handleQuickErase, handleManualCleanup, makeAiSubMasks } = useAiMasking();
+
+  // A preset or paste brought AI mask parts without bitmaps: make them for this photo (Plan item 90).
+  const aiSubMasksToMake = useEditorStore((s) => s.aiSubMasksToMake);
+  useEffect(() => {
+    if (aiSubMasksToMake.length === 0) return;
+    setEditor({ aiSubMasksToMake: [] });
+    void makeAiSubMasks(aiSubMasksToMake);
+  }, [aiSubMasksToMake]);
 
   const [crop, setCrop] = useState<Crop | null>(null);
   const prevCropParams = useRef<any>(null);

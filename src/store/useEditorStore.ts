@@ -117,6 +117,8 @@ export interface EditorState {
   /** The mask, AI edit or component under the pointer in the panel list; the photo shows its area alone. */
   hoveredMaskItemId: string | null;
   isGeneratingAiMask: boolean;
+  /** AI mask components a preset or paste brought without bitmaps; the editor makes them for the open photo. */
+  aiSubMasksToMake: string[];
   isGeneratingAi: boolean;
   aiDenoiseProgress: Record<string, number>;
   aiUpscaleProgress: Record<string, number>;
@@ -128,6 +130,8 @@ export interface EditorState {
   // Clipboard
   copiedSectionAdjustments: any | null;
   copiedMask: MaskContainer | null;
+  /** The photo `copiedMask` was copied from; on another one it pastes without its bitmaps. */
+  copiedMaskPath: string | null;
   copiedAdjustments: Adjustments | null;
 
   // Actions
@@ -204,10 +208,12 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   copiedSectionAdjustments: null,
   copiedMask: null,
+  copiedMaskPath: null,
   brushSettings: { size: 50, feather: 50, tool: ToolType.Brush },
   copiedAdjustments: null,
 
   isGeneratingAiMask: false,
+  aiSubMasksToMake: [],
   isAIConnectorConnected: false,
   isGeneratingAi: false,
   aiDenoiseProgress: {},

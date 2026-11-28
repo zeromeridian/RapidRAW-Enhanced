@@ -16,9 +16,18 @@ import {
   CROP_GEOMETRY_KEYS,
   PasteMode,
   LensAdjustment,
+  MaskContainer,
   normalizeLoadedAdjustments,
 } from '../utils/adjustments';
 import { calculateCenteredCrop } from '../utils/cropUtils';
+import {
+  aiSubMasksToMake,
+  fitMasksToImage,
+  maskImageSize,
+  masksForApplying,
+  toPortableMasks,
+  withMasks,
+} from '../utils/maskUtils';
 import { Invokes, Panel, SelectedImage } from '../components/ui/AppProperties';
 import { globalImageCache } from '../utils/ImageLRUCache';
 
@@ -40,6 +49,16 @@ export const toggleAutoSync = () => {
     ...appSettings,
     copyPasteSettings: { ...copyPasteSettings, autoSync: !copyPasteSettings.autoSync },
   });
+};
+
+/** The mask size (`maskImageSize`) of the photo open in Develop with `adjustments` (its orientation); null without one. */
+export const openPhotoMaskSize = (adjustments: Partial<Adjustments> = useEditorStore.getState().adjustments) =>
+  maskImageSize(useEditorStore.getState().selectedImage, adjustments.orientationSteps);
+
+/** Has the editor make the AI parts of `masks`, applied to the open photo without bitmaps (Plan item 90). */
+export const makeAiMasksFor = (masks: MaskContainer[] | undefined) => {
+  const ids = aiSubMasksToMake(masks).map((subMask) => subMask.id);
+  if (ids.length > 0) useEditorStore.getState().setEditor({ aiSubMasksToMake: ids });
 };
 
 /** A photo's adjustments with every edit removed: its defaults, with the crop's aspect ratio of the uncropped photo. */
@@ -303,7 +322,11 @@ export function useEditorActions() {
         adjustmentsToCopy[key] = structuredClone(sourceAdjustments[key]);
       }
     }
-    useEditorStore.getState().setEditor({ copiedAdjustments: adjustmentsToCopy });
+    // Shapes copied from the open photo record its size; copied from the Library they keep the size they record.
+    const sourceSize = selectedImage && pathToCopyFrom === selectedImage.path ? openPhotoMaskSize() : null;
+    useEditorStore.getState().setEditor({
+      copiedAdjustments: withMasks(adjustmentsToCopy, (masks) => toPortableMasks(masks, sourceSize)),
+    });
     useProcessStore.getState().setProcess({ isCopied: true });
   }, []);
 
@@ -359,43 +382,57 @@ export function useEditorActions() {
 
       pathsToUpdate.forEach((p) => globalImageCache.delete(p));
 
-      const pastesIntoEditor = !!selectedImage && pathsToUpdate.includes(selectedImage.path);
-      const pasted: Adjustments = { ...adjustments, ...adjustmentsToApply };
-      if (pastesIntoEditor) {
+      // Pasted masks get new ids and are fitted to each photo, their shapes to its size and their
+      // AI parts made for it (Plan items 90 and 91): here for the open photo, by the backend for
+      // the others.
+      const pastedAdjustments = withMasks(adjustmentsToApply, masksForApplying);
+      const editorPath = selectedImage && pathsToUpdate.includes(selectedImage.path) ? selectedImage.path : null;
+      const editorSize = openPhotoMaskSize({ ...adjustments, ...pastedAdjustments });
+      const editorPasted = withMasks(pastedAdjustments, (masks) => fitMasksToImage(masks, editorSize));
+      const pasted: Adjustments = { ...adjustments, ...editorPasted };
+      if (editorPath) {
         setAdjustments(() => pasted, t('contextMenus.editor.pasteAdjustments'));
+        makeAiMasksFor(pasted.masks);
       }
 
-      invoke(Invokes.ApplyAdjustmentsToPaths, { paths: pathsToUpdate, adjustments: adjustmentsToApply })
-        .then(() => {
-          if (pastesIntoEditor && selectedImage) {
-            invoke('load_metadata', { path: selectedImage.path }).then((meta: any) => {
-              if (meta.adjustments) {
-                const lens: Partial<Adjustments> = {
-                  lensMaker: meta.adjustments.lensMaker,
-                  lensModel: meta.adjustments.lensModel,
-                  lensDistortionParams: meta.adjustments.lensDistortionParams,
-                };
-                const { adjustments: current, history, historyIndex } = useEditorStore.getState();
-                const lensChanged = (Object.keys(lens) as (keyof Adjustments)[]).some(
-                  (key) => JSON.stringify(current[key]) !== JSON.stringify(lens[key]),
-                );
-                if (!lensChanged) return;
-                // The backend resolves the lens profile for this image; while the paste is still the
-                // current step, it belongs to that step instead of becoming a step of its own.
-                if (current === pasted && history[historyIndex] === pasted) {
-                  const amended = { ...pasted, ...lens };
-                  setEditor((state) => ({
-                    adjustments: amended,
-                    history: state.history.map((step, i) => (i === state.historyIndex ? amended : step)),
-                  }));
-                } else {
-                  setAdjustments(lens);
+      const otherPaths = pathsToUpdate.filter((path) => path !== editorPath);
+      const writes: Promise<unknown>[] = [];
+      if (otherPaths.length > 0) {
+        writes.push(invoke(Invokes.ApplyAdjustmentsToPaths, { paths: otherPaths, adjustments: pastedAdjustments }));
+      }
+      if (editorPath) {
+        writes.push(
+          invoke(Invokes.ApplyAdjustmentsToPaths, { paths: [editorPath], adjustments: editorPasted, editorPath }).then(
+            () =>
+              invoke('load_metadata', { path: editorPath }).then((meta: any) => {
+                if (meta.adjustments) {
+                  const lens: Partial<Adjustments> = {
+                    lensMaker: meta.adjustments.lensMaker,
+                    lensModel: meta.adjustments.lensModel,
+                    lensDistortionParams: meta.adjustments.lensDistortionParams,
+                  };
+                  const { adjustments: current, history, historyIndex } = useEditorStore.getState();
+                  const lensChanged = (Object.keys(lens) as (keyof Adjustments)[]).some(
+                    (key) => JSON.stringify(current[key]) !== JSON.stringify(lens[key]),
+                  );
+                  if (!lensChanged) return;
+                  // The backend resolves the lens profile for this image; while the paste is still the
+                  // current step, it belongs to that step instead of becoming a step of its own.
+                  if (current === pasted && history[historyIndex] === pasted) {
+                    const amended = { ...pasted, ...lens };
+                    setEditor((state) => ({
+                      adjustments: amended,
+                      history: state.history.map((step, i) => (i === state.historyIndex ? amended : step)),
+                    }));
+                  } else {
+                    setAdjustments(lens);
+                  }
                 }
-              }
-            });
-          }
-        })
-        .catch((err) => toast.error(`Failed to paste adjustments: ${err}`));
+              }),
+          ),
+        );
+      }
+      Promise.all(writes).catch((err) => toast.error(`Failed to paste adjustments: ${err}`));
 
       setProcess({ isPasted: true });
     },

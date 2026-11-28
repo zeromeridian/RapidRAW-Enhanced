@@ -1438,14 +1438,16 @@ fn shade(value: u8, invert: bool, opacity: f32) -> u8 {
 }
 
 /// Combines a mask's components, drawn by `component` (`None` for a component without a
-/// bitmap: hidden, or an AI mask not generated yet).
+/// bitmap: hidden, or an AI mask not generated yet). A visible mask none of whose components
+/// has a bitmap is empty, inverted or not (Plan item 90: an inverted mask whose AI parts were
+/// not made yet covered the whole photo); `None` only for a hidden mask.
 fn combine_mask_bitmap(
     mask_def: &MaskDefinition,
     width: u32,
     height: u32,
     mut component: impl FnMut(&SubMask) -> Option<Arc<GrayImage>>,
 ) -> Option<GrayImage> {
-    if !mask_def.visible || mask_def.sub_masks.is_empty() {
+    if !mask_def.visible {
         return None;
     }
 
@@ -1480,7 +1482,10 @@ fn combine_mask_bitmap(
             .for_each(|(dst, &src)| *dst = combine(*dst, shade(src, invert, opacity)));
     }
 
-    let mut final_mask = base.unwrap_or_else(|| GrayImage::new(width, height));
+    // An empty mask rather than none: renders pair the bitmaps with the visible masks by position.
+    let Some(mut final_mask) = base else {
+        return Some(GrayImage::new(width, height));
+    };
     let (invert, opacity) = (mask_def.invert, mask_def.opacity);
     if invert || opacity < 100.0 {
         final_mask
@@ -2058,6 +2063,30 @@ mod tests {
         let tone = bitmap.get_pixel(0, 0)[0];
         assert!(bitmap.pixels().all(|p| p[0] == tone));
         tone
+    }
+
+    #[test]
+    fn an_inverted_mask_without_any_bitmap_has_no_effect() {
+        let mask = |sub_masks: Value| -> MaskDefinition {
+            serde_json::from_value(json!({
+                "id": "m1", "name": "Mask", "visible": true, "invert": true,
+                "adjustments": {}, "subMasks": sub_masks,
+            }))
+            .unwrap()
+        };
+        // Pasted or applied from a preset: its AI part is not made for this photo yet.
+        let not_made = mask(json!([{
+            "id": "s1", "type": "ai-depth", "visible": true, "mode": "additive",
+            "parameters": { "minDepth": 20.0, "maxDepth": 80.0, "maskDataBase64": null },
+        }]));
+        let hidden = mask(json!([{
+            "id": "s1", "type": "all", "visible": false, "mode": "additive", "parameters": {},
+        }]));
+        // Still a bitmap, as renders pair bitmaps with the visible masks by position.
+        for definition in [not_made, hidden, mask(json!([]))] {
+            let bitmap = generate_mask_bitmap(&definition, 4, 2, 1.0, (0.0, 0.0), None).unwrap();
+            assert!(bitmap.pixels().all(|p| p[0] == 0));
+        }
     }
 
     #[test]

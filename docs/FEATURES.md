@@ -521,6 +521,15 @@ details are in `RELEASE_NOTES.MD`.
   values, Configure keeps the preset's). Each preset shows how many
   settings it holds; replaces the Tool/Style choice, and older presets
   apply as before.
+- **Masks in presets and copied settings fit each photo:** they carry no
+  mask images; Subject, Sky, Foreground, Text and Depth parts are made
+  again for every photo they are applied to (in Develop at once; Library
+  Apply Preset, paste onto several photos and Auto Sync per photo before
+  saving). Brush, Flow and Quick Eraser parts stay with their photo
+  (Auto Sync still syncs them). Linear, Radial and Subject masks record
+  the photo size they were drawn on and are fitted to each photo's size
+  (positions per side, lengths by the short side); Auto Sync keeps them
+  as drawn.
 - **Looks tab** (formerly Presets, key P): a Presets · Profiles · LUTs
   switch shows one kind at a time. Presets, profiles and LUTs share one
   browser: a grid of previews or a list, Favorites (star) listed first,

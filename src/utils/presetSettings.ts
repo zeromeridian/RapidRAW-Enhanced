@@ -6,6 +6,8 @@ import {
   COPYABLE_ADJUSTMENT_KEYS,
   INITIAL_ADJUSTMENTS,
 } from './adjustments';
+import { toPortableMasks, withMasks } from './maskUtils';
+import type { ImageDimensions } from '../hooks/useImageRenderSize';
 
 /** The checkboxes a group shows in the preset dialog: its parts, or the group itself. */
 export const presetSettingUnits = (group: AdjustmentGroup): AdjustmentGroup[] => group.parts ?? [group];
@@ -45,14 +47,22 @@ export const getPresetKeys = (preset: Preset): Set<string> => toWholeUnits(Objec
 
 /**
  * The values a preset saves for `keys`, in the Copy & Paste order, taken from `source`. A ticked
- * setting that `source` lacks is saved at its default, so applying the preset resets it.
+ * setting that `source` lacks is saved at its default, so applying the preset resets it. Masks
+ * are saved portable (`toPortableMasks`), their shapes recording `sourceSize`, the photo's.
  */
-export const pickPresetAdjustments = (keys: ReadonlySet<string>, source: Partial<Adjustments>): Partial<Adjustments> =>
-  Object.fromEntries(
-    COPYABLE_ADJUSTMENT_KEYS.filter((key) => keys.has(key)).map((key) => [
-      key,
-      source[key as keyof Adjustments] ?? INITIAL_ADJUSTMENTS[key as keyof Adjustments],
-    ]),
+export const pickPresetAdjustments = (
+  keys: ReadonlySet<string>,
+  source: Partial<Adjustments>,
+  sourceSize?: ImageDimensions | null,
+): Partial<Adjustments> =>
+  withMasks(
+    Object.fromEntries(
+      COPYABLE_ADJUSTMENT_KEYS.filter((key) => keys.has(key)).map((key) => [
+        key,
+        source[key as keyof Adjustments] ?? INITIAL_ADJUSTMENTS[key as keyof Adjustments],
+      ]),
+    ),
+    (masks) => toPortableMasks(masks, sourceSize),
   );
 
 /** The values of `adjustments` the preset dialog does not list; editing a preset keeps them. */

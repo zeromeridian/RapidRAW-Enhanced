@@ -4,8 +4,9 @@ import { toast } from 'react-toastify';
 import { useEditorStore } from '../store/useEditorStore';
 import { useEditorActions } from './useEditorActions';
 import { Adjustments, AiPatch, MaskContainer, Coord } from '../utils/adjustments';
-import { SubMask } from '../components/panel/right/Masks';
+import { Mask, SubMask } from '../components/panel/right/Masks';
 import { Invokes } from '../components/ui/AppProperties';
+import { aiSubMasksToMake } from '../utils/maskUtils';
 import { useAuth } from '@clerk/react';
 
 const getTransformAdjustments = (adj: Adjustments) => ({
@@ -28,6 +29,12 @@ const getTransformAdjustments = (adj: Adjustments) => ({
   lensTcaEnabled: adj.lensTcaEnabled,
   lensVignetteEnabled: adj.lensVignetteEnabled,
 });
+
+/** The mask or AI edit component `id`, whose other parameters a newly made bitmap keeps. */
+const findSubMask = (adjustments: Adjustments, id: string): SubMask | undefined =>
+  [...(adjustments.masks ?? []), ...(adjustments.aiPatches ?? [])]
+    .flatMap((container: MaskContainer | AiPatch) => container.subMasks ?? [])
+    .find((subMask: SubMask) => subMask.id === id);
 
 export function useAiMasking() {
   const { setAdjustments } = useEditorActions();
@@ -302,9 +309,7 @@ export function useAiMasking() {
         skipRefinement: isInpaintMask,
       });
 
-      const subMask = adjustments.aiPatches
-        ?.flatMap((p: AiPatch) => p.subMasks)
-        .find((sm: SubMask) => sm.id === subMaskId);
+      const subMask = findSubMask(adjustments, subMaskId);
       const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
       patchesSentToBackend.delete(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
@@ -337,9 +342,7 @@ export function useAiMasking() {
         rotation: adjustments.rotation,
       });
 
-      const subMask = adjustments.aiPatches
-        ?.flatMap((p: AiPatch) => p.subMasks)
-        .find((sm: SubMask) => sm.id === subMaskId);
+      const subMask = findSubMask(adjustments, subMaskId);
       const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
       patchesSentToBackend.delete(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
@@ -365,9 +368,7 @@ export function useAiMasking() {
         rotation: adjustments.rotation,
       });
 
-      const subMask = adjustments.aiPatches
-        ?.flatMap((p: AiPatch) => p.subMasks)
-        .find((sm: SubMask) => sm.id === subMaskId);
+      const subMask = findSubMask(adjustments, subMaskId);
       const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
       patchesSentToBackend.delete(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
@@ -394,9 +395,7 @@ export function useAiMasking() {
         rotation: adjustments.rotation,
       });
 
-      const subMask = adjustments.aiPatches
-        ?.flatMap((p: AiPatch) => p.subMasks)
-        .find((sm: SubMask) => sm.id === subMaskId);
+      const subMask = findSubMask(adjustments, subMaskId);
       const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
       patchesSentToBackend.delete(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
@@ -424,9 +423,7 @@ export function useAiMasking() {
         rotation: adjustments.rotation,
       });
 
-      const subMask =
-        adjustments.masks?.flatMap((m: MaskContainer) => m.subMasks).find((sm: SubMask) => sm.id === subMaskId) ||
-        adjustments.aiPatches?.flatMap((p: AiPatch) => p.subMasks).find((sm: SubMask) => sm.id === subMaskId);
+      const subMask = findSubMask(adjustments, subMaskId);
       const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
       patchesSentToBackend.delete(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
@@ -434,6 +431,29 @@ export function useAiMasking() {
       toast.error(`AI Text Mask Failed: ${error}`);
     } finally {
       setEditor({ isGeneratingAiMask: false });
+    }
+  };
+
+  /**
+   * Makes the bitmaps of the AI components `ids` for the open photo, one at a time, from what
+   * each keeps: its drawn box, words or depth range (after a preset or paste, Plan item 90).
+   */
+  const makeAiSubMasks = async (ids: string[]) => {
+    for (const id of ids) {
+      const subMask = aiSubMasksToMake(useEditorStore.getState().adjustments.masks).find((sm) => sm.id === id);
+      if (!subMask) continue;
+      const parameters = subMask.parameters;
+      if (subMask.type === Mask.AiDepth) await handleGenerateAiDepthMask(id, parameters);
+      else if (subMask.type === Mask.AiSky) await handleGenerateAiSkyMask(id);
+      else if (subMask.type === Mask.AiForeground) await handleGenerateAiForegroundMask(id);
+      else if (subMask.type === Mask.AiText) await handleGenerateAiTextMask(id, parameters.prompt);
+      else if (subMask.type === Mask.AiSubject) {
+        await handleGenerateAiMask(
+          id,
+          { x: parameters.startX, y: parameters.startY },
+          { x: parameters.endX, y: parameters.endY },
+        );
+      }
     }
   };
 
@@ -469,5 +489,6 @@ export function useAiMasking() {
     handleGenerateAiForegroundMask,
     handleGenerateAiSkyMask,
     handleGenerateAiTextMask,
+    makeAiSubMasks,
   };
 }

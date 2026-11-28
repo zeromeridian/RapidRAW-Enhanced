@@ -2,6 +2,9 @@ use std::collections::HashMap;
 
 use crate::app_state::AppState;
 
+/// The parameters that can hold a mask component's bitmap (AI masks, older brush masks).
+pub const SUB_MASK_DATA_KEYS: [&str; 2] = ["mask_data_base64", "maskDataBase64"];
+
 pub fn hydrate_sub_masks(
     sub_masks: &mut Vec<serde_json::Value>,
     cache: &mut HashMap<String, serde_json::Value>,
@@ -21,8 +24,7 @@ pub fn hydrate_sub_masks(
             .get_mut("parameters")
             .and_then(|p| p.as_object_mut())
         {
-            let keys_to_check = ["mask_data_base64", "maskDataBase64"];
-            for key in keys_to_check {
+            for key in SUB_MASK_DATA_KEYS {
                 if params.contains_key(key) {
                     let val = params.get(key).unwrap();
                     if !val.is_null() {

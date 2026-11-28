@@ -1797,6 +1797,7 @@
       "cancel": "Cancel",
       "hintFromPhoto": "Ticked settings are saved with this photo's values; applying the preset changes only those.",
       "hintKeepValues": "Ticked settings keep the preset's values; a setting you tick is saved at its default.",
+      "paintedMasksLeftOut": "Brush, Flow and Quick Eraser parts stay with this photo; a mask made only of them is not saved.",
       "placeholder": "Enter preset name...",
       "save": "Save",
       "settings": "Settings",

@@ -791,6 +791,7 @@ mod output_naming_tests {
             &serde_json::json!({ "exposure": 2.5, "saturation": 18.0 }),
             &settings,
             None,
+            &|_| Err("no AI models in tests".to_string()),
         )
         .unwrap();
 
@@ -5264,28 +5265,39 @@ fn merge_adjustment_changes(target: &mut Value, changes: &Value, complete: &Valu
 /// Writes `adjustments` into each image's sidecar and resolves its lens
 /// profile. Paste passes complete sections, which replace the target's.
 /// Develop Auto Sync also passes `changes`, the controls that changed, which
-/// are merged individually (see `merge_adjustment_changes`). Resolves once
-/// every sidecar is written; thumbnails regenerate afterwards, skipping
-/// images that a newer update superseded.
+/// are merged individually (see `merge_adjustment_changes`). Masks are
+/// prepared for each photo (`prepare_masks_for_photo`; Auto Sync makes AI
+/// parts only) except `editor_path`, the photo open in Develop, whose editor
+/// prepares them. Resolves once every sidecar is
+/// written; thumbnails regenerate afterwards, skipping images that a newer
+/// update superseded.
 #[tauri::command]
 pub async fn apply_adjustments_to_paths(
     paths: Vec<String>,
     adjustments: Value,
     changes: Option<Value>,
+    editor_path: Option<String>,
     app_handle: AppHandle,
 ) -> Result<(), String> {
     let write_settings = load_settings(app_handle.clone()).unwrap_or_default();
     let write_paths = paths.clone();
+    let task_app_handle = app_handle.clone();
+    // Pasted or synced AI masks carry no bitmaps; they are made for each photo (Plan item 90).
+    // Pasted shapes are fitted to each photo's size (item 91); Auto Sync (`changes`) keeps the
+    // pixels of its matched set, as it keeps painted parts, so a slider move decodes no photo.
+    let fits_shapes = changes.is_none();
+    let prepares_masks = crate::ai_commands::masks_need_preparing(&adjustments, fits_shapes);
 
     tauri::async_runtime::spawn_blocking(move || {
         let enable_xmp_sync = write_settings.enable_xmp_sync.unwrap_or(false);
         let create_xmp_if_missing = write_settings.create_xmp_if_missing.unwrap_or(false);
         let lens_db = crate::lens_correction::database();
+        let ai_models = crate::ai_commands::blocking_ai_models(&task_app_handle);
         let _merge_guard = ADJUSTMENT_MERGE_LOCK
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
 
-        write_paths.par_iter().for_each(|path| {
+        let write = |path: &String| {
             let (source_path, sidecar_path) = parse_virtual_path(path);
             let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
@@ -5304,6 +5316,8 @@ pub async fn apply_adjustments_to_paths(
                 lens_db,
                 || exif_processing::exif_for_lens_lookup(&existing_metadata.exif, &source_path),
             );
+            let previous = (prepares_masks && editor_path.as_ref() != Some(path))
+                .then(|| new_adjustments.clone());
             merge_adjustment_changes(
                 &mut new_adjustments,
                 changes.as_ref().unwrap_or(&adjustments),
@@ -5314,6 +5328,16 @@ pub async fn apply_adjustments_to_paths(
                 &exif_processing::exif_for_lens_lookup(&existing_metadata.exif, &source_path),
                 lens_db,
             );
+            if let Some(previous) = &previous {
+                crate::ai_commands::prepare_masks_for_photo(
+                    &source_path.to_string_lossy(),
+                    &mut new_adjustments,
+                    previous,
+                    fits_shapes,
+                    &write_settings,
+                    &ai_models,
+                );
+            }
 
             existing_metadata.adjustments = new_adjustments;
 
@@ -5324,7 +5348,14 @@ pub async fn apply_adjustments_to_paths(
             if enable_xmp_sync && !path.contains("?vc=") {
                 sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
             }
-        });
+        };
+        // One photo at a time while masks are prepared: each decodes a full-size photo, and the
+        // AI models run one at a time anyway.
+        if prepares_masks {
+            write_paths.iter().for_each(write);
+        } else {
+            write_paths.par_iter().for_each(write);
+        }
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -5440,6 +5471,7 @@ fn apply_preset_adjustments_to_path(
     adjustments: &Value,
     settings: &AppSettings,
     lens_db: Option<&crate::lens_correction::LensDatabase>,
+    ai_models: &crate::ai_commands::AiModelLoader,
 ) -> Result<(), String> {
     let (source_path, sidecar_path) = parse_virtual_path(path);
     if !source_path.is_file() || !is_supported_image_file(source_path.to_string_lossy().as_ref()) {
@@ -5474,6 +5506,18 @@ fn apply_preset_adjustments_to_path(
         &exif_processing::exif_for_lens_lookup(&existing_metadata.exif, &source_path),
         lens_db,
     );
+    // The preset's masks are fitted to this photo and their AI parts made before its edit is
+    // written (Plan items 90 and 91).
+    if preset_map.contains_key("masks") {
+        crate::ai_commands::prepare_masks_for_photo(
+            &source_path.to_string_lossy(),
+            &mut existing_metadata.adjustments,
+            &Value::Null,
+            true,
+            settings,
+            ai_models,
+        );
+    }
     let json_string =
         serde_json::to_string_pretty(&existing_metadata).map_err(|error| error.to_string())?;
     write_metadata_file(&sidecar_path, &json_string)?;
@@ -5537,13 +5581,19 @@ pub async fn apply_preset_batch(
             .transpose()?;
         let mut applied = 0;
         let mut process_failed = 0;
+        let ai_models = crate::ai_commands::blocking_ai_models(&task_app_handle);
 
         for path in paths {
             if cancellation_token.load(Ordering::Relaxed) {
                 break;
             }
-            match apply_preset_adjustments_to_path(&path, &request.adjustments, &settings, lens_db)
-            {
+            match apply_preset_adjustments_to_path(
+                &path,
+                &request.adjustments,
+                &settings,
+                lens_db,
+                &ai_models,
+            ) {
                 Ok(()) => {
                     applied += 1;
                     let _ = task_app_handle.emit(

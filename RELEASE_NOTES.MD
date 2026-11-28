@@ -5,6 +5,46 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.125.3-fix-preset-mask-bitmaps — 2026-11-27
+
+### Masks
+
+- **Linear, Radial and Subject masks in presets and pasted settings fit
+  the photo they are applied to:** a photo of another size (another
+  camera, a JPEG from a RAW, a portrait from a landscape) gets them at
+  the same place relative to the picture, instead of at the original
+  photo's pixel positions. Masks drawn before this version have no size
+  recorded and apply as before until they are saved into a preset or
+  copied again in Develop.
+- Paste Mask on another photo fits the mask the same way. Auto Sync
+  keeps the masks exactly as drawn.
+
+## 1.125.2-fix-preset-mask-bitmaps — 2026-11-27
+
+### Masks
+
+- **Presets and Copy & Paste no longer carry one photo's AI masks onto
+  other photos.** A preset or pasted edit with a Subject, Sky,
+  Foreground, Text or Depth mask now makes that mask again for each
+  photo it is applied to, instead of laying the original photo's mask
+  (for example its depth map) over it and drawing ghost edges. In
+  Develop the mask is made right after you apply or paste; Apply Preset
+  in the Library, pasting onto several photos and Auto Sync make it for
+  each photo before saving its edit, which takes longer.
+- Brush, Flow and Quick Eraser parts are painted for one photo, so
+  presets and copied settings now leave them out; a mask made only of
+  them is not saved. The Save New Preset dialog says so. Auto Sync still
+  syncs them.
+- Existing presets are cleaned once when ThisIsRAW starts: they drop the
+  stored mask images and painted parts, which also makes large presets
+  much smaller.
+- An inverted mask whose parts are all hidden, or not made yet, no
+  longer covers the whole photo; it has no effect.
+- Paste Mask on another photo works like Copy & Paste: the mask's AI
+  parts are made for that photo.
+- Making a Sky or Foreground mask again no longer resets its other
+  settings.
+
 ## 1.125.1-dev-mask-cue-thumb-numbers — 2026-11-27
 
 ### Library

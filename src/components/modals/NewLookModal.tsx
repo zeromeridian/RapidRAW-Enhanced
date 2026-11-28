@@ -19,8 +19,10 @@ import {
   ProfileAdjustment,
   getProfileBakeGroupOfKey,
 } from '../../utils/adjustments';
+import { hasPaintedSubMasks } from '../../utils/maskUtils';
 import { presetSettingUnits } from '../../utils/presetSettings';
 import { LookDialog, LookType, lookTypeOf } from '../../hooks/useLookDialog';
+import { useEditorStore } from '../../store/useEditorStore';
 
 /** What the dialog returns: the Type, name, group and the ticked settings. */
 export interface LookChoice {
@@ -192,6 +194,11 @@ export default function NewLookModal({
 
   const isRename = dialog?.mode === 'renameProfile';
   const isBake = type !== 'preset';
+  // A preset saves the photo's masks without their painted parts (Plan item 90); Configure keeps
+  // the preset's own masks, which have none.
+  const photoHasPaintedMasks = useEditorStore((state) => hasPaintedSubMasks(state.adjustments.masks));
+  const leavesOutPaintedParts =
+    !isBake && dialog?.mode !== 'configurePreset' && keys.has('masks') && photoHasPaintedMasks;
 
   /** A setting a profile or LUT can bake: Profile only while the photo has one. */
   const canBake = useCallback(
@@ -359,6 +366,11 @@ export default function NewLookModal({
                               onToggle={() => setTicked(part.keys, !isTicked(part))}
                             />
                           ))}
+                          {settingGroup.keys.includes('masks') && leavesOutPaintedParts && (
+                            <Text className="pl-6" color={TextColors.secondary} variant={TextVariants.small}>
+                              {t('modals.configurePreset.paintedMasksLeftOut')}
+                            </Text>
+                          )}
                         </div>
                       );
                     })}

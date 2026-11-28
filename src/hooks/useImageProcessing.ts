@@ -9,7 +9,7 @@ import { Adjustments, COPYABLE_ADJUSTMENT_KEYS, getAdjustmentChanges, getUpscale
 import { Invokes, Panel } from '../components/ui/AppProperties';
 import { debouncedSave } from './useEditorActions';
 import { globalImageCache } from '../utils/ImageLRUCache';
-import { stripSentMaskData } from '../utils/maskUtils';
+import { stripSentMaskData, withMasks, withoutAiBitmaps } from '../utils/maskUtils';
 
 const INTERACTIVE_ANALYTICS_MIN_INTERVAL_MS = 250;
 const INTERACTIVE_ANALYTICS_MAX_INTERVAL_MS = 1000;
@@ -478,12 +478,14 @@ export function useImageProcessing(
             if (sync) {
               otherPaths.forEach((p) => globalImageCache.delete(p));
               // Apply updates in order so a later change to the same control always wins.
+              // Synced masks keep their ids, so each photo keeps the AI parts it made for itself
+              // and makes the new ones (Plan item 90).
               autoSyncQueueRef.current = autoSyncQueueRef.current
                 .then(() =>
                   invoke(Invokes.ApplyAdjustmentsToPaths, {
                     paths: otherPaths,
-                    adjustments: sync.complete,
-                    changes: sync.changes,
+                    adjustments: withMasks(sync.complete, withoutAiBitmaps),
+                    changes: withMasks(sync.changes, withoutAiBitmaps),
                   }),
                 )
                 .catch((err) => {
