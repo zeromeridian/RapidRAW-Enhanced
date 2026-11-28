@@ -27,13 +27,11 @@ import { hasMetadataPicks } from '../../utils/metadataFilter';
 
 const ALL_COLOR_OPTIONS = [...COLOR_LABELS, { name: 'none', color: '#9ca3af' }];
 
-const isRatingInRange = (rating: number, threshold: number, comparison: RatingComparison) =>
-  threshold > 0 &&
-  (comparison === 'atMost'
-    ? rating <= threshold
-    : comparison === 'exactly'
-      ? rating === threshold
-      : rating >= threshold);
+/**
+ * Stars show the chosen rating as solid stars 1 to `rating`, as in Lightroom Classic; the ≥ / = / ≤
+ * button beside them shows the comparison (unrated and no rating: none solid).
+ */
+const isStarFilled = (star: number, rating: number) => star <= rating;
 
 type SelectByCriteria = Partial<FilterCriteria> & {
   rawKind?: 'dng' | 'otherRaw';
@@ -239,11 +237,7 @@ export function QuickFilterControl({ forceExpanded = false, onExpandedWidthChang
               </button>
             ))}
             {[1, 2, 3, 4, 5].map((starValue) => {
-              const isFilled = isRatingInRange(
-                starValue,
-                filterCriteria.rating,
-                filterCriteria.ratingComparison ?? 'atLeast',
-              );
+              const isFilled = isStarFilled(starValue, filterCriteria.rating);
               return (
                 <button
                   key={`qf-star-${starValue}`}
@@ -674,15 +668,15 @@ export function SelectByControl({ forceExpanded = false, onExpandedWidthChange }
             ))}
             {[1, 2, 3, 4, 5].map((rating) => {
               const count = selectByCounts.get(`rating-${selectRatingComparison}-${rating}`) || 0;
-              const isIncluded = isRatingInRange(rating, activeSelectByRating, selectRatingComparison);
+              const isFilled = isStarFilled(rating, activeSelectByRating);
               return (
                 <button
                   key={`select-rating-${rating}`}
                   type="button"
                   className={clsx(
                     'p-0.5 transition-colors hover:text-accent',
-                    isIncluded ? 'text-accent' : 'text-text-secondary',
-                    count === 0 && !isIncluded && 'opacity-40',
+                    isFilled ? 'text-accent' : 'text-text-secondary',
+                    count === 0 && !isFilled && 'opacity-40',
                   )}
                   disabled={count === 0}
                   onClick={() =>
@@ -693,7 +687,7 @@ export function SelectByControl({ forceExpanded = false, onExpandedWidthChange }
                   }
                   data-tooltip={`${selectByGroups[0].options[rating].label} (${count})`}
                 >
-                  <Star size={16} className={isIncluded ? 'fill-accent' : undefined} />
+                  <Star size={16} className={isFilled ? 'fill-accent' : undefined} />
                 </button>
               );
             })}

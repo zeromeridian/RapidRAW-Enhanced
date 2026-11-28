@@ -2887,6 +2887,7 @@
       "empty": "No LUTs yet — import some",
       "filterLabel": "LUT Files",
       "hideLut": "Hide the LUT (it stays in the edit)",
+      "historyRemove": "LUT removed",
       "importFailed": "Failed to import LUTs",
       "importIntoGroup": "Import LUTs into Group…",
       "importLuts": "Import LUTs…",

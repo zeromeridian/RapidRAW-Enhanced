@@ -5,6 +5,22 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.125.5-fix-xmp-read-keeps-edits — 2026-11-28
+
+### Library
+
+- **The rating stars in the filter bar and in Select show the chosen
+  rating as solid stars from the left**, as in Lightroom Classic:
+  "≥ 3" shows three solid stars, not the two empty ones followed by
+  three solid. The ≥ / = / ≤ button beside them still sets how the
+  rating is compared.
+
+### Looks
+
+- **Applying or removing a LUT is its own History step**, named after
+  the LUT ("LUT removed" when it is taken off), so Undo takes back
+  just the LUT.
+
 ## 1.125.4-fix-xmp-read-keeps-edits — 2026-11-28
 
 ### Library

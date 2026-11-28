@@ -206,15 +206,19 @@ export function useEditorActions() {
           isAndroid && path.startsWith('content://')
             ? await invoke<string>('resolve_android_content_uri_name', { uriStr: path })
             : path.split(/[\\/]/).pop() || 'LUT';
-        setAdjustments((prev: Adjustments) => ({
-          ...prev,
-          lutPath: path,
-          lutName: name,
-          lutSize: result.size,
-          lutData: result.data,
-          lutIntensity: 100,
-          sectionVisibility: { ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility), lut: true },
-        }));
+        // Its own History step, named after the LUT, like a preset.
+        setAdjustments(
+          (prev: Adjustments) => ({
+            ...prev,
+            lutPath: path,
+            lutName: name,
+            lutSize: result.size,
+            lutData: result.data,
+            lutIntensity: 100,
+            sectionVisibility: { ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility), lut: true },
+          }),
+          name,
+        );
       } catch (err) {
         toast.error(`Failed to load LUT: ${err}`);
       }

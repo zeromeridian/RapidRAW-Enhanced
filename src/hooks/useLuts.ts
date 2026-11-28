@@ -58,7 +58,7 @@ export function useLuts() {
     }
   }, []);
 
-  const clearLut = useCallback(() => setAdjustments(withoutLut), [setAdjustments]);
+  const clearLut = useCallback(() => setAdjustments(withoutLut, t('ui.lut.historyRemove')), [setAdjustments, t]);
 
   /** Chooses `entry` as the photo's LUT, or removes it when it is the current one. */
   const selectLut = (entry: LutEntry) => {
