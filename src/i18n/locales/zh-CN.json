@@ -1314,7 +1314,6 @@
       "button": "导入",
       "cancel": "取消导入",
       "cancelling": "正在取消…",
-      "count": "{{current}}/{{total}}",
       "failed": "导入失败！",
       "starting": "正在开始…"
     },

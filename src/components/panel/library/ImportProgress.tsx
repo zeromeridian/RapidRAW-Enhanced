@@ -9,7 +9,10 @@ import { useProcessStore } from '../../../store/useProcessStore';
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
-/** The running import in the Library header: a bar, the count, the current file and Cancel. */
+/**
+ * The running import in the Library header, in every folder (the full progress screen shows only
+ * for an empty one): the count, a bar, the current file and Cancel, large enough to notice.
+ */
 export default function ImportProgress({ importState }: { importState: ImportState }) {
   const { t } = useTranslation();
   const current = importState.progress?.current ?? 0;
@@ -25,33 +28,27 @@ export default function ImportProgress({ importState }: { importState: ImportSta
   return (
     <div className="flex items-center gap-2 min-w-0" data-tooltip={importState.path || undefined}>
       <Text as="span" color={TextColors.accent} className="shrink-0">
-        <FolderInput size={16} />
+        <FolderInput size={20} />
       </Text>
-      <div className="flex flex-col gap-1 min-w-0 w-44 compact:w-32">
-        <div className="flex items-baseline justify-between gap-2">
-          <Text as="span" variant={TextVariants.small} className="truncate">
-            {isCancelling
-              ? t('library.import.cancelling')
-              : importState.path
-                ? fileName(importState.path)
-                : t('library.import.starting')}
-          </Text>
-          <Text as="span" variant={TextVariants.small} className="shrink-0 tabular-nums">
-            {t('library.import.count', { current, total })}
-          </Text>
-        </div>
-        <div className="h-1.5 rounded-full bg-surface overflow-hidden">
+      <div className="flex flex-col gap-1 min-w-0 w-72 compact:w-48">
+        <Text as="span" color={TextColors.primary} className="truncate tabular-nums">
+          {isCancelling ? t('library.import.cancelling') : t('library.import.count', { current, total })}
+        </Text>
+        <div className="h-2 rounded-full bg-surface overflow-hidden">
           <div className="h-full bg-accent transition-[width] duration-200" style={{ width: `${percent}%` }} />
         </div>
+        <Text as="span" variant={TextVariants.small} className="truncate">
+          {importState.path ? fileName(importState.path) : t('library.import.starting')}
+        </Text>
       </div>
       <button
-        className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface transition-colors disabled:opacity-50 shrink-0"
+        className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface transition-colors disabled:opacity-50 shrink-0"
         data-tooltip={t('library.import.cancel')}
         disabled={isCancelling}
         onClick={handleCancel}
         type="button"
       >
-        <X size={16} />
+        <X size={18} />
       </button>
     </div>
   );

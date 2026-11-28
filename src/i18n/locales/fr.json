@@ -1343,7 +1343,6 @@
       "button": "Importer",
       "cancel": "Annuler l'importation",
       "cancelling": "Annulation…",
-      "count": "{{current}}/{{total}}",
       "failed": "Échec de l'importation !",
       "starting": "Démarrage…"
     },

@@ -1314,7 +1314,6 @@
       "button": "가져오기",
       "cancel": "가져오기 취소",
       "cancelling": "취소하는 중…",
-      "count": "{{current}}/{{total}}",
       "failed": "가져오기 실패!",
       "starting": "시작하는 중…"
     },

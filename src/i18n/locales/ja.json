@@ -1314,7 +1314,6 @@
       "button": "インポート",
       "cancel": "インポートをキャンセル",
       "cancelling": "キャンセル中…",
-      "count": "{{current}}/{{total}}",
       "failed": "インポートに失敗しました！",
       "starting": "開始中…"
     },

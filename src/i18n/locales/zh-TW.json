@@ -1314,7 +1314,6 @@
       "button": "匯入",
       "cancel": "取消匯入",
       "cancelling": "正在取消…",
-      "count": "{{current}}/{{total}}",
       "failed": "匯入失敗！",
       "starting": "正在開始…"
     },

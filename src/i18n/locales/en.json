@@ -1532,7 +1532,7 @@
       "button": "Import",
       "cancel": "Cancel import",
       "cancelling": "Cancelling…",
-      "count": "{{current}}/{{total}}",
+      "count": "Importing {{current}} / {{total}}",
       "failed": "Import Failed!",
       "starting": "Starting…"
     },

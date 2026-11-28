@@ -518,11 +518,7 @@ export default function ImportSettingsModal({
                 {t('modals.importSettings.destination')}
               </Text>
               <div className="flex items-center gap-2">
-                <Text
-                  as="div"
-                  className="flex-1 min-w-0 truncate font-mono bg-bg-primary rounded-md px-3 py-2"
-                  data-tooltip={destination || undefined}
-                >
+                <Text as="div" className="flex-1 min-w-0 break-all font-mono bg-bg-primary rounded-md px-3 py-2">
                   {destination || t('modals.importSettings.noDestination')}
                 </Text>
                 <button

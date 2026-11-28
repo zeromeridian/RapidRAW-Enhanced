@@ -5,6 +5,18 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.125.6-fix-xmp-read-keeps-edits — 2026-11-28
+
+### Import
+
+- **The import progress is easy to see in every folder:** the Library
+  header shows "Importing 12 / 80" with a larger bar and the current
+  file. Before, the full progress screen appeared only when the open
+  folder was empty, so an import into a folder with photos was easy to
+  miss.
+- The import dialog shows the whole destination path, wrapping onto a
+  second line when it is long, instead of cutting off the folder name.
+
 ## 1.125.5-fix-xmp-read-keeps-edits — 2026-11-28
 
 ### Library
