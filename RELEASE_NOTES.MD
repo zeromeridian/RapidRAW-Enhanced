@@ -5,6 +5,25 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.125.4-fix-xmp-read-keeps-edits — 2026-11-28
+
+### Library
+
+- **Read XMP from Folder no longer replaces a newer edit with an older
+  one.** When XMP sync was off while you kept editing, a photo's XMP
+  still held its earlier edit, and reading it brought that edit back:
+  for example a LUT applied since was lost. A photo now takes the
+  edit from its XMP only when the XMP was changed elsewhere since
+  ThisIsRAW last wrote or read it. Ratings, labels and keywords are
+  read as before. The message at the end says how many photos kept
+  their own edit.
+- Edits saved before this version cannot tell whether their XMP is
+  newer, so Read XMP keeps them. From the first read or save on, a
+  later change to the XMP made elsewhere is taken.
+- Read XMP from Folder and Refresh Folders show a progress bar while
+  they work, so you can see they are running; Refresh Folders follows
+  the thumbnails until they are all rendered again.
+
 ## 1.125.3-fix-preset-mask-bitmaps — 2026-11-27
 
 ### Masks

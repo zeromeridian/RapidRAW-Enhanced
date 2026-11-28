@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import type { ParseKeys, TFunction } from 'i18next';
 import { Maximize2, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -12,6 +13,7 @@ import { useUIStore } from '../store/useUIStore';
 import { autoStackCreatedImages } from '../utils/autoStacking';
 import { unstackImagePaths } from '../utils/imageStacks';
 import { getEnabledCopySuffix } from '../utils/outputNaming';
+import { showProgressToast } from '../utils/progressToast';
 import { applyBatchEditToPaths, debouncedSave, useEditorActions } from './useEditorActions';
 import { openCaptureTimeStackModal, saveImageStacks } from './useLibraryActions';
 
@@ -305,14 +307,29 @@ export function usePhotoCommands({ refreshImageList }: { refreshImageList(): Pro
       },
     };
 
-    /** Reads the XMP files of a folder into the library (the folder menu's Read XMP from Folder). */
+    /**
+     * Reads the XMP files of a folder into the library (the folder menu's Read XMP from Folder), with a
+     * progress bar. A photo whose edit is newer than its XMP's keeps it (`apply_xmp_adjustments`, Plan item 92).
+     */
     const readXmpFromFolder = async (folderPath: string) => {
+      const progress = showProgressToast(t('contextMenus.folders.readXmpReading'));
+      const unlisten = await listen<{ current: number; total: number }>('xmp-read-progress', ({ payload }) => {
+        const { current, total } = payload;
+        progress.update(t('contextMenus.folders.readXmpProgress', { current, total }), current, total);
+      });
       try {
-        const filesRead = await invoke<number>(Invokes.ReadXmpFromFolder, { path: folderPath });
+        const { read, keptEdits } = await invoke<{ read: number; keptEdits: number }>(Invokes.ReadXmpFromFolder, {
+          path: folderPath,
+        });
         if (folderPath === useLibraryStore.getState().currentFolderPath) await refreshImageList();
-        toast.success(t('contextMenus.folders.readXmpSuccess', { count: filesRead }));
+        const summary = t('contextMenus.folders.readXmpSuccess', { count: read });
+        progress.done(
+          keptEdits > 0 ? `${summary}. ${t('contextMenus.folders.readXmpKeptEdits', { count: keptEdits })}` : summary,
+        );
       } catch (err) {
-        toast.error(t('contextMenus.folders.readXmpFailed', { err }));
+        progress.fail(t('contextMenus.folders.readXmpFailed', { err }));
+      } finally {
+        unlisten();
       }
     };
 

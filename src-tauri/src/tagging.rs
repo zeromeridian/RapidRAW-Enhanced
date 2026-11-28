@@ -16,7 +16,7 @@ use tokenizers::Tokenizer;
 use tokio::task::JoinHandle;
 use walkdir::WalkDir;
 
-use crate::file_management::{self, parse_virtual_path};
+use crate::file_management::{self, parse_virtual_path, xmp_sync_for_path};
 use crate::formats::is_supported_image_file;
 use crate::hierarchy::TAG_HIERARCHY;
 use crate::image_processing::{GpuContext, ImageMetadata};
@@ -742,11 +742,13 @@ pub async fn start_background_indexing(
     Ok(())
 }
 
+/// Changes one path's tags and saves them, to its XMP too with `xmp` (`xmp_sync_for_path`).
 fn modify_tags_for_path(
     path_str: &str,
     modify_fn: impl Fn(&mut Vec<String>),
+    xmp: Option<bool>,
 ) -> Result<ImageMetadata, String> {
-    let (_, sidecar_path) = parse_virtual_path(path_str);
+    let (source_path, sidecar_path) = parse_virtual_path(path_str);
 
     let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
@@ -760,8 +762,7 @@ fn modify_tags_for_path(
         metadata.tags = Some(tags);
     }
 
-    let json_string = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
-    crate::file_management::write_metadata_file(&sidecar_path, &json_string)?;
+    file_management::save_metadata(&source_path, &sidecar_path, &mut metadata, xmp)?;
     Ok(metadata)
 }
 
@@ -773,22 +774,12 @@ fn modify_tags_for_paths(
     modify_fn: impl Fn(&mut Vec<String>) + Sync,
 ) -> Result<Vec<PathTags>, String> {
     let settings = crate::app_settings::load_settings(app_handle.clone()).unwrap_or_default();
-    let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
-    let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
     let updated_tags = paths
         .par_iter()
         .map(|path| -> Result<PathTags, String> {
-            let metadata = modify_tags_for_path(path, &modify_fn)?;
-
-            if enable_xmp_sync && !path.contains("?vc=") {
-                let (source_path, _) = parse_virtual_path(path);
-                file_management::sync_metadata_to_xmp(
-                    &source_path,
-                    &metadata,
-                    create_xmp_if_missing,
-                );
-            }
+            let metadata =
+                modify_tags_for_path(path, &modify_fn, xmp_sync_for_path(&settings, path))?;
             Ok((path.clone(), metadata.tags))
         })
         .collect::<Result<Vec<_>, String>>()

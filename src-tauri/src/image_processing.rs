@@ -79,6 +79,12 @@ pub struct ImageMetadata {
     /// `{original_filename}` uses; set once, then kept.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preserved_file_name: Option<String>,
+    /// Digest of the ThisIsRAW edit (`rr:Adjustments`) in the image's XMP when ThisIsRAW last
+    /// wrote or read it. A forced XMP read takes the XMP's edit only when it has changed since
+    /// (it was edited elsewhere), so an XMP left behind while XMP sync was off never replaces a
+    /// newer edit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub xmp_adjustments_digest: Option<String>,
 }
 
 impl Default for ImageMetadata {
@@ -93,6 +99,7 @@ impl Default for ImageMetadata {
             xmp_stack: None,
             embedded_xmp_modified: None,
             preserved_file_name: None,
+            xmp_adjustments_digest: None,
         }
     }
 }

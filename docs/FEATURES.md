@@ -800,9 +800,15 @@ details are in `RELEASE_NOTES.MD`.
   their rating, label, keywords, and flag in their own `.tirdata` and never
   read or write the XMP.
 - Recursive **Read XMP from Folder** action that treats XMP as authoritative
-  for matching images, recognizes basename and full-filename sidecars and
-  embedded XMP, reports the imported-image count, and refreshes the currently
-  open folder.
+  for ratings, labels, keywords and flags of matching images, recognizes
+  basename and full-filename sidecars and embedded XMP, shows a progress
+  bar, reports the imported-image count, and refreshes the currently open
+  folder. It takes an XMP's ThisIsRAW edit only when the XMP changed
+  elsewhere since ThisIsRAW last wrote or read it (a digest in the
+  `.tirdata`), so an XMP left behind while XMP sync was off never replaces
+  a newer edit; the message counts the photos that kept their own edit.
+- **Refresh Folders** shows a progress bar until the folders' thumbnails are
+  rendered again.
 - Initial Lightroom Classic translation covers global tone, presence, HSL,
   sharpening/noise reduction, color calibration, point curves, monochrome
   (including black-and-white profiles such as Adobe Monochrome), grain, and

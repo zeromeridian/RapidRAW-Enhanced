@@ -69,6 +69,7 @@ import {
   EXTERNAL_EDIT_FORMATS,
   EXTERNAL_EDIT_FORMAT_LABELS,
   LibraryViewMode,
+  type Progress,
 } from '../components/ui/AppProperties';
 import { Status } from '../components/ui/ExportImportProperties';
 import { Color, COLOR_LABELS } from '../utils/adjustments';
@@ -88,6 +89,7 @@ import { isCollectionView, isPathWithin } from '../utils/libraryViews';
 import type { MenuOptionSource } from '../utils/menuBar';
 import { getRejectedPathsForLoadedFolder, isImageFlagTag } from '../utils/imageFlags';
 import { USER_TAG_PREFIX } from '../utils/keywords';
+import { showProgressToast } from '../utils/progressToast';
 
 /** Open as Layers asks first above this many photos: each is a full-size 16-bit layer. */
 const OPEN_AS_LAYERS_CONFIRM_ABOVE = 10;
@@ -138,18 +140,42 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
   const refreshFolders = useCallback(
     async (folderPaths: string[]) => {
+      // A progress toast until the thumbnails are rendered again, so it is clear something is happening.
+      const progress = showProgressToast(t('contextMenus.folders.refreshing'));
       // The tree remembers folder photo counts; Refresh counts these folders again (Plan item 71).
       await invoke(Invokes.RefreshFolderPhotoCounts, { folderPaths }).catch((err) =>
         console.error('Failed to refresh folder photo counts:', err),
       );
       await props.refreshAllFolderTrees();
       const includeSubfolders = useSettingsStore.getState().appSettings?.libraryViewMode === 'recursive';
-      await invoke(Invokes.RefreshFolderThumbnails, { folderPaths, includeSubfolders }).catch((err) => {
+      let queued: number;
+      try {
+        queued = await invoke<number>(Invokes.RefreshFolderThumbnails, { folderPaths, includeSubfolders });
+      } catch (err) {
         console.error('Failed to refresh folder thumbnails:', err);
-        toast.error(`Failed to refresh folder thumbnails: ${err}`);
-      });
+        progress.fail(`Failed to refresh folder thumbnails: ${err}`);
+        return;
+      }
+      if (queued === 0) {
+        progress.done(t('contextMenus.folders.refreshed'));
+        return;
+      }
+      // The thumbnails render in the background; follow the Library's thumbnail progress until it ends.
+      let finished = false;
+      const follow = ({ current = 0, total = 0 }: Progress) => {
+        if (finished) return;
+        if (total > 0 && current < total) {
+          progress.update(t('contextMenus.folders.refreshingThumbnails', { current, total }), current, total);
+          return;
+        }
+        finished = true;
+        unsubscribe();
+        progress.done(t('contextMenus.folders.refreshed'));
+      };
+      const unsubscribe = useProcessStore.subscribe((state) => follow(state.thumbnailProgress));
+      follow(useProcessStore.getState().thumbnailProgress);
     },
-    [props.refreshAllFolderTrees],
+    [props.refreshAllFolderTrees, t],
   );
 
   const openPresetBatchForFolders = useCallback((folderPaths: string[], includeSubfolders: boolean) => {

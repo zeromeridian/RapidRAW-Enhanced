@@ -10,7 +10,7 @@ use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::thread;
 
 use anyhow::Result;
@@ -619,13 +619,13 @@ mod output_naming_tests {
 
     use super::{
         DC_CREATOR, DC_RIGHTS, DC_SUBJECT, LOCAL_ONLY_ADJUSTMENT_KEYS, LR_HIERARCHICAL_SUBJECT,
-        apply_preset_adjustments_to_path, collect_preset_batch_folder_paths,
+        XmpFolderRead, apply_preset_adjustments_to_path, collect_preset_batch_folder_paths,
         compute_thumbnail_cache_hash, deletion_stem_for, ensure_transfer_destination_free,
         extract_app_xmp_value, extract_xmp_array, extract_xmp_stack, find_all_associated_files,
         generate_filename_from_template, import_rapidraw_sidecars_blocking, is_sidecar_of,
         parse_sidecar_filename, parse_virtual_path, read_xmp_from_folder_blocking,
-        sanitize_filename_suffix, set_app_xmp_value, sync_metadata_from_xmp, sync_metadata_to_xmp,
-        update_exif_fields_for_path,
+        sanitize_filename_suffix, save_metadata, set_app_xmp_value, sync_metadata_from_xmp,
+        sync_metadata_to_xmp, update_exif_fields_for_path,
     };
     use crate::app_settings::AppSettings;
     use crate::image_processing::ImageMetadata;
@@ -1530,9 +1530,22 @@ mod output_naming_tests {
         )
         .unwrap();
 
-        let files_read =
-            read_xmp_from_folder_blocking(folder.path().to_string_lossy().into_owned()).unwrap();
-        assert_eq!(files_read, 2);
+        let progress = std::sync::Mutex::new(Vec::new());
+        let summary =
+            read_xmp_from_folder_blocking(folder.path().to_string_lossy().into_owned(), |c, t| {
+                progress.lock().unwrap().push((c, t))
+            })
+            .unwrap();
+        assert_eq!(
+            summary,
+            XmpFolderRead {
+                read: 2,
+                kept_edits: 0
+            }
+        );
+        let mut progress = progress.into_inner().unwrap();
+        progress.sort_unstable();
+        assert_eq!(progress, [(0, 2), (1, 2), (2, 2)]);
 
         let imported = crate::exif_processing::load_sidecar(&sidecar);
         assert_eq!(imported.rating, 5);
@@ -1543,6 +1556,75 @@ mod output_naming_tests {
         let nested_metadata =
             crate::exif_processing::load_sidecar(&nested.join("nested.jpg.tirdata"));
         assert_eq!(nested_metadata.rating, 4);
+    }
+
+    /// Owner report 2026-11-27 (item 92): Read XMP from Folder replaced an edit with the older
+    /// one an XMP kept from before XMP sync was turned off, losing the LUT applied since.
+    #[test]
+    fn forced_xmp_read_never_replaces_a_newer_edit() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("image.jpg");
+        let sidecar = folder.path().join("image.jpg.tirdata");
+        fs::write(&image, []).unwrap();
+        let read_folder = || {
+            read_xmp_from_folder_blocking(folder.path().to_string_lossy().into_owned(), |_, _| {})
+                .unwrap()
+        };
+
+        // Saved with XMP sync on: the XMP holds this edit and the `.tirdata` its digest.
+        let mut metadata = ImageMetadata {
+            adjustments: serde_json::json!({ "exposure": 0.5, "transformConstrainCrop": true }),
+            ..ImageMetadata::default()
+        };
+        save_metadata(&image, &sidecar, &mut metadata, Some(true)).unwrap();
+        assert!(metadata.xmp_adjustments_digest.is_some());
+
+        // XMP sync off: a LUT is applied, the XMP keeps the old edit.
+        metadata.adjustments["lutName"] = serde_json::json!("Film");
+        metadata.adjustments["lutData"] = serde_json::json!("cube:AAAA");
+        metadata.adjustments["transformConstrainCrop"] = serde_json::json!(false);
+        save_metadata(&image, &sidecar, &mut metadata, None).unwrap();
+
+        assert_eq!(
+            read_folder(),
+            XmpFolderRead {
+                read: 1,
+                kept_edits: 1
+            }
+        );
+        let after = crate::exif_processing::load_sidecar(&sidecar);
+        assert_eq!(after.adjustments, metadata.adjustments);
+
+        // An edit from before the digest existed is kept too, and its XMP then recorded.
+        let mut legacy = after.clone();
+        legacy.xmp_adjustments_digest = None;
+        save_metadata(&image, &sidecar, &mut legacy, None).unwrap();
+        assert_eq!(read_folder().kept_edits, 1);
+        let after = crate::exif_processing::load_sidecar(&sidecar);
+        assert_eq!(after.adjustments, metadata.adjustments);
+        assert!(after.xmp_adjustments_digest.is_some());
+
+        // The XMP edited elsewhere (another installation): its edit is taken.
+        let mut elsewhere = ImageMetadata {
+            adjustments: serde_json::json!({ "exposure": 1.5 }),
+            ..ImageMetadata::default()
+        };
+        sync_metadata_to_xmp(&image, &elsewhere, false).unwrap();
+        assert_eq!(read_folder().kept_edits, 0);
+        let after = crate::exif_processing::load_sidecar(&sidecar);
+        assert_eq!(after.adjustments["exposure"], 1.5);
+        assert!(after.adjustments.get("lutData").is_none());
+
+        // Read again unchanged: nothing more to take, and later edits here stay.
+        elsewhere.adjustments = serde_json::json!({ "exposure": 2.0 });
+        let mut here = after.clone();
+        here.adjustments = elsewhere.adjustments.clone();
+        save_metadata(&image, &sidecar, &mut here, None).unwrap();
+        assert_eq!(read_folder().kept_edits, 1);
+        assert_eq!(
+            crate::exif_processing::load_sidecar(&sidecar).adjustments["exposure"],
+            2.0
+        );
     }
 
     #[test]
@@ -2071,11 +2153,23 @@ pub async fn update_exif_fields(
 
 /// With XMP sync on, whether a missing XMP is created (`create_xmp_if_missing`); `None` with it off.
 pub(crate) fn xmp_sync_mode(app_handle: &AppHandle) -> Option<bool> {
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    xmp_sync_setting(&load_settings(app_handle.clone()).unwrap_or_default())
+}
+
+fn xmp_sync_setting(settings: &crate::app_settings::AppSettings) -> Option<bool> {
     settings
         .enable_xmp_sync
         .unwrap_or(false)
         .then(|| settings.create_xmp_if_missing.unwrap_or(false))
+}
+
+/// `xmp_sync_setting` for `path`, for `save_metadata`: `None` for a virtual copy, whose XMP
+/// belongs to the physical image.
+pub(crate) fn xmp_sync_for_path(
+    settings: &crate::app_settings::AppSettings,
+    path: &str,
+) -> Option<bool> {
+    xmp_sync_setting(settings).filter(|_| !path.contains("?vc="))
 }
 
 /// Sets (or, when empty, clears) EXIF fields such as `Artist` in the image's
@@ -2113,17 +2207,13 @@ pub(crate) fn update_exif_fields_for_path(
     }
 
     metadata.exif = Some(exif_data);
-    if let Ok(json) = serde_json::to_string_pretty(&metadata) {
-        let _ = write_metadata_file(&primary_path, &json);
-    }
+    let (source_path, _) = parse_virtual_path(path);
+    let xmp = xmp.filter(|_| !path.contains("?vc="));
+    let _ = save_metadata(&source_path, &primary_path, &mut metadata, xmp);
     // A changed lens, focal length or aperture changes the version 2 profile.
     crate::lens_correction::forget_lens_profiles(path);
 
-    if let Some(create_if_missing) = xmp
-        && !path.contains("?vc=")
-    {
-        let (source_path, _) = parse_virtual_path(path);
-        sync_metadata_to_xmp(&source_path, &metadata, create_if_missing);
+    if xmp.is_some() {
         let cleared: Vec<(&str, XmpArray)> = XMP_EXIF_FIELDS
             .iter()
             .filter(|(key, _, _)| {
@@ -5135,16 +5225,10 @@ fn save_metadata_and_update_thumbnail_blocking(
 
     metadata.adjustments = final_adjustments;
 
-    let json_string = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
-    write_metadata_file(&sidecar_path, &json_string)?;
-
-    if let Ok(settings) = load_settings(app_handle.clone())
-        && settings.enable_xmp_sync.unwrap_or(false)
-        && !path.contains("?vc=")
-    {
-        let create_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
-        sync_metadata_to_xmp(&source_path, &metadata, create_if_missing);
-    }
+    let xmp = load_settings(app_handle.clone())
+        .ok()
+        .and_then(|settings| xmp_sync_for_path(&settings, &path));
+    save_metadata(&source_path, &sidecar_path, &mut metadata, xmp)?;
 
     let loaded_image_lock = state.original_image.lock().unwrap();
     let preloaded_image_option = if let Some(loaded_image) = loaded_image_lock.as_ref() {
@@ -5289,8 +5373,6 @@ pub async fn apply_adjustments_to_paths(
     let prepares_masks = crate::ai_commands::masks_need_preparing(&adjustments, fits_shapes);
 
     tauri::async_runtime::spawn_blocking(move || {
-        let enable_xmp_sync = write_settings.enable_xmp_sync.unwrap_or(false);
-        let create_xmp_if_missing = write_settings.create_xmp_if_missing.unwrap_or(false);
         let lens_db = crate::lens_correction::database();
         let ai_models = crate::ai_commands::blocking_ai_models(&task_app_handle);
         let _merge_guard = ADJUSTMENT_MERGE_LOCK
@@ -5341,13 +5423,12 @@ pub async fn apply_adjustments_to_paths(
 
             existing_metadata.adjustments = new_adjustments;
 
-            if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
-                let _ = write_metadata_file(&sidecar_path, &json_string);
-            }
-
-            if enable_xmp_sync && !path.contains("?vc=") {
-                sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
-            }
+            let _ = save_metadata(
+                &source_path,
+                &sidecar_path,
+                &mut existing_metadata,
+                xmp_sync_for_path(&write_settings, path),
+            );
         };
         // One photo at a time while masks are prepared: each decodes a full-size photo, and the
         // AI models run one at a time anyway.
@@ -5518,18 +5599,12 @@ fn apply_preset_adjustments_to_path(
             ai_models,
         );
     }
-    let json_string =
-        serde_json::to_string_pretty(&existing_metadata).map_err(|error| error.to_string())?;
-    write_metadata_file(&sidecar_path, &json_string)?;
-
-    if settings.enable_xmp_sync.unwrap_or(false) && !path.contains("?vc=") {
-        sync_metadata_to_xmp(
-            &source_path,
-            &existing_metadata,
-            settings.create_xmp_if_missing.unwrap_or(false),
-        );
-    }
-    Ok(())
+    save_metadata(
+        &source_path,
+        &sidecar_path,
+        &mut existing_metadata,
+        xmp_sync_for_path(settings, path),
+    )
 }
 
 #[tauri::command]
@@ -5680,8 +5755,6 @@ pub async fn reset_adjustments_for_paths(
 ) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let settings = load_settings(app_handle.clone()).unwrap_or_default();
-        let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
-        let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
         paths.par_iter().for_each(|path| {
             let (source_path, sidecar_path) = parse_virtual_path(path);
@@ -5698,14 +5771,12 @@ pub async fn reset_adjustments_for_paths(
                 "toneMapper": crate::tone_mapping::default_tone_mapper(is_raw_file(&source_path)),
             });
 
-            if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
-                let _ = write_metadata_file(&sidecar_path, &json_string);
-            }
-
-            if enable_xmp_sync && !path.contains("?vc=") {
-                let source_path = parse_virtual_path(path).0;
-                sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
-            }
+            let _ = save_metadata(
+                &source_path,
+                &sidecar_path,
+                &mut existing_metadata,
+                xmp_sync_for_path(&settings, path),
+            );
         });
 
         refresh_edited_thumbnails(&app_handle, paths);
@@ -5764,8 +5835,6 @@ fn edit_sidecars_for_paths(
 ) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let settings = load_settings(app_handle.clone()).unwrap_or_default();
-        let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
-        let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
         let edited_paths: Vec<String> = paths
             .into_par_iter()
@@ -5777,17 +5846,13 @@ fn edit_sidecars_for_paths(
                     return false;
                 }
 
-                match serde_json::to_string_pretty(&existing_metadata) {
-                    Ok(json_string) => {
-                        if let Err(e) = write_metadata_file(&sidecar_path, &json_string) {
-                            log::error!("Failed to update the sidecar of {}: {}", path, e);
-                        }
-                    }
-                    Err(e) => log::error!("Failed to serialize metadata for {}: {}", path, e),
-                }
-
-                if enable_xmp_sync && !path.contains("?vc=") {
-                    sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
+                if let Err(e) = save_metadata(
+                    &source_path,
+                    &sidecar_path,
+                    &mut existing_metadata,
+                    xmp_sync_for_path(&settings, path),
+                ) {
+                    log::error!("Failed to update the sidecar of {}: {}", path, e);
                 }
                 true
             })
@@ -5809,8 +5874,6 @@ pub async fn apply_auto_adjustments_to_paths(
 
     tauri::async_runtime::spawn_blocking(move || {
         let settings = load_settings(app_handle.clone()).unwrap_or_default();
-        let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
-        let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
         let state = app_handle.state::<AppState>();
         let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
@@ -5883,17 +5946,12 @@ pub async fn apply_auto_adjustments_to_paths(
                         }
                     }
 
-                    if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
-                        let _ = write_metadata_file(&sidecar_path, &json_string);
-                    }
-
-                    if enable_xmp_sync && !path.contains("?vc=") {
-                        sync_metadata_to_xmp(
-                            &source_path,
-                            &existing_metadata,
-                            create_xmp_if_missing,
-                        );
-                    }
+                    let _ = save_metadata(
+                        &source_path,
+                        &sidecar_path,
+                        &mut existing_metadata,
+                        xmp_sync_for_path(&settings, path),
+                    );
                     Ok(image)
                 })()
                 .map_err(|e| eprintln!("Failed to apply auto adjustments to {}: {}", path, e))
@@ -5944,11 +6002,9 @@ fn set_color_label_for_paths_blocking(
     app_handle: AppHandle,
 ) -> Result<(), String> {
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
-    let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
     paths.par_iter().for_each(|path| {
-        let (_, sidecar_path) = parse_virtual_path(path);
+        let (source_path, sidecar_path) = parse_virtual_path(path);
 
         let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
@@ -5967,14 +6023,12 @@ fn set_color_label_for_paths_blocking(
             metadata.tags = Some(tags);
         }
 
-        if let Ok(json_string) = serde_json::to_string_pretty(&metadata) {
-            let _ = write_metadata_file(&sidecar_path, &json_string);
-        }
-
-        if enable_xmp_sync && !path.contains("?vc=") {
-            let source_path = parse_virtual_path(path).0;
-            sync_metadata_to_xmp(&source_path, &metadata, create_xmp_if_missing);
-        }
+        let _ = save_metadata(
+            &source_path,
+            &sidecar_path,
+            &mut metadata,
+            xmp_sync_for_path(&settings, path),
+        );
     });
 
     Ok(())
@@ -5999,24 +6053,20 @@ fn set_rating_for_paths_blocking(
     app_handle: AppHandle,
 ) -> Result<(), String> {
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
-    let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
     paths.par_iter().for_each(|path| {
-        let (_, sidecar_path) = parse_virtual_path(path);
+        let (source_path, sidecar_path) = parse_virtual_path(path);
 
         let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
         metadata.rating = rating;
 
-        if let Ok(json_string) = serde_json::to_string_pretty(&metadata) {
-            let _ = write_metadata_file(&sidecar_path, &json_string);
-        }
-
-        if enable_xmp_sync && !path.contains("?vc=") {
-            let source_path = parse_virtual_path(path).0;
-            sync_metadata_to_xmp(&source_path, &metadata, create_xmp_if_missing);
-        }
+        let _ = save_metadata(
+            &source_path,
+            &sidecar_path,
+            &mut metadata,
+            xmp_sync_for_path(&settings, path),
+        );
     });
 
     Ok(())
@@ -6990,11 +7040,13 @@ fn write_image_stacks_to_xmp(
                 })
         });
 
-        let json = serde_json::to_string_pretty(&metadata)
-            .map_err(|error| format!("Failed to serialize stack metadata for {path}: {error}"))?;
-        write_metadata_file(&sidecar_path, &json)?;
-        sync_metadata_to_xmp(&source_path, &metadata, create_xmp_if_missing);
-        Ok(())
+        save_metadata(
+            &source_path,
+            &sidecar_path,
+            &mut metadata,
+            Some(create_xmp_if_missing),
+        )
+        .map_err(|error| format!("Failed to save stack metadata for {path}: {error}"))
     })
 }
 
@@ -7376,15 +7428,36 @@ pub fn resolve_xmp_path(image_path: &Path) -> Option<PathBuf> {
     .find(|candidate| candidate.is_file())
 }
 
+/// What Read XMP from Folder did: photos read, and how many kept their own edit because the
+/// XMP's differing edit was not newer (`apply_xmp_adjustments`).
+#[derive(Serialize, Default, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct XmpFolderRead {
+    read: usize,
+    kept_edits: usize,
+}
+
 #[tauri::command]
-pub async fn read_xmp_from_folder(path: String, app_handle: AppHandle) -> Result<usize, String> {
+pub async fn read_xmp_from_folder(
+    path: String,
+    app_handle: AppHandle,
+) -> Result<XmpFolderRead, String> {
+    let progress_handle = app_handle.clone();
     crate::blocking_command::run_in_file_order(&app_handle, move || {
-        read_xmp_from_folder_blocking(path)
+        read_xmp_from_folder_blocking(path, |current, total| {
+            let _ = progress_handle.emit(
+                "xmp-read-progress",
+                serde_json::json!({ "current": current, "total": total }),
+            );
+        })
     })
     .await
 }
 
-fn read_xmp_from_folder_blocking(path: String) -> Result<usize, String> {
+fn read_xmp_from_folder_blocking(
+    path: String,
+    on_progress: impl Fn(usize, usize) + Sync,
+) -> Result<XmpFolderRead, String> {
     let folder = Path::new(&path);
     if !folder.is_dir() {
         return Err(format!("Folder does not exist: {}", folder.display()));
@@ -7400,27 +7473,46 @@ fn read_xmp_from_folder_blocking(path: String) -> Result<usize, String> {
         })
         .collect();
 
-    let imported = image_paths.par_iter().try_fold(
-        || 0,
-        |imported, image_path| {
-            let (_, sidecar_path) = parse_virtual_path(&image_path.to_string_lossy());
-            let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-            let Some(content) = read_image_xmp(image_path, &mut metadata, true) else {
-                return Ok(imported);
-            };
-            apply_xmp(&content, &mut metadata, true);
-            let json = serde_json::to_string_pretty(&metadata).map_err(|error| {
-                format!(
-                    "Could not serialize XMP metadata for {}: {error}",
-                    image_path.display()
-                )
-            })?;
-            write_metadata_file(&sidecar_path, &json)?;
-            Ok::<usize, String>(imported + 1)
-        },
-    );
+    let total = image_paths.len();
+    let done = AtomicUsize::new(0);
+    on_progress(0, total);
+    let summary =
+        image_paths
+            .par_iter()
+            .try_fold(XmpFolderRead::default, |mut summary, image_path| {
+                let result = read_xmp_into_sidecar(image_path);
+                on_progress(done.fetch_add(1, Ordering::Relaxed) + 1, total);
+                if let Some(edit) = result? {
+                    summary.read += 1;
+                    summary.kept_edits += usize::from(edit == XmpEdit::Kept { differs: true });
+                }
+                Ok::<XmpFolderRead, String>(summary)
+            });
 
-    imported.try_reduce(|| 0, |left, right| Ok(left + right))
+    summary.try_reduce(XmpFolderRead::default, |left, right| {
+        Ok(XmpFolderRead {
+            read: left.read + right.read,
+            kept_edits: left.kept_edits + right.kept_edits,
+        })
+    })
+}
+
+/// Forced XMP read of one photo into its `.tirdata`; `None` when it has no XMP.
+fn read_xmp_into_sidecar(image_path: &Path) -> Result<Option<XmpEdit>, String> {
+    let (_, sidecar_path) = parse_virtual_path(&image_path.to_string_lossy());
+    let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+    let Some(content) = read_image_xmp(image_path, &mut metadata, true) else {
+        return Ok(None);
+    };
+    let applied = apply_xmp(&content, &mut metadata, true);
+    let json = serde_json::to_string_pretty(&metadata).map_err(|error| {
+        format!(
+            "Could not serialize XMP metadata for {}: {error}",
+            image_path.display()
+        )
+    })?;
+    write_metadata_file(&sidecar_path, &json)?;
+    Ok(Some(applied.edit))
 }
 
 /// Imports an image's XMP into its metadata. The XMP belongs to the physical
@@ -7433,7 +7525,7 @@ pub fn sync_metadata_from_xmp(
 ) -> bool {
     let previous_stamp = metadata.embedded_xmp_modified;
     let changed = read_image_xmp(source_path, metadata, force)
-        .is_some_and(|content| apply_xmp(&content, metadata, force));
+        .is_some_and(|content| apply_xmp(&content, metadata, force).changed);
     changed || metadata.embedded_xmp_modified != previous_stamp
 }
 
@@ -7469,8 +7561,10 @@ fn read_image_xmp(source_path: &Path, metadata: &mut ImageMetadata, force: bool)
     }
 }
 
-fn apply_xmp(content: &str, metadata: &mut ImageMetadata, force: bool) -> bool {
+fn apply_xmp(content: &str, metadata: &mut ImageMetadata, force: bool) -> XmpApplied {
     let mut changed = false;
+    // Before the rating below is copied into the edit.
+    let has_edit = !metadata.adjustments.is_null();
 
     let xmp_rating = extract_xmp_rating(content).unwrap_or(0);
     if (force || (metadata.rating == 0 && xmp_rating != 0)) && metadata.rating != xmp_rating {
@@ -7526,18 +7620,8 @@ fn apply_xmp(content: &str, metadata: &mut ImageMetadata, force: bool) -> bool {
         changed = true;
     }
 
-    if let Some(encoded_adjustments) = extract_app_xmp_value(content, "Adjustments")
-        && let Ok(bytes) = general_purpose::STANDARD.decode(encoded_adjustments)
-        && let Ok(mut imported_adjustments) = serde_json::from_slice::<Value>(&bytes)
-        && imported_adjustments.is_object()
-        && (force || metadata.adjustments.is_null())
-    {
-        restore_local_only_adjustments(&mut imported_adjustments, &metadata.adjustments);
-        if metadata.adjustments != imported_adjustments {
-            metadata.adjustments = imported_adjustments;
-            changed = true;
-        }
-    }
+    let edit = apply_xmp_adjustments(content, metadata, has_edit, force, &mut changed);
+    let edit_kept = matches!(edit, XmpEdit::Kept { .. });
 
     // Only into EXIF already read from the image: a map holding just these would
     // count as read (`has_descriptive_exif`) and hide the camera's EXIF.
@@ -7559,12 +7643,14 @@ fn apply_xmp(content: &str, metadata: &mut ImageMetadata, force: bool) -> bool {
         changed = true;
     }
 
-    let should_import_auto_geometry = force
-        || metadata
-            .adjustments
-            .get("transformAutoMode")
-            .and_then(Value::as_str)
-            .is_none();
+    // These mirror the XMP's edit, so a kept edit keeps its own.
+    let should_import_auto_geometry = !edit_kept
+        && (force
+            || metadata
+                .adjustments
+                .get("transformAutoMode")
+                .and_then(Value::as_str)
+                .is_none());
     let mut imported_auto_geometry = false;
     let xmp_auto_mode = extract_app_xmp_value(content, "AutoGeometryMode")
         .filter(|mode| matches!(mode.as_str(), "auto" | "level" | "vertical" | "guided"));
@@ -7589,12 +7675,13 @@ fn apply_xmp(content: &str, metadata: &mut ImageMetadata, force: bool) -> bool {
             "transformHorizontal",
             serde_json::json!(horizontal),
         );
-    } else if force {
+    } else if force && !edit_kept {
         changed |= set_adjustment_value(metadata, "transformAutoMode", serde_json::Value::Null);
     }
 
     if let Some(constrain_crop) =
         extract_app_xmp_value(content, "ConstrainCrop").and_then(|value| value.parse::<bool>().ok())
+        && !edit_kept
         && (force
             || imported_auto_geometry
             || metadata.adjustments.get("transformConstrainCrop").is_none())
@@ -7606,7 +7693,76 @@ fn apply_xmp(content: &str, metadata: &mut ImageMetadata, force: bool) -> bool {
         );
     }
 
-    changed
+    XmpApplied { changed, edit }
+}
+
+/// What `apply_xmp` did.
+struct XmpApplied {
+    changed: bool,
+    edit: XmpEdit,
+}
+
+/// What `apply_xmp_adjustments` did with the XMP's ThisIsRAW edit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum XmpEdit {
+    /// The XMP has none, or an unforced read left the photo's own edit alone.
+    NotRead,
+    Taken,
+    /// A forced read kept the photo's own edit; `differs` when the XMP's edit is not the same.
+    Kept {
+        differs: bool,
+    },
+}
+
+/// Takes the XMP's ThisIsRAW edit when the photo has none (`has_edit`, as before `apply_xmp`
+/// copied the rating into it), or in a forced read when the XMP's
+/// edit has changed since ThisIsRAW last wrote or read it (`xmp_adjustments_digest`), so it was
+/// edited elsewhere. Otherwise the `.tirdata`'s edit is newer (XMP sync was off when it
+/// changed) and is kept; it is kept too when the `.tirdata` records no digest (written before
+/// `1.125.4`), since which edit is newer cannot be told. Never loses an edit; a forced read
+/// records the digest, so a later change elsewhere is recognised.
+fn apply_xmp_adjustments(
+    content: &str,
+    metadata: &mut ImageMetadata,
+    has_edit: bool,
+    force: bool,
+    changed: &mut bool,
+) -> XmpEdit {
+    let Some(encoded) = extract_app_xmp_value(content, "Adjustments") else {
+        return XmpEdit::NotRead;
+    };
+    let Some(mut imported) = general_purpose::STANDARD
+        .decode(&encoded)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .filter(Value::is_object)
+    else {
+        return XmpEdit::NotRead;
+    };
+    let digest = xmp_adjustments_digest(&encoded);
+    let known = metadata.xmp_adjustments_digest.as_deref();
+    let take = !has_edit || (force && known.is_some_and(|known| known != digest.as_str()));
+    if !take && !force {
+        return XmpEdit::NotRead;
+    }
+
+    let edit = if take {
+        restore_local_only_adjustments(&mut imported, &metadata.adjustments);
+        if metadata.adjustments != imported {
+            metadata.adjustments = imported;
+            *changed = true;
+        }
+        XmpEdit::Taken
+    } else {
+        XmpEdit::Kept {
+            differs: *portable_xmp_adjustments(&metadata.adjustments) != imported,
+        }
+    };
+    if metadata.xmp_adjustments_digest.as_deref() != Some(digest.as_str()) {
+        metadata.xmp_adjustments_digest = Some(digest);
+        *changed = true;
+    }
+    edit
 }
 
 /// Last modification time in nanoseconds since the epoch, or 0 when unavailable.
@@ -7672,10 +7828,41 @@ pub(crate) fn copy_file_atomically(source: &Path, destination: &Path) -> Result<
     })
 }
 
-/// Writes an image's metadata to its XMP. The XMP belongs to the physical
-/// image, so a virtual copy must never overwrite it; callers skip paths
-/// containing `?vc=`.
-pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create_if_missing: bool) {
+/// Saves `metadata` as the `.tirdata` at `sidecar_path`. With `xmp`
+/// (`Some(create_if_missing)`) it first writes the XMP of `source_path` and records the digest
+/// of the edit written there, so a later forced XMP read knows that edit is not newer
+/// (`xmp_adjustments_digest`). Virtual copies pass `None` (see `sync_metadata_to_xmp`).
+pub(crate) fn save_metadata(
+    source_path: &Path,
+    sidecar_path: &Path,
+    metadata: &mut ImageMetadata,
+    xmp: Option<bool>,
+) -> Result<(), String> {
+    if let Some(create_if_missing) = xmp
+        && let Some(digest) = sync_metadata_to_xmp(source_path, metadata, create_if_missing)
+    {
+        metadata.xmp_adjustments_digest = Some(digest);
+    }
+    let json = serde_json::to_string_pretty(metadata).map_err(|error| error.to_string())?;
+    write_metadata_file(sidecar_path, &json)
+}
+
+/// Digest of an XMP's ThisIsRAW edit (`rr:Adjustments`, as written).
+fn xmp_adjustments_digest(encoded_adjustments: &str) -> String {
+    blake3::hash(encoded_adjustments.as_bytes())
+        .to_hex()
+        .to_string()
+}
+
+/// Writes an image's metadata to its XMP and returns the digest of the edit written
+/// (`xmp_adjustments_digest`), or `None` when no XMP was written. Use `save_metadata`, which
+/// records it in the `.tirdata`. The XMP belongs to the physical image, so a virtual copy must
+/// never overwrite it; callers skip paths containing `?vc=`.
+pub fn sync_metadata_to_xmp(
+    source_path: &Path,
+    metadata: &ImageMetadata,
+    create_if_missing: bool,
+) -> Option<String> {
     let xmp_path = source_path.with_extension("xmp");
     let xmp_path_upper = source_path.with_extension("XMP");
 
@@ -7689,7 +7876,7 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
 
     if actual_xmp.is_none() {
         if !create_if_missing {
-            return;
+            return None;
         }
         let skeleton = r#"<?xml version="1.0" encoding="UTF-8"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="ThisIsRAW">
@@ -7701,7 +7888,7 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
  </rdf:RDF>
 </x:xmpmeta>"#;
         if write_metadata_file(&xmp_path, skeleton).is_err() {
-            return;
+            return None;
         }
         actual_xmp = Some(xmp_path);
     }
@@ -7776,6 +7963,7 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
         let adjustments_json = serde_json::to_vec(&portable_xmp_adjustments(&metadata.adjustments))
             .unwrap_or_default();
         let encoded_adjustments = general_purpose::STANDARD.encode(adjustments_json);
+        let digest = xmp_adjustments_digest(&encoded_adjustments);
         set_app_xmp_value(&mut content, "AdjustmentsVersion", Some("1"));
         set_app_xmp_value(&mut content, "Adjustments", Some(&encoded_adjustments));
 
@@ -7870,6 +8058,10 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
             add_xmp_preserved_file_name(&mut content, name);
         }
 
-        let _ = write_metadata_file(&xmp_file, &content);
+        write_metadata_file(&xmp_file, &content)
+            .ok()
+            .map(|()| digest)
+    } else {
+        None
     }
 }
